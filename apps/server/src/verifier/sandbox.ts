@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { env } from "../env.js";
 import { badRequest } from "../lib/http.js";
@@ -174,6 +174,9 @@ export async function runTests(rawFiles: Files, opts: { acceptance?: Files | nul
     const src = join(base, "src");
     const report = join(base, "report");
     mkdirSync(report, { recursive: true });
+    // O container roda como "node" (uid 1000), que não é o dono da pasta (o usuário do servidor):
+    // sem isto o vitest não consegue gravar o relatório. A pasta é só desta execução e é apagada no fim.
+    chmodSync(report, 0o777);
     writeFiles(src, { ...files, ...(acceptance ?? {}) });
     const entry = entryComponent(files);
     if (entry) writeFiles(src, { "__preview__.test.tsx": previewTest(entry) });
