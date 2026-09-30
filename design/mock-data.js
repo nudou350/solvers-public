@@ -369,7 +369,7 @@
     },
     {
      "type": "plan",
-     "label": "Plano pago com execução de código"
+     "label": "Claude Pro ou ChatGPT Plus"
     }
    ],
    "packageContents": [
@@ -680,7 +680,7 @@
     },
     {
      "type": "plan",
-     "label": "Plano pago com execução de código"
+     "label": "Claude Pro ou ChatGPT Plus"
     }
    ],
    "packageContents": [

@@ -1,17 +1,27 @@
-import { INSTALL_GUIDES } from "./guides.js";
+import { installGuide, keyAliases, normalizeKey } from "./guides.js";
 
 // Avaliação do preflight_check (pura, sem sessão nem banco): o que está ok, o que falta
 // (bloqueia) e o que é opcional e está ausente (só avisa).
 
-export type PreflightRequirement = { type: "client" | "connector" | "plan"; label: string; key?: string; optional?: boolean };
+export type PreflightRequirement = {
+  type: "client" | "connector" | "plan";
+  label: string;
+  key?: string;
+  optional?: boolean;
+  howTo?: string;
+  helpUrl?: string;
+};
 
 /** Ferramentas do conector do Figma que podem aparecer sem "figma" no nome (com ou sem prefixo). */
-const FIGMA_TOOL = /(^|[^a-z0-9])get_(design_context|variable_defs|metadata|screenshot)$/;
+const FIGMA_TOOL = /(^|_)get_(design_context|variable_defs|metadata|screenshot)$/;
 
+/** Chave e nomes de ferramenta são comparados normalizados: "Google Drive" casa com "mcp__claude_ai_Google_Drive__search". */
 export function connectorAvailable(key: string, tools: string[]): boolean {
-  const k = key.toLowerCase();
-  const names = tools.map((t) => t.toLowerCase());
-  return names.some((t) => t.includes(k)) || (k === "figma" && names.some((t) => FIGMA_TOOL.test(t)));
+  const k = normalizeKey(key);
+  if (!k) return false;
+  const names = tools.map(normalizeKey);
+  const wanted = [k, ...keyAliases(k)];
+  return names.some((t) => wanted.some((w) => t.includes(w))) || (k === "figma" && names.some((t) => FIGMA_TOOL.test(t)));
 }
 
 export function evaluatePreflight(requirements: PreflightRequirement[], availableTools: string[]) {
@@ -20,9 +30,8 @@ export function evaluatePreflight(requirements: PreflightRequirement[], availabl
   const ok: string[] = [];
   for (const r of requirements) {
     if (r.type === "connector") {
-      const key = (r.key ?? r.label).toLowerCase();
-      const guide = INSTALL_GUIDES[key] ?? `Peça ao usuário para adicionar o conector ${r.label} nas configurações da IA.`;
-      if (connectorAvailable(key, availableTools)) ok.push(`${r.label}: conectado`);
+      const guide = installGuide(r);
+      if (connectorAvailable(r.key ?? r.label, availableTools)) ok.push(`${r.label}: conectado`);
       else if (r.optional) warnings.push(`${r.label} não conectado: siga o caminho sem conector da etapa 1. Se o usuário preferir conectar:\n${guide}`);
       else missing.push(`${r.label}: NÃO encontrado.\n${guide}`);
     } else if (r.type === "plan") {

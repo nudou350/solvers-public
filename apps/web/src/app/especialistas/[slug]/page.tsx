@@ -279,9 +279,17 @@ export default async function AgentPage({ params }: Props) {
             </div>
             {connectors.length ? (
               connectors.map((r) => (
-                <div key={r.label} className="row between" style={gap("12px")}>
-                  <b className="grow">{connectorName(r.label)}</b>
-                  {r.optional ? <span className="chip">Opcional</span> : <span className="chip chip-warn">Conecte na sua IA</span>}
+                <div key={r.label} className="col" style={gap("6px")}>
+                  <div className="row between" style={gap("12px")}>
+                    <b className="grow">{connectorName(r.label)}</b>
+                    {r.optional ? <span className="chip">Opcional</span> : <span className="chip chip-warn">Conecte na sua IA</span>}
+                  </div>
+                  {r.howTo ? <p className="small muted" style={{ overflowWrap: "anywhere" }}>{r.howTo}</p> : null}
+                  {r.helpUrl ? (
+                    <a className="link small" href={r.helpUrl} target="_blank" rel="noopener noreferrer">
+                      Ajuda oficial
+                    </a>
+                  ) : null}
                 </div>
               ))
             ) : (

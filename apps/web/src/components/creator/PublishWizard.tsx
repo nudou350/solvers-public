@@ -3,6 +3,7 @@
 // MOCK: ainda não há API de publicação (fase D, FRONT_PLAN.md). Nada aqui é enviado ao servidor:
 // os arquivos ficam no navegador, a bateria de testes é simulada e "Publicar" só mostra "Enviado para revisão".
 // Da API real vêm apenas os limites e regras (getConfig: minPurchaseUsdc, feeBps, guaranteeMinSales/Rating) e a cotação.
+import type { Requirement } from "@solvers/api-client";
 import { useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -25,8 +26,16 @@ const STEPS = [
 ] as const;
 
 const CLIENTS = ["Claude", "ChatGPT"];
-const CONNECTORS = ["Figma", "GitHub", "Google Drive", "Google Agenda", "Google Planilhas"];
-const PLANS = ["Gratuito ou pago", "Claude Pro ou ChatGPT Plus", "Plano pago com execução de código"];
+const CONNECTORS = ["Figma", "GitHub", "Google Drive", "Google Agenda", "Google Planilhas", "Gmail", "Notion", "Slack"];
+const PLANS = ["Qualquer plano", "Plano pago recomendado (Claude Pro ou ChatGPT Plus)"];
+/** Nome do requisito de plano quando o criador recomenda um plano pago. */
+const PAID_PLAN = "Claude Pro ou ChatGPT Plus";
+const HOWTO_MAX = 600;
+const KEY_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
+
+type Conn = { label: string; key: string; optional: boolean; howTo?: string; helpUrl?: string; custom?: boolean };
+type ConnDraft = { label: string; key: string; howTo: string; helpUrl: string };
+const EMPTY_CONN: ConnDraft = { label: "", key: "", howTo: "", helpUrl: "" };
 
 type FileKind = "Conhecimento" | "Modelos" | "Ferramentas";
 type LocalFile = { name: string; size: number; kind: FileKind };
@@ -44,6 +53,25 @@ function kindOf(name: string): FileKind {
   if (["js", "ts", "mjs", "cjs", "py"].includes(ext)) return "Ferramentas";
   if (["json", "yaml", "yml", "csv"].includes(ext)) return "Modelos";
   return "Conhecimento";
+}
+
+/** "Google Drive" -> "google_drive": minúsculas, sem acentos, tokens separados por "_". */
+function connKey(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isHttpUrl(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function fileSize(bytes: number): string {
@@ -67,7 +95,11 @@ export function PublishWizard() {
   const [form, setForm] = useState({ name: "", tagline: "", description: "", price: "" });
   const [touched, setTouched] = useState(false);
   const [clients, setClients] = useState<string[]>(["Claude", "ChatGPT"]);
-  const [conns, setConns] = useState<string[]>([]);
+  const [conns, setConns] = useState<Conn[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [connDraft, setConnDraft] = useState<ConnDraft>(EMPTY_CONN);
+  const [keyEdited, setKeyEdited] = useState(false);
+  const [connTouched, setConnTouched] = useState(false);
   const [plan, setPlan] = useState(PLANS[0]!);
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [cases, setCases] = useState<TestCase[]>([]);
@@ -88,6 +120,21 @@ export function PublishWizard() {
     tagline: form.tagline.trim().length < 10 ? "Escreva uma frase curta (pelo menos 10 caracteres)." : null,
     price: !Number.isFinite(price) || price <= 0 ? "Informe o preço em USDC." : minPrice != null && price < minPrice ? `O preço mínimo é ${usdc(minPrice)}.` : null,
   };
+  const connErrors = {
+    label: connDraft.label.trim().length < 2 ? "Dê um nome ao conector." : null,
+    key: !KEY_RE.test(connDraft.key)
+      ? "Use minúsculas, números e _ (ex.: google_drive)."
+      : conns.some((c) => c.key === connDraft.key || c.label.toLowerCase() === connDraft.label.trim().toLowerCase())
+        ? "Esse conector já está na lista."
+        : null,
+    helpUrl: connDraft.helpUrl.trim() && !isHttpUrl(connDraft.helpUrl.trim()) ? "Informe o link completo, começando com https://" : null,
+  };
+  // Requisitos no formato do servidor (Requirement[]). Nada é enviado nesta pré-visualização.
+  const requirements: Requirement[] = [
+    ...clients.map<Requirement>((label) => ({ type: "client", label })),
+    ...conns.map<Requirement>((c) => ({ type: "connector", label: c.label, key: c.key, optional: c.optional, ...(c.howTo ? { howTo: c.howTo } : {}), ...(c.helpUrl ? { helpUrl: c.helpUrl } : {}) })),
+    ...(plan === PLANS[1] ? [{ type: "plan", label: PAID_PLAN } satisfies Requirement] : []),
+  ];
   const step1Ok = !errors.name && !errors.tagline && !errors.price;
   const testsOk = result != null && result.score >= MIN_SCORE && result.total >= MIN_CASES;
   const canPublish = step1Ok && clients.length > 0 && testsOk;
@@ -95,6 +142,31 @@ export function PublishWizard() {
   const set = (k: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
     setPublished(false);
+  };
+  const toggleCatalog = (label: string) =>
+    setConns((c) => (c.some((x) => !x.custom && x.label === label) ? c.filter((x) => x.custom || x.label !== label) : [...c, { label, key: connKey(label), optional: false }]));
+  const setOptional = (key: string) => setConns((c) => c.map((x) => (x.key === key ? { ...x, optional: !x.optional } : x)));
+  const removeConn = (key: string) => setConns((c) => c.filter((x) => x.key !== key));
+  const editConn = (k: keyof ConnDraft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    if (k === "key") setKeyEdited(true);
+    setConnDraft((d) => ({ ...d, [k]: v, ...(k === "label" && !keyEdited ? { key: connKey(v) } : {}) }));
+  };
+  const closeConnForm = () => {
+    setAddOpen(false);
+    setConnDraft(EMPTY_CONN);
+    setKeyEdited(false);
+    setConnTouched(false);
+  };
+  const addConn = (e: FormEvent) => {
+    e.preventDefault();
+    setConnTouched(true);
+    if (connErrors.label || connErrors.key || connErrors.helpUrl) return;
+    const howTo = connDraft.howTo.trim();
+    const helpUrl = connDraft.helpUrl.trim();
+    // Conector personalizado nasce opcional: só bloqueia o comprador se o criador desmarcar.
+    setConns((c) => [...c, { label: connDraft.label.trim(), key: connDraft.key, optional: true, custom: true, ...(howTo ? { howTo } : {}), ...(helpUrl ? { helpUrl } : {}) }]);
+    closeConnForm();
   };
   const toggle = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   const go = (n: number) => {
@@ -221,15 +293,77 @@ export function PublishWizard() {
                 </span>
                 <div className="row wrapx" style={gap(10)}>
                   {CONNECTORS.map((n) => {
-                    const on = conns.includes(n);
+                    const on = conns.some((c) => !c.custom && c.label === n);
                     return (
-                      <button key={n} type="button" className={["chip", on ? "on" : ""].join(" ")} aria-pressed={on} onClick={() => setConns((c) => toggle(c, n))}>
+                      <button key={n} type="button" className={["chip", on ? "on" : ""].join(" ")} aria-pressed={on} onClick={() => toggleCatalog(n)}>
                         {n}
                       </button>
                     );
                   })}
+                  {conns
+                    .filter((c) => c.custom)
+                    .map((c) => (
+                      <button key={c.key} type="button" className="chip chip-brand" aria-label={`Remover o conector ${c.label}`} onClick={() => removeConn(c.key)}>
+                        {c.label}
+                        <Icon name="x" size="s" />
+                      </button>
+                    ))}
                 </div>
                 <span className="hint">Escolha só o que o especialista realmente usa. Cada conector pede autorização do comprador.</span>
+                {conns.length ? (
+                  <div className="card-flat pad-s col" style={gap(6)}>
+                    <span className="small muted">Marque como opcional o que o especialista consegue dispensar: o comprador é só avisado, não fica bloqueado.</span>
+                    {conns.map((c) => (
+                      <div key={c.key} className="row between wrapx" style={gap(10)}>
+                        <b className="small" style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                          {c.label}
+                        </b>
+                        <button type="button" className={["chip", c.optional ? "on" : ""].join(" ")} aria-pressed={c.optional} aria-label={`${c.label}: opcional`} onClick={() => setOptional(c.key)}>
+                          Opcional
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {addOpen ? (
+                  <form className="card pad-s col" style={gap(12)} onSubmit={addConn} noValidate>
+                    <b className="small">Novo conector</b>
+                    <Field id="cn-nome" label="Nome do conector" error={connTouched ? connErrors.label : null}>
+                      <input id="cn-nome" className="input" value={connDraft.label} onChange={editConn("label")} placeholder="Ex: Google Drive" maxLength={60} aria-invalid={connTouched && !!connErrors.label} autoFocus />
+                    </Field>
+                    <Field id="cn-como" label="Como conectar (opcional)" hint={`${connDraft.howTo.length}/${HOWTO_MAX} · Em 1 a 3 frases, o que o comprador faz na IA dele.`}>
+                      <textarea id="cn-como" className="textarea" style={{ minHeight: 72 }} value={connDraft.howTo} onChange={editConn("howTo")} placeholder="Ex: Na sua IA, abra as configurações de conectores e autorize o Google Drive." maxLength={HOWTO_MAX} />
+                    </Field>
+                    <Field id="cn-link" label="Link da ajuda oficial (opcional)" error={connTouched ? connErrors.helpUrl : null}>
+                      <input id="cn-link" className="input" type="url" inputMode="url" value={connDraft.helpUrl} onChange={editConn("helpUrl")} placeholder="https://" aria-invalid={connTouched && !!connErrors.helpUrl} />
+                    </Field>
+                    <details>
+                      <summary className="small muted" style={{ cursor: "pointer", minHeight: 32 }}>
+                        Avançado
+                      </summary>
+                      <div style={{ paddingTop: 8 }}>
+                        <Field id="cn-chave" label="Chave" hint="Identificador interno, gerado do nome. Minúsculas, números e _." error={connTouched ? connErrors.key : null}>
+                          <input id="cn-chave" className="input mono" value={connDraft.key} onChange={editConn("key")} maxLength={40} spellCheck={false} aria-invalid={connTouched && !!connErrors.key} />
+                        </Field>
+                      </div>
+                    </details>
+                    <div className="row wrapx" style={gap(10)}>
+                      <Button type="submit" variant="secondary" icon="plus">
+                        Adicionar conector
+                      </Button>
+                      <Button variant="ghost" onClick={closeConnForm}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div>
+                    <button type="button" className="link-btn" onClick={() => setAddOpen(true)}>
+                      <Icon name="plus" size="s" />
+                      Adicionar outro conector
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="col" style={gap(10)} role="radiogroup" aria-labelledby="req-plan">
                 <span className="label" id="req-plan">
@@ -431,6 +565,8 @@ export function PublishWizard() {
                 <SummaryRow label="Especialista" value={form.name.trim() || "Sem nome"} bad={!!errors.name} />
                 <SummaryRow label="Licença permanente" value={Number.isFinite(price) && price > 0 ? `${money(price)} · ${usdc(price)}` : "Sem preço"} bad={!!errors.price} />
                 <SummaryRow label="IAs" value={clients.join(" e ") || "Nenhuma"} bad={clients.length === 0} />
+                <SummaryRow label="Conectores" value={conns.length ? conns.map((c) => (c.optional ? `${c.label} (opcional)` : c.label)).join(", ") : "Nenhum"} />
+                <SummaryRow label="Plano recomendado" value={requirements.some((r) => r.type === "plan") ? PAID_PLAN : PLANS[0]!} />
                 <SummaryRow label="Arquivos" value={files.length ? `${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}` : "Nenhum"} />
                 <SummaryRow label="Nota de desempenho" value={result ? `${result.score}% em ${result.total} casos` : "Bateria não rodada"} bad={!testsOk} good={testsOk} />
               </div>

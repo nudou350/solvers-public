@@ -251,7 +251,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
               toolNames: pkg.manifest.tools.map((t) => t.name),
               usage: access.usage,
             })} Quando o teste acabar, ofereça o link de compra: ${purchaseLink(row.slug)}`;
-      const reqs = pkg.manifest.requirements.map((r) => `- [${r.type}] ${r.label}${r.key ? ` (chave: ${r.key})` : ""}`).join("\n") || "- nenhum";
+      const reqs = pkg.manifest.requirements.map((r) => `- [${r.type}] ${r.label}${r.key ? ` (chave: ${r.key})` : ""}${r.optional ? " (opcional)" : ""}`).join("\n") || "- nenhum";
       const memoryHint = pkg.usesMemory ? `\nEste especialista usa memória: chame get_memory com agent_id="${row.id}" antes da etapa 1.` : "";
       const out = [
         `session_id: ${session.id}`,

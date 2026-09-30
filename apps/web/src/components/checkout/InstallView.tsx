@@ -28,6 +28,9 @@ type Check = {
   acting?: boolean;
   /** Requisito opcional: não bloqueia nem conta no progresso. */
   optional?: boolean;
+  /** Orientação do criador para conectores fora do catálogo. */
+  howTo?: string;
+  helpUrl?: string;
 };
 
 
@@ -144,6 +147,8 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
         actLabel: "Já conectei",
         act: () => setConns((c) => ({ ...c, [r.label]: true })),
         optional: r.optional,
+        howTo: r.howTo,
+        helpUrl: r.helpUrl,
       };
     }),
     {
@@ -320,6 +325,16 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                     <div className={`small ${k.ok ? "ok" : k.optional ? "muted" : "warn"}`} aria-live={k.key === "test" ? "polite" : undefined}>
                       {k.ok ? k.statusOk : k.statusNo}
                     </div>
+                    {!k.ok && k.howTo ? (
+                      <div className="small muted" style={{ marginTop: 4, overflowWrap: "anywhere" }}>
+                        {k.howTo}
+                      </div>
+                    ) : null}
+                    {!k.ok && k.helpUrl ? (
+                      <a className="link small" href={k.helpUrl} target="_blank" rel="noopener noreferrer">
+                        Ajuda oficial
+                      </a>
+                    ) : null}
                   </div>
                   {!k.ok && k.act ? (
                     <Button variant="secondary" size="sm" loading={k.acting} onClick={k.act}>

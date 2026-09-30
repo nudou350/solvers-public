@@ -9,6 +9,10 @@ export const Requirement = z.object({
   key: z.string().optional(),
   /** Opcional: se faltar, o preflight avisa sem bloquear (ex.: Figma com caminho sem conector). */
   optional: z.boolean().optional(),
+  /** Conector: como conectar, em 1–3 frases (o criador escreve para conectores fora do catálogo). */
+  howTo: z.string().max(600).optional(),
+  /** Conector: link da ajuda oficial, usado como reserva quando o menu da IA mudar. */
+  helpUrl: z.string().url().optional(),
 });
 
 export const Agent = z.object({

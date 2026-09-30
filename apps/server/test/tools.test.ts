@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { evaluatePreflight, preflightText } from "../src/mcp/preflight.js";
+import { INSTALL_GUIDES, installGuide } from "../src/mcp/guides.js";
+import { connectorAvailable, evaluatePreflight, preflightText } from "../src/mcp/preflight.js";
 import { a11yCheck, budgetSplit, contrastCheck, normalizeFiles } from "../src/runtime/tool-fns.js";
 
 // Funções puras das ferramentas de servidor (sem Docker, env ou banco).
@@ -324,5 +325,54 @@ describe("preflight_check", () => {
     assert.match(text, /Figma não conectado: siga o caminho sem conector da etapa 1/);
     assert.match(text, /chame next_step com session_id="s1"/);
     assert.doesNotMatch(text, /Não avance/);
+  });
+
+  it("chave com espaço casa com nomes de ferramenta com underscore", () => {
+    const drive = { type: "connector" as const, label: "Google Drive", key: "Google Drive" };
+    for (const t of ["mcp__claude_ai_Google_Drive__authenticate", "google_drive_search"]) {
+      assert.equal(evaluatePreflight([drive], [t]).blocked, false, t);
+    }
+    assert.equal(connectorAvailable("google drive", ["mcp__claude_ai_Google_Drive__authenticate"]), true);
+    assert.equal(connectorAvailable("Google Drive", ["mcp__claude_ai_Google_Calendar__authenticate"]), false);
+  });
+
+  it("chave com acento e nome alternativo do catálogo", () => {
+    assert.equal(connectorAvailable("Agenda Pública", ["agenda_publica_list"]), true);
+    assert.equal(connectorAvailable("Google Agenda", ["mcp__claude_ai_Google_Calendar__authenticate"]), true);
+    assert.equal(connectorAvailable("Google Planilhas", ["google_sheets_read"]), true);
+    assert.equal(connectorAvailable("", ["qualquer"]), false);
+  });
+
+  it("obrigatório ausente bloqueia e traz o guia; opcional ausente avisa com o guia", () => {
+    const drive = { type: "connector" as const, label: "Google Drive", key: "google_drive" };
+    const r = evaluatePreflight([drive], ["search_web"]);
+    assert.equal(r.blocked, true);
+    assert.match(r.missing[0], /Como conectar o Google Drive/);
+    assert.match(r.missing[0], /Claude:.*ChatGPT:/s);
+    const o = evaluatePreflight([{ ...drive, optional: true }], ["search_web"]);
+    assert.equal(o.blocked, false);
+    assert.match(o.warnings[0], /Google Drive não conectado.*Como conectar o Google Drive/s);
+  });
+
+  it("howTo do criador prevalece sobre o catálogo e inclui a ajuda oficial", () => {
+    const req = { type: "connector" as const, label: "Notion", key: "notion", howTo: "Ative o Notion e escolha a página do projeto.", helpUrl: "https://ajuda.exemplo.com/notion" };
+    const g = installGuide(req);
+    assert.match(g, /^Ative o Notion e escolha a página do projeto\./);
+    assert.match(g, /Ajuda oficial: https:\/\/ajuda\.exemplo\.com\/notion/);
+    assert.doesNotMatch(g, /Como conectar/);
+    assert.match(evaluatePreflight([req], []).missing[0], /Ative o Notion/);
+  });
+
+  it("catálogo com helpUrl e conector fora do catálogo sem howTo usam o texto genérico", () => {
+    assert.match(installGuide({ label: "Slack", key: "slack", helpUrl: "https://ajuda.exemplo.com/slack" }), /Como conectar o Slack[\s\S]*Ajuda oficial: https:\/\/ajuda\.exemplo\.com\/slack/);
+    assert.equal(installGuide({ label: "Trello" }), "Peça ao usuário para adicionar o conector Trello nas configurações da IA.");
+    assert.match(installGuide({ label: "Trello", helpUrl: "https://ajuda.exemplo.com/t" }), /configurações da IA\.\nAjuda oficial: https:\/\/ajuda\.exemplo\.com\/t$/);
+  });
+
+  it("guias do catálogo existem para os conectores do wizard", () => {
+    for (const k of ["figma", "github", "google_drive", "google_agenda", "google_planilhas", "gmail", "notion", "slack"]) {
+      assert.ok(INSTALL_GUIDES[k], k);
+      assert.equal(installGuide({ label: k, key: k }), INSTALL_GUIDES[k]);
+    }
   });
 });
