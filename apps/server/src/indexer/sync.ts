@@ -178,7 +178,8 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
     if (existing) {
       await db
         .update(schema.milestones)
-        .set({ status: statusOut, passedAt, amount: m.amount })
+        // A contestação só conta (painel do criador) quando confirmada on-chain.
+        .set({ status: statusOut, passedAt, amount: m.amount, ...(statusOut === "disputed" && !existing.disputedAt ? { disputedAt: new Date() } : {}) })
         .where(and(eq(schema.milestones.escrowId, escrowAddr), eq(schema.milestones.idx, idx)));
     } else {
       await db.insert(schema.milestones).values({
@@ -190,6 +191,7 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
         amount: m.amount,
         status: statusOut,
         passedAt,
+        disputedAt: statusOut === "disputed" ? new Date() : null,
       });
     }
   }

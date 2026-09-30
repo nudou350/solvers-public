@@ -14,7 +14,7 @@ export type Files = Record<string, string>;
 
 export type TestReport = {
   passed: boolean;
-  mode: "docker" | "simulated";
+  mode: "docker" | "simulated" | "manual";
   numTests: number;
   numPassed: number;
   numFailed: number;

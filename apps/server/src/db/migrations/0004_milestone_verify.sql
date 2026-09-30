@@ -1,0 +1,1 @@
+ALTER TABLE "milestones" ADD COLUMN "verify" text DEFAULT 'tests' NOT NULL;

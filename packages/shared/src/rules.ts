@@ -37,10 +37,13 @@ export function reputationScore(purchases: number, disputesLost: number): number
   return Math.max(0, Math.min(100, raw));
 }
 
+/** Compras necessárias para o nível completo de garantia. */
+export const FULL_LEVEL_PURCHASES = 3;
+
 export function guaranteeLevel(purchases: number, disputesLost: number): GuaranteeLevel {
   const score = reputationScore(purchases, disputesLost);
-  if (disputesLost >= 3 || score < 30) return "none";
-  if (purchases < 3) return "limited";
+  if (disputesLost >= MAX_BUYER_DISPUTES_LOST || score < 30) return "none";
+  if (purchases < FULL_LEVEL_PURCHASES) return "limited";
   return "full";
 }
 
@@ -63,6 +66,22 @@ export const GUARANTEE_LIMITS_USDC: Record<GuaranteeLevel, number> = {
 
 /** Teto de disputes_lost aceito on-chain em create_escrow (espelha o programa). */
 export const MAX_BUYER_DISPUTES_LOST = 3;
+
+/** No nível limitado, garantias acima deste valor precisam de pelo menos 2 etapas. */
+export const SINGLE_MILESTONE_MAX_USDC = 10;
+
+/** Especialista sai da vitrine com nota abaixo de DELIST_MAX_RATING depois de DELIST_MIN_REVIEWS avaliações. */
+export const DELIST_MIN_REVIEWS = 10;
+export const DELIST_MAX_RATING = 3.5;
+
+/** Divide o preço da garantia pelas etapas do modelo (% de cada uma); a última fica com o arredondamento. */
+export function splitGuaranteeAmounts(totalUsdc: number, sharesPct: number[]): number[] {
+  const total = usdcToUnits(totalUsdc);
+  const sum = sharesPct.reduce((s, p) => s + p, 0);
+  const units = sharesPct.map((p) => (total * BigInt(Math.round(p * 100))) / BigInt(Math.round(sum * 100)));
+  const rest = total - units.reduce((s, u) => s + u, 0n);
+  return units.map((u, i) => unitsToUsdc(i === units.length - 1 ? u + rest : u));
+}
 
 /** agent_id: 16 bytes em hex (32 caracteres). */
 export function agentIdToBytes(id: string): Uint8Array {

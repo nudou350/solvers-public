@@ -2,17 +2,21 @@ import {
   Agent,
   AgentDetail,
   ConnectorStatus,
+  Creator,
   CreatorDashboard,
   CreatorProfile,
   Escrow,
   EscrowDetail,
+  GuaranteeStatus,
   License,
   ResaleListing,
   Memory,
   Profile,
+  PublicConfig,
   Review,
   SubmitResponse,
   TxResponse,
+  UsageSummary,
   UserReputation,
 } from "@solvers/shared";
 import { z, type ZodTypeAny } from "zod";
@@ -78,22 +82,7 @@ export function createApi(opts: ApiOptions = {}) {
 
   const api = {
     // ----- Loja (público) -----
-    getConfig: () =>
-      req(
-        z.object({
-          cluster: z.string(),
-          programId: z.string(),
-          usdcMint: z.string(),
-          feePayer: z.string(),
-          feeBps: z.number().nullable(),
-          minPurchaseUsdc: z.number(),
-          faucetEnabled: z.boolean(),
-          faucetAmountUsdc: z.number(),
-          connectorUrl: z.string(),
-          brlPerUsd: z.number(),
-        }).passthrough(),
-        "/api/config",
-      ),
+    getConfig: () => req(PublicConfig, "/api/config"),
     getAgents: (q: { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number } = {}) => {
       const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
       return req(z.array(Agent), `/api/agents${p.size ? `?${p}` : ""}`);
@@ -103,6 +92,8 @@ export function createApi(opts: ApiOptions = {}) {
     getReviews: (idOrSlug: string) => req(z.array(Review), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews`),
     search: (need: string) => post(z.array(Agent), "/api/search", { need }),
     getCreator: (id: string) => req(CreatorProfile, `/api/creators/${encodeURIComponent(id)}`),
+    /** Criadores com especialista na vitrine: monte um mapa por id para os cards (nome e reputação). */
+    getCreators: () => req(z.array(Creator), "/api/creators"),
 
     // ----- Login com carteira (SIWS) -----
     async login(wallet: WalletLike) {
@@ -119,8 +110,9 @@ export function createApi(opts: ApiOptions = {}) {
     getMyEscrow: (id: string) => req(EscrowDetail, `/api/me/escrows/${id}`),
     downloadDeliverable: (escrowId: string, index: number) =>
       req(z.object({ files: z.record(z.string()) }), `/api/me/escrows/${escrowId}/milestones/${index}/download`),
-    getMyUsage: () =>
-      req(z.array(z.object({ agentId: z.string(), activations: z.number(), calls: z.number(), lastUsedAt: z.string() })), "/api/me/usage"),
+    getMyUsage: () => req(z.array(UsageSummary), "/api/me/usage"),
+    /** Limite de garantias da carteira: quanto ainda pode abrir e quantas compras faltam para o nível completo. */
+    getMyGuarantee: () => req(GuaranteeStatus, "/api/me/guarantee"),
     getMyAccess: (idOrSlug: string) =>
       req(
         z.object({ agentId: z.string(), license: z.string().nullable(), creditsLeft: z.number().nullable(), trialUsesLeft: z.number() }),
@@ -132,6 +124,8 @@ export function createApi(opts: ApiOptions = {}) {
     getResaleListings: () => req(z.array(ResaleListing), "/api/market/listings"),
     getReputation: () => req(UserReputation, "/api/me/reputation"),
     getProfile: () => req(Profile, "/api/me/profile"),
+    updateProfile: (data: { displayName?: string | null; email?: string | null }) =>
+      req(z.object({ ok: z.boolean() }), "/api/me/profile", { method: "PATCH", body: JSON.stringify(data) }),
     getBalance: () => req(z.object({ usdc: z.number() }), "/api/me/balance"),
     faucet: () => post(z.object({ signature: z.string(), amountUsdc: z.number() }).passthrough(), "/api/faucet"),
 
@@ -152,11 +146,12 @@ export function createApi(opts: ApiOptions = {}) {
     buildPurchase: (agentId: string, type: "permanent" | "credits" = "permanent", amount?: number) =>
       post(TxResponse, "/api/tx/purchase", { agentId, type, amount }),
     buildReview: (agentId: string, rating: number, text: string) => post(TxResponse, "/api/tx/review", { agentId, rating, text }),
-    buildEscrow: (
-      agentId: string,
-      milestones: { title: string; criteria: string; amountUsdc: number; acceptanceTests?: Record<string, string> }[],
-    ) =>
-      post(TxResponse, "/api/tx/escrow", { agentId, milestones }),
+    /**
+     * Tarefa com garantia: as etapas e os critérios vêm do modelo do criador (getAgent().guarantee);
+     * o comprador só dá um título e descreve o que quer. acceptanceTests é opcional, por etapa.
+     */
+    buildEscrow: (agentId: string, task: { title: string; description: string; acceptanceTests?: (Record<string, string> | null)[] }) =>
+      post(TxResponse, "/api/tx/escrow", { agentId, ...task }),
     buildRelease: (escrowId: string, index: number) => post(TxResponse, `/api/tx/escrow/${escrowId}/release`, { index }),
     buildDispute: (escrowId: string, index: number, criterion: string, reason: string) =>
       post(TxResponse, `/api/tx/escrow/${escrowId}/dispute`, { index, criterion, reason }),

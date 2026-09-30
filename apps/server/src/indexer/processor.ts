@@ -85,7 +85,9 @@ async function handle(ev: SolversEvent, signature: string, blockTime: number | n
       if (!agentId) return;
       await syncCredits(ev.data.agent, ev.data.buyer, agentId);
       await syncReputation(ev.data.buyer);
-      await recordChainTx(signature, "credits", ev.data.buyer, agentId);
+      // O evento traz só a quantidade: o valor pago é quantidade × preço por uso do especialista.
+      const [agentRow] = await db.select({ pricePerUse: schema.agents.pricePerUse }).from(schema.agents).where(eq(schema.agents.id, agentId));
+      await recordChainTx(signature, "credits", ev.data.buyer, agentId, agentRow ? agentRow.pricePerUse * BigInt(ev.data.amount) : undefined);
       return;
     }
     case "CreditConsumed": {

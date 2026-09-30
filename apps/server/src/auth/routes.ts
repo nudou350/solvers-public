@@ -6,6 +6,7 @@ import { env } from "../env.js";
 import { h, parse } from "../lib/http.js";
 import { SESSION_COOKIE, signSession, requireAuth, requireWallet } from "./jwt.js";
 import { createNonce, verifySiws } from "./siws.js";
+import { ensureProfile } from "../store/profile.js";
 
 export const authRouter = Router();
 
@@ -31,6 +32,7 @@ authRouter.post(
       req.body,
     );
     const wallet = await verifySiws(body);
+    await ensureProfile(wallet);
     const token = await signSession(wallet);
     res.cookie(SESSION_COOKIE, token, {
       httpOnly: true,

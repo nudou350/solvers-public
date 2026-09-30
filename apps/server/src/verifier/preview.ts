@@ -70,12 +70,16 @@ ul{padding-left:18px}
 </style></head><body>
 <div class="band">PRÉVIA · SOLVERS</div>
 <header><strong>Etapa ${idx + 1}: ${esc(m.title)}</strong><br>
-<span class="ok">✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} testes aprovados · ${esc(acceptanceLine)}${report.mode === "simulated" ? " (verificação simulada)" : ""}</span></header>
+<span class="ok">${
+      report.mode === "manual"
+        ? "Revisão manual: leia a entrega e aprove ou conteste dentro do prazo"
+        : `✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} testes aprovados · ${esc(acceptanceLine)}${report.mode === "simulated" ? " (verificação simulada)" : ""}`
+    }</span></header>
 <main>
 ${frame ? `<div class="frame"><iframe sandbox srcdoc="${esc(frame)}" title="Componente entregue (prévia estática)"></iframe><div class="wm">PRÉVIA</div></div>` : "<p>Prévia visual indisponível para esta entrega.</p>"}
 <h3>Arquivos entregues</h3>
 <ul>${fileNames.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
-<p>O código completo fica disponível para download depois que você aprovar a etapa (ou quando o prazo de aprovação automática terminar).</p>
+${report.mode === "manual" ? "" : "<p>O código completo fica disponível para download depois que você aprovar a etapa (ou quando o prazo de aprovação automática terminar).</p>"}
 <h3>Critérios combinados</h3><p>${esc(m.criteria)}</p>
 </main></body></html>`);
   });

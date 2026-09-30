@@ -9,10 +9,10 @@
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { loadSigner, type KeyPairSigner } from "@solvers/chain";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
-import { usdcToUnits } from "@solvers/shared";
+import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS, usdcToUnits } from "@solvers/shared";
 import { authorities, chain, initChain } from "../chain/index.js";
 import { db, pool, schema } from "../db/index.js";
 import { runMigrations } from "../db/migrate.js";
@@ -65,6 +65,12 @@ async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
     })),
     tools: m.tools,
     guaranteeCriteria: m.guarantee.defaultCriteria,
+    guaranteeTemplate: m.guarantee.available
+      ? {
+          priceUsdc: m.guarantee.priceUsdc ?? m.pricing.priceUsdc,
+          milestones: m.guarantee.milestones ?? [{ title: "Entrega", criteria: m.guarantee.defaultCriteria, sharePct: 100, verify: "tests" as const }],
+        }
+      : undefined,
     catalogOnly: m.catalogOnly ?? false,
   };
   const values = {
@@ -137,7 +143,11 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
     }
   }
   await syncAgent(await c.agentPda(m.id));
-  await db.update(schema.agents).set({ listed: true }).where(eq(schema.agents.id, m.id));
+  await db
+    .update(schema.agents)
+    // Volta à vitrine, a não ser que a nota continue abaixo do mínimo (o job tiraria de novo).
+    .set({ listed: sql`not (${schema.agents.ratingCount} >= ${DELIST_MIN_REVIEWS} and ${schema.agents.ratingSum}::float / nullif(${schema.agents.ratingCount}, 0) < ${DELIST_MAX_RATING})` })
+    .where(eq(schema.agents.id, m.id));
 }
 
 export async function publish(slugs: string[]) {

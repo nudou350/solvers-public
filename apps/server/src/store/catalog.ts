@@ -1,10 +1,11 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Agent, AgentDetail, CreatorProfile } from "@solvers/shared";
-import { FREE_TRIAL_USES, unitsToUsdc, averageRating } from "@solvers/shared";
+import type { Agent, AgentDetail, Creator, CreatorProfile, GuaranteeOffer } from "@solvers/shared";
+import { FREE_TRIAL_USES, unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shared";
+import { env } from "../env.js";
 import { db, schema } from "../db/index.js";
 import { notFound } from "../lib/http.js";
 import { brlPerUsd } from "./fx.js";
-import { toAgent, toCreator, toReview, type AgentExtras, type CreatorStats } from "./mappers.js";
+import { guaranteeOffered, toAgent, toCreator, toReview, type AgentExtras, type CreatorStats } from "./mappers.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
@@ -119,6 +120,18 @@ export async function getCreator(creatorId: string) {
   return toCreator(row, await creatorStats(creatorId));
 }
 
+/** Todos os criadores com especialista na vitrine (para os cards mostrarem nome e reputação). */
+export async function listCreators(): Promise<Creator[]> {
+  const rows = await db
+    .select()
+    .from(schema.creators)
+    .where(
+      sql`exists (select 1 from ${schema.agents} a where a.creator_id = ${schema.creators.id} and a.status = 'active' and a.listed)`,
+    )
+    .orderBy(schema.creators.name);
+  return Promise.all(rows.map(async (r) => toCreator(r, await creatorStats(r.id))));
+}
+
 export async function getCreatorProfile(creatorId: string): Promise<CreatorProfile> {
   const creator = await getCreator(creatorId);
   if (!creator) throw notFound("Criador não encontrado");
@@ -153,6 +166,11 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
       agentsPublished: 1,
     };
   const rate = await brlPerUsd();
+  const dist = await db
+    .select({ rating: schema.reviews.rating, n: sql<number>`count(*)`.mapWith(Number) })
+    .from(schema.reviews)
+    .where(and(eq(schema.reviews.agentId, row.id), eq(schema.reviews.onchain, true)))
+    .groupBy(schema.reviews.rating);
   const resale = await db
     .select()
     .from(schema.resalePrices)
@@ -171,6 +189,21 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     priceBrl: Math.round(unitsToUsdc(row.price) * rate * 100) / 100,
     pricePerUseBrl: row.pricePerUse > 0n ? Math.round(unitsToUsdc(row.pricePerUse) * rate * 100) / 100 : null,
     resalePriceHistory: resale.map((r) => ({ date: r.at.toISOString(), priceUsdc: unitsToUsdc(r.price) })),
+    ratingDistribution: [5, 4, 3, 2, 1].map((star) => dist.find((d) => d.rating === star)?.n ?? 0),
+    guarantee: guaranteeOffer(row, rate),
+  };
+}
+
+/** Modelo de tarefa com garantia do criador, com o valor de cada etapa já calculado. */
+export function guaranteeOffer(row: AgentRow, brlRate: number): GuaranteeOffer | null {
+  const t = row.details.guaranteeTemplate;
+  if (!t || !guaranteeOffered(row)) return null;
+  const amounts = splitGuaranteeAmounts(t.priceUsdc, t.milestones.map((m) => m.sharePct));
+  return {
+    priceUsdc: t.priceUsdc,
+    priceBrl: Math.round(t.priceUsdc * brlRate * 100) / 100,
+    reviewWindowSecs: env.ESCROW_REVIEW_WINDOW_SECS,
+    milestones: t.milestones.map((m, i) => ({ title: m.title, criteria: m.criteria, amountUsdc: amounts[i]!, verify: m.verify ?? "tests" })),
   };
 }
 

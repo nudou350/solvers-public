@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creatorReputationScore, usdcToUnits, unitsToUsdc, guaranteeLevel, reputationScore, averageRating, agentIdToBytes, bytesToHex } from "./rules.js";
+import { creatorReputationScore, usdcToUnits, unitsToUsdc, guaranteeLevel, reputationScore, averageRating, agentIdToBytes, bytesToHex, splitGuaranteeAmounts } from "./rules.js";
 
 test("usdc conversions", () => {
   assert.equal(usdcToUnits(12), 12_000_000n);
@@ -29,4 +29,10 @@ test("creator reputation", () => {
   assert.equal(creatorReputationScore(0, 0, 0), 50);
   assert.equal(creatorReputationScore(40, 5, 0), 90);
   assert.equal(creatorReputationScore(10, 4, 2), 40);
+});
+
+test("guarantee split", () => {
+  assert.deepEqual(splitGuaranteeAmounts(19, [50, 50]), [9.5, 9.5]);
+  assert.deepEqual(splitGuaranteeAmounts(10, [1, 1, 1]), [3.333333, 3.333333, 3.333334]);
+  assert.equal(splitGuaranteeAmounts(7.77, [30, 70]).reduce((s, x) => s + x, 0).toFixed(6), "7.770000");
 });

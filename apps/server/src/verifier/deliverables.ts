@@ -56,6 +56,44 @@ export function readDeliverable(dir: string): Files {
   return out;
 }
 
+type FinalReport = TestReport & { a11y?: ReturnType<typeof a11yCheck>; selfWrittenTestsOnly?: boolean };
+
+/** Etapa com testes: roda a bateria de aceite combinada (ou os testes da entrega) e o a11y, se combinado. */
+async function verifyWithTests(files: Files, m: typeof schema.milestones.$inferSelect): Promise<{ report: FinalReport; previewHtml: string | null }> {
+  const acceptance = m.acceptancePath && existsSync(m.acceptancePath) ? readDeliverable(m.acceptancePath) : null;
+  const { report, previewHtml } = await runTests(files, { acceptance });
+
+  // Critério de acessibilidade combinado: checagem estática no código da entrega.
+  const wantsA11y = /acessibilidade|a11y/i.test(m.criteria);
+  const a11y = wantsA11y ? a11yCheck(Object.fromEntries(Object.entries(files).filter(([n]) => !/\.test\./.test(n)))) : null;
+  const finalReport: FinalReport = {
+    ...report,
+    passed: report.passed && (a11y?.passed ?? true),
+    ...(a11y ? { a11y } : {}),
+    // Sem bateria de aceite, os testes vieram da própria entrega: o relatório deixa isso explícito.
+    selfWrittenTestsOnly: !acceptance,
+  };
+  if (a11y && !a11y.passed) {
+    finalReport.failures = [...finalReport.failures, ...a11y.issues.map((i) => ({ test: `acessibilidade: ${i.rule}`, message: `${i.file}: ${i.message}` }))];
+  }
+  return { report: finalReport, previewHtml };
+}
+
+/**
+ * Etapa de revisão manual (ex: plano): não há teste automático. A entrega fica disponível para o
+ * comprador ler na prévia; ele aprova ou contesta dentro da janela, senão a liberação é automática.
+ */
+function manualReview(files: Files): { report: FinalReport; previewHtml: string } {
+  const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const previewHtml = Object.entries(files)
+    .map(([name, content]) => `<h4>${esc(name)}</h4><pre style="white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace">${esc(content)}</pre>`)
+    .join("");
+  return {
+    report: { passed: true, mode: "manual", numTests: 0, numPassed: 0, numFailed: 0, acceptance: null, failures: [], durationMs: 0 },
+    previewHtml,
+  };
+}
+
 export async function submitDeliverable(input: { wallet: string; agentId: string; escrowId: string; index: number; files: Files }) {
   const files = sanitizeFiles(input.files);
   const [escrow] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, input.escrowId));
@@ -75,22 +113,7 @@ export async function submitDeliverable(input: { wallet: string; agentId: string
   const hash = filesHash(files);
   await db.update(schema.milestones).set({ status: "submitted", deliverablePath: dir, deliverableHash: hash.toString("hex") }).where(where);
 
-  const acceptance = m.acceptancePath && existsSync(m.acceptancePath) ? readDeliverable(m.acceptancePath) : null;
-  const { report, previewHtml } = await runTests(files, { acceptance });
-
-  // Critério de acessibilidade combinado: checagem estática no código da entrega.
-  const wantsA11y = /acessibilidade|a11y/i.test(m.criteria);
-  const a11y = wantsA11y ? a11yCheck(Object.fromEntries(Object.entries(files).filter(([n]) => !/\.test\./.test(n)))) : null;
-  const finalReport: TestReport & { a11y?: ReturnType<typeof a11yCheck>; selfWrittenTestsOnly?: boolean } = {
-    ...report,
-    passed: report.passed && (a11y?.passed ?? true),
-    ...(a11y ? { a11y } : {}),
-    // Sem bateria de aceite, os testes vieram da própria entrega: o relatório deixa isso explícito.
-    selfWrittenTestsOnly: !acceptance,
-  };
-  if (a11y && !a11y.passed) {
-    finalReport.failures = [...finalReport.failures, ...a11y.issues.map((i) => ({ test: `acessibilidade: ${i.rule}`, message: `${i.file}: ${i.message}` }))];
-  }
+  const { report: finalReport, previewHtml } = m.verify === "manual" ? manualReview(files) : await verifyWithTests(files, m);
 
   if (!finalReport.passed) {
     await db

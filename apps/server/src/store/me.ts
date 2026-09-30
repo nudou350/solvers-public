@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { unitsToUsdc, type ConnectorStatus, type CreatorDashboard, type Memory } from "@solvers/shared";
+import { averageRating, bpsToScore, unitsToUsdc, type ConnectorStatus, type CreatorDashboard, type Memory } from "@solvers/shared";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { requireAuth, requireWallet } from "../auth/jwt.js";
@@ -123,41 +123,87 @@ meRouter.get(
     const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
     const empty: CreatorDashboard = {
       creator: null,
-      totals: { sales: 0, uses: 0, salesRevenueUsdc: 0, royaltiesUsdc: 0, disputesOpened: 0, disputesLost: 0 },
+      totals: { sales: 0, uses: 0, salesRevenueUsdc: 0, royaltiesUsdc: 0, disputesOpened: 0, disputesOpen: 0, disputesLost: 0 },
+      last30: { sales: 0, uses: 0, revenueUsdc: 0 },
+      creatorSharePct: 90,
       agents: [],
       daily: [],
+      disputes: [],
     };
     if (!creatorRow) return empty;
+    const feeBps = (await chain().fetchConfig().catch(() => null))?.data.feeBps ?? 1000;
+    const share = 1 - feeBps / 10_000;
+    const net = (usdc: number) => Math.round(usdc * share * 100) / 100;
+    empty.creatorSharePct = Math.round(share * 1000) / 10;
     const agents = await db.select().from(schema.agents).where(eq(schema.agents.creatorId, creatorRow.id));
     if (agents.length === 0) return { ...empty, creator: await getCreator(creatorRow.id) };
     const ids = agents.map((a) => a.id);
-    const feeBps = (await chain().fetchConfig().catch(() => null))?.data.feeBps ?? 1000;
 
-    const disputes = await db
-      .select({ agentId: schema.escrows.agentId, n: sql<number>`count(*)`.mapWith(Number) })
+    // Contestações de etapas de garantia dos especialistas deste criador.
+    const disputeRows = await db
+      .select({
+        escrowId: schema.milestones.escrowId,
+        index: schema.milestones.idx,
+        agentId: schema.escrows.agentId,
+        taskTitle: schema.escrows.title,
+        milestoneTitle: schema.milestones.title,
+        criterion: schema.milestones.disputeCriterion,
+        reason: schema.milestones.disputeReason,
+        amount: schema.milestones.amount,
+        status: schema.milestones.status,
+        openedAt: schema.milestones.disputedAt,
+      })
       .from(schema.milestones)
       .innerJoin(schema.escrows, eq(schema.escrows.id, schema.milestones.escrowId))
-      .where(and(inArray(schema.escrows.agentId, ids), sql`${schema.milestones.disputeReason} is not null`))
-      .groupBy(schema.escrows.agentId);
-    const disputesBy = new Map(disputes.map((d) => [d.agentId, d.n]));
+      // disputedAt só é gravado quando a contestação foi confirmada on-chain (tentativas abandonadas ficam de fora).
+      .where(and(inArray(schema.escrows.agentId, ids), isNotNull(schema.milestones.disputedAt)))
+      .orderBy(desc(schema.milestones.disputedAt));
+    const disputes = disputeRows
+      .filter((d) => ["disputed", "refunded", "approved"].includes(d.status))
+      .map((d) => ({
+        escrowId: d.escrowId,
+        index: d.index,
+        agentId: d.agentId,
+        taskTitle: d.taskTitle,
+        milestoneTitle: d.milestoneTitle,
+        criterion: d.criterion,
+        reason: d.reason,
+        amountUsdc: unitsToUsdc(d.amount),
+        openedAt: d.openedAt?.toISOString() ?? null,
+        result: (d.status === "disputed" ? "open" : d.status === "refunded" ? "buyer" : "creator") as "open" | "buyer" | "creator",
+      }));
+    const disputesBy = new Map<string, number>();
+    for (const d of disputes) disputesBy.set(d.agentId, (disputesBy.get(d.agentId) ?? 0) + 1);
 
-    const perAgent = agents.map((a) => {
-      const gross = Number(a.totalSales) * unitsToUsdc(a.price);
-      return {
-        agentId: a.id,
-        name: a.name,
-        sales: Number(a.totalSales),
-        uses: Number(a.verifiedUses),
-        revenueUsdc: Math.round(gross * (1 - feeBps / 10_000) * 100) / 100,
-        disputes: disputesBy.get(a.id) ?? 0,
-      };
-    });
+    // Receita pelo valor efetivamente pago (licenças e pacotes de créditos), já sem a taxa da plataforma.
+    const paid = await db
+      .select({ agentId: schema.chainTxs.agentId, sum: sql<string>`coalesce(sum(${schema.chainTxs.amount}), 0)` })
+      .from(schema.chainTxs)
+      .where(and(inArray(schema.chainTxs.agentId, ids), inArray(schema.chainTxs.kind, ["purchase", "credits"])))
+      .groupBy(schema.chainTxs.agentId);
+    const paidBy = new Map(paid.map((p) => [p.agentId, unitsToUsdc(BigInt(p.sum))]));
+
+    const perAgent = agents.map((a) => ({
+      agentId: a.id,
+      slug: a.slug,
+      name: a.name,
+      version: a.version,
+      status: (["active", "pending", "suspended"].includes(a.status) ? a.status : "pending") as "active" | "pending" | "suspended",
+      listed: a.listed,
+      userRating: averageRating(a.ratingSum, a.ratingCount),
+      evalScore: bpsToScore(a.evalScoreBps),
+      sales: Number(a.totalSales),
+      uses: Number(a.verifiedUses),
+      revenueUsdc: net(paidBy.get(a.id) ?? 0),
+      disputes: disputesBy.get(a.id) ?? 0,
+    }));
 
     const daily = await db
       .select({
         date: sql<string>`to_char(date_trunc('day', ${schema.chainTxs.createdAt}), 'YYYY-MM-DD')`,
+        // "Vendas" = licenças (mesma conta do total on-chain); a receita inclui os pacotes de créditos.
         sales: sql<number>`count(*) filter (where ${schema.chainTxs.kind} = 'purchase')`.mapWith(Number),
-        revenue: sql<number>`coalesce(sum(${schema.chainTxs.amount}) filter (where ${schema.chainTxs.kind} = 'purchase'), 0)`.mapWith(Number),
+        revenue: sql<number>`coalesce(sum(${schema.chainTxs.amount}) filter (where ${schema.chainTxs.kind} in ('purchase', 'credits')), 0)`.mapWith(Number),
       })
       .from(schema.chainTxs)
       .where(and(inArray(schema.chainTxs.agentId, ids), gt(schema.chainTxs.createdAt, sql`now() - interval '30 days'`)))
@@ -179,24 +225,32 @@ meRouter.get(
         date,
         sales: d?.sales ?? 0,
         uses: usesBy.get(date) ?? 0,
-        revenueUsdc: Math.round(unitsToUsdc(BigInt(Math.round(d?.revenue ?? 0))) * (1 - feeBps / 10_000) * 100) / 100,
+        revenueUsdc: net(unitsToUsdc(BigInt(Math.round(d?.revenue ?? 0)))),
       };
     });
 
-    const disputesLost = agents.reduce((s, a) => s + a.disputesLost, 0);
+    const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + f(x), 0);
     return {
       creator: await getCreator(creatorRow.id),
       totals: {
-        sales: perAgent.reduce((s, a) => s + a.sales, 0),
-        uses: perAgent.reduce((s, a) => s + a.uses, 0),
-        salesRevenueUsdc: Math.round(perAgent.reduce((s, a) => s + a.revenueUsdc, 0) * 100) / 100,
+        sales: sum(perAgent, (a) => a.sales),
+        uses: sum(perAgent, (a) => a.uses),
+        salesRevenueUsdc: Math.round(sum(perAgent, (a) => a.revenueUsdc) * 100) / 100,
         // Revenda é P2: royalties começam em zero até o mercado de revenda existir on-chain.
         royaltiesUsdc: 0,
-        disputesOpened: perAgent.reduce((s, a) => s + a.disputes, 0),
-        disputesLost,
+        disputesOpened: disputes.length,
+        disputesOpen: disputes.filter((d) => d.result === "open").length,
+        disputesLost: sum(agents, (a) => a.disputesLost),
       },
+      last30: {
+        sales: sum(dailyOut, (d) => d.sales),
+        uses: sum(dailyOut, (d) => d.uses),
+        revenueUsdc: Math.round(sum(dailyOut, (d) => d.revenueUsdc) * 100) / 100,
+      },
+      creatorSharePct: Math.round(share * 1000) / 10,
       agents: perAgent,
       daily: dailyOut,
+      disputes,
     };
   }),
 );

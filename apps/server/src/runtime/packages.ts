@@ -7,6 +7,9 @@ import { env } from "../env.js";
 // Carrega os pacotes dos solvers do disco (INSTRUCTIONS.md 5.4 e 6). No MVP o servidor lê
 // agents/<slug>; o conteúdo das etapas nunca sai inteiro: só a etapa corrente é entregue.
 
+/** Um critério por item: ";" e quebra de linha separam critérios na contestação. */
+const Criterion = z.string().min(2).max(300).refine((c) => !/[;\n]/.test(c), "critério não pode conter ';' nem quebra de linha");
+
 export const Manifest = z.object({
   id: z.string().regex(/^[0-9a-f]{32}$/),
   slug: z.string(),
@@ -23,7 +26,37 @@ export const Manifest = z.object({
   packageContents: z.array(z.string()),
   steps: z.array(z.object({ file: z.string(), title: z.string().optional(), gate: z.array(z.string()).default([]) })),
   tools: z.array(z.object({ name: z.string(), description: z.string(), runner: z.string() })).default([]),
-  guarantee: z.object({ available: z.boolean(), defaultCriteria: z.array(z.string()).default([]) }),
+  guarantee: z
+    .object({
+      available: z.boolean(),
+      defaultCriteria: z.array(Criterion).default([]),
+      /** Preço de uma tarefa com garantia (padrão: o preço da licença). */
+      priceUsdc: z.number().positive().optional(),
+      /** Etapas da tarefa: o comprador não as define, só descreve o que quer. */
+      milestones: z
+        .array(
+          z.object({
+            title: z.string().min(2).max(120),
+            criteria: z.array(Criterion).min(1),
+            /** % do preço; a soma das etapas é 100. */
+            sharePct: z.number().min(1),
+            /** tests: verificador automático; manual: o comprador revisa (ex: plano). */
+            verify: z.enum(["tests", "manual"]).default("tests"),
+          }),
+        )
+        .min(1)
+        .max(5)
+        .optional(),
+    })
+    .superRefine((g, ctx) => {
+      if (!g.available) return;
+      if (g.milestones && Math.abs(g.milestones.reduce((s, m) => s + m.sharePct, 0) - 100) > 0.001) {
+        ctx.addIssue({ code: "custom", message: "guarantee.milestones: a soma de sharePct precisa ser 100" });
+      }
+      if (!g.milestones && g.defaultCriteria.length === 0) {
+        ctx.addIssue({ code: "custom", message: "guarantee: sem milestones, defaultCriteria precisa de pelo menos um critério" });
+      }
+    }),
   pricing: z.object({ priceUsdc: z.number(), pricePerUseUsdc: z.number().nullable(), royaltyBps: z.number().int() }),
   beforeAfter: z.array(z.object({ prompt: z.string(), withoutSolver: z.string(), withSolver: z.string() })).default([]),
   versions: z

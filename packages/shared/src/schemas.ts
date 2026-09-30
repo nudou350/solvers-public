@@ -30,6 +30,8 @@ export const Agent = z.object({
   guaranteeAvailable: z.boolean(),
   resaleFloorUsdc: z.number().nullable(),
   trend7d: z.number(),
+  /** Data da primeira versão publicada (ISO). */
+  publishedAt: z.string(),
 });
 
 export const Creator = z.object({
@@ -75,6 +77,8 @@ export const EscrowStatus = z.enum(["active", "approved", "disputed", "refunded"
 
 export const Escrow = z.object({
   id: z.string(),
+  /** Título da tarefa, escrito pelo comprador. */
+  title: z.string(),
   agentId: z.string(),
   buyerWallet: z.string(),
   amountUsdc: z.number(),

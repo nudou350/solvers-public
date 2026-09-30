@@ -2,7 +2,18 @@ import { Router } from "express";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { address, type Address } from "@solvers/chain";
-import { FREE_TRIAL_USES, MIN_PERMANENT_PRICE_USDC, unitsToUsdc, usdcToUnits, type License, type Profile, type TxResponse } from "@solvers/shared";
+import {
+  FREE_TRIAL_USES,
+  GUARANTEE_LIMITS_USDC,
+  MIN_PERMANENT_PRICE_USDC,
+  unitsToUsdc,
+  usdcToUnits,
+  type License,
+  type Profile,
+  type PublicConfig,
+  type TxResponse,
+  type UsageSummary,
+} from "@solvers/shared";
 import { chain, explorerUrl } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
@@ -20,10 +31,12 @@ import {
   getCreatorProfile,
   listAgents,
   listCategories,
+  listCreators,
   listReviews,
   mapAgents,
 } from "./catalog.js";
 import { creditsToLicense, toLicense, toReputation } from "./mappers.js";
+import { ensureProfile } from "./profile.js";
 
 export const storeRouter = Router();
 
@@ -31,7 +44,7 @@ export const storeRouter = Router();
 
 storeRouter.get(
   "/config",
-  h(async () => {
+  h(async (): Promise<PublicConfig> => {
     const c = chain();
     const config = await c.fetchConfig().catch(() => null);
     return {
@@ -46,6 +59,11 @@ storeRouter.get(
       brlPerUsd: await brlPerUsd(),
       faucetAmountUsdc: env.FAUCET_AMOUNT_USDC,
       connectorUrl: `${env.PUBLIC_API_URL.replace(/\/$/, "")}/mcp`,
+      freeTrialUses: FREE_TRIAL_USES,
+      reviewWindowSecs: env.ESCROW_REVIEW_WINDOW_SECS,
+      guaranteeLimitsUsdc: GUARANTEE_LIMITS_USDC,
+      guaranteeMinSales: env.GUARANTEE_MIN_SALES,
+      guaranteeMinRating: env.GUARANTEE_MIN_RATING,
     };
   }),
 );
@@ -104,6 +122,8 @@ storeRouter.post(
     return mapAgents(await searchAgentRows(need, 3));
   }),
 );
+
+storeRouter.get("/creators", h(async () => listCreators()));
 
 storeRouter.get("/creators/:id", h(async (req) => getCreatorProfile(String(req.params.id))));
 
@@ -191,9 +211,13 @@ storeRouter.get(
     const wallet = requireWallet(req);
     const [rep] = await db.select().from(schema.userReputation).where(eq(schema.userReputation.wallet, wallet));
     const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
+    const profile = await ensureProfile(wallet);
     const txs = await db.select().from(schema.chainTxs).where(eq(schema.chainTxs.wallet, wallet)).orderBy(desc(schema.chainTxs.createdAt)).limit(30);
     return {
       wallet,
+      displayName: profile.displayName,
+      email: profile.email,
+      memberSince: profile.createdAt.toISOString(),
       reputation: toReputation(wallet, rep),
       creator: creatorRow ? await getCreator(creatorRow.id) : null,
       explorerUrl: explorerUrl("address", wallet),
@@ -207,6 +231,28 @@ storeRouter.get(
   }),
 );
 
+/** Nome e e-mail do perfil (o front envia os dados do login por e-mail). */
+storeRouter.patch(
+  "/me/profile",
+  requireAuth,
+  h(async (req) => {
+    const wallet = requireWallet(req);
+    const body = parse(
+      z.object({
+        displayName: z.string().trim().min(1).max(80).nullable().optional(),
+        email: z.string().trim().toLowerCase().email().max(200).nullable().optional(),
+      }),
+      req.body,
+    );
+    await ensureProfile(wallet);
+    await db
+      .update(schema.userProfiles)
+      .set({ ...body, updatedAt: new Date() })
+      .where(eq(schema.userProfiles.wallet, wallet));
+    return { ok: true };
+  }),
+);
+
 storeRouter.get(
   "/me/balance",
   requireAuth,
@@ -216,23 +262,68 @@ storeRouter.get(
   }),
 );
 
-/** Uso de cada especialista pela carteira (biblioteca). */
+/** Uso de cada especialista pela carteira (biblioteca): totais, mês atual, 8 semanas e créditos. */
 storeRouter.get(
   "/me/usage",
   requireAuth,
-  h(async (req) => {
+  h(async (req): Promise<UsageSummary[]> => {
     const wallet = requireWallet(req);
+    const act = sql`${schema.usageEvents.tool} = 'activate_solver'`;
     const rows = await db
       .select({
         agentId: schema.usageEvents.agentId,
-        activations: sql<number>`count(*) filter (where ${schema.usageEvents.tool} = 'activate_solver')`.mapWith(Number),
+        activations: sql<number>`count(*) filter (where ${act})`.mapWith(Number),
         calls: sql<number>`count(*)`.mapWith(Number),
         lastUsedAt: sql<string>`max(${schema.usageEvents.createdAt})`,
+        usesThisMonth: sql<number>`count(*) filter (where ${act} and ${schema.usageEvents.createdAt} >= date_trunc('month', now()))`.mapWith(Number),
       })
       .from(schema.usageEvents)
       .where(eq(schema.usageEvents.wallet, wallet))
       .groupBy(schema.usageEvents.agentId);
-    return rows.filter((r) => r.agentId).map((r) => ({ ...r, lastUsedAt: new Date(r.lastUsedAt).toISOString() }));
+    // Ativações por semana (0 = semana atual ... 7 = sete semanas atrás).
+    const weeks = await db
+      .select({
+        agentId: schema.usageEvents.agentId,
+        ago: sql<number>`((date_trunc('week', now())::date - date_trunc('week', ${schema.usageEvents.createdAt})::date) / 7)`.mapWith(Number),
+        n: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(schema.usageEvents)
+      .where(and(eq(schema.usageEvents.wallet, wallet), act, gt(schema.usageEvents.createdAt, sql`date_trunc('week', now()) - interval '7 weeks'`)))
+      .groupBy(sql`1`, sql`2`);
+    const weekly = (agentId: string) => {
+      const out = [0, 0, 0, 0, 0, 0, 0, 0];
+      for (const w of weeks) if (w.agentId === agentId && w.ago >= 0 && w.ago < 8) out[7 - w.ago] = w.n;
+      return out;
+    };
+    const cred = await db.select().from(schema.credits).where(and(eq(schema.credits.ownerWallet, wallet), gt(schema.credits.purchased, 0)));
+    const byAgent = new Map<string, UsageSummary>();
+    for (const r of rows) {
+      if (!r.agentId) continue;
+      byAgent.set(r.agentId, {
+        agentId: r.agentId,
+        activations: r.activations,
+        calls: r.calls,
+        lastUsedAt: new Date(r.lastUsedAt).toISOString(),
+        usesThisMonth: r.usesThisMonth,
+        weekly: weekly(r.agentId),
+        creditsLeft: null,
+        creditsTotal: null,
+      });
+    }
+    for (const c of cred) {
+      const u = byAgent.get(c.agentId) ?? {
+        agentId: c.agentId,
+        activations: 0,
+        calls: 0,
+        lastUsedAt: null,
+        usesThisMonth: 0,
+        weekly: weekly(c.agentId),
+        creditsLeft: null,
+        creditsTotal: null,
+      };
+      byAgent.set(c.agentId, { ...u, creditsLeft: c.remaining, creditsTotal: c.purchased });
+    }
+    return [...byAgent.values()];
   }),
 );
 

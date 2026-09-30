@@ -339,7 +339,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Entregar etapa com garantia",
       description:
-        "Entrega os arquivos de uma etapa de uma tarefa com garantia. O servidor roda a verificação combinada (ex: testes) e, se passar, libera a etapa para aprovação do usuário com um link de prévia.",
+        "Entrega os arquivos de uma etapa de uma tarefa com garantia. Em etapas com testes, o servidor roda a verificação combinada e, se passar, libera a etapa para aprovação do usuário com um link de prévia. Em etapas de revisão manual (ex: plano), envie o texto (ex: PLANO.md): ele vai direto para o usuário revisar na prévia.",
       inputSchema: {
         session_id: z.string(),
         escrow_id: z.string(),
@@ -354,7 +354,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         const session = await getSession(session_id, ctx.wallet);
         const r = await submitDeliverable({ wallet: ctx.wallet, agentId: session.agentId, escrowId: escrow_id, index: milestone, files: artifact.files });
         const out = r.passed
-          ? `Verificação aprovada (${r.report.numPassed}/${r.report.numTests} testes). A etapa foi marcada como aprovada nos testes.\nPrévia: ${r.previewUrl}\nO usuário tem até ${r.autoReleaseAt} para aprovar ou contestar na loja; depois disso o pagamento é liberado automaticamente.`
+          ? `${r.report.mode === "manual" ? "Entrega recebida para a revisão do usuário." : `Verificação aprovada (${r.report.numPassed}/${r.report.numTests} testes). A etapa foi marcada como aprovada nos testes.`}\nPrévia: ${r.previewUrl}\nO usuário tem até ${r.autoReleaseAt} para aprovar ou contestar na loja; depois disso o pagamento é liberado automaticamente.`
           : `A verificação falhou (${r.report.numFailed} falha(s)). Corrija e envie de novo:\n${r.report.failures.map((f) => `- ${f.test}: ${f.message}`).join("\n")}`;
         return { text: out, agentId: session.agentId, sessionId: session.id };
       },

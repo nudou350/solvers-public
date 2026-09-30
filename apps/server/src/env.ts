@@ -56,6 +56,10 @@ const schema = z.object({
   /** Janela para o comprador revisar uma etapa aprovada nos testes. */
   ESCROW_REVIEW_WINDOW_SECS: z.coerce.number().default(72 * 3600),
   AUTO_RELEASE_ENABLED: bool.default("true"),
+  /** O criador só oferece garantia depois deste número de vendas... */
+  GUARANTEE_MIN_SALES: z.coerce.number().int().min(0).default(10),
+  /** ...e com nota média igual ou acima desta (0 desliga a exigência de nota). */
+  GUARANTEE_MIN_RATING: z.coerce.number().min(0).max(5).default(4),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(60),
 });
 

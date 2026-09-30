@@ -26,6 +26,7 @@ import { runMigrations } from "../db/migrate.js";
 import { processSignature } from "../indexer/processor.js";
 import { sha256 } from "../lib/crypto.js";
 import { getPackage } from "../runtime/packages.js";
+import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { criteriaHash, readDeliverable, saveAcceptance, submitDeliverable } from "../verifier/deliverables.js";
 
 const KEYS = join(process.cwd(), ".keys", "buyers");
@@ -187,17 +188,22 @@ async function main() {
         [2, false],
       ] as const) {
         const nonce = BigInt(Date.now()) * 10n + BigInt(n);
-        const ms = [
-          { title: "Formulário de login acessível", criteria: "Todos os testes passam; Sem erros de acessibilidade críticos", amountUsdc: 8 },
-          { title: "Tela de recuperação de senha", criteria: "Todos os testes passam; Mensagens de erro anunciadas ao leitor de tela", amountUsdc: 6 },
-        ];
+        // Etapas do modelo do criador (manifest.guarantee); a bateria de aceite vale para a etapa do componente.
+        const offer = guaranteeOffer(await findAgentRow(fe.id), 1);
+        if (!offer) throw new Error("frontend-react sem modelo de garantia (na demo, use GUARANTEE_MIN_SALES=0)");
+        const ms = offer.milestones.map((m) => ({ title: m.title, criteria: m.criteria.join("\n"), amountUsdc: m.amountUsdc }));
+        const testIdx = ms.length - 1;
+        const task =
+          n === 1
+            ? { title: "Formulário de login acessível", description: "Login com e-mail e senha, validação no envio e erros anunciados ao leitor de tela." }
+            : { title: "Tela de recuperação de senha", description: "Campo de e-mail, confirmação de envio e mensagens de erro acessíveis." };
         const escrowAddr = await c.escrowPda(b.address, await c.agentPda(fe.id), nonce);
-        const acc = saveAcceptance(escrowAddr, 0, acceptanceTests);
+        const acc = saveAcceptance(escrowAddr, testIdx, acceptanceTests);
         const { instructions, escrow } = await c.createEscrowIxs(
           b.address,
           fe.id,
           nonce,
-          ms.map((m, idx) => ({ amount: usdcToUnits(m.amountUsdc), criteriaHash: criteriaHash(m.title, m.criteria, idx === 0 ? acc.hash : null) })),
+          ms.map((m, idx) => ({ amount: usdcToUnits(m.amountUsdc), criteriaHash: criteriaHash(m.title, m.criteria, idx === testIdx ? acc.hash : null) })),
           BigInt(Number(process.env.ESCROW_REVIEW_WINDOW_SECS ?? 259200)),
         );
         await db.insert(schema.escrows).values({
@@ -205,8 +211,9 @@ async function main() {
           agentId: fe.id,
           buyerWallet: b.address,
           creatorWallet: (await db.select().from(schema.creators).where(eq(schema.creators.id, fe.creatorId)))[0]?.wallet ?? fe.creatorId,
+          ...task,
           nonce,
-          total: usdcToUnits(14),
+          total: usdcToUnits(offer.priceUsdc),
           status: "pending",
           reviewWindowSecs: Number(process.env.ESCROW_REVIEW_WINDOW_SECS ?? 259200),
         });
@@ -216,17 +223,16 @@ async function main() {
             idx,
             title: m.title,
             criteria: m.criteria,
-            criteriaHash: criteriaHash(m.title, m.criteria, idx === 0 ? acc.hash : null).toString("hex"),
+            criteriaHash: criteriaHash(m.title, m.criteria, idx === testIdx ? acc.hash : null).toString("hex"),
             amount: usdcToUnits(m.amountUsdc),
-            acceptancePath: idx === 0 ? acc.path : null,
-            acceptanceHash: idx === 0 ? acc.hash : null,
+            acceptancePath: idx === testIdx ? acc.path : null,
+            acceptanceHash: idx === testIdx ? acc.hash : null,
           })),
         );
         await asUser(b, instructions);
-        await submitDeliverable({ wallet: b.address, agentId: fe.id, escrowId: escrow, index: 0, files });
+        await submitDeliverable({ wallet: b.address, agentId: fe.id, escrowId: escrow, index: testIdx, files });
         if (done) {
-          await asUser(b, await c.releaseMilestoneIxs(b, address(escrow), 0));
-          await asUser(b, await c.releaseMilestoneIxs(b, address(escrow), 1));
+          for (let idx = 0; idx < ms.length; idx++) await asUser(b, await c.releaseMilestoneIxs(b, address(escrow), idx));
         }
         console.log(`  garantia ${done ? "concluída" : "em andamento"}: ${escrow}`);
       }

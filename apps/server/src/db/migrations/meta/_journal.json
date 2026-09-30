@@ -22,6 +22,20 @@
       "when": 1790752318159,
       "tag": "0002_verifier_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790776877678,
+      "tag": "0003_front_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790777937586,
+      "tag": "0004_milestone_verify",
+      "breakpoints": true
     }
   ]
 }

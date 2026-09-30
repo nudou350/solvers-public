@@ -6,12 +6,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { api, login, signAsWallet } from "./e2e-api.js";
 import { call, connect, rpc } from "./e2e-mcp.js";
-import { key, log } from "./env.js";
+import { generateKeyPairSigner, type KeyPairSigner } from "@solana/kit";
+import { usdcToUnits } from "@solvers/shared";
+import { chain, key, log } from "./env.js";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const API = process.env.API_URL ?? "http://localhost:3017";
 
-async function tx(token: string, signer: Awaited<ReturnType<typeof key>>, path: string, body: unknown) {
+async function tx(token: string, signer: KeyPairSigner, path: string, body: unknown) {
   const built = await api<{ transaction: string; meta?: Record<string, unknown> }>(path, { method: "POST", token, body: JSON.stringify(body) });
   const signed = await signAsWallet(signer, built.transaction);
   const res = await api<{ signature: string; events: string[] }>("/api/tx/submit", { method: "POST", token, body: JSON.stringify({ transaction: signed }) });
@@ -19,11 +21,13 @@ async function tx(token: string, signer: Awaited<ReturnType<typeof key>>, path: 
 }
 
 async function main() {
-  const buyer = await key("buyer2");
+  // Carteira nova a cada execução: o limite de garantias abertas (20 USDC) não acumula entre rodadas.
+  const buyer = process.env.E2E_BUYER ? await key(process.env.E2E_BUYER) : await generateKeyPairSigner();
   const token = await loginWithToken(buyer);
-  await api("/api/faucet", { method: "POST", token }).catch(() => undefined);
+  // Licença (19) + tarefa com garantia (19); o servidor paga as taxas, então não precisa de SOL.
+  await (await chain()).faucet(buyer.address, usdcToUnits(60));
 
-  const agents = await api<{ id: string; slug: string; name: string }[]>("/api/agents");
+  const agents = await api<{ id: string; slug: string; name: string; creatorId: string }[]>("/api/agents");
   const fe = agents.find((a) => a.slug === "frontend-react")!;
   const ui = agents.find((a) => a.slug === "ui-design")!;
 
@@ -75,32 +79,29 @@ async function main() {
     "LoginForm.tsx": readFileSync(join(dir, "LoginForm.tsx"), "utf8"),
     "LoginForm.test.tsx": readFileSync(join(dir, "LoginForm.test.tsx"), "utf8"),
   };
-  // Critério "todos os testes passam" com bateria de aceite fixa, combinada antes.
+  // As etapas vêm do modelo do criador (Plano 30% + Componente e testes 70%); o comprador só descreve a tarefa.
+  // A bateria de aceite fixa vale para a etapa 2 (componente e testes).
+  const detailFe = await api<{ guarantee: { priceUsdc: number; milestones: { title: string; criteria: string[] }[] } | null }>(`/api/agents/${fe.id}`);
+  if (!detailFe.guarantee || detailFe.guarantee.milestones.length !== 2) throw new Error(`modelo de garantia ausente: ${JSON.stringify(detailFe.guarantee)}`);
   const esc = await tx(token, buyer, "/api/tx/escrow", {
     agentId: fe.id,
-    milestones: [
-      {
-        title: "Formulário de login",
-        criteria: "Todos os testes passam; Sem erros de acessibilidade críticos",
-        amountUsdc: 6,
-        acceptanceTests: { "LoginForm.test.tsx": files["LoginForm.test.tsx"] },
-      },
-      { title: "Recuperar senha", criteria: "Todos os testes passam", amountUsdc: 4 },
-    ],
+    title: "Formulário de login",
+    description: "Formulário de login com e-mail e senha, validação no envio e mensagens de erro acessíveis.",
+    acceptanceTests: [null, { "LoginForm.test.tsx": files["LoginForm.test.tsx"] }],
   });
   const escrowId = esc.meta!.escrowId as string;
   log("garantia criada com bateria de aceite", `${escrowId} (${esc.events.join(",")})`);
   const reserved = await call(mcp, "submit_deliverable", {
     session_id: sessionId,
     escrow_id: escrowId,
-    milestone: 0,
+    milestone: 1,
     artifact: { files: { ...files, "acceptance.LoginForm.test.tsx": "it('ok',()=>{})" } },
   }).catch((e) => e as Error);
   if (!(reserved instanceof Error) || !reserved.message.includes("reservado")) throw new Error("entrega não pode sobrescrever a bateria de aceite");
   log("entrega não consegue trocar a bateria de aceite", "ok");
-  const bad = await call(mcp, "submit_deliverable", { session_id: sessionId, escrow_id: escrowId, milestone: 0, artifact: { files: { "NOTAS.md": "sem componente" } } });
+  const bad = await call(mcp, "submit_deliverable", { session_id: sessionId, escrow_id: escrowId, milestone: 1, artifact: { files: { "NOTAS.md": "sem componente" } } });
   if (!bad.includes("falhou")) throw new Error(`entrega sem o componente deveria falhar:\n${bad}`);
-  const good = await call(mcp, "submit_deliverable", { session_id: sessionId, escrow_id: escrowId, milestone: 0, artifact: { files } });
+  const good = await call(mcp, "submit_deliverable", { session_id: sessionId, escrow_id: escrowId, milestone: 1, artifact: { files } });
   if (!good.includes("aprovada")) throw new Error(`entrega deveria passar:\n${good}`);
   const preview = /Prévia: (\S+)/.exec(good)![1]!;
   const pv = await fetch(preview);
@@ -109,31 +110,46 @@ async function main() {
   if (pvBad.status !== 404) throw new Error("prévia com token errado deveria dar 404");
   log("entrega verificada, etapa marcada on-chain, prévia com marca d'água", preview.split("?")[0]);
 
-  const detail = await api<{ escrow: { milestones: { status: string }[]; autoReleaseAt: string } }>(`/api/me/escrows/${escrowId}`, { token });
-  if (detail.escrow.milestones[0]!.status !== "passed" || !detail.escrow.autoReleaseAt) throw new Error(`etapa deveria estar passed: ${JSON.stringify(detail)}`);
-  const early = await api(`/api/me/escrows/${escrowId}/milestones/0/download`, { token }).catch((e) => e as Error);
+  const detail = await api<{ escrow: { title: string; milestones: { status: string }[]; autoReleaseAt: string }; description: string }>(`/api/me/escrows/${escrowId}`, { token });
+  if (detail.escrow.milestones[1]!.status !== "passed" || !detail.escrow.autoReleaseAt) throw new Error(`etapa deveria estar passed: ${JSON.stringify(detail)}`);
+  if (detail.escrow.title !== "Formulário de login" || !detail.description) throw new Error("título/descrição da tarefa não gravados");
+  const early = await api(`/api/me/escrows/${escrowId}/milestones/1/download`, { token }).catch((e) => e as Error);
   if (!(early instanceof Error)) throw new Error("download antes da aprovação deveria ser bloqueado");
 
-  await tx(token, buyer, `/api/tx/escrow/${escrowId}/release`, { index: 0 });
-  const dl = await api<{ files: Record<string, string> }>(`/api/me/escrows/${escrowId}/milestones/0/download`, { token });
+  await tx(token, buyer, `/api/tx/escrow/${escrowId}/release`, { index: 1 });
+  const dl = await api<{ files: Record<string, string> }>(`/api/me/escrows/${escrowId}/milestones/1/download`, { token });
   if (!dl.files["LoginForm.tsx"]) throw new Error("download sem arquivo");
   log("comprador aprovou; pagamento liberado e arquivo final disponível", Object.keys(dl.files).join(", "));
+
+  // Etapa 1 (plano) é de revisão manual: sem testes, vai direto para o comprador revisar na prévia.
+  const plan = await call(mcp, "submit_deliverable", {
+    session_id: sessionId,
+    escrow_id: escrowId,
+    milestone: 0,
+    artifact: { files: { "PLANO.md": "# Plano\n- Props: onSubmit, isLoading\n- Casos de teste: envio vazio, e-mail inválido, sucesso" } },
+  });
+  if (!plan.includes("revisão do usuário")) throw new Error(`plano deveria ir para revisão manual:\n${plan}`);
+  const planDetail = await api<{ escrow: { milestones: { status: string }[] }; milestones: { verify: string }[] }>(`/api/me/escrows/${escrowId}`, { token });
+  if (planDetail.escrow.milestones[0]!.status !== "passed" || planDetail.milestones[0]!.verify !== "manual") {
+    throw new Error(`plano deveria estar passed/manual: ${JSON.stringify(planDetail)}`);
+  }
+  log("etapa de plano: revisão manual, liberada para o comprador", "ok");
 
   // 5. Contestação exige o critério; admin resolve com reembolso
   const noCrit = await api(`/api/tx/escrow/${escrowId}/dispute`, {
     method: "POST",
     token,
-    body: JSON.stringify({ index: 1, criterion: "algo inventado", reason: "não entregou" }),
+    body: JSON.stringify({ index: 0, criterion: "algo inventado", reason: "não entregou" }),
   }).catch((e) => e as Error);
   if (!(noCrit instanceof Error) || !noCrit.message.includes("invalid_criterion")) throw new Error("contestação sem critério válido deveria falhar");
-  await tx(token, buyer, `/api/tx/escrow/${escrowId}/dispute`, { index: 1, criterion: "Todos os testes passam", reason: "A tela não foi entregue." });
+  await tx(token, buyer, `/api/tx/escrow/${escrowId}/dispute`, { index: 0, criterion: "Props e estados definidos", reason: "O plano não foi entregue." });
   const admin = await key("admin");
   const adminToken = await loginWithToken(admin);
   const disputes = await api<{ escrowId: string; criterion: string }[]>("/api/admin/disputes", { token: adminToken });
-  if (!disputes.some((d) => d.escrowId === escrowId && d.criterion === "Todos os testes passam")) throw new Error("disputa não listada para o admin");
-  await api(`/api/admin/escrow/${escrowId}/resolve`, { method: "POST", token: adminToken, body: JSON.stringify({ index: 1, refund: true }) });
+  if (!disputes.some((d) => d.escrowId === escrowId && d.criterion === "Props e estados definidos")) throw new Error("disputa não listada para o admin");
+  await api(`/api/admin/escrow/${escrowId}/resolve`, { method: "POST", token: adminToken, body: JSON.stringify({ index: 0, refund: true }) });
   const after = await api<{ escrow: { status: string; milestones: { status: string }[] } }>(`/api/me/escrows/${escrowId}`, { token });
-  if (after.escrow.milestones[1]!.status !== "refunded") throw new Error(`etapa 2 deveria estar refunded: ${JSON.stringify(after.escrow)}`);
+  if (after.escrow.milestones[0]!.status !== "refunded") throw new Error(`etapa 1 deveria estar refunded: ${JSON.stringify(after.escrow)}`);
   log("contestação com critério + resolução do admin (reembolso)", after.escrow.status);
 
   // 6. Memórias na vitrine: pede a assinatura, lista e apaga
@@ -152,10 +168,22 @@ async function main() {
   const conn = await api<{ authorizedClients: unknown[] }>("/api/connector", { token });
   const rep = await api<{ guaranteeLevel: string; purchases: number }>("/api/me/reputation", { token });
   log("status do conector e reputação", `${conn.authorizedClients.length} cliente(s), nível ${rep.guaranteeLevel}`);
+
+  // 8. Endpoints das telas: limite de garantia, uso, perfil, criadores e painel
+  const g = await api<{ limitUsdc: number; openUsdc: number; availableUsdc: number }>("/api/me/guarantee", { token });
+  if (g.availableUsdc !== Math.max(0, g.limitUsdc - g.openUsdc)) throw new Error(`limite de garantia inconsistente: ${JSON.stringify(g)}`);
+  const usage = await api<{ agentId: string; weekly: number[]; usesThisMonth: number }[]>("/api/me/usage", { token });
+  if (!usage.some((u) => u.weekly.length === 8)) throw new Error(`uso sem série semanal: ${JSON.stringify(usage)}`);
+  await api("/api/me/profile", { method: "PATCH", token, body: JSON.stringify({ displayName: "Comprador E2E", email: "E2E@Exemplo.com" }) });
+  const prof = await api<{ displayName: string; email: string; memberSince: string }>("/api/me/profile", { token });
+  if (prof.displayName !== "Comprador E2E" || prof.email !== "e2e@exemplo.com" || !prof.memberSince) throw new Error(`perfil: ${JSON.stringify(prof)}`);
+  const creators = await api<{ id: string }[]>("/api/creators");
+  if (!creators.some((c) => c.id === fe.creatorId)) throw new Error("criador do especialista fora da lista");
+  log("limite de garantia, uso semanal, perfil e criadores", `${g.availableUsdc}/${g.limitUsdc} USDC livres`);
   console.log(`\nE2E completo OK (${API})`);
 }
 
-async function loginWithToken(signer: Awaited<ReturnType<typeof key>>) {
+async function loginWithToken(signer: KeyPairSigner) {
   const { getBase58Decoder, signBytes } = await import("@solana/kit");
   const { message } = await api<{ message: string }>(`/api/auth/nonce?wallet=${signer.address}`);
   const signature = getBase58Decoder().decode(await signBytes(signer.keyPair.privateKey, new TextEncoder().encode(message)));

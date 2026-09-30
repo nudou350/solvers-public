@@ -42,6 +42,8 @@ export type AgentDetails = {
   versions?: AgentVersion[];
   tools?: { name: string; description: string; runner: string }[];
   guaranteeCriteria?: string[];
+  /** Modelo de tarefa com garantia definido pelo criador (manifest.guarantee). */
+  guaranteeTemplate?: { priceUsdc: number; milestones: { title: string; criteria: string[]; sharePct: number; verify: "tests" | "manual" }[] };
   catalogOnly?: boolean;
 };
 
@@ -150,6 +152,8 @@ export const escrows = pgTable(
     agentId: text("agent_id").notNull(),
     buyerWallet: text("buyer_wallet").notNull(),
     creatorWallet: text("creator_wallet").notNull(),
+    title: text("title").notNull().default(""),
+    description: text("description").notNull().default(""),
     nonce: u64("nonce").notNull(),
     total: u64("total").notNull(),
     status: text("status").notNull().default("pending"), // pending (tx não confirmada) | active | approved | disputed | refunded
@@ -169,6 +173,8 @@ export const milestones = pgTable(
     title: text("title").notNull(),
     criteria: text("criteria").notNull(),
     criteriaHash: text("criteria_hash").notNull(),
+    /** tests: verificador automático; manual: o comprador revisa a entrega (ex: plano). */
+    verify: text("verify").notNull().default("tests"),
     amount: u64("amount").notNull(),
     status: text("status").notNull().default("pending"),
     passedAt: ts("passed_at"),
@@ -181,9 +187,19 @@ export const milestones = pgTable(
     verifierReport: jsonb("verifier_report").$type<Record<string, unknown>>(),
     disputeReason: text("dispute_reason"),
     disputeCriterion: text("dispute_criterion"),
+    disputedAt: ts("disputed_at"),
   },
   (t) => [primaryKey({ columns: [t.escrowId, t.idx] })],
 );
+
+/** Dados de perfil fora da blockchain (nome e e-mail vêm do login por e-mail). */
+export const userProfiles = pgTable("user_profiles", {
+  wallet: text("wallet").primaryKey(),
+  displayName: text("display_name"),
+  email: text("email"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
 
 export const userReputation = pgTable("user_reputation", {
   wallet: text("wallet").primaryKey(),

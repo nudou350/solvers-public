@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Agent, Creator, Escrow, License, Review, UserReputation } from "./schemas.js";
+import { Agent, Creator, Escrow, GuaranteeLevel, License, Review, UserReputation } from "./schemas.js";
 
 // Extensões ao contrato para telas que o schema base não cobre.
 // Nunca alteram os campos de Agent/Creator/...; vêm em objetos separados.
@@ -18,6 +18,24 @@ export const AgentVersion = z.object({
   evalScore: z.number().nullable(),
 });
 
+export const MilestoneVerify = z.enum(["tests", "manual"]);
+
+/** Tarefa com garantia oferecida pelo criador: o comprador só descreve o que quer. */
+export const GuaranteeOffer = z.object({
+  priceUsdc: z.number(),
+  priceBrl: z.number(),
+  reviewWindowSecs: z.number(),
+  milestones: z.array(
+    z.object({
+      title: z.string(),
+      criteria: z.array(z.string()),
+      amountUsdc: z.number(),
+      /** "tests": o servidor verifica com testes; "manual": o comprador revisa a entrega (ex: um plano). */
+      verify: MilestoneVerify,
+    }),
+  ),
+});
+
 /** GET /api/agents/:slug */
 export const AgentDetail = z.object({
   agent: Agent,
@@ -29,6 +47,10 @@ export const AgentDetail = z.object({
   priceBrl: z.number().nullable(),
   pricePerUseBrl: z.number().nullable(),
   resalePriceHistory: z.array(z.object({ date: z.string(), priceUsdc: z.number() })),
+  /** Quantidade de avaliações por nota, de 5 a 1 estrela. */
+  ratingDistribution: z.array(z.number()).length(5),
+  /** null quando o especialista não oferece garantia (ou ainda não atingiu o mínimo de vendas e nota). */
+  guarantee: GuaranteeOffer.nullable(),
 });
 
 /** GET /api/creators/:id */
@@ -46,12 +68,23 @@ export const CreatorDashboard = z.object({
     salesRevenueUsdc: z.number(),
     royaltiesUsdc: z.number(),
     disputesOpened: z.number(),
+    disputesOpen: z.number(),
     disputesLost: z.number(),
   }),
+  /** Últimos 30 dias. */
+  last30: z.object({ sales: z.number(), uses: z.number(), revenueUsdc: z.number() }),
+  /** Parte do criador em cada venda (1 - taxa da plataforma). */
+  creatorSharePct: z.number(),
   agents: z.array(
     z.object({
       agentId: z.string(),
+      slug: z.string(),
       name: z.string(),
+      version: z.string(),
+      status: z.enum(["active", "pending", "suspended"]),
+      listed: z.boolean(),
+      userRating: z.number(),
+      evalScore: z.number(),
       sales: z.number(),
       uses: z.number(),
       revenueUsdc: z.number(),
@@ -59,6 +92,20 @@ export const CreatorDashboard = z.object({
     }),
   ),
   daily: z.array(z.object({ date: z.string(), sales: z.number(), uses: z.number(), revenueUsdc: z.number() })),
+  disputes: z.array(
+    z.object({
+      escrowId: z.string(),
+      index: z.number(),
+      agentId: z.string(),
+      taskTitle: z.string(),
+      milestoneTitle: z.string(),
+      criterion: z.string().nullable(),
+      reason: z.string().nullable(),
+      amountUsdc: z.number(),
+      openedAt: z.string().nullable(),
+      result: z.enum(["open", "buyer", "creator"]),
+    }),
+  ),
 });
 
 /** GET /api/connector */
@@ -70,6 +117,9 @@ export const ConnectorStatus = z.object({
 /** GET /api/me/profile */
 export const Profile = z.object({
   wallet: z.string(),
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+  memberSince: z.string(),
   reputation: UserReputation,
   creator: Creator.nullable(),
   explorerUrl: z.string(),
@@ -79,6 +129,8 @@ export const Profile = z.object({
 /** GET /api/me/escrows/:id */
 export const EscrowDetail = z.object({
   escrow: Escrow,
+  description: z.string(),
+  createdAt: z.string(),
   agent: z.object({ id: z.string(), slug: z.string(), name: z.string() }),
   milestones: z.array(
     z.object({
@@ -89,12 +141,61 @@ export const EscrowDetail = z.object({
       previewUrl: z.string().nullable(),
       tests: z.object({ passed: z.number(), total: z.number(), mode: z.string() }).nullable(),
       criteria: z.array(z.string()),
+      verify: MilestoneVerify,
       hasAcceptanceTests: z.boolean(),
       disputeCriterion: z.string().nullable(),
       downloadable: z.boolean(),
     }),
   ),
   explorerUrl: z.string(),
+});
+
+/** GET /api/me/guarantee: quanto a carteira ainda pode colocar em garantias abertas. */
+export const GuaranteeStatus = z.object({
+  level: GuaranteeLevel,
+  limitUsdc: z.number(),
+  openUsdc: z.number(),
+  availableUsdc: z.number(),
+  purchases: z.number(),
+  /** Compras que faltam para o nível completo (0 quando já está nele). */
+  purchasesToFull: z.number(),
+  disputesLost: z.number(),
+  maxDisputesLost: z.number(),
+  /** Acima deste valor, contas no nível limitado precisam de pelo menos 2 etapas. */
+  singleMilestoneMaxUsdc: z.number(),
+});
+
+/** GET /api/me/usage */
+export const UsageSummary = z.object({
+  agentId: z.string(),
+  activations: z.number(),
+  calls: z.number(),
+  lastUsedAt: z.string().nullable(),
+  usesThisMonth: z.number(),
+  /** Ativações por semana, das 8 últimas (a última é a semana atual). */
+  weekly: z.array(z.number()).length(8),
+  creditsLeft: z.number().nullable(),
+  creditsTotal: z.number().nullable(),
+});
+
+/** GET /api/config */
+export const PublicConfig = z.object({
+  cluster: z.string(),
+  rpcUrl: z.string().nullable(),
+  programId: z.string(),
+  usdcMint: z.string(),
+  feePayer: z.string(),
+  feeBps: z.number().nullable(),
+  minPurchaseUsdc: z.number(),
+  faucetEnabled: z.boolean(),
+  faucetAmountUsdc: z.number(),
+  brlPerUsd: z.number(),
+  connectorUrl: z.string(),
+  freeTrialUses: z.number(),
+  reviewWindowSecs: z.number(),
+  guaranteeLimitsUsdc: z.object({ none: z.number(), limited: z.number(), full: z.number() }),
+  guaranteeMinSales: z.number(),
+  guaranteeMinRating: z.number(),
 });
 
 /** GET /api/market/listings (revenda é P2: dados simulados na demo) */
@@ -126,5 +227,10 @@ export type ConnectorStatus = z.infer<typeof ConnectorStatus>;
 export type Profile = z.infer<typeof Profile>;
 export type TxResponse = z.infer<typeof TxResponse>;
 export type EscrowDetail = z.infer<typeof EscrowDetail>;
+export type GuaranteeOffer = z.infer<typeof GuaranteeOffer>;
+export type MilestoneVerify = z.infer<typeof MilestoneVerify>;
+export type GuaranteeStatus = z.infer<typeof GuaranteeStatus>;
+export type UsageSummary = z.infer<typeof UsageSummary>;
+export type PublicConfig = z.infer<typeof PublicConfig>;
 export type ResaleListing = z.infer<typeof ResaleListing>;
 export type SubmitResponse = z.infer<typeof SubmitResponse>;

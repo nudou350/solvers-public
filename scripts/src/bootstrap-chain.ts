@@ -4,7 +4,8 @@ import { chain, key, log, RPC_URL } from "./env.js";
 import { usdcToUnits, MIN_PERMANENT_PRICE_USDC } from "@solvers/shared";
 
 const FEE_BPS = Number(process.env.FEE_BPS ?? 1000);
-const MIN_STAKE_USDC = Number(process.env.MIN_STAKE_USDC ?? 10);
+// Publicar é grátis: sem depósito do criador (a qualidade vem da bateria de testes e da nota).
+const MIN_STAKE_USDC = Number(process.env.MIN_STAKE_USDC ?? 0);
 
 const c = await chain();
 const admin = await key("admin");

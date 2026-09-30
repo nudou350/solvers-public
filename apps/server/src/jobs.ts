@@ -6,11 +6,14 @@ import { db, schema } from "./db/index.js";
 import { env } from "./env.js";
 import { processSignature } from "./indexer/processor.js";
 import { randomId, sha256 } from "./lib/crypto.js";
+import { notifyCreator } from "./notify/telegram.js";
+import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS } from "@solvers/shared";
 
 // Jobs periódicos:
 // - auto release (a cada minuto): etapas aprovadas nos testes cujo prazo venceu são pagas ao criador.
 // - fechamento de escrows encerrados (devolve o rent à plataforma).
 // - lote de usos verificados (a cada 10 min): record_usage_batch com raiz Merkle dos recibos.
+// - vitrine (a cada hora): tira especialistas com nota baixa depois de 10 avaliações.
 
 export async function autoReleaseOnce(): Promise<number> {
   if (!env.AUTO_RELEASE_ENABLED) return 0;
@@ -127,6 +130,28 @@ export async function recordUsageBatchOnce(): Promise<number> {
   return total;
 }
 
+/**
+ * Qualidade da vitrine: especialista com nota média abaixo de DELIST_MAX_RATING depois de
+ * DELIST_MIN_REVIEWS avaliações sai da vitrine (continua funcionando para quem já comprou).
+ */
+export async function delistLowRatedOnce(): Promise<number> {
+  const rows = await db
+    .update(schema.agents)
+    .set({ listed: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.agents.listed, true),
+        sql`${schema.agents.ratingCount} >= ${DELIST_MIN_REVIEWS}`,
+        sql`${schema.agents.ratingSum}::float / nullif(${schema.agents.ratingCount}, 0) < ${DELIST_MAX_RATING}`,
+      ),
+    )
+    .returning({ id: schema.agents.id, name: schema.agents.name });
+  for (const r of rows) {
+    void notifyCreator(r.id, `Solvers: "${r.name}" saiu da vitrine porque a nota média ficou abaixo de ${DELIST_MAX_RATING}. Quem já comprou continua usando normalmente.`);
+  }
+  return rows.length;
+}
+
 function every(ms: number, name: string, fn: () => Promise<number>) {
   let timer: NodeJS.Timeout | null = null;
   let busy = false;
@@ -154,4 +179,5 @@ function every(ms: number, name: string, fn: () => Promise<number>) {
 export const jobs = [
   every(60_000, "auto release", async () => (await autoReleaseOnce()) + (await closeFinishedOnce())),
   every(10 * 60_000, "lote de usos", recordUsageBatchOnce),
+  every(60 * 60_000, "vitrine: nota baixa", delistLowRatedOnce),
 ];
