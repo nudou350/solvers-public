@@ -74,8 +74,9 @@ pub mod solvers {
         nonce: u64,
         milestones: Vec<MilestoneInput>,
         review_window_secs: i64,
+        delivery_days: u16,
     ) -> Result<()> {
-        instructions::escrow::create_escrow(ctx, nonce, milestones, review_window_secs)
+        instructions::escrow::create_escrow(ctx, nonce, milestones, review_window_secs, delivery_days)
     }
     pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 32]) -> Result<()> {
         instructions::escrow::mark_passed(ctx, index, deliverable_hash)
@@ -88,6 +89,12 @@ pub mod solvers {
     }
     pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) -> Result<()> {
         instructions::escrow::resolve_dispute(ctx, index, refund)
+    }
+    pub fn cancel_undelivered(ctx: Context<CancelUndelivered>, index: u8) -> Result<()> {
+        instructions::escrow::cancel_undelivered(ctx, index)
+    }
+    pub fn resolve_stale_dispute(ctx: Context<ResolveStaleDispute>, index: u8) -> Result<()> {
+        instructions::escrow::resolve_stale_dispute(ctx, index)
     }
     pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {
         instructions::escrow::close_escrow(ctx)

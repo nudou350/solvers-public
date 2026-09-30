@@ -94,6 +94,10 @@ export const Escrow = z.object({
   status: EscrowStatus,
   milestones: z.array(Milestone),
   autoReleaseAt: z.string(),
+  /** Prazo de entrega (ISO). Nulo em tarefas criadas antes do prazo existir. */
+  deliveryDeadline: z.string().nullable(),
+  /** Taxa da plataforma fixada na criação (pontos-base). Nulo em tarefas antigas. */
+  feeBps: z.number().nullable(),
 });
 
 export const Memory = z.object({

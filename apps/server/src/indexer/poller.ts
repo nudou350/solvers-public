@@ -6,7 +6,7 @@ import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { h, unauthorized } from "../lib/http.js";
-import { processSignature, processTransaction, recordFailure, retryFailures } from "./processor.js";
+import { clearFailure, processSignature, processTransaction, recordFailure, retryFailures } from "./processor.js";
 
 // Indexador (INSTRUCTIONS.md 5.11): webhook da Helius + polling de fallback obrigatório.
 
@@ -64,6 +64,8 @@ export async function pollOnce(): Promise<number> {
   for (const sig of pending.reverse()) {
     try {
       await processSignature(sig);
+      // Pode haver uma pendência antiga (webhook que falhou): agora está resolvida.
+      await clearFailure(sig);
     } catch (e) {
       console.error(`[indexer] falha em ${sig}:`, (e as Error).message);
       await recordFailure(sig, e);
@@ -130,6 +132,7 @@ webhookRouter.post(
         count += logs
           ? (await processTransaction(sig, logs, { failed: tx.meta?.err != null, blockTime: tx.blockTime ?? null })).length
           : (await processSignature(sig)).length;
+        await clearFailure(sig);
       } catch (e) {
         await recordFailure(sig, e);
       }

@@ -1,7 +1,7 @@
 //! Testes do programa com LiteSVM (INSTRUCTIONS.md 4.7).
 //! Requer `tests/fixtures/mpl_core.so` (dump da devnet) e o build em `target/deploy/solvers.so`.
 
-use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::spl_token;
 use litesvm::LiteSVM;
@@ -153,10 +153,15 @@ impl Env {
     }
 
     fn send(&mut self, ix: Instruction, signers: &[&Keypair]) -> Result<(), String> {
+        self.send_logs(ix, signers).map(|_| ())
+    }
+
+    /// Como `send`, mas devolve os logs da transação (para conferir eventos).
+    fn send_logs(&mut self, ix: Instruction, signers: &[&Keypair]) -> Result<Vec<String>, String> {
         let mut all: Vec<&Keypair> = vec![&self.payer];
         all.extend(signers.iter().copied().filter(|k| k.pubkey() != self.payer.pubkey()));
         let tx = Transaction::new_signed_with_payer(&[ix], Some(&self.payer.pubkey()), &all, self.svm.latest_blockhash());
-        let res = self.svm.send_transaction(tx).map(|_| ()).map_err(|e| format!("{:?}", e.meta.logs));
+        let res = self.svm.send_transaction(tx).map(|m| m.logs).map_err(|e| format!("{:?}", e.meta.logs));
         self.svm.expire_blockhash();
         res
     }
@@ -172,6 +177,11 @@ impl Env {
     }
 
     fn init_config(&mut self, admin: &Keypair, min_stake: u64) -> Result<(), String> {
+        let params = self.params(min_stake);
+        self.init_config_with(admin, params)
+    }
+
+    fn init_config_with(&mut self, admin: &Keypair, params: ConfigParams) -> Result<(), String> {
         let ix = Instruction {
             program_id: solvers::ID,
             accounts: solvers::accounts::InitializeConfig {
@@ -184,21 +194,55 @@ impl Env {
                 system_program: system_program::ID,
             }
             .to_account_metas(None),
-            data: solvers::instruction::InitializeConfig { args: self.params(min_stake) }.data(),
+            data: solvers::instruction::InitializeConfig { args: params }.data(),
         };
         self.send(ix, &[admin])
     }
 
     fn update_min_stake(&mut self, min_stake: u64) {
+        let params = self.params(min_stake);
+        self.update_config_with(params).unwrap();
+    }
+
+    fn update_fee(&mut self, fee_bps: u16) -> Result<Vec<String>, String> {
+        let params = ConfigParams { fee_bps, ..self.params(0) };
+        self.update_config_with(params)
+    }
+
+    fn update_config_with(&mut self, params: ConfigParams) -> Result<Vec<String>, String> {
         let ix = Instruction {
             program_id: solvers::ID,
             accounts: solvers::accounts::UpdateConfig { admin: self.admin.pubkey(), config: config_pda() }
                 .to_account_metas(None),
-            data: solvers::instruction::UpdateConfig { args: self.params(min_stake) }.data(),
+            data: solvers::instruction::UpdateConfig { args: params }.data(),
         };
         let admin = self.admin.insecure_clone();
-        self.send(ix, &[&admin]).unwrap();
+        self.send_logs(ix, &[&admin])
     }
+}
+
+fn b64_decode(s: &str) -> Vec<u8> {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let (mut out, mut acc, mut bits) = (Vec::new(), 0u32, 0u32);
+    for c in s.bytes().filter(|&c| c != b'=') {
+        acc = (acc << 6) | ALPHABET.iter().position(|&a| a == c).expect("base64 inválido") as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+        }
+    }
+    out
+}
+
+/// Eventos do tipo `T` emitidos nos logs ("Program data:" = discriminator + borsh).
+fn events<T: Discriminator + AnchorDeserialize>(logs: &[String]) -> Vec<T> {
+    logs.iter()
+        .filter_map(|l| l.strip_prefix("Program data: "))
+        .map(|d| b64_decode(d.trim()))
+        .filter(|d| d.starts_with(T::DISCRIMINATOR))
+        .map(|d| T::deserialize(&mut &d[T::DISCRIMINATOR.len()..]).unwrap())
+        .collect()
 }
 
 struct TestAgent {
@@ -549,6 +593,16 @@ struct TestEscrow {
 }
 
 fn create_escrow(env: &mut Env, agent: &TestAgent, buyer: &Keypair, amounts: &[u64]) -> Result<TestEscrow, String> {
+    create_escrow_days(env, agent, buyer, amounts, 0)
+}
+
+fn create_escrow_days(
+    env: &mut Env,
+    agent: &TestAgent,
+    buyer: &Keypair,
+    amounts: &[u64],
+    delivery_days: u16,
+) -> Result<TestEscrow, String> {
     let nonce: u64 = 1;
     let key = pda(&[ESCROW_SEED, buyer.pubkey().as_ref(), agent.key.as_ref(), &nonce.to_le_bytes()]);
     let vault = pda(&[ESCROW_VAULT_SEED, key.as_ref()]);
@@ -572,6 +626,7 @@ fn create_escrow(env: &mut Env, agent: &TestAgent, buyer: &Keypair, amounts: &[u
             nonce,
             milestones: amounts.iter().map(|&amount| MilestoneInput { amount, criteria_hash: [9; 32] }).collect(),
             review_window_secs: REVIEW_WINDOW,
+            delivery_days,
         }
         .data(),
     };
@@ -616,7 +671,7 @@ fn warp(env: &mut Env, secs: i64) {
     env.svm.set_sysvar(&clock);
 }
 
-fn close(env: &mut Env, escrow: &TestEscrow, buyer: &Pubkey, caller: &Keypair) -> Result<(), String> {
+fn close(env: &mut Env, escrow: &TestEscrow, buyer: &Pubkey, caller: &Keypair) -> Result<Vec<String>, String> {
     let ix = Instruction {
         program_id: solvers::ID,
         accounts: solvers::accounts::CloseEscrow {
@@ -631,7 +686,7 @@ fn close(env: &mut Env, escrow: &TestEscrow, buyer: &Pubkey, caller: &Keypair) -
         .to_account_metas(None),
         data: solvers::instruction::CloseEscrow {}.data(),
     };
-    env.send(ix, &[caller])
+    env.send_logs(ix, &[caller])
 }
 
 #[test]
@@ -680,8 +735,19 @@ fn escrow_auto_release_after_window() {
     state.pack_into_slice(&mut vault.data);
     env.svm.set_account(escrow.vault, vault).unwrap();
 
+    // Só quem pagou o rent (a plataforma) fecha: terceiros e o próprio comprador são recusados.
+    let err = close(&mut env, &escrow, &buyer.pubkey(), &keeper).unwrap_err();
+    assert!(err.contains("NotRentPayer"), "{err}");
+    let err = close(&mut env, &escrow, &buyer.pubkey(), &buyer).unwrap_err();
+    assert!(err.contains("NotRentPayer"), "{err}");
+    assert!(env.svm.get_account(&escrow.key).is_some_and(|a| a.lamports > 0));
+
     let before = env.svm.get_account(&env.payer.pubkey()).unwrap().lamports;
-    close(&mut env, &escrow, &buyer.pubkey(), &keeper).unwrap();
+    let payer = env.payer.insecure_clone();
+    let logs = close(&mut env, &escrow, &buyer.pubkey(), &payer).unwrap();
+    let closed = events::<solvers::events::EscrowClosed>(&logs);
+    assert_eq!(closed.len(), 1);
+    assert_eq!((closed[0].escrow, closed[0].agent, closed[0].buyer), (escrow.key, agent.key, buyer.pubkey()));
     assert!(env.svm.get_account(&escrow.key).is_none_or(|a| a.lamports == 0));
     assert!(env.svm.get_account(&env.payer.pubkey()).unwrap().lamports > before);
     assert_eq!(env.balance(&buyer_usdc), 10 * USDC + 1);
@@ -829,4 +895,402 @@ fn only_verifier_marks_passed_and_only_admin_approves() {
     };
     let err = env.send(ix, &[&buyer]).unwrap_err();
     assert!(err.contains("NotVerifier"), "{err}");
+}
+
+fn current_time(env: &Env) -> i64 {
+    env.svm.get_sysvar::<solana_clock::Clock>().unix_timestamp
+}
+
+fn cancel_ix(env: &Env, escrow: &TestEscrow, signer: &Pubkey, destination: Pubkey, index: u8) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::CancelUndelivered {
+            buyer: *signer,
+            escrow: escrow.key,
+            vault: escrow.vault,
+            buyer_usdc: destination,
+            usdc_mint: env.mint,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::CancelUndelivered { index }.data(),
+    }
+}
+
+fn cancel(env: &mut Env, escrow: &TestEscrow, buyer: &Keypair, index: u8) -> Result<Vec<String>, String> {
+    let ix = cancel_ix(env, escrow, &buyer.pubkey(), env.ata(&buyer.pubkey()), index);
+    env.send_logs(ix, &[buyer])
+}
+
+fn stale(env: &mut Env, escrow: &TestEscrow, caller: &Keypair, buyer: &Pubkey, index: u8) -> Result<Vec<String>, String> {
+    let ix = Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ResolveStaleDispute {
+            caller: caller.pubkey(),
+            escrow: escrow.key,
+            vault: escrow.vault,
+            buyer_usdc: env.ata(buyer),
+            usdc_mint: env.mint,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::ResolveStaleDispute { index }.data(),
+    };
+    env.send_logs(ix, &[caller])
+}
+
+#[test]
+fn create_escrow_delivery_days_and_fee_snapshot() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let now = current_time(&env);
+
+    // 0 = prazo padrão; o escrow guarda a taxa vigente e nenhuma etapa nasce contestada.
+    let (b0, _) = new_buyer(&mut env, 30 * USDC);
+    let e0 = create_escrow_days(&mut env, &agent, &b0, &[10 * USDC], 0).unwrap();
+    let e: Escrow = env.account(&e0.key);
+    assert_eq!(e.delivery_deadline, now + DEFAULT_DELIVERY_DAYS as i64 * 86_400);
+    assert_eq!(e.fee_bps, FEE_BPS);
+    assert_eq!(e.milestones[0].disputed_at, 0);
+
+    let (b30, _) = new_buyer(&mut env, 30 * USDC);
+    let e30 = create_escrow_days(&mut env, &agent, &b30, &[10 * USDC], 30).unwrap();
+    let e: Escrow = env.account(&e30.key);
+    assert_eq!(e.delivery_deadline, now + 30 * 86_400);
+
+    let (b60, _) = new_buyer(&mut env, 30 * USDC);
+    let e60 = create_escrow_days(&mut env, &agent, &b60, &[10 * USDC], MAX_DELIVERY_DAYS).unwrap();
+    let e: Escrow = env.account(&e60.key);
+    assert_eq!(e.delivery_deadline, now + MAX_DELIVERY_DAYS as i64 * 86_400);
+
+    // Acima do máximo é recusado e nada é cobrado.
+    let (b61, b61_usdc) = new_buyer(&mut env, 30 * USDC);
+    let err = create_escrow_days(&mut env, &agent, &b61, &[10 * USDC], 61).err().unwrap();
+    assert!(err.contains("InvalidDeliveryDays"), "{err}");
+    assert_eq!(env.balance(&b61_usdc), 30 * USDC);
+}
+
+#[test]
+fn fee_is_snapshotted_at_creation_and_immune_to_update_config() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, _) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[10 * USDC, 10 * USDC]).unwrap();
+
+    // O admin sobe a taxa de 10% para 20% depois da criação.
+    env.update_fee(2_000).unwrap();
+    assert_eq!(env.account::<Config>(&config_pda()).fee_bps, 2_000);
+
+    // Liberação: a taxa continua 10%.
+    release(&mut env, &agent, &escrow, &buyer, 0).unwrap();
+    assert_eq!(env.balance(&env.treasury.clone()), USDC);
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC + 9 * USDC);
+
+    // Resolução de disputa a favor do criador: também 10%.
+    dispute(&mut env, &escrow, &buyer, 1).unwrap();
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 1, false).unwrap();
+    assert_eq!(env.balance(&env.treasury.clone()), 2 * USDC);
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC + 18 * USDC);
+
+    // Um escrow novo já nasce com a taxa nova.
+    let (buyer2, _) = new_buyer(&mut env, 30 * USDC);
+    let escrow2 = create_escrow(&mut env, &agent, &buyer2, &[10 * USDC]).unwrap();
+    assert_eq!(env.account::<Escrow>(&escrow2.key).fee_bps, 2_000);
+}
+
+#[test]
+fn update_config_caps_fee_and_emits_event() {
+    let mut env = Env::new();
+    let err = env.update_fee(2_001).unwrap_err();
+    assert!(err.contains("FeeTooHigh"), "{err}");
+    assert_eq!(env.account::<Config>(&config_pda()).fee_bps, FEE_BPS);
+
+    let logs = env.update_fee(2_000).unwrap();
+    let evs = events::<solvers::events::ConfigUpdated>(&logs);
+    assert_eq!(evs.len(), 1);
+    assert_eq!(evs[0].fee_bps, 2_000);
+    assert_eq!(evs[0].verifier, env.verifier.pubkey());
+    assert_eq!(evs[0].usage_authority, env.usage.pubkey());
+    assert_eq!((evs[0].min_stake, evs[0].min_price), (0, MIN_PRICE));
+
+    // A inicialização também respeita o teto.
+    let mut env = Env::build(false);
+    let admin = env.admin.insecure_clone();
+    let params = ConfigParams { fee_bps: 2_001, ..env.params(0) };
+    let err = env.init_config_with(&admin, params).unwrap_err();
+    assert!(err.contains("FeeTooHigh"), "{err}");
+}
+
+#[test]
+fn update_pricing_emits_event() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    let ix = Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::UpdatePricing { creator: agent.creator.pubkey(), config: config_pda(), agent: agent.key }
+            .to_account_metas(None),
+        data: solvers::instruction::UpdatePricing { price: 20 * USDC, price_per_use: USDC }.data(),
+    };
+    let creator = agent.creator.insecure_clone();
+    let logs = env.send_logs(ix, &[&creator]).unwrap();
+    let evs = events::<solvers::events::PricingUpdated>(&logs);
+    assert_eq!(evs.len(), 1);
+    assert_eq!((evs[0].agent, evs[0].price, evs[0].price_per_use), (agent.key, 20 * USDC, USDC));
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.price, a.price_per_use), (20 * USDC, USDC));
+}
+
+#[test]
+fn cancel_undelivered_refunds_pending_milestones_after_deadline() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow_days(&mut env, &agent, &buyer, &[10 * USDC, 10 * USDC, 5 * USDC], 7).unwrap();
+    let deadline = env.account::<Escrow>(&escrow.key).delivery_deadline;
+    assert_eq!(env.balance(&buyer_usdc), 5 * USDC);
+
+    // Antes do prazo: recusado, nada se move.
+    let err = cancel(&mut env, &escrow, &buyer, 0).unwrap_err();
+    assert!(err.contains("DeliveryDeadlineNotReached"), "{err}");
+    // No segundo exato do prazo ainda não vale (só depois).
+    let to_deadline = deadline - current_time(&env);
+    warp(&mut env, to_deadline);
+    let err = cancel(&mut env, &escrow, &buyer, 0).unwrap_err();
+    assert!(err.contains("DeliveryDeadlineNotReached"), "{err}");
+    assert_eq!(env.balance(&escrow.vault), 25 * USDC);
+
+    // Etapa entregue (Passed) não é cancelável, mesmo vencido o prazo.
+    mark_passed(&mut env, &escrow, 2).unwrap();
+    warp(&mut env, 1);
+    let err = cancel(&mut env, &escrow, &buyer, 2).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+
+    // Só o comprador cancela.
+    let keeper = Keypair::new();
+    let ix = cancel_ix(&env, &escrow, &keeper.pubkey(), buyer_usdc, 0);
+    let err = env.send(ix, &[&keeper]).unwrap_err();
+    assert!(err.contains("NotBuyer"), "{err}");
+    // Nem desviar o dinheiro para outra conta: o destino tem que ser do comprador.
+    let (_, other_usdc) = new_buyer(&mut env, 0);
+    let ix = cancel_ix(&env, &escrow, &buyer.pubkey(), other_usdc, 0);
+    assert!(env.send(ix, &[&buyer]).is_err());
+    // Índice inexistente.
+    let err = cancel(&mut env, &escrow, &buyer, 9).unwrap_err();
+    assert!(err.contains("InvalidMilestoneIndex"), "{err}");
+
+    // Vencido: devolve a etapa inteira, sem taxa, e emite MilestoneUpdated.
+    let logs = cancel(&mut env, &escrow, &buyer, 0).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 15 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 15 * USDC);
+    assert_eq!(env.balance(&env.treasury.clone()), 0);
+    let evs = events::<solvers::events::MilestoneUpdated>(&logs);
+    assert_eq!(evs.len(), 1);
+    assert_eq!((evs[0].escrow, evs[0].index, evs[0].status), (escrow.key, 0, MilestoneStatus::Refunded as u8));
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.milestones[0].status, MilestoneStatus::Refunded);
+    assert_eq!(e.status, EscrowStatus::Active);
+
+    // Segunda chamada na mesma etapa: recusada, sem dupla devolução.
+    let err = cancel(&mut env, &escrow, &buyer, 0).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+    assert_eq!(env.balance(&buyer_usdc), 15 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 15 * USDC);
+
+    // Cancelar a etapa 1 e liberar a 2 (Passed): o escrow termina Completed, cofre zerado.
+    cancel(&mut env, &escrow, &buyer, 1).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 25 * USDC);
+    release(&mut env, &agent, &escrow, &buyer, 2).unwrap();
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.status, EscrowStatus::Completed);
+    assert_eq!(env.balance(&escrow.vault), 0);
+}
+
+#[test]
+fn cancel_all_undelivered_refunds_escrow_and_allows_close() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[10 * USDC, 10 * USDC]).unwrap();
+    warp(&mut env, DEFAULT_DELIVERY_DAYS as i64 * 86_400 + 1);
+    cancel(&mut env, &escrow, &buyer, 0).unwrap();
+    cancel(&mut env, &escrow, &buyer, 1).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 30 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 0);
+    assert_eq!(env.account::<Escrow>(&escrow.key).status, EscrowStatus::Refunded);
+    // Sem reputação afetada: ninguém perdeu disputa.
+    assert_eq!(env.account::<Agent>(&agent.key).disputes_lost, 0);
+
+    let payer = env.payer.insecure_clone();
+    close(&mut env, &escrow, &buyer.pubkey(), &payer).unwrap();
+    assert!(env.svm.get_account(&escrow.key).is_none_or(|a| a.lamports == 0));
+}
+
+#[test]
+fn stale_dispute_refunds_buyer_only_after_sla() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    // Prazo de entrega de 1 dia: já vencido quando o SLA de 7 dias termina.
+    let escrow = create_escrow_days(&mut env, &agent, &buyer, &[10 * USDC, 10 * USDC], 1).unwrap();
+    let keeper = Keypair::new();
+
+    // Sem disputa aberta, não há o que resolver.
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+
+    let opened = current_time(&env);
+    dispute(&mut env, &escrow, &buyer, 0).unwrap();
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.milestones[0].disputed_at, opened);
+    assert_eq!(e.milestones[1].disputed_at, 0);
+    assert_eq!(e.status, EscrowStatus::Disputed);
+
+    // Antes do SLA (faltando 1 segundo): recusado.
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("DisputeSlaNotReached"), "{err}");
+    warp(&mut env, DISPUTE_SLA_SECS - 1);
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("DisputeSlaNotReached"), "{err}");
+    assert_eq!(env.balance(&escrow.vault), 20 * USDC);
+
+    // Destino que não é a ATA do comprador é recusado.
+    let (_, other_usdc) = new_buyer(&mut env, 0);
+    let ix = Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ResolveStaleDispute {
+            caller: keeper.pubkey(),
+            escrow: escrow.key,
+            vault: escrow.vault,
+            buyer_usdc: other_usdc,
+            usdc_mint: env.mint,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::ResolveStaleDispute { index: 0 }.data(),
+    };
+    warp(&mut env, 1);
+    assert!(env.send(ix, &[&keeper]).is_err());
+
+    // No SLA (>=): qualquer um devolve tudo ao comprador, sem taxa e sem mexer na reputação.
+    let logs = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 20 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 10 * USDC);
+    assert_eq!(env.balance(&env.treasury.clone()), 0);
+    let resolved = events::<solvers::events::DisputeResolved>(&logs);
+    assert_eq!(resolved.len(), 1);
+    assert_eq!((resolved[0].escrow, resolved[0].index, resolved[0].refunded), (escrow.key, 0, true));
+    let updated = events::<solvers::events::MilestoneUpdated>(&logs);
+    assert_eq!(updated.len(), 1);
+    assert_eq!(updated[0].status, MilestoneStatus::Refunded as u8);
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.milestones[0].status, MilestoneStatus::Refunded);
+    assert_eq!(e.status, EscrowStatus::Active);
+    assert_eq!(env.account::<Agent>(&agent.key).disputes_lost, 0);
+    assert_eq!(env.account::<UserReputation>(&rep_pda(&buyer.pubkey())).disputes_lost, 0);
+
+    // Dupla chamada e julgamento tardio do admin: recusados, sem segunda devolução.
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+    let err = resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 0, true).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+    let err = resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 0, false).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+    assert_eq!(env.balance(&buyer_usdc), 20 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 10 * USDC);
+}
+
+#[test]
+fn admin_resolution_excludes_stale_dispute() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[10 * USDC]).unwrap();
+    mark_passed(&mut env, &escrow, 0).unwrap();
+    dispute(&mut env, &escrow, &buyer, 0).unwrap();
+    warp(&mut env, DISPUTE_SLA_SECS);
+
+    // O admin ainda pode julgar depois do SLA, desde que chegue antes do resgate automático.
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 0, false).unwrap();
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC + 9 * USDC);
+    let keeper = Keypair::new();
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("InvalidMilestoneStatus"), "{err}");
+    assert_eq!(env.balance(&buyer_usdc), 20 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 0);
+}
+
+#[test]
+fn stale_dispute_on_pending_milestone_also_waits_for_delivery_deadline() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow_days(&mut env, &agent, &buyer, &[10 * USDC], 30).unwrap();
+    let deadline = env.account::<Escrow>(&escrow.key).delivery_deadline;
+    let keeper = Keypair::new();
+
+    // Contesta no dia 1 uma etapa que nunca foi entregue; open_dispute não mexe em passed_at.
+    dispute(&mut env, &escrow, &buyer, 0).unwrap();
+    assert_eq!(env.account::<Escrow>(&escrow.key).milestones[0].passed_at, 0);
+
+    // 7 dias depois, mas antes do prazo de entrega: recusado.
+    warp(&mut env, DISPUTE_SLA_SECS);
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("DeliveryDeadlineNotReached"), "{err}");
+    assert_eq!(env.balance(&escrow.vault), 10 * USDC);
+
+    // No segundo exato do prazo ainda não vale; depois dele, reembolsa.
+    let to_deadline = deadline - current_time(&env);
+    warp(&mut env, to_deadline);
+    let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+    assert!(err.contains("DeliveryDeadlineNotReached"), "{err}");
+    warp(&mut env, 1);
+    stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 30 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 0);
+    assert_eq!(env.account::<Escrow>(&escrow.key).status, EscrowStatus::Refunded);
+}
+
+#[test]
+fn stale_dispute_on_delivered_milestone_needs_admin_judgment() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 30 * USDC);
+    let escrow = create_escrow_days(&mut env, &agent, &buyer, &[10 * USDC, 10 * USDC], 1).unwrap();
+    let keeper = Keypair::new();
+
+    // O relógio do LiteSVM começa em 0, que é o valor sentinela de passed_at: usa um horário real.
+    warp(&mut env, 1_700_000_000);
+
+    // Entregue (Passed) e contestada dentro da janela de revisão; passed_at continua gravado.
+    mark_passed(&mut env, &escrow, 0).unwrap();
+    mark_passed(&mut env, &escrow, 1).unwrap();
+    dispute(&mut env, &escrow, &buyer, 0).unwrap();
+    dispute(&mut env, &escrow, &buyer, 1).unwrap();
+    assert_ne!(env.account::<Escrow>(&escrow.key).milestones[0].passed_at, 0);
+
+    // Mesmo com o SLA e o prazo de entrega vencidos, e mesmo muito depois, o automático recusa.
+    for secs in [DISPUTE_SLA_SECS, 30 * 86_400] {
+        warp(&mut env, secs);
+        let err = stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap_err();
+        assert!(err.contains("StaleDisputeNeedsJudgment"), "{err}");
+    }
+    assert_eq!(env.balance(&escrow.vault), 20 * USDC);
+    assert_eq!(env.balance(&buyer_usdc), 10 * USDC);
+
+    // O admin ainda julga: reembolso numa etapa e pagamento ao criador (com a taxa) na outra.
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 0, true).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 20 * USDC);
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 1, false).unwrap();
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC + 9 * USDC);
+    assert_eq!(env.balance(&env.treasury.clone()), USDC);
+    assert_eq!(env.balance(&escrow.vault), 0);
+    assert_eq!(env.account::<Escrow>(&escrow.key).status, EscrowStatus::Completed);
 }

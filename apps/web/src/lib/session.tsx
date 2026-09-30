@@ -5,7 +5,7 @@ import type { PublicConfig } from "@solvers/api-client";
 import dynamic from "next/dynamic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, onUnauthorized, type SolversApi } from "./api";
-import { createDevAdapter, DEV_WALLET_ALLOWED, devWalletBlocked, forgetDevWallet, loadDevWallet, PRIVY_APP_ID, type WalletAdapter, type WalletLike } from "./wallet";
+import { createDevAdapter, devWalletBlocked, forgetDevWallet, loadDevWallet, PRIVY_APP_ID, type WalletAdapter, type WalletLike } from "./wallet";
 
 const PrivyWallet = dynamic(() => import("./wallet/privy"), { ssr: false });
 
@@ -112,8 +112,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   adapterRef.current = adapter;
 
   useEffect(() => {
-    loadConfig().then(setConfig, () => setConfig(null));
-    if (!PRIVY_APP_ID && DEV_WALLET_ALLOWED) loadDevWallet(false)?.then(setDevWallet, () => {});
+    loadConfig().then(
+      (cfg) => {
+        setConfig(cfg);
+        // Só restaura a carteira de desenvolvimento depois de a config provar que a rede permite (na dúvida, não restaura).
+        if (!PRIVY_APP_ID && !devWalletBlocked(cfg.cluster)) loadDevWallet(false)?.then(setDevWallet, () => {});
+      },
+      () => setConfig(null),
+    );
   }, []);
 
   /** Relê a sessão. Sem `force`, pula a pergunta ao servidor quando não há indício de sessão (ver HINT). */
@@ -160,7 +166,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLoggingIn(true);
       try {
         if (adapterRef.current.kind === "dev") {
-          const blocked = devWalletBlocked((await loadConfig().catch(() => null))?.cluster);
+          const cfg = await loadConfig().catch(() => null);
+          if (!cfg) throw new Error("Não deu para confirmar a rede agora. Tente de novo em instantes.");
+          const blocked = devWalletBlocked(cfg.cluster);
           if (blocked) throw new Error(blocked);
         }
         const w = await adapterRef.current.connect();
@@ -201,7 +209,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [login]);
 
   const current = adapter.current;
-  const wallet = me && current && current.address === me.wallet ? current : null;
+  // A carteira de desenvolvimento só assina com a rede confirmada como de teste (mesma regra do login).
+  const devBlocked = adapter.kind === "dev" && (!config || devWalletBlocked(config.cluster) !== null);
+  const wallet = me && current && !devBlocked && current.address === me.wallet ? current : null;
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
 

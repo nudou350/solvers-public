@@ -7,6 +7,7 @@ import { notFound } from "../lib/http.js";
 import { getPackage } from "../runtime/packages.js";
 import { trialInfo } from "../runtime/trial.js";
 import { brlPerUsd } from "./fx.js";
+import { textMatchesHash } from "./review-rules.js";
 import { guaranteeOffered, toAgent, toCreator, toReview, type AgentExtras, type CreatorStats } from "./mappers.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
@@ -165,7 +166,8 @@ export async function listReviews(agentId: string, limit = 50) {
         .where(inArray(schema.userProfiles.wallet, wallets))
     : [];
   const nameOf = new Map(names.map((n) => [n.wallet, n.name]));
-  return rows.map((r) => toReview(r, nameOf.get(r.authorWallet) ?? null));
+  // O texto é off-chain: só aparece se o sha256 dele bate com o hash confirmado on-chain.
+  return rows.map((r) => toReview(textMatchesHash(r.text, r.contentHash) ? r : { ...r, text: "" }, nameOf.get(r.authorWallet) ?? null));
 }
 
 export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {

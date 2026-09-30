@@ -4,12 +4,16 @@ import { db, schema } from "../db/index.js";
 import { forbidden, notFound } from "../lib/http.js";
 import { randomId, sha256Hex } from "../lib/crypto.js";
 import type { SolverPackage } from "./packages.js";
-import { escrowIsOpen, paidAccessById, type PaidAccess } from "./access.js";
+import { escrowIsOpen, paidAccessById, sessionGrantValid, type PaidAccess } from "./access.js";
+import { licenseRecheckDue, withSummary } from "./session-rules.js";
 
 // Motor de etapas (INSTRUCTIONS.md 5.4): sessão por ativação, uma etapa por vez, gates,
 // e marca d'água simples por carteira.
 
 export type Session = typeof schema.sessions.$inferSelect;
+
+/** Última validação on-chain bem-sucedida da licença por sessão (licença:carteira), em ms. */
+const licenseChecked = new Map<string, number>();
 
 /** Teste grátis: sessão curta e com teto de chamadas (evita baixar a base inteira de graça). */
 const TRIAL_TTL_MS = 2 * 3600_000;
@@ -114,21 +118,25 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
       throw forbidden("A tarefa com garantia deste especialista foi encerrada. Ative o solver de novo com activate_solver.");
     }
   }
-  if (s.access === "license" && s.licenseId) {
-    const [lic] = await db
-      .select({ owner: schema.licenses.ownerWallet })
-      .from(schema.licenses)
-      .where(eq(schema.licenses.id, s.licenseId));
-    if (!lic || lic.owner !== wallet) throw forbidden("A licença deste especialista não pertence mais a esta carteira.");
+  if (s.access === "license") {
+    // Licença revendida: confere o dono on-chain (sessionGrantValid cai no banco se o RPC falhar), com cache curto
+    // para não bater no RPC a cada chamada.
+    const key = `${s.licenseId}:${wallet}`;
+    if (licenseRecheckDue(licenseChecked.get(key), Date.now())) {
+      if (!s.licenseId || !(await sessionGrantValid(s))) {
+        licenseChecked.delete(key);
+        throw forbidden("A licença deste especialista não pertence mais a esta carteira.");
+      }
+      if (licenseChecked.size > 2000) for (const [k, t] of licenseChecked) if (licenseRecheckDue(t, Date.now())) licenseChecked.delete(k);
+      licenseChecked.set(key, Date.now());
+    }
   }
   return s;
 }
 
 export async function advance(session: Session, resultSummary?: string): Promise<Session> {
-  const context = { ...(session.context as Record<string, unknown>) };
-  const summaries = Array.isArray(context.summaries) ? [...(context.summaries as unknown[])] : [];
-  if (resultSummary && session.stepIndex > 0) summaries[session.stepIndex - 1] = resultSummary.slice(0, 4000);
-  context.summaries = summaries;
+  // O resumo recebido é da etapa anterior à que está sendo entregue (slot stepIndex - 1).
+  const context = withSummary(session.context as Record<string, unknown>, resultSummary ? session.stepIndex - 1 : -1, resultSummary ?? "");
   const [s] = await db
     .update(schema.sessions)
     .set({ stepIndex: session.stepIndex + 1, context, updatedAt: new Date() })
@@ -136,6 +144,24 @@ export async function advance(session: Session, resultSummary?: string): Promise
     .returning();
   // Outra chamada avançou antes: devolve o estado atual sem pular etapa.
   return s ?? (await getSession(session.id, session.wallet));
+}
+
+/** A sessão de garantia passa a apontar para outra tarefa aberta do mesmo especialista (escolhida pelo escrow_id informado). */
+export async function bindSessionEscrow(session: Session, escrowId: string): Promise<Session> {
+  const context = { ...(session.context as Record<string, unknown>), escrowId };
+  const [s] = await db
+    .update(schema.sessions)
+    .set({ context, updatedAt: new Date() })
+    .where(and(eq(schema.sessions.id, session.id), eq(schema.sessions.access, "guarantee")))
+    .returning();
+  return s ?? session;
+}
+
+/** Reenvio de etapa (next_step repetido): só guarda o resumo no slot certo, sem avançar a sessão. */
+export async function saveSummary(session: Session, slot: number, summary: string): Promise<Session> {
+  const context = withSummary(session.context as Record<string, unknown>, slot, summary);
+  const [s] = await db.update(schema.sessions).set({ context, updatedAt: new Date() }).where(eq(schema.sessions.id, session.id)).returning();
+  return s ?? session;
 }
 
 const WATERMARKS = [
@@ -195,7 +221,7 @@ export function renderStep(pkg: SolverPackage, session: Session, index: number):
     watermark(session.wallet, pkg.manifest.id),
     gate,
     "",
-    `Quando o checklist estiver completo, chame next_step com session_id="${session.id}" e result_summary no formato pedido acima.`,
+    `Quando o checklist estiver completo, chame next_step com session_id="${session.id}", completed_step=${index + 1} e result_summary no formato pedido acima.`,
   ].join("\n");
   return { text, done: false };
 }

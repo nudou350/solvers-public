@@ -17,6 +17,10 @@ import { txErrorMessage } from "@/lib/tx";
 
 type Client = "claude" | "gpt";
 
+/** Nome com que cada app se registra ao autorizar. Nome que não bate com nenhum dos dois ("Assistente de IA") vale para a aba aberta. */
+const CLIENT_NAME: Record<Client, RegExp> = { claude: /claude|anthropic/i, gpt: /chatgpt|gpt|openai/i };
+const isKnown = (name: string) => CLIENT_NAME.claude.test(name) || CLIENT_NAME.gpt.test(name);
+
 type Check = {
   key: string;
   label: string;
@@ -67,7 +71,8 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const [copied, setCopied] = useState(false);
   const [plan, setPlan] = useState(false);
   const [conns, setConns] = useState<Record<string, boolean>>({});
-  const [added, setAdded] = useState(false);
+  // "Já colei e confirmei" é por aba: o que foi feito no Claude não vale para o ChatGPT.
+  const [addedBy, setAddedBy] = useState<Record<Client, boolean>>({ claude: false, gpt: false });
   const [conn, setConn] = useState<ConnectorStatus | null>(null);
   const [testing, setTesting] = useState(false);
   const [testedEmpty, setTestedEmpty] = useState(false);
@@ -76,7 +81,12 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const url = config?.connectorUrl ?? "";
   const gpt = tab === "gpt";
   const clientName = gpt ? "ChatGPT" : "Claude";
-  const connected = !!conn && conn.authorizedClients.length > 0;
+  // Só conta a autorização do app desta aba (ou de um app sem nome reconhecível).
+  const mine = conn?.authorizedClients.filter((c) => CLIENT_NAME[tab].test(c.clientName) || !isKnown(c.clientName)) ?? [];
+  const others = conn?.authorizedClients.filter((c) => !mine.includes(c)) ?? [];
+  const connected = mine.length > 0;
+  const added = addedBy[tab] || connected;
+  const setAdded = (v: boolean) => setAddedBy((a) => ({ ...a, [tab]: v }));
 
   const test = useCallback(
     async (silent = false) => {
@@ -84,9 +94,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
       try {
         const c = await api.getConnector();
         setConn(c);
-        const ok = c.authorizedClients.length > 0;
-        if (ok) setAdded(true);
-        if (!silent) setTestedEmpty(!ok);
+        if (!silent) setTestedEmpty(true);
       } catch (e) {
         if (!silent) {
           const info = txErrorMessage(e);
@@ -124,7 +132,8 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const planReq = agent?.requirements.find((r) => r.type === "plan");
   const connectorReqs = agent?.requirements.filter((r) => r.type === "connector") ?? [];
   const logged = status === "authed" && !!me;
-  const first = conn?.authorizedClients[0];
+  const first = mine[0];
+  const otherNames = [...new Set(others.map((c) => c.clientName))].join(" e ");
 
   const checks: Check[] = [
     {
@@ -164,14 +173,16 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
       key: "test",
       label: "Teste de conexão",
       ok: connected,
-      statusOk: first ? `Funcionando · ${first.clientName} autorizado ${ago(first.authorizedAt)}` : "Funcionando",
+      statusOk: first ? `${first.clientName} autorizado ${ago(first.authorizedAt)}. Faça o passo 4 para confirmar.` : "Autorizado. Faça o passo 4 para confirmar.",
       statusNo: !logged
         ? "Entre na sua conta para testar"
-        : testedEmpty
-          ? "Ainda não encontramos a sua IA. Confira o passo 3 e autorize o acesso."
-          : added
-            ? "Pronto para testar"
-            : "Faça o passo 3 primeiro",
+        : others.length
+          ? `Encontramos ${otherNames}, mas não o ${clientName}. Faça o passo 3 neste app e autorize o acesso.`
+          : testedEmpty
+            ? `Ainda não encontramos o ${clientName}. Confira o passo 3 e autorize o acesso.`
+            : added
+              ? "Pronto para testar"
+              : "Faça o passo 3 primeiro",
       actLabel: !logged ? "Entrar" : "Testar conexão",
       act: !logged ? doLogin : () => void test(false),
       acting: !logged ? loggingIn : testing,
@@ -353,6 +364,15 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               <div className="grow">
                 <b>Tudo pronto!</b>
                 <div className="small muted">{agent ? "Seu especialista já pode ser usado na sua IA." : "Seus especialistas já podem ser usados na sua IA."}</div>
+                {agent && trial?.owned ? (
+                  <div className="tiny faint" style={{ marginTop: 4 }}>
+                    Depois de usar,{" "}
+                    <Link className="link" href={`/especialistas/${agent.slug}#avaliar`}>
+                      conte como foi
+                    </Link>
+                    .
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

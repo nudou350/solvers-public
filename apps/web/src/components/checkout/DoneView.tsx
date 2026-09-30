@@ -1,6 +1,7 @@
 "use client";
 // Compra concluída (design: compra-concluida): licença ou tarefa com garantia.
 import type { AgentDetail } from "@solvers/api-client";
+import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Toast";
@@ -9,6 +10,7 @@ import { Tile } from "@/components/ui/Tile";
 import { brl, date, usdc } from "@/lib/format";
 import { clusterName, explorerLink, trustedExplorerUrl } from "@/lib/explorer";
 import { useSession } from "@/lib/session";
+import { useToast } from "@/components/ui/Toast";
 import { gap } from "@/lib/style";
 import { type DoneKind } from "./util";
 
@@ -28,54 +30,87 @@ export type DoneProps = {
   explorer: string | null;
 };
 
-/** A URL diz o que foi comprado; a conta confirma. "unknown" = sem sessão para conferir (não bloqueia nada). */
+/** A URL diz o que foi comprado; a conta confirma. "unknown" = sem sessão para conferir: a página não afirma nada. */
 type Check = "checking" | "ok" | "missing" | "unknown";
 
+/** Esperas entre as conferências (~30 s no total): a compra pode demorar um pouco para aparecer na conta. */
+const RETRY_DELAYS_MS = [0, 2000, 3000, 5000, 5000, 5000, 10_000];
+
 export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer }: DoneProps) {
-  const { api, config, status } = useSession();
+  const { api, config, status, login, loggingIn } = useSession();
+  const toast = useToast();
   const [check, setCheck] = useState<Check>("checking");
+  // Valor guardado confirmado pelo servidor (garantia); o da URL não conta como prova.
+  const [escrowUsdc, setEscrowUsdc] = useState<number | null>(null);
+  const [recheck, setRecheck] = useState(0);
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authed") return setCheck("unknown");
     let alive = true;
-    const confirm =
-      kind === "escrow"
-        ? escrow
-          ? api.getMyEscrow(escrow).then(() => true)
-          : Promise.resolve(false)
-        : api.getMyAccess(detail.agent.slug).then((a) => !!a.license);
-    confirm.then(
-      (ok) => alive && setCheck(ok ? "ok" : "missing"),
-      () => alive && setCheck("missing"),
-    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const once = async (): Promise<boolean> => {
+      if (kind === "escrow") {
+        if (!escrow) return false;
+        const d = await api.getMyEscrow(escrow);
+        // A garantia precisa ser deste especialista, não só da conta.
+        if (d.agent.slug !== detail.agent.slug) return false;
+        if (alive) setEscrowUsdc(d.escrow.amountUsdc);
+        return true;
+      }
+      return !!(await api.getMyAccess(detail.agent.slug)).license;
+    };
+    const attempt = async (i: number) => {
+      const ok = await once().catch(() => false);
+      if (!alive) return;
+      if (ok) setCheck("ok");
+      else if (i + 1 < RETRY_DELAYS_MS.length) timer = setTimeout(() => void attempt(i + 1), RETRY_DELAYS_MS[i + 1]);
+      else setCheck("missing");
+    };
+    setCheck("checking");
+    void attempt(0);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
-  }, [api, status, kind, escrow, detail.agent.slug]);
+  }, [api, status, kind, escrow, detail.agent.slug, recheck]);
   const { agent } = detail;
   const [tech, setTech] = useState(false);
   // Data de hoje só no navegador (evita divergência de hidratação por fuso).
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => setToday(date(new Date().toISOString())), []);
 
-  const paid = paidUsdc ?? (kind === "escrow" ? (detail.guarantee?.priceUsdc ?? agent.priceUsdc) : agent.priceUsdc);
+  const confirmed = check === "ok";
+  // Garantia: o valor vem do servidor. Licença: o da URL só aparece com a posse confirmada.
+  const paid = kind === "escrow" ? (escrowUsdc ?? detail.guarantee?.priceUsdc ?? agent.priceUsdc) : (paidUsdc ?? agent.priceUsdc);
   const rate = config?.brlPerUsd ?? null;
   const isEscrow = kind === "escrow";
   const account = isEscrow ? escrow : asset;
   const txLink = sig ? (trustedExplorerUrl(explorer) ?? (config ? explorerLink(config, "tx", sig) : null)) : null;
 
-  const heading = isEscrow ? `Pronto! Sua tarefa com o ${agent.name} começou.` : `Pronto! O ${agent.name} é seu.`;
-  const lead = isEscrow
+  const heading = !confirmed
+    ? `Sua compra do ${agent.name}`
+    : isEscrow
+      ? `Pronto! Sua tarefa com o ${agent.name} começou.`
+      : `Pronto! O ${agent.name} é seu.`;
+  const lead = check === "unknown"
+    ? "Entre com a conta que você usou na compra para a gente conferir. Só confirmamos depois de ver na sua conta."
+    : check === "missing"
+      ? null
+      : check === "checking"
+        ? "Só um instante, estamos conferindo na sua conta."
+        : isEscrow
     ? "O pagamento está guardado e só vai para o criador quando você aprovar cada etapa. Conecte o especialista à sua IA para ele começar a trabalhar na tarefa."
     : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
 
   return (
     <section className="wrap" style={{ position: "relative", paddingTop: 56, paddingBottom: 72 }}>
-      <div className="confetti" aria-hidden>
-        {CONFETTI.map(([l, t, r], i) => (
-          <i key={i} style={{ left: `${l}%`, top: `${t}%`, "--r": `${r}deg` } as CSSProperties} />
-        ))}
-      </div>
+      {confirmed ? (
+        <div className="confetti" aria-hidden>
+          {CONFETTI.map(([l, t, r], i) => (
+            <i key={i} style={{ left: `${l}%`, top: `${t}%`, "--r": `${r}deg` } as CSSProperties} />
+          ))}
+        </div>
+      ) : null}
       <div className="col center" style={{ ...gap(22), alignItems: "center", position: "relative", maxWidth: 720, margin: "0 auto" }}>
         <span
           className="pop"
@@ -83,26 +118,47 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
             width: 96,
             height: 96,
             borderRadius: "50%",
-            background: "var(--mint)",
+            background: confirmed ? "var(--mint)" : "var(--brand)",
             color: "#fff",
             display: "grid",
             placeItems: "center",
-            boxShadow: "0 18px 40px -12px color-mix(in oklab,var(--mint) 60%,transparent)",
+            boxShadow: `0 18px 40px -12px color-mix(in oklab,var(${confirmed ? "--mint" : "--brand"}) 60%,transparent)`,
           }}
         >
-          <Icon name="check" size="xl" />
+          <Icon name={confirmed ? "check" : "info"} size="xl" />
         </span>
         {check === "missing" ? (
           <Notice
             tone="warn"
             title="Ainda não encontramos esta compra na sua conta"
             actions={
-              <Button size="sm" variant="secondary" href={isEscrow ? "/garantias" : "/biblioteca"}>
-                {isEscrow ? "Ver minhas garantias" : "Ver minha biblioteca"}
+              <>
+                <Button size="sm" variant="secondary" icon="refresh" onClick={() => setRecheck((n) => n + 1)}>
+                  Conferir de novo
+                </Button>
+                <Button size="sm" variant="ghost" href={isEscrow ? "/garantias" : "/biblioteca"}>
+                  {isEscrow ? "Ver minhas garantias" : "Ver minha biblioteca"}
+                </Button>
+              </>
+            }
+          >
+            Se você acabou de pagar, ela pode levar mais alguns instantes para aparecer. Se entrou com outra conta, confira na conta usada na compra.
+          </Notice>
+        ) : check === "unknown" ? (
+          <Notice
+            tone="info"
+            title="Entre para conferir a compra"
+            actions={
+              <Button
+                size="sm"
+                loading={loggingIn}
+                onClick={() => void login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }))}
+              >
+                Entrar para conferir
               </Button>
             }
           >
-            Se você acabou de pagar, ela aparece em instantes. Se entrou com outra conta, confira na conta usada na compra.
+            Esta página só confirma depois de ver a compra na sua conta.
           </Notice>
         ) : (
           <span className="chip chip-ok" aria-live="polite">
@@ -112,8 +168,9 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
         <h1 className="display h1s" style={{ fontSize: 60 }}>
           {heading}
         </h1>
-        <p className="lead">{lead}</p>
+        {lead ? <p className="lead">{lead}</p> : null}
 
+        {confirmed ? (
         <div className="ticket" style={{ width: "100%", maxWidth: 520, textAlign: "left", padding: 26 }}>
           <div className="sol-line" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 4, borderRadius: 0 }} />
           <div className="row between">
@@ -147,7 +204,9 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
             </span>
           </div>
         </div>
+        ) : null}
 
+        {confirmed ? (
         <div className="row wrapx m-col" style={{ ...gap(12), justifyContent: "center", width: "100%" }}>
           <Button size="lg" href={`/instalar?agent=${agent.slug}`} iconRight="arrow-right">
             Conectar à minha IA
@@ -162,8 +221,19 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
             </Button>
           )}
         </div>
+        ) : null}
 
-        {sig ? (
+        {confirmed && !isEscrow ? (
+          <p className="small muted">
+            Depois de usar o especialista, conte como foi:{" "}
+            <Link className="link" href={`/especialistas/${agent.slug}#avaliar`}>
+              avaliar o {agent.name}
+            </Link>
+            .
+          </p>
+        ) : null}
+
+        {confirmed && sig ? (
           <>
             <button type="button" className="link-btn small" onClick={() => setTech((v) => !v)} aria-expanded={tech} aria-controls="detalhes-tecnicos">
               {tech ? "Ocultar detalhes técnicos" : isEscrow ? "Ver detalhes técnicos da tarefa" : "Ver detalhes técnicos da licença"}

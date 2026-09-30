@@ -13,20 +13,24 @@ export type MilestoneState = { amount: bigint; criteriaHash: ReadonlyUint8Array;
 /** Quando a etapa passou nos testes (0 = ainda não passou). */
 passedAt: bigint; 
 /** Hash do motivo da contestação (texto fica off-chain). */
-disputeReasonHash: ReadonlyUint8Array;  };
+disputeReasonHash: ReadonlyUint8Array; 
+/** Quando a etapa foi contestada (0 = sem contestação); conta o prazo de julgamento. */
+disputedAt: bigint;  };
 
 export type MilestoneStateArgs = { amount: number | bigint; criteriaHash: ReadonlyUint8Array; status: MilestoneStatusArgs; deliverableHash: ReadonlyUint8Array; 
 /** Quando a etapa passou nos testes (0 = ainda não passou). */
 passedAt: number | bigint; 
 /** Hash do motivo da contestação (texto fica off-chain). */
-disputeReasonHash: ReadonlyUint8Array;  };
+disputeReasonHash: ReadonlyUint8Array; 
+/** Quando a etapa foi contestada (0 = sem contestação); conta o prazo de julgamento. */
+disputedAt: number | bigint;  };
 
 export function getMilestoneStateEncoder(): FixedSizeEncoder<MilestoneStateArgs> {
-    return getStructEncoder([['amount', getU64Encoder()], ['criteriaHash', fixEncoderSize(getBytesEncoder(), 32)], ['status', getMilestoneStatusEncoder()], ['deliverableHash', fixEncoderSize(getBytesEncoder(), 32)], ['passedAt', getI64Encoder()], ['disputeReasonHash', fixEncoderSize(getBytesEncoder(), 32)]]);
+    return getStructEncoder([['amount', getU64Encoder()], ['criteriaHash', fixEncoderSize(getBytesEncoder(), 32)], ['status', getMilestoneStatusEncoder()], ['deliverableHash', fixEncoderSize(getBytesEncoder(), 32)], ['passedAt', getI64Encoder()], ['disputeReasonHash', fixEncoderSize(getBytesEncoder(), 32)], ['disputedAt', getI64Encoder()]]);
 }
 
 export function getMilestoneStateDecoder(): FixedSizeDecoder<MilestoneState> {
-    return getStructDecoder([['amount', getU64Decoder()], ['criteriaHash', fixDecoderSize(getBytesDecoder(), 32)], ['status', getMilestoneStatusDecoder()], ['deliverableHash', fixDecoderSize(getBytesDecoder(), 32)], ['passedAt', getI64Decoder()], ['disputeReasonHash', fixDecoderSize(getBytesDecoder(), 32)]]);
+    return getStructDecoder([['amount', getU64Decoder()], ['criteriaHash', fixDecoderSize(getBytesDecoder(), 32)], ['status', getMilestoneStatusDecoder()], ['deliverableHash', fixDecoderSize(getBytesDecoder(), 32)], ['passedAt', getI64Decoder()], ['disputeReasonHash', fixDecoderSize(getBytesDecoder(), 32)], ['disputedAt', getI64Decoder()]]);
 }
 
 export function getMilestoneStateCodec(): FixedSizeCodec<MilestoneStateArgs, MilestoneState> {

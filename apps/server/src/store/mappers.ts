@@ -129,6 +129,9 @@ export function toEscrow(row: EscrowRow, ms: MilestoneRow[]): Escrow {
     milestones,
     // Sem etapa aprovada nos testes ainda, não há prazo de liberação automática: string vazia.
     autoReleaseAt: row.autoReleaseAt ? row.autoReleaseAt.toISOString() : "",
+    // Nulos em tarefas criadas antes do programa v2.
+    deliveryDeadline: row.deliveryDeadline ? row.deliveryDeadline.toISOString() : null,
+    feeBps: row.feeBps ?? null,
   };
 }
 

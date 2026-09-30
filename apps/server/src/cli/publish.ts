@@ -160,11 +160,14 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
     }
   }
   await syncAgent(await c.agentPda(m.id));
+}
+
+/** Volta à vitrine, a não ser que a nota continue abaixo do mínimo (o job tiraria de novo). Só depois do catálogo completo. */
+async function relist(agentId: string) {
   await db
     .update(schema.agents)
-    // Volta à vitrine, a não ser que a nota continue abaixo do mínimo (o job tiraria de novo).
     .set({ listed: sql`not (${schema.agents.ratingCount} >= ${DELIST_MIN_REVIEWS} and ${schema.agents.ratingSum}::float / nullif(${schema.agents.ratingCount}, 0) < ${DELIST_MAX_RATING})` })
-    .where(eq(schema.agents.id, m.id));
+    .where(eq(schema.agents.id, agentId));
 }
 
 export async function publish(slugs: string[]) {
@@ -179,10 +182,13 @@ export async function publish(slugs: string[]) {
     const m = pkg.manifest;
     console.log(`\n▶ ${m.name} (${m.slug}) v${m.version}`);
     const creator = await creatorSigner(m.creator.id);
-    await upsertCatalog(pkg, creator.address);
+    // Ordem: conhecimento, cadeia e só então o catálogo (preço, versão, garantia). Se algo falhar no meio,
+    // a vitrine continua mostrando a versão anterior, consistente com a cadeia.
     const chunks = await ingestPackage(pkg);
     console.log(`  conhecimento: ${chunks} trechos`);
     await publishOnChain(pkg, creator);
+    await upsertCatalog(pkg, creator.address);
+    await relist(m.id);
     console.log(`  versionHash ${pkg.versionHash.slice(0, 16)}…  ok`);
   }
 }

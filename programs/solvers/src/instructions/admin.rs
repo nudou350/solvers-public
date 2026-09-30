@@ -33,6 +33,7 @@ pub struct InitializeConfig<'info> {
 
 pub fn initialize_config(ctx: Context<InitializeConfig>, args: ConfigParams) -> Result<()> {
     require!(args.fee_bps <= MAX_BPS, SolversError::InvalidBps);
+    require!(args.fee_bps <= MAX_FEE_BPS, SolversError::FeeTooHigh);
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();
     config.verifier = args.verifier;
@@ -55,12 +56,20 @@ pub struct UpdateConfig<'info> {
 
 pub fn update_config(ctx: Context<UpdateConfig>, args: ConfigParams) -> Result<()> {
     require!(args.fee_bps <= MAX_BPS, SolversError::InvalidBps);
+    require!(args.fee_bps <= MAX_FEE_BPS, SolversError::FeeTooHigh);
     let config = &mut ctx.accounts.config;
     config.verifier = args.verifier;
     config.usage_authority = args.usage_authority;
     config.fee_bps = args.fee_bps;
     config.min_stake = args.min_stake;
     config.min_price = args.min_price;
+    emit!(ConfigUpdated {
+        verifier: config.verifier,
+        usage_authority: config.usage_authority,
+        fee_bps: config.fee_bps,
+        min_stake: config.min_stake,
+        min_price: config.min_price,
+    });
     Ok(())
 }
 

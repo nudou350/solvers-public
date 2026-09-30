@@ -139,7 +139,7 @@ export function Memories() {
       <div className="col grow" style={{ "--gap": "4px" } as React.CSSProperties}>
         <b style={{ fontSize: 17 }}>Suas memórias são criptografadas e pertencem a você</b>
         <p className="muted">
-          Só você e o especialista, enquanto você o usa, conseguem lê-las. Nem o Solver nem o criador têm acesso. Você pode ver e apagar tudo quando quiser.
+          Elas ficam guardadas com criptografia e só são abertas quando você usa o especialista na sua IA. O criador não tem acesso a elas. Você pode ver e apagar tudo quando quiser.
         </p>
       </div>
       {items.length > 0 ? (

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
-import { address, type Address } from "@solvers/chain";
+import { address, TxError, type Address } from "@solvers/chain";
 import {
   FREE_TRIAL_USES,
   GUARANTEE_LIMITS_USDC,
@@ -20,6 +20,7 @@ import { chain, explorerUrl } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { processSignature } from "../indexer/processor.js";
+import { assertFreshPrice } from "./fresh-price.js";
 import { brlPerUsd } from "./fx.js";
 import { pixConfig } from "../pix/routes.js";
 import type { Signature } from "@solvers/chain";
@@ -215,7 +216,7 @@ storeRouter.get(
     const [rep] = await db.select().from(schema.userReputation).where(eq(schema.userReputation.wallet, wallet));
     const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
     const profile = await ensureProfile(wallet);
-    const txs = await db.select().from(schema.chainTxs).where(eq(schema.chainTxs.wallet, wallet)).orderBy(desc(schema.chainTxs.createdAt)).limit(30);
+    const txs = await db.select().from(schema.chainTxs).where(eq(schema.chainTxs.wallet, wallet)).orderBy(desc(sql`coalesce(${schema.chainTxs.blockTime}, ${schema.chainTxs.createdAt})`)).limit(30);
     return {
       wallet,
       displayName: profile.displayName,
@@ -227,7 +228,8 @@ storeRouter.get(
       history: txs.map((t) => ({
         kind: t.kind,
         label: KIND_LABEL[t.kind] ?? t.kind,
-        at: t.createdAt.toISOString(),
+        // Horário do bloco; created_at é só o momento em que o indexador viu a transação.
+        at: (t.blockTime ?? t.createdAt).toISOString(),
         signature: t.signature,
       })),
     };
@@ -377,6 +379,8 @@ storeRouter.post(
     const body = parse(z.object({ agentId: z.string(), type: z.literal("permanent").default("permanent") }), req.body);
     const row = await findAgentRow(body.agentId);
     if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
+    // update_pricing não emite evento: confere o preço on-chain e, se mudou, espelha e responde 409 price_changed.
+    await assertFreshPrice(row);
     const c = chain();
     await assertBalance(wallet, row.price);
     const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
@@ -393,6 +397,14 @@ storeRouter.post(
     try {
       ({ signature } = await chain().submitSigned(transaction));
     } catch (e) {
+      // Sem resposta conclusiva da rede (timeout, erro de rede): a transação PODE ter entrado. Não diz "falhou"
+      // (o front responde "nada foi cobrado" a 422/status failed): 409 com code "unconfirmed" e a assinatura.
+      if (e instanceof TxError && e.phase === "unconfirmed") {
+        throw new HttpError(409, "Não conseguimos confirmar se a transação foi concluída. Confira em alguns instantes antes de tentar de novo: ela pode ter entrado.", "unconfirmed", {
+          signature: e.signature ?? "",
+          explorerUrl: e.signature ? explorerUrl("tx", e.signature) : undefined,
+        });
+      }
       // Mesmo formato do contrato (SubmitResponse), com HTTP 422 para o front tratar como erro.
       res.status(422);
       return { signature: "", status: "failed", error: (e as Error).message };

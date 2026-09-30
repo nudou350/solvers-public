@@ -18,6 +18,13 @@ pub const MAX_MILESTONES: usize = 5;
 pub const MAX_BPS: u16 = 10_000;
 /// Comprador com esse número de disputas perdidas não pode abrir nova garantia.
 pub const MAX_BUYER_DISPUTES_LOST: u32 = 3;
+/// Teto da taxa da plataforma (20%). Vale como constante para não mudar o layout de `Config`.
+pub const MAX_FEE_BPS: u16 = 2_000;
+/// Prazo de entrega da garantia quando o comprador não escolhe um, e o máximo aceito (em dias).
+pub const DEFAULT_DELIVERY_DAYS: u16 = 14;
+pub const MAX_DELIVERY_DAYS: u16 = 60;
+/// Depois de 7 dias sem o admin julgar, qualquer um pode devolver a etapa contestada ao comprador.
+pub const DISPUTE_SLA_SECS: i64 = 7 * 86_400;
 
 #[account]
 #[derive(InitSpace)]
@@ -135,6 +142,8 @@ pub struct MilestoneState {
     pub passed_at: i64,
     /// Hash do motivo da contestação (texto fica off-chain).
     pub dispute_reason_hash: [u8; 32],
+    /// Quando a etapa foi contestada (0 = sem contestação); conta o prazo de julgamento.
+    pub disputed_at: i64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
@@ -164,6 +173,10 @@ pub struct Escrow {
     pub status: EscrowStatus,
     pub bump: u8,
     pub vault_bump: u8,
+    /// Taxa da plataforma no momento da criação: mudar `Config` depois não afeta esta garantia.
+    pub fee_bps: u16,
+    /// Prazo (unix) para o solver entregar cada etapa; vencido, o comprador cancela as pendentes.
+    pub delivery_deadline: i64,
 }
 
 impl Escrow {

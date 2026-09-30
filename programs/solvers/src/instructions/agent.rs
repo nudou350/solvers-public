@@ -167,6 +167,7 @@ pub fn update_pricing(ctx: Context<UpdatePricing>, price: u64, price_per_use: u6
     let agent = &mut ctx.accounts.agent;
     agent.price = price;
     agent.price_per_use = price_per_use;
+    emit!(PricingUpdated { agent: agent.key(), price, price_per_use });
     Ok(())
 }
 

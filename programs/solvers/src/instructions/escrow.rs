@@ -62,6 +62,7 @@ pub fn create_escrow(
     nonce: u64,
     milestones: Vec<MilestoneInput>,
     review_window_secs: i64,
+    delivery_days: u16,
 ) -> Result<()> {
     require!(ctx.accounts.agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     require!(!milestones.is_empty() && milestones.len() <= MAX_MILESTONES, SolversError::InvalidMilestones);
@@ -69,6 +70,9 @@ pub fn create_escrow(
         (MIN_REVIEW_WINDOW..=MAX_REVIEW_WINDOW).contains(&review_window_secs),
         SolversError::InvalidReviewWindow
     );
+    require!(delivery_days <= MAX_DELIVERY_DAYS, SolversError::InvalidDeliveryDays);
+    let days = if delivery_days == 0 { DEFAULT_DELIVERY_DAYS } else { delivery_days };
+    let now = Clock::get()?.unix_timestamp;
 
     let rep = &mut ctx.accounts.reputation;
     if rep.wallet == Pubkey::default() {
@@ -115,6 +119,7 @@ pub fn create_escrow(
             deliverable_hash: [0; 32],
             passed_at: 0,
             dispute_reason_hash: [0; 32],
+            disputed_at: 0,
         })
         .collect();
     escrow.review_window_secs = review_window_secs;
@@ -122,6 +127,11 @@ pub fn create_escrow(
     escrow.status = EscrowStatus::Active;
     escrow.bump = ctx.bumps.escrow;
     escrow.vault_bump = ctx.bumps.vault;
+    // A taxa fica congelada na criação: um update_config posterior não muda o que o criador recebe.
+    escrow.fee_bps = ctx.accounts.config.fee_bps;
+    escrow.delivery_deadline = now
+        .checked_add(days as i64 * 86_400)
+        .ok_or(SolversError::MathOverflow)?;
 
     emit!(EscrowCreated {
         escrow: escrow.key(),
@@ -257,7 +267,7 @@ pub fn release_milestone(ctx: Context<ReleaseMilestone>, index: u8) -> Result<()
         &a.creator_usdc,
         &a.token_program,
         amount,
-        a.config.fee_bps,
+        a.escrow.fee_bps,
     )?;
 
     let escrow = &mut ctx.accounts.escrow;
@@ -292,6 +302,7 @@ pub fn open_dispute(ctx: Context<OpenDispute>, index: u8, reason_hash: [u8; 32])
     }
     m.status = MilestoneStatus::Disputed;
     m.dispute_reason_hash = reason_hash;
+    m.disputed_at = now;
     escrow.refresh_status();
     let rep = &mut ctx.accounts.reputation;
     rep.disputes_opened = rep.disputes_opened.saturating_add(1);
@@ -361,7 +372,7 @@ pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) ->
             &a.creator_usdc,
             &a.token_program,
             amount,
-            a.config.fee_bps,
+            a.escrow.fee_bps,
         )?;
         let rep = &mut ctx.accounts.buyer_reputation;
         rep.disputes_lost = rep.disputes_lost.saturating_add(1);
@@ -377,8 +388,105 @@ pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) ->
     Ok(())
 }
 
+/// Cancelamento por atraso: passado o prazo de entrega, o comprador recupera as etapas que o
+/// solver nem chegou a entregar (ainda Pending), sem taxa.
+#[derive(Accounts)]
+pub struct CancelUndelivered<'info> {
+    pub buyer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &escrow.nonce.to_le_bytes()],
+        bump = escrow.bump,
+        has_one = buyer @ SolversError::NotBuyer
+    )]
+    pub escrow: Box<Account<'info, Escrow>>,
+    #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
+    pub vault: Box<Account<'info, TokenAccount>>,
+    #[account(mut, token::mint = usdc_mint, token::authority = buyer)]
+    pub buyer_usdc: Box<Account<'info, TokenAccount>>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn cancel_undelivered(ctx: Context<CancelUndelivered>, index: u8) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let deadline = ctx.accounts.escrow.delivery_deadline;
+    let m = ctx
+        .accounts
+        .escrow
+        .milestones
+        .get(index as usize)
+        .ok_or(SolversError::InvalidMilestoneIndex)?;
+    require!(m.status == MilestoneStatus::Pending, SolversError::InvalidMilestoneStatus);
+    require!(now > deadline, SolversError::DeliveryDeadlineNotReached);
+    let amount = m.amount;
+
+    // O status sai de Pending uma única vez: a etapa não pode ser devolvida (nem paga) de novo.
+    let escrow = &mut ctx.accounts.escrow;
+    escrow.milestones[index as usize].status = MilestoneStatus::Refunded;
+    escrow.refresh_status();
+    let a = &ctx.accounts;
+    vault_transfer(&a.escrow, &a.vault, &a.usdc_mint, &a.buyer_usdc, &a.token_program, amount)?;
+    let key = a.escrow.key();
+    emit!(MilestoneUpdated { escrow: key, index, status: MilestoneStatus::Refunded as u8 });
+    Ok(())
+}
+
+/// Disputa parada de etapa nunca entregue: se o admin não julgar em DISPUTE_SLA_SECS e o prazo de
+/// entrega já venceu, qualquer um devolve a etapa ao comprador. A conta do comprador é a ATA, como em resolve_dispute. Não mexe em reputação: nem o
+/// solver nem o comprador perderam a disputa.
+#[derive(Accounts)]
+pub struct ResolveStaleDispute<'info> {
+    pub caller: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &escrow.nonce.to_le_bytes()],
+        bump = escrow.bump
+    )]
+    pub escrow: Box<Account<'info, Escrow>>,
+    #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
+    pub vault: Box<Account<'info, TokenAccount>>,
+    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    pub buyer_usdc: Box<Account<'info, TokenAccount>>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn resolve_stale_dispute(ctx: Context<ResolveStaleDispute>, index: u8) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let m = ctx
+        .accounts
+        .escrow
+        .milestones
+        .get(index as usize)
+        .ok_or(SolversError::InvalidMilestoneIndex)?;
+    require!(m.status == MilestoneStatus::Disputed, SolversError::InvalidMilestoneStatus);
+    // Etapa que já passou nos testes (passed_at não é zerado por open_dispute) e foi contestada
+    // é um caso de julgamento: só o admin decide, senão bastaria baixar a entrega e esperar.
+    require!(m.passed_at == 0, SolversError::StaleDisputeNeedsJudgment);
+    let due = m.disputed_at.checked_add(DISPUTE_SLA_SECS).ok_or(SolversError::MathOverflow)?;
+    require!(now >= due, SolversError::DisputeSlaNotReached);
+    // Nunca entregue: o reembolso automático também respeita o prazo de entrega, senão contestar
+    // no 1º dia (o que tira a etapa de Pending e impede a entrega) ignoraria delivery_days.
+    require!(now > ctx.accounts.escrow.delivery_deadline, SolversError::DeliveryDeadlineNotReached);
+    let amount = m.amount;
+
+    // O status sai de Disputed uma única vez: o admin (resolve_dispute) e este caminho se excluem.
+    let escrow = &mut ctx.accounts.escrow;
+    escrow.milestones[index as usize].status = MilestoneStatus::Refunded;
+    escrow.refresh_status();
+    let a = &ctx.accounts;
+    vault_transfer(&a.escrow, &a.vault, &a.usdc_mint, &a.buyer_usdc, &a.token_program, amount)?;
+    let key = a.escrow.key();
+    emit!(DisputeResolved { escrow: key, index, refunded: true });
+    emit!(MilestoneUpdated { escrow: key, index, status: MilestoneStatus::Refunded as u8 });
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct CloseEscrow<'info> {
+    /// Só quem pagou o rent (a plataforma) fecha; o rent volta para essa mesma carteira.
+    #[account(address = escrow.rent_payer @ SolversError::NotRentPayer)]
     pub caller: Signer<'info>,
     /// CHECK: recebe o rent de volta; validado contra escrow.rent_payer.
     #[account(mut, address = escrow.rent_payer)]
@@ -400,6 +508,8 @@ pub struct CloseEscrow<'info> {
 }
 
 /// Fecha um escrow encerrado: devolve sobras ao comprador e o rent a quem pagou (a plataforma).
+/// Só essa carteira pode fechar, para o fechamento não tirar da vitrine um escrow que o comprador
+/// ainda quer consultar.
 pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {
     let a = &ctx.accounts;
     require!(
@@ -418,5 +528,7 @@ pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {
             authority: escrow.to_account_info(),
         },
         &[seeds],
-    ))
+    ))?;
+    emit!(EscrowClosed { escrow: escrow.key(), agent: escrow.agent, buyer: escrow.buyer });
+    Ok(())
 }

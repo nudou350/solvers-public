@@ -13,3 +13,9 @@ deliverables/
 .DS_Store
 .keys/
 design/Solver.bundle.html
+
+# gerado pelo turbo a cada execução
+/AGENTS.md
+
+# worktrees temporários de agentes
+/.claude/worktrees/

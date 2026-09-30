@@ -91,3 +91,26 @@ pub struct DisputeResolved {
     pub index: u8,
     pub refunded: bool,
 }
+
+#[event]
+pub struct ConfigUpdated {
+    pub verifier: Pubkey,
+    pub usage_authority: Pubkey,
+    pub fee_bps: u16,
+    pub min_stake: u64,
+    pub min_price: u64,
+}
+
+#[event]
+pub struct EscrowClosed {
+    pub escrow: Pubkey,
+    pub agent: Pubkey,
+    pub buyer: Pubkey,
+}
+
+#[event]
+pub struct PricingUpdated {
+    pub agent: Pubkey,
+    pub price: u64,
+    pub price_per_use: u64,
+}

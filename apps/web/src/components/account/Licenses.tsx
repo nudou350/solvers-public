@@ -7,6 +7,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
+import { ReviewBox } from "@/components/catalog/ReviewBox";
 import { Tile } from "@/components/ui/Tile";
 import { date, int, spark } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -21,6 +22,8 @@ export function Licenses() {
   const [usage, setUsage] = useState<Map<string, UsageSummary>>(new Map());
   // Testes grátis em andamento; se a chamada falhar a lista de licenças continua valendo sozinha.
   const [trials, setTrials] = useState<MyTrial[] | null>(null);
+  // Licença com o formulário de avaliação aberto.
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const list = Array.isArray(licenses) ? licenses : [];
   const agents = useAgentsIndex([...list.map((l) => l.agentId), ...(trials ?? []).map((t) => t.agentId)]);
 
@@ -90,6 +93,9 @@ export function Licenses() {
                     <Button variant="secondary" href={`/instalar?agent=${encodeURIComponent(a.slug)}`}>
                       Abrir instalação
                     </Button>
+                    <Button variant="ghost" icon="star" aria-expanded={reviewing === l.id} onClick={() => setReviewing(reviewing === l.id ? null : l.id)}>
+                      Avaliar
+                    </Button>
                     <Button variant="ghost" href={`/especialistas/${encodeURIComponent(a.slug)}`}>
                       Ver especialista
                     </Button>
@@ -97,6 +103,11 @@ export function Licenses() {
                 ) : null}
               </div>
             </div>
+            {a && reviewing === l.id ? (
+              <div style={{ padding: "4px 24px 24px", borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+                <ReviewBox compact agentId={l.agentId} slug={a.slug} onSaved={() => setReviewing(null)} onCancel={() => setReviewing(null)} />
+              </div>
+            ) : null}
           </article>
         );
       })}

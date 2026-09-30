@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { and, eq, gt, lt } from "drizzle-orm";
-import { db, schema } from "../db/index.js";
+import { db, schema, type Db } from "../db/index.js";
 import { env } from "../env.js";
 import { randomId } from "../lib/crypto.js";
 
@@ -45,9 +45,12 @@ export function unwrapKey(wrapped: Buffer): Buffer {
   return open(KEK, wrapped.subarray(0, 12), wrapped.subarray(12, 28), wrapped.subarray(28));
 }
 
-export async function storeMemoryKey(tokenId: string, wallet: string, wrapped: Buffer, expiresAt: Date) {
-  await db.delete(schema.memoryKeys).where(lt(schema.memoryKeys.expiresAt, new Date()));
-  await db
+/** Conexão normal ou transação aberta (db.transaction): quem chama decide o escopo atômico. */
+export type DbExecutor = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+export async function storeMemoryKey(tokenId: string, wallet: string, wrapped: Buffer, expiresAt: Date, exec: DbExecutor = db) {
+  await exec.delete(schema.memoryKeys).where(lt(schema.memoryKeys.expiresAt, new Date()));
+  await exec
     .insert(schema.memoryKeys)
     .values({ tokenId, wallet, wrappedKey: wrapped, expiresAt })
     .onConflictDoUpdate({ target: schema.memoryKeys.tokenId, set: { wrappedKey: wrapped, expiresAt, wallet } });

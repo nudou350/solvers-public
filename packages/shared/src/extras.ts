@@ -110,6 +110,15 @@ export const CreatorDashboard = z.object({
     }),
   ),
   daily: z.array(z.object({ date: z.string(), sales: z.number(), uses: z.number(), revenueUsdc: z.number() })),
+  /** Ganhos de tarefas com garantia (etapas liberadas ao criador, já sem a taxa), à parte das vendas. */
+  guarantee: z
+    .object({
+      earnedUsdc: z.number(),
+      last30Usdc: z.number(),
+      releases: z.number(),
+      recent: z.array(z.object({ signature: z.string(), agentId: z.string().nullable(), amountUsdc: z.number(), at: z.string() })),
+    })
+    .optional(),
   disputes: z.array(
     z.object({
       escrowId: z.string(),
@@ -163,6 +172,12 @@ export const EscrowDetail = z.object({
       hasAcceptanceTests: z.boolean(),
       disputeCriterion: z.string().nullable(),
       downloadable: z.boolean(),
+      /** Quando o comprador contestou (ISO), ou nulo. */
+      disputedAt: z.string().nullable(),
+      /** Só para etapa que nunca foi entregue: data a partir da qual, sem julgamento, o comprador é reembolsado automaticamente (ISO). Nulo se não houve contestação ou se a etapa já passou nos testes (aí só um administrador julga). */
+      disputeDeadline: z.string().nullable(),
+      /** Etapa pendente com prazo de entrega vencido: o comprador pode cancelar e receber de volta. */
+      canCancelUndelivered: z.boolean(),
     }),
   ),
   explorerUrl: z.string(),

@@ -55,17 +55,18 @@ async function main() {
   const list = await call(mcp, "list_my_solvers");
   if (!list.includes(fe.id)) throw new Error(`list_my_solvers não mostrou a licença:\n${list}`);
   const act = await call(mcp, "activate_solver", { agent_id: fe.id });
-  if (!act.includes("licença permanente") && !act.includes("reaproveitada")) throw new Error(`esperava acesso por licença:\n${act}`);
+  if (!act.includes("licença vitalícia") && !act.includes("licença permanente") && !act.includes("reaproveitada")) throw new Error(`esperava acesso por licença:\n${act}`);
   const sessionId = /session_id: (ses_[0-9a-f]+)/.exec(act)![1]!;
   log("conector reconhece a licença na hora", sessionId);
 
   const actUi = await call(mcp, "activate_solver", { agent_id: ui.id });
   const uiSession = /session_id: (ses_[0-9a-f]+)/.exec(actUi)![1]!;
   const pre = await call(mcp, "preflight_check", { session_id: uiSession, available_tools: ["web_search", "solvers:next_step"] });
-  if (!pre.includes("Figma: NÃO encontrado")) throw new Error(`preflight deveria acusar Figma:\n${pre}`);
+  // O Figma virou conector opcional: sem ele o preflight libera com aviso (não bloqueia).
+  if (!pre.startsWith("Tudo pronto") || !pre.includes("Figma (opcional) não conectado")) throw new Error(`preflight deveria avisar (sem bloquear) que o Figma não está conectado:\n${pre}`);
   const preOk = await call(mcp, "preflight_check", { session_id: uiSession, available_tools: ["figma:get_file", "web_search"] });
-  if (!preOk.startsWith("Tudo pronto")) throw new Error(`preflight com Figma deveria passar:\n${preOk}`);
-  log("preflight detecta falta do Figma e libera quando conectado", "ok");
+  if (!preOk.startsWith("Tudo pronto") || !preOk.includes("Figma (opcional): conectado")) throw new Error(`preflight com Figma deveria passar e mostrar o Figma conectado:\n${preOk}`);
+  log("preflight avisa da falta do Figma (opcional) e mostra conectado quando o Figma aparece", "ok");
 
   // UI Design sem licença: teste grátis com limites (a etapa depois do teste devolve o texto de fim)
   const uiDetail = await api<{ trial: { uses: number; steps: number; totalSteps: number } | null }>(`/api/agents/${ui.id}`);

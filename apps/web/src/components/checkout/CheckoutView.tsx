@@ -26,6 +26,8 @@ const TITLE_MIN = 3;
 const TITLE_MAX = 120;
 const DESC_MIN = 10;
 const DESC_MAX = 4000;
+/** Prazo de entrega da garantia, em dias (o servidor assume 14 se não vier). */
+const DELIVERY_OPTIONS = [7, 14, 30, 60];
 
 function StepDot({ n, done }: { n: number; done?: boolean }) {
   return <span className={`dot ${done ? "dot-ok" : "dot-now"}`}>{done ? "✓" : n}</span>;
@@ -35,7 +37,10 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   const router = useRouter();
   const toast = useToast();
   const { api, config, status, me, walletKind, loggingIn, login, requireWallet } = useSession();
-  const { agent, creator, guarantee } = detail;
+  // O preço pode mudar enquanto a pessoa está aqui (409 price_changed): guardamos a versão relida do especialista.
+  const [fresh, setFresh] = useState<AgentDetail | null>(null);
+  const cur = fresh ?? detail;
+  const { agent, creator, guarantee } = cur;
   const rate = config?.brlPerUsd ?? null;
   const tx = useTx();
   const faucet = useFaucet();
@@ -80,6 +85,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   // ----- tarefa (garantia) -----
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
+  const [deliveryDays, setDeliveryDays] = useState(14);
   const [touched, setTouched] = useState(false);
   const titleOk = title.trim().length >= TITLE_MIN && title.trim().length <= TITLE_MAX;
   const descOk = desc.trim().length >= DESC_MIN && desc.trim().length <= DESC_MAX;
@@ -94,6 +100,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
 
   // ----- Pix -----
   const [charge, setCharge] = useState<PixCharge | null>(null);
+  // Carteira que gerou a cobrança: o Pix só vale para ela; trocar de conta fecha o QR.
+  const [chargeWallet, setChargeWallet] = useState<string | null>(null);
+  const meWallet = me?.wallet ?? null;
+  const meWalletRef = useRef(meWallet);
+  meWalletRef.current = meWallet;
   const [pixPending, setPixPending] = useState(false);
   const [pixError, setPixError] = useState<TxErrorInfo | null>(null);
   const creditedOnce = useRef<string | null>(null);
@@ -101,15 +112,31 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   useEffect(() => {
     // Trocar o tipo desfaz a cobrança em andamento (ela foi calculada para outro valor).
     setCharge(null);
+    setChargeWallet(null);
     setPixError(null);
     setAgree(false);
     tx.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type]);
 
+  // Entrou outra conta: o QR aberto era da anterior. Fecha, para ninguém pagar um Pix que credita a carteira errada.
+  useEffect(() => {
+    if (!charge || !chargeWallet || !meWallet || meWallet === chargeWallet) return;
+    setCharge(null);
+    setChargeWallet(null);
+    setPixError(null);
+    creditedOnce.current = null;
+    toast({ tone: "info", title: "O Pix anterior foi fechado", text: "Ele era de outra conta. Gere um novo para esta." });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meWallet, chargeWallet, charge]);
+
+  // Aviso de preço alterado (vem do erro da compra direta ou do Pix). Some sozinho na próxima tentativa, que limpa o erro.
+  const priceChange = tx.error?.priceChange ?? pixError?.priceChange ?? null;
+  const priceErr = tx.error?.code === "price_changed" || pixError?.code === "price_changed";
+
   const purchase = useCallback(async () => {
     const r = await tx.run(() =>
-      isG ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim() }) : api.buildPurchase(agent.id),
+      isG ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim(), deliveryDays }) : api.buildPurchase(agent.id),
     );
     if (!r) {
       void loadAccount();
@@ -124,11 +151,32 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     q.set("usdc", String(paid));
     if (r.explorerUrl) q.set("explorer", r.explorerUrl);
     router.push(`/checkout/concluido?${q}`);
-  }, [tx, isG, api, agent.id, agent.slug, title, desc, total, router, loadAccount]);
+  }, [tx, isG, api, agent.id, agent.slug, title, desc, deliveryDays, total, router, loadAccount]);
+
+  const chargeWalletRef = useRef(chargeWallet);
+  chargeWalletRef.current = chargeWallet;
+
+  useEffect(() => {
+    if (!priceErr) return;
+    // Mostra já o novo valor, relê o especialista e pede a confirmação de novo (nada é repetido sozinho).
+    if (priceChange) setFresh((f) => ({ ...(f ?? detail), agent: { ...(f ?? detail).agent, priceUsdc: priceChange.usdc } }));
+    setAgree(false);
+    let alive = true;
+    api.getAgent(detail.agent.slug).then(
+      (d) => alive && setFresh(d),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx.error, pixError]);
 
   const onCredited = useCallback(
     (c: PixCharge) => {
       if (creditedOnce.current === c.id) return;
+      // Resposta atrasada de outra conta: não compra nada nesta.
+      if (!chargeWalletRef.current || chargeWalletRef.current !== meWalletRef.current) return;
       creditedOnce.current = c.id;
       void loadAccount();
       void purchase();
@@ -140,8 +188,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     setPixPending(true);
     setPixError(null);
     try {
-      await requireWallet();
+      const w = await requireWallet();
       const c = await api.createPixCharge({ agentId: agent.id, type });
+      // A conta mudou enquanto a cobrança era criada: não mostra o QR de outra carteira.
+      if (meWalletRef.current && meWalletRef.current !== w.address) return;
+      setChargeWallet(w.address);
       setCharge(c);
     } catch (e) {
       if (e instanceof ApiError && e.code === "balance_sufficient") {
@@ -225,7 +276,10 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     <b>{me.displayName ?? `Carteira ${short(me.wallet)}`}</b>
                     <div className="small muted">{me.email ?? (me.displayName ? `Carteira ${short(me.wallet)}` : "Conectada")}</div>
                   </div>
-                  <SwitchAccount disabled={busy} />
+                  <div className="col" style={gap(4, { alignItems: "flex-end" })}>
+                    <SwitchAccount disabled={busy || showPix} />
+                    {showPix ? <span className="tiny faint">Cancele o Pix para trocar de conta.</span> : null}
+                  </div>
                 </div>
               ) : walletKind === "privy" ? (
                 <PrivyLogin loading={loggingIn} onLogin={doLogin} />
@@ -305,6 +359,29 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     <span id="tarefa-ajuda" className={`tiny num ${s.counter} ${touched && !descOk ? "warn" : "faint"}`}>
                       {desc.trim().length < DESC_MIN ? `Mínimo de ${DESC_MIN} caracteres · ` : ""}
                       {desc.length}/{DESC_MAX}
+                    </span>
+                  </div>
+                  <div className="field">
+                    <span className="label" id="tarefa-prazo">
+                      Prazo de entrega
+                    </span>
+                    <div className="seg" role="radiogroup" aria-labelledby="tarefa-prazo" style={{ alignSelf: "flex-start" }}>
+                      {DELIVERY_OPTIONS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          role="radio"
+                          aria-checked={deliveryDays === d}
+                          className={deliveryDays === d ? "on" : undefined}
+                          onClick={() => setDeliveryDays(d)}
+                          disabled={busy || showPix}
+                        >
+                          {d} dias
+                        </button>
+                      ))}
+                    </div>
+                    <span className="tiny faint">
+                      Se o especialista não entregar dentro do prazo, você pode cancelar a etapa e receber o valor dela de volta, sem taxa.
                     </span>
                   </div>
                   <div className="col" style={gap(12)}>
@@ -469,11 +546,13 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               {showPix && charge ? (
                 <PixPanel
                   charge={charge}
+                  ownerWallet={chargeWallet ?? ""}
                   totalUsdc={total}
                   onUpdate={setCharge}
                   onCredited={onCredited}
                   onRestart={() => {
                     setCharge(null);
+                    setChargeWallet(null);
                     creditedOnce.current = null;
                     tx.reset();
                   }}
@@ -508,7 +587,26 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   </p>
                 </>
               )}
-              {pixError ? (
+              {priceErr ? (
+                <Notice
+                  tone="warn"
+                  role="alert"
+                  title="O preço do especialista mudou"
+                  actions={
+                    // Pix já pago e creditado: a compra só segue quando a pessoa confirma o novo valor.
+                    showPix && charge?.status === "credited" ? (
+                      <Button size="sm" loading={tx.pending} onClick={() => void purchase()}>
+                        Confirmar e pagar {totalText}
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {priceChange
+                    ? `O preço do especialista mudou de ${money(priceChange.previousUsdc)} para ${money(priceChange.usdc)}. Confira o novo valor e confirme de novo.`
+                    : "O preço do especialista mudou. Confira o novo valor e confirme de novo."}
+                </Notice>
+              ) : null}
+              {pixError && pixError.code !== "price_changed" ? (
                 <Notice tone="bad" role="alert" title={pixError.title}>
                   {pixError.text}
                 </Notice>
@@ -516,7 +614,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               <p className={tx.pending ? "small muted center" : "sr-only"} role="status" aria-live="polite">
                 {tx.pending ? "Assinando e registrando a compra na rede…" : ""}
               </p>
-              {tx.error ? (
+              {tx.error && tx.error.code !== "price_changed" ? (
                 <Notice
                   tone="bad"
                   role="alert"

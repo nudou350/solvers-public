@@ -345,7 +345,7 @@ export default async function AgentPage({ params }: Props) {
         </section>
       ) : null}
 
-      <section className="wrap" style={{ paddingBottom: 24 }}>
+      <section id="avaliar" className="wrap" style={{ paddingBottom: 24 }}>
         <div className="row between end wrapx" style={gap("12px", { marginBottom: 26 })}>
           <h2 className="display h2s">Avaliações</h2>
           <span className="verified">

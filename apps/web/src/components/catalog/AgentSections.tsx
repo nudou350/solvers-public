@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Tabs } from "@/components/ui/Tabs";
 import { api } from "@/lib/api";
+import { useMyAccess } from "@/lib/hooks";
 import { date, dec1, initials, int, short, starPct } from "@/lib/format";
 import { gap } from "@/lib/style";
+import { ReviewBox } from "./ReviewBox";
 
 /** Detalhes técnicos da versão: impressão digital, conta do especialista na rede (AgentDetail.onchain.agent) e rede. */
 export type TechInfo = { hash: string; network: string; account: string | null; explorer: string | null };
@@ -249,6 +251,13 @@ export function Versions({ versions }: { versions: AgentVersion[] }) {
 
 const FIRST = 6;
 
+/** Formulário de avaliação, só para quem tem a licença deste especialista. */
+function MyReviewBox({ slug, onSaved }: { slug: string; onSaved: () => void }) {
+  const access = useMyAccess(slug);
+  if (!access?.license) return null;
+  return <ReviewBox agentId={access.agentId} slug={slug} onSaved={onSaved} />;
+}
+
 /** Avaliações: as primeiras e, em "ver todas", a lista completa de getReviews(). */
 export function Reviews({ slug, initial, total }: { slug: string; initial: Review[]; total: number }) {
   const [list, setList] = useState(initial.slice(0, FIRST));
@@ -271,11 +280,20 @@ export function Reviews({ slug, initial, total }: { slug: string; initial: Revie
     );
   };
 
+  // Quem tem a licença avalia aqui (ou edita a própria avaliação); depois a lista é relida.
+  const mineBox = <MyReviewBox slug={slug} onSaved={loadAll} />;
+
   if (list.length === 0)
-    return <div className="card-flat pad center muted">Ainda não há avaliações. Só quem compra pode avaliar, então elas chegam com as primeiras compras.</div>;
+    return (
+      <div className="col" style={gap("18px")}>
+        {mineBox}
+        <div className="card-flat pad center muted">Ainda não há avaliações. Só quem compra pode avaliar, então elas chegam com as primeiras compras.</div>
+      </div>
+    );
 
   return (
     <>
+      <div style={{ marginBottom: 18 }}>{mineBox}</div>
       <div className="g2" style={gap("18px")}>
         {list.map((r) => {
           // Nome do perfil de quem avaliou; sem ele, a carteira encurtada.

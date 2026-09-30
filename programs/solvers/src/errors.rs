@@ -58,4 +58,16 @@ pub enum SolversError {
     PriceChanged,
     #[msg("Esta licença já foi usada em outra avaliação")]
     LicenseAlreadyReviewed,
+    #[msg("Prazo de entrega inválido")]
+    InvalidDeliveryDays,
+    #[msg("O prazo de entrega ainda não venceu")]
+    DeliveryDeadlineNotReached,
+    #[msg("O prazo de julgamento da disputa ainda não venceu")]
+    DisputeSlaNotReached,
+    #[msg("Taxa acima do teto da plataforma")]
+    FeeTooHigh,
+    #[msg("Somente quem pagou o rent pode fechar o escrow")]
+    NotRentPayer,
+    #[msg("Etapa já entregue e contestada: só o admin julga")]
+    StaleDisputeNeedsJudgment,
 }

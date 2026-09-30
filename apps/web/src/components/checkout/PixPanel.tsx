@@ -1,6 +1,6 @@
 "use client";
 // Cobrança Pix da demo: QR (ou QR de mentira no modo simulado), copia e cola, valor, expiração
-// e consulta a cada 3 s até o USDC de teste ser creditado.
+// e consulta a cada 3 s até o USDC de teste ser creditado. O status do servidor decide; o relógio local só avisa.
 import type { PixCharge } from "@solvers/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
 import { brlValue, copyText, usdc } from "@/lib/format";
+import { ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { txErrorMessage, type TxErrorInfo } from "@/lib/tx";
@@ -15,6 +16,11 @@ import { FakeQr } from "./FakeQr";
 import s from "./checkout.module.css";
 
 const POLL_MS = 3000;
+/** Depois do prazo, continua consultando por mais este tempo até o servidor decidir (o provedor pode atrasar). */
+const GRACE_MS = 2 * 60_000;
+/** Aprovado há mais que isto e ainda sem crédito: mostra uma mensagem tranquila e consulta com menos frequência. */
+const SLOW_CREDIT_MS = 2 * 60_000;
+const SLOW_POLL_MS = 15_000;
 
 function mmss(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -25,57 +31,84 @@ function mmss(ms: number) {
 
 export function PixPanel({
   charge,
+  ownerWallet,
   totalUsdc,
   onUpdate,
   onCredited,
   onRestart,
 }: {
   charge: PixCharge;
+  /** Carteira dona da cobrança: só ela (a sessão atual) consulta e simula este Pix. */
+  ownerWallet: string;
   /** Total da compra: se o Pix cobre só a diferença, explicamos. */
   totalUsdc: number;
   onUpdate: (c: PixCharge) => void;
   onCredited: (c: PixCharge) => void;
   onRestart: () => void;
 }) {
-  const { api, config } = useSession();
+  const { api, config, me, login, loggingIn } = useSession();
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [error, setError] = useState<TxErrorInfo | null>(null);
+  const [gone, setGone] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const failures = useRef(0);
   const cb = useRef({ onUpdate, onCredited });
   cb.current = { onUpdate, onCredited };
+  const walletNow = useRef(me?.wallet ?? null);
+  walletNow.current = me?.wallet ?? null;
 
-  const waiting = charge.status === "pending" || charge.status === "approved";
+  // Quem manda é o status do servidor. O relógio daqui só avisa que o prazo acabou e dispara uma última consulta:
+  // ele pode estar adiantado, e o Pix pago no limite ainda é creditado.
   const left = new Date(charge.expiresAt).getTime() - now;
-  // Expirou pelo relógio local: para de consultar (o servidor também a dá como expirada).
-  const expired = charge.status === "expired" || (waiting && left <= 0);
-  const polling = waiting && !expired;
+  const pending = charge.status === "pending";
+  const approved = charge.status === "approved";
+  const due = pending && left <= 0;
+  const sessionOk = me?.wallet === ownerWallet;
+  // Pendente consulta até um pouco depois do prazo (o provedor pode demorar a confirmar); aprovado consulta até creditar.
+  const lapsed = pending && left < -GRACE_MS;
+  // Crédito demorado: depois de ~2 min aprovado, avisa com calma e consulta mais devagar.
+  const [slowCredit, setSlowCredit] = useState(false);
+  useEffect(() => {
+    if (!approved) return setSlowCredit(false);
+    const t = setTimeout(() => setSlowCredit(true), SLOW_CREDIT_MS);
+    return () => clearTimeout(t);
+  }, [approved]);
+  const polling = (pending || approved) && sessionOk && !gone && !lapsed;
 
-  // Consulta a cobrança a cada 3 s até ser creditada (ou expirar).
+  // Consulta a cobrança a cada 3 s até ser creditada (ou o servidor dar como expirada).
   useEffect(() => {
     if (!polling) return;
     let alive = true;
-    const t = setInterval(async () => {
+    const check = async () => {
       try {
         const c = await api.getPixCharge(charge.id);
         if (!alive) return;
+        failures.current = 0;
+        setOffline(false);
         cb.current.onUpdate(c);
         if (c.status === "credited") cb.current.onCredited(c);
-      } catch {
-        /* falha momentânea: tenta de novo no próximo ciclo */
+      } catch (e) {
+        if (!alive) return;
+        if (e instanceof ApiError && e.status === 404) setGone(true);
+        // 401: a sessão se refaz sozinha; sessionOk vira false e o painel pede para entrar de novo.
+        else if (!(e instanceof ApiError && e.status === 401) && ++failures.current >= 3) setOffline(true);
       }
-    }, POLL_MS);
+    };
+    const t = setInterval(check, slowCredit ? SLOW_POLL_MS : POLL_MS);
+    if (due) void check(); // o prazo acabou agora: uma consulta imediata antes de dar o Pix como vencido
     return () => {
       alive = false;
       clearInterval(t);
     };
-  }, [api, charge.id, polling]);
+  }, [api, charge.id, polling, due, ownerWallet, slowCredit]);
 
   useEffect(() => {
-    if (!polling) return;
+    if (!pending || lapsed) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [polling]);
+  }, [pending, lapsed]);
 
   // Só aceita base64 puro no QR (vai para um data: URL).
   const qrPng = charge.qrCodeBase64 && /^[A-Za-z0-9+/=]+$/.test(charge.qrCodeBase64) ? charge.qrCodeBase64 : null;
@@ -85,6 +118,7 @@ export function PixPanel({
     setError(null);
     try {
       const c = await api.simulatePixPayment(charge.id);
+      if (walletNow.current !== ownerWallet) return; // a conta mudou no meio: descarta
       onUpdate(c);
       if (c.status === "credited") onCredited(c);
     } catch (e) {
@@ -108,18 +142,82 @@ export function PixPanel({
       </Notice>
     );
 
-  if (expired || charge.status === "failed")
+  const restart = (
+    <Button variant="secondary" size="sm" icon="refresh" onClick={onRestart}>
+      Gerar outro Pix
+    </Button>
+  );
+
+  if (gone)
+    return (
+      <Notice tone="warn" role="alert" title="Não encontramos este Pix nesta conta" actions={restart}>
+        Ele pode ter sido gerado por outra conta. Se você já pagou, o valor entra na conta que gerou o Pix. Gere um novo código para continuar aqui.
+      </Notice>
+    );
+
+  if (!sessionOk && (pending || approved))
+    return (
+      <Notice
+        tone="warn"
+        role="alert"
+        title="Sua sessão terminou"
+        actions={
+          <>
+            <Button size="sm" loading={loggingIn} onClick={() => void login().catch(() => {})}>
+              Entrar de novo
+            </Button>
+            {restart}
+          </>
+        }
+      >
+        Entre na mesma conta para continuar acompanhando este Pix. Se você já pagou, o saldo entra na conta quando o pagamento for confirmado.
+      </Notice>
+    );
+
+  // Pagamento aprovado: não some por causa do relógio, só termina quando o saldo é creditado.
+  if (approved && slowCredit)
+    return (
+      <Notice
+        tone="info"
+        title="Seu pagamento foi recebido"
+        actions={
+          <Button variant="secondary" size="sm" onClick={onRestart}>
+            Sair desta tela
+          </Button>
+        }
+      >
+        O saldo pode demorar um pouco mais; você pode fechar esta tela, ele entra sozinho.
+      </Notice>
+    );
+  if (approved)
+    return (
+      <div className={s.status} role="status" aria-live="polite">
+        <Spinner size="s" />
+        <span className="small">
+          <b>Pagamento recebido, creditando saldo…</b>
+          <span className="muted"> Não precisa pagar de novo. A compra continua sozinha.</span>
+          {offline ? <span className="muted"> Não conseguimos confirmar agora; tentando de novo.</span> : null}
+        </span>
+      </div>
+    );
+
+  if (charge.status === "expired" || charge.status === "failed")
     return (
       <Notice
         tone="warn"
         title={charge.status === "failed" ? "O Pix não foi aprovado" : "Este Pix expirou"}
-        actions={
-          <Button variant="secondary" size="sm" icon="refresh" onClick={onRestart}>
-            Gerar outro Pix
-          </Button>
-        }
+        actions={restart}
       >
         Nada foi cobrado. Gere um novo código para continuar.
+      </Notice>
+    );
+
+  // O prazo acabou no relógio, mas o servidor ainda não deu o Pix como vencido: sem afirmar que nada foi cobrado.
+  if (due)
+    return (
+      <Notice tone="warn" title="O prazo deste Pix terminou" actions={restart}>
+        Se você já pagou, o saldo entra em instantes e a compra continua aqui. Se ainda não pagou, gere um novo código.
+        {offline ? " Não conseguimos confirmar agora; tentando de novo." : ""}
       </Notice>
     );
 
@@ -153,8 +251,9 @@ export function PixPanel({
           <div className={s.status} role="status" aria-live="polite">
             <Spinner size="s" />
             <span className="small">
-              {charge.status === "approved" ? "Pagamento aprovado. Creditando o USDC…" : "Aguardando o pagamento"}
+              Aguardando o pagamento
               <span className="muted"> · expira em {mmss(left)}</span>
+              {offline ? <span className="muted"> · Não conseguimos confirmar agora; tentando de novo.</span> : null}
             </span>
           </div>
         </div>

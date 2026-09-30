@@ -1,31 +1,19 @@
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { env } from "../env.js";
 import { badRequest } from "../lib/http.js";
 import { randomId } from "../lib/crypto.js";
+import { evaluateReport, PREVIEW_TEST_FILE, type Files, type RunResult } from "./report.js";
+import { describeReadFailure, dirUsage, readRegularFile, readRegularJson } from "./safe-read.js";
 
 // Verificador da garantia (INSTRUCTIONS.md 5.7): roda a entrega contra a bateria de aceite
 // combinada na criação da garantia, num container descartável (sem rede, CPU/memória limitadas,
-// sem privilégios, timeout que mata o container). Um teste por vez (fila).
+// sem privilégios, rootfs somente leitura, timeout que mata o container). Um teste por vez (fila).
 // Também captura uma prévia em HTML estático do componente (sem código-fonte).
+// Tudo que volta do container (relatório e prévia) é NÃO CONFIÁVEL: lido só via safe-read.ts.
 
-export type Files = Record<string, string>;
-
-export type TestReport = {
-  passed: boolean;
-  mode: "docker" | "simulated" | "manual";
-  numTests: number;
-  numPassed: number;
-  numFailed: number;
-  /** Testes da bateria de aceite (fixa) versus testes que vieram na entrega. */
-  acceptance: { numTests: number; numPassed: number } | null;
-  failures: { test: string; message: string }[];
-  durationMs: number;
-  log?: string;
-};
-
-export type RunResult = { report: TestReport; previewHtml: string | null };
+export type { Files, RunResult, TestReport } from "./report.js";
 
 const ALLOWED_EXT = /\.(tsx?|jsx?|css|json|md)$/;
 const RESERVED = /^(acceptance\.|__preview__)/;
@@ -33,6 +21,12 @@ const MAX_TOTAL_BYTES = 300_000;
 const MAX_FILES = 40;
 const MAX_OUTPUT = 200_000;
 const TIMEOUT_MS = 60_000;
+/** Tetos dos arquivos que voltam do container e do que ele pode gravar no relatório. */
+const MAX_JSON_BYTES = 2_000_000;
+const MAX_PREVIEW_BYTES = 400_000;
+const MAX_REPORT_DIR_BYTES = 8_000_000;
+const MAX_REPORT_DIR_ENTRIES = 500;
+const WATCH_MS = 1_000;
 
 function normalizeName(name: string): string {
   const norm = posix.normalize(name.replace(/\\/g, "/")).replace(/^\/+/, "");
@@ -85,19 +79,26 @@ export function entryComponent(files: Files): string | null {
   return entry ? entry[0] : null;
 }
 
-/** Teste auxiliar que renderiza o componente e grava o HTML estático para a prévia. */
+/**
+ * Teste auxiliar que renderiza o componente e grava o HTML estático para a prévia. Nunca reprova:
+ * o servidor exige código de saída 0 do vitest, e a prévia é opcional (componente que precisa de
+ * outras props, ou que falha ao importar, só fica sem prévia).
+ */
 function previewTest(entry: string): string {
   const mod = `./${entry.replace(/\.(tsx|jsx)$/, "")}`;
-  return `import * as M from ${JSON.stringify(mod)};
-import { render } from "@testing-library/react";
+  return `import { render } from "@testing-library/react";
 import { writeFileSync } from "node:fs";
 import { it } from "vitest";
-it("__preview__", () => {
-  const all = M as Record<string, unknown>;
-  const C = (all.default ?? Object.values(all).find((v) => typeof v === "function" && /^[A-Z]/.test((v as { name: string }).name))) as never;
-  if (!C) return;
-  const { container } = render(<C {...({ onSubmit: () => {} } as object)} />);
-  writeFileSync("/work/report/preview.html", container.innerHTML);
+it("__preview__", async () => {
+  try {
+    const all = (await import(${JSON.stringify(mod)})) as Record<string, unknown>;
+    const C = (all.default ?? Object.values(all).find((v) => typeof v === "function" && /^[A-Z]/.test((v as { name: string }).name))) as never;
+    if (!C) return;
+    const { container } = render(<C {...({ onSubmit: () => {} } as object)} />);
+    writeFileSync("/work/report/preview.html", container.innerHTML);
+  } catch {
+    // sem prévia
+  }
 });
 `;
 }
@@ -124,14 +125,6 @@ function docker(args: string[]): Promise<{ code: number; out: string }> {
     child.on("error", (e) => res({ code: 127, out: String(e) }));
   });
 }
-
-type VitestJson = {
-  numTotalTests?: number;
-  testResults?: {
-    name?: string;
-    assertionResults?: { fullName?: string; title?: string; status?: string; failureMessages?: string[] }[];
-  }[];
-};
 
 /** Remove scripts, handlers e URLs javascript: do HTML capturado (a prévia não executa nada). */
 export function sanitizeHtml(html: string): string {
@@ -163,6 +156,26 @@ function simulate(files: Files, acceptance: Files | null): RunResult {
   };
 }
 
+/** Apaga a pasta da execução. O container pode ter deixado pastas sem permissão: limpa por dentro dele. */
+async function cleanup(base: string, report: string, image: string) {
+  try {
+    rmSync(base, { recursive: true, force: true });
+    return;
+  } catch {
+    /* segue para a limpeza pelo container */
+  }
+  try {
+    await docker([
+      "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--user", "node",
+      "-v", `${report}:/work/report`, image,
+      "sh", "-c", "rm -rf /work/report/* /work/report/.[!.]* 2>/dev/null; true",
+    ]);
+    rmSync(base, { recursive: true, force: true });
+  } catch (e) {
+    console.warn(`[verifier] não consegui apagar ${base}:`, (e as Error).message);
+  }
+}
+
 export async function runTests(rawFiles: Files, opts: { acceptance?: Files | null; image?: string } = {}): Promise<RunResult> {
   const files = sanitizeFiles(rawFiles);
   const acceptance = opts.acceptance ?? null;
@@ -173,17 +186,35 @@ export async function runTests(rawFiles: Files, opts: { acceptance?: Files | nul
     const base = resolve(env.DELIVERABLES_DIR, "runs", id);
     const src = join(base, "src");
     const report = join(base, "report");
-    mkdirSync(report, { recursive: true });
-    // O container roda como "node" (uid 1000), que não é o dono da pasta (o usuário do servidor):
-    // sem isto o vitest não consegue gravar o relatório. A pasta é só desta execução e é apagada no fim.
-    chmodSync(report, 0o777);
-    writeFiles(src, { ...files, ...(acceptance ?? {}) });
-    const entry = entryComponent(files);
-    if (entry) writeFiles(src, { "__preview__.test.tsx": previewTest(entry) });
     const name = `solvers-verify-${id}`;
     const t0 = Date.now();
-    const timer = setTimeout(() => void docker(["kill", name]), TIMEOUT_MS);
+    let timedOut = false;
+    let overflow = false;
+    let timer: NodeJS.Timeout | undefined;
+    let watch: NodeJS.Timeout | undefined;
+    const kill = () => void docker(["kill", name]);
+    // Tudo que cria a pasta da execução fica dentro do try: qualquer erro aqui também apaga runs/<id>.
     try {
+      mkdirSync(report, { recursive: true });
+      // O container roda como "node" (uid 1000), que não é o dono da pasta (o usuário do servidor):
+      // sem isto o vitest não consegue gravar o relatório. A pasta é só desta execução e é apagada no fim.
+      // O que o container deixa aqui é NÃO CONFIÁVEL (symlink, FIFO, arquivo enorme): ver safe-read.ts.
+      chmodSync(report, 0o777);
+      writeFiles(src, { ...files, ...(acceptance ?? {}) });
+      const entry = entryComponent(files);
+      if (entry) writeFiles(src, { [PREVIEW_TEST_FILE]: previewTest(entry) });
+      timer = setTimeout(() => {
+        timedOut = true;
+        kill();
+      }, TIMEOUT_MS);
+      // Vigia do tamanho do relatório: o container grava direto numa pasta do host.
+      watch = setInterval(() => {
+        const u = dirUsage(report, MAX_REPORT_DIR_ENTRIES);
+        if (!overflow && (u.truncated || u.bytes > MAX_REPORT_DIR_BYTES)) {
+          overflow = true;
+          kill();
+        }
+      }, WATCH_MS);
       const r = await docker([
         "run",
         "--rm",
@@ -201,6 +232,19 @@ export async function runTests(rawFiles: Files, opts: { acceptance?: Files | nul
         "ALL",
         "--security-opt",
         "no-new-privileges",
+        // Rootfs somente leitura: o código da entrega não adultera o vitest nem o node_modules.
+        // Só /tmp (tmpfs com teto; o cacheDir do vitest aponta para lá) e /work/report são graváveis.
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,size=64m",
+        // O vite grava o config empacotado aqui (node_modules/.vite-temp); com rootfs read-only precisa de tmpfs.
+        "--tmpfs",
+        "/work/node_modules/.vite-temp:rw,size=16m",
+        "--env",
+        "HOME=/tmp",
+        // Nenhum arquivo criado passa de 8 MB (o vigia acima cobre o total da pasta).
+        "--ulimit",
+        "fsize=8000000:8000000",
         "--user",
         "node",
         "-v",
@@ -215,34 +259,28 @@ export async function runTests(rawFiles: Files, opts: { acceptance?: Files | nul
         "--reporter=json",
         "--outputFile.json=/work/report/vitest.json",
       ]);
-      const jsonPath = join(report, "vitest.json");
-      const json = existsSync(jsonPath) ? (JSON.parse(readFileSync(jsonPath, "utf8")) as VitestJson) : null;
-      const results = (json?.testResults ?? []).flatMap((tr) =>
-        (tr.assertionResults ?? []).map((a) => ({ file: tr.name ?? "", name: a.fullName ?? a.title ?? "teste", ok: a.status === "passed", msg: (a.failureMessages ?? []).join("\n") })),
-      );
-      const real = results.filter((t) => !t.file.includes("__preview__"));
-      const acc = real.filter((t) => /acceptance\./.test(t.file));
-      const failures = real.filter((t) => !t.ok).map((t) => ({ test: t.name, message: t.msg.slice(0, 800) }));
-      const numPassed = real.filter((t) => t.ok).length;
-      const accOk = !acceptance || (acc.length > 0 && acc.every((t) => t.ok));
-      const previewPath = join(report, "preview.html");
-      return {
-        report: {
-          passed: json != null && real.length > 0 && failures.length === 0 && accOk,
-          mode: "docker",
-          numTests: real.length,
-          numPassed,
-          numFailed: real.length - numPassed,
-          acceptance: acceptance ? { numTests: acc.length, numPassed: acc.filter((t) => t.ok).length } : null,
-          failures: json ? failures : [{ test: "execução", message: r.out.slice(-1500) || "Sem relatório de testes" }],
-          durationMs: Date.now() - t0,
-          log: json ? undefined : r.out.slice(-2000),
-        },
-        previewHtml: existsSync(previewPath) ? sanitizeHtml(readFileSync(previewPath, "utf8")) : null,
-      };
+      clearInterval(watch);
+      const read = readRegularJson(join(report, "vitest.json"), MAX_JSON_BYTES);
+      const testReport = evaluateReport({
+        json: read.ok ? read.value : null,
+        jsonProblem: read.ok ? undefined : describeReadFailure("O relatório de testes", read),
+        exitCode: r.code,
+        timedOut,
+        overflow,
+        out: r.out,
+        acceptanceFiles: acceptance ? Object.keys(acceptance) : null,
+        durationMs: Date.now() - t0,
+      });
+      let previewHtml: string | null = null;
+      if (testReport.passed) {
+        const p = readRegularFile(join(report, "preview.html"), MAX_PREVIEW_BYTES);
+        if (p.ok) previewHtml = sanitizeHtml(p.data.toString("utf8"));
+      }
+      return { report: testReport, previewHtml };
     } finally {
       clearTimeout(timer);
-      rmSync(base, { recursive: true, force: true });
+      clearInterval(watch);
+      await cleanup(base, report, image);
     }
   });
 }

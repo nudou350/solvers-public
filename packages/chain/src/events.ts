@@ -15,7 +15,10 @@ export type SolversEvent =
   | { name: "ReviewSubmitted"; data: gen.ReviewSubmittedEvent }
   | { name: "EscrowCreated"; data: gen.EscrowCreatedEvent }
   | { name: "MilestoneUpdated"; data: gen.MilestoneUpdatedEvent }
-  | { name: "DisputeResolved"; data: gen.DisputeResolvedEvent };
+  | { name: "DisputeResolved"; data: gen.DisputeResolvedEvent }
+  | { name: "ConfigUpdated"; data: gen.ConfigUpdatedEvent }
+  | { name: "EscrowClosed"; data: gen.EscrowClosedEvent }
+  | { name: "PricingUpdated"; data: gen.PricingUpdatedEvent };
 
 const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) => unknown]> = [
   ["AgentRegistered", gen.AGENT_REGISTERED_EVENT_DISCRIMINATOR, gen.parseAgentRegisteredEvent],
@@ -31,6 +34,9 @@ const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) 
   ["EscrowCreated", gen.ESCROW_CREATED_EVENT_DISCRIMINATOR, gen.parseEscrowCreatedEvent],
   ["MilestoneUpdated", gen.MILESTONE_UPDATED_EVENT_DISCRIMINATOR, gen.parseMilestoneUpdatedEvent],
   ["DisputeResolved", gen.DISPUTE_RESOLVED_EVENT_DISCRIMINATOR, gen.parseDisputeResolvedEvent],
+  ["ConfigUpdated", gen.CONFIG_UPDATED_EVENT_DISCRIMINATOR, gen.parseConfigUpdatedEvent],
+  ["EscrowClosed", gen.ESCROW_CLOSED_EVENT_DISCRIMINATOR, gen.parseEscrowClosedEvent],
+  ["PricingUpdated", gen.PRICING_UPDATED_EVENT_DISCRIMINATOR, gen.parsePricingUpdatedEvent],
 ];
 
 type ReadonlyUint8Array = gen.AgentRegisteredEvent["agentId"];

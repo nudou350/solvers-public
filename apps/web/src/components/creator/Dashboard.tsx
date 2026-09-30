@@ -271,6 +271,52 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
         )}
       </div>
 
+      {data.guarantee ? (
+        <div className="card pad-s" style={{ padding: "8px 24px", marginBottom: 24 }}>
+          <div className="row between wrapx" style={{ padding: "14px 0" }}>
+            <h2 className="h3">Ganhos de tarefas com garantia</h2>
+            <span className="small muted">Já sem a taxa da plataforma, à parte das vendas</span>
+          </div>
+          <div className="g3 m1" style={gap(16, { padding: "4px 0 18px", borderTop: "1px solid var(--line)" })}>
+            <div className="col" style={gap(4, { paddingTop: 14 })}>
+              <span className="small muted">Recebido no total</span>
+              <span className="display num" style={{ fontSize: 34, lineHeight: 1, whiteSpace: "nowrap" }}>{money0(data.guarantee.earnedUsdc)}</span>
+              <span className="tiny faint">{usdc(data.guarantee.earnedUsdc)}</span>
+            </div>
+            <div className="col" style={gap(4, { paddingTop: 14 })}>
+              <span className="small muted">Últimos 30 dias</span>
+              <span className="display num" style={{ fontSize: 34, lineHeight: 1, whiteSpace: "nowrap" }}>{money0(data.guarantee.last30Usdc)}</span>
+              <span className="tiny faint">{usdc(data.guarantee.last30Usdc)}</span>
+            </div>
+            <div className="col" style={gap(4, { paddingTop: 14 })}>
+              <span className="small muted">Etapas liberadas</span>
+              <span className="display num" style={{ fontSize: 34, lineHeight: 1 }}>{int(data.guarantee.releases)}</span>
+              <span className="tiny faint">aprovadas pelo comprador, automáticas ou a seu favor</span>
+            </div>
+          </div>
+          {data.guarantee.recent.length === 0 ? (
+            <div style={{ borderTop: "1px solid var(--line)" }}>
+              <Empty bare icon="shield-check" title="Nenhum pagamento de garantia ainda">
+                Quando uma etapa de tarefa com garantia for liberada para você, ela aparece aqui.
+              </Empty>
+            </div>
+          ) : (
+            data.guarantee.recent.map((r) => (
+              <div key={r.signature} className="rowline">
+                <span className="ok">
+                  <Icon name="shield-check" size="s" />
+                </span>
+                <div className="grow col" style={gap(2, { minWidth: 0 })}>
+                  <b className="trunc">{(r.agentId && nameOf.get(r.agentId)) || "Tarefa com garantia"}</b>
+                  <span className="tiny faint">{date(r.at)}</span>
+                </div>
+                <b className="num">{money(r.amountUsdc)}</b>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+
       <div className="card pad-s" style={{ padding: "8px 24px" }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
           <h2 className="h3">Contestações recentes</h2>

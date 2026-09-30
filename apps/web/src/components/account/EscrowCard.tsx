@@ -8,7 +8,7 @@ import { Chip, type ChipTone } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
 import { Notice, useToast } from "@/components/ui/Toast";
-import { brl, countdown, saveTextFile, usdc } from "@/lib/format";
+import { brl, countdown, date, saveTextFile, usdc } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { txErrorMessage, useTx } from "@/lib/tx";
@@ -99,6 +99,34 @@ export function Deliverable({ escrowId, index, label = "Baixar arquivos" }: { es
   );
 }
 
+/** Cancelar uma etapa não entregue (prazo vencido) com confirmação simples. */
+function CancelUndelivered({ amount, pending, onConfirm }: { amount: string; pending: boolean; onConfirm: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking)
+    return (
+      <div>
+        <Button variant="secondary" size="sm" icon="refresh" onClick={() => setAsking(true)} disabled={pending}>
+          Cancelar e receber de volta
+        </Button>
+      </div>
+    );
+  return (
+    <div className="card-flat pad-s col" style={{ "--gap": "10px", background: "var(--surface)" } as React.CSSProperties} role="group" aria-label="Confirmar o cancelamento">
+      <span className="small">
+        O valor desta etapa ({amount}) volta para a sua conta, sem taxa. A etapa deixa de ser entregue. Quer cancelar?
+      </span>
+      <div className="row wrapx" style={{ "--gap": "8px" } as React.CSSProperties}>
+        <Button variant="primary" size="sm" loading={pending} onClick={onConfirm}>
+          Sim, cancelar e receber de volta
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setAsking(false)} disabled={pending}>
+          Voltar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DisputeForm({ criteria, onCancel, onSend, pending }: { criteria: string[]; onCancel: () => void; onSend: (c: string, reason: string) => void; pending: boolean }) {
   const [crit, setCrit] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -154,13 +182,29 @@ function DisputeForm({ criteria, onCancel, onSend, pending }: { criteria: string
   );
 }
 
-export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Escrow; detail: EscrowDetail | null; agent: Agent | undefined; onChanged: () => void }) {
+export function EscrowCard({
+  escrow: e,
+  detail,
+  detailFailed = false,
+  onRetryDetail,
+  agent,
+  onChanged,
+}: {
+  escrow: Escrow;
+  detail: EscrowDetail | null;
+  /** O detalhe (critérios, prazos, prévia) não carregou: o cartão avisa e oferece "Tentar de novo". */
+  detailFailed?: boolean;
+  onRetryDetail?: () => Promise<boolean>;
+  agent: Agent | undefined;
+  onChanged: () => void;
+}) {
   const { api, config } = useSession();
   const rate = config?.brlPerUsd ?? null;
   const toast = useToast();
   const tx = useTx();
   const [disputing, setDisputing] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const ms: Ms[] = e.milestones.map((m, i) => ({ ...m, extra: detail?.milestones.find((x) => x.index === i) ?? null }));
   const done = ms.filter((m) => m.status === "approved").length;
@@ -172,7 +216,13 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
   const disputed = ms.find((m) => m.status === "disputed");
   const [chipText, chipTone] = ESCROW_CHIP[e.status];
   const money = (n: number) => (rate ? brl(n, rate) : usdc(n));
+  // Prazo de entrega: só tarefas novas têm; nas antigas (nulo) não aparece nada.
+  const deadline = e.deliveryDeadline;
+  const overdue = deadline ? new Date(deadline).getTime() < now : false;
+  const firstPending = ms.findIndex((m) => m.status === "pending");
   const isDesign = agent?.category === "Design";
+  // Sem o detalhe, os critérios saem do texto da garantia, dividido como o servidor divide (mesma regra da validação).
+  const focusCriteria = focus ? (focus.extra?.criteria ?? splitCriteria(focus.criteria)) : [];
 
   const approve = async () => {
     if (focusIdx < 0) return;
@@ -183,12 +233,21 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
     onChanged();
   };
 
+  const cancelUndelivered = async (idx: number) => {
+    const r = await tx.run(() => api.buildCancelUndelivered(e.id, idx));
+    // Com ou sem sucesso, relê: o prazo ou o estado da etapa pode ter mudado.
+    onChanged();
+    if (!r) return;
+    setMsg({ tone: "ok", text: "Etapa cancelada. O valor dela voltou para a sua conta, sem taxa." });
+    toast({ tone: "ok", title: "Etapa cancelada", text: "O valor voltou para a sua conta." });
+  };
+
   const sendDispute = async (criterion: string, reason: string) => {
     if (focusIdx < 0) return;
     const r = await tx.run(() => api.buildDispute(e.id, focusIdx, criterion, reason));
     if (!r) return;
     setDisputing(false);
-    setMsg({ tone: "warn", text: "Contestação enviada. O valor continua guardado até a análise, e você será avisado do resultado." });
+    setMsg({ tone: "warn", text: "Contestação enviada. O valor continua guardado até a análise. Volte aqui para conferir o resultado." });
     toast({ tone: "ok", title: "Contestação enviada" });
     onChanged();
   };
@@ -241,6 +300,12 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
                       {label}
                       {m.status === "disputed" && x?.disputeCriterion ? <span className="muted"> · critério: {x.disputeCriterion}</span> : null}
                     </div>
+                    {m.status === "pending" && deadline && i === firstPending && e.status === "active" ? (
+                      <span className={`tiny ${overdue ? "warn" : "faint"}`}>{overdue ? "Prazo de entrega vencido" : `Entrega até ${date(deadline)}`}</span>
+                    ) : null}
+                    {m.status === "pending" && x?.canCancelUndelivered ? (
+                      <CancelUndelivered amount={money(x.amountUsdc)} pending={tx.pending} onConfirm={() => void cancelUndelivered(i)} />
+                    ) : null}
                     {x?.tests && x.tests.mode !== "manual" && x.tests.total > 0 && (m.status === "passed" || m.status === "approved") ? (
                       <span className="tiny faint">
                         {x.tests.passed} de {x.tests.total} testes passaram
@@ -322,9 +387,8 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
                       variant="danger"
                       size="lg"
                       icon="flag"
-                      // A contestação usa os critérios exatos do servidor (getMyEscrow): espera o detalhe carregar.
-                      disabled={tx.pending || !focus.extra}
-                      title={focus.extra ? undefined : "Carregando os critérios da etapa…"}
+                      // Os critérios vêm do detalhe (getMyEscrow) ou, se ele falhou, do texto da garantia.
+                      disabled={tx.pending || !focusCriteria.length}
                       onClick={() => {
                         tx.reset();
                         setDisputing(true);
@@ -334,9 +398,9 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
                     </Button>
                   ) : null}
                 </div>
-              ) : focus.extra ? (
+              ) : (
                 <DisputeForm
-                  criteria={focus.extra.criteria}
+                  criteria={focusCriteria}
                   pending={tx.pending}
                   onCancel={() => {
                     tx.reset();
@@ -344,7 +408,7 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
                   }}
                   onSend={sendDispute}
                 />
-              ) : null}
+              )}
             </>
           ) : e.status === "active" && submitted ? (
             <div className="col" style={{ "--gap": "10px", alignItems: "flex-start" } as React.CSSProperties}>
@@ -358,7 +422,31 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
           ) : e.status === "active" && !disputed ? (
             <div className="col" style={{ "--gap": "10px", alignItems: "flex-start" } as React.CSSProperties}>
               <Chip icon="clock">Aguardando entrega</Chip>
-              <p className="muted">A prévia aparece aqui assim que o especialista entregar a próxima etapa. Você será avisado.</p>
+              <p className="muted">A prévia aparece aqui assim que o especialista entregar a próxima etapa. Volte aqui para conferir.</p>
+            </div>
+          ) : null}
+          {detailFailed && !detail ? (
+            <div className="row card-flat pad-s wrapx" style={{ "--gap": "10px", background: "var(--surface)" } as React.CSSProperties} role="status">
+              <span className="warn">
+                <Icon name="info" size="s" />
+              </span>
+              <span className="small grow">Não deu para carregar todos os detalhes desta garantia (prazos e prévia).</span>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="refresh"
+                loading={retrying}
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    await onRetryDetail?.();
+                  } finally {
+                    setRetrying(false);
+                  }
+                }}
+              >
+                Tentar de novo
+              </Button>
             </div>
           ) : null}
           {tx.error ? (
@@ -378,7 +466,14 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
               <span className="warn">
                 <Icon name="info" size="s" />
               </span>
-              <span className="small grow">Contestação em análise. O valor continua guardado e você será avisado do resultado.</span>
+              <span className="small grow">
+                Contestação em análise. O valor continua guardado. Volte aqui para conferir o resultado.
+                {disputed.extra?.disputedAt
+                  ? disputed.extra.disputeDeadline
+                    ? ` Se ninguém julgar até ${date(disputed.extra.disputeDeadline)}, o valor volta para você automaticamente.`
+                    : " Um administrador vai analisar a sua contestação."
+                  : ""}
+              </span>
             </div>
           ) : null}
           {detail ? (

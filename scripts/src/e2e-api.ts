@@ -14,14 +14,21 @@ import { key, log } from "./env.js";
 const API = process.env.API_URL ?? "http://localhost:3017";
 
 export async function api<T = unknown>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  // /api/tx, /api/search e /api/faucet têm limite de 20 req/min por IP (app.ts "costly"): os roteiros longos
+  // passam disso, então o 429 espera a janela virar e repete (nunca repete erro de outro tipo).
+  let res!: Response;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
   const body = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} -> ${res.status}: ${JSON.stringify(body)}`);
   return body;

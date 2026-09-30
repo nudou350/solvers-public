@@ -6,7 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getAddressDecoder, getAddressEncoder, getArrayDecoder, getArrayEncoder, getBytesDecoder, getBytesEncoder, getI64Decoder, getI64Encoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type Codec, type Decoder, type EncodedAccount, type Encoder, type FetchAccountConfig, type FetchAccountsConfig, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getAddressDecoder, getAddressEncoder, getArrayDecoder, getArrayEncoder, getBytesDecoder, getBytesEncoder, getI64Decoder, getI64Encoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type Codec, type Decoder, type EncodedAccount, type Encoder, type FetchAccountConfig, type FetchAccountsConfig, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
 import { getEscrowStatusDecoder, getEscrowStatusEncoder, getMilestoneStateDecoder, getMilestoneStateEncoder, type EscrowStatus, type EscrowStatusArgs, type MilestoneState, type MilestoneStateArgs } from '../types/index.js';
 
 export const ESCROW_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([31, 213, 123, 187, 186, 22, 218, 155]);
@@ -19,7 +19,11 @@ rentPayer: Address; nonce: bigint; total: bigint; milestones: Array<MilestoneSta
 /** Janela para o comprador revisar uma etapa aprovada nos testes. */
 reviewWindowSecs: bigint; 
 /** Prazo da liberação automática da etapa aprovada mais recente (0 = nenhuma). */
-autoReleaseAt: bigint; status: EscrowStatus; bump: number; vaultBump: number;  };
+autoReleaseAt: bigint; status: EscrowStatus; bump: number; vaultBump: number; 
+/** Taxa da plataforma no momento da criação: mudar `Config` depois não afeta esta garantia. */
+feeBps: number; 
+/** Prazo (unix) para o solver entregar cada etapa; vencido, o comprador cancela as pendentes. */
+deliveryDeadline: bigint;  };
 
 export type EscrowArgs = { buyer: Address; agent: Address; creator: Address; 
 /** Quem pagou o rent (recebe de volta no close_escrow). */
@@ -27,16 +31,20 @@ rentPayer: Address; nonce: number | bigint; total: number | bigint; milestones: 
 /** Janela para o comprador revisar uma etapa aprovada nos testes. */
 reviewWindowSecs: number | bigint; 
 /** Prazo da liberação automática da etapa aprovada mais recente (0 = nenhuma). */
-autoReleaseAt: number | bigint; status: EscrowStatusArgs; bump: number; vaultBump: number;  };
+autoReleaseAt: number | bigint; status: EscrowStatusArgs; bump: number; vaultBump: number; 
+/** Taxa da plataforma no momento da criação: mudar `Config` depois não afeta esta garantia. */
+feeBps: number; 
+/** Prazo (unix) para o solver entregar cada etapa; vencido, o comprador cancela as pendentes. */
+deliveryDeadline: number | bigint;  };
 
 /** Gets the encoder for {@link EscrowArgs} account data. */
 export function getEscrowEncoder(): Encoder<EscrowArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)], ['buyer', getAddressEncoder()], ['agent', getAddressEncoder()], ['creator', getAddressEncoder()], ['rentPayer', getAddressEncoder()], ['nonce', getU64Encoder()], ['total', getU64Encoder()], ['milestones', getArrayEncoder(getMilestoneStateEncoder())], ['reviewWindowSecs', getI64Encoder()], ['autoReleaseAt', getI64Encoder()], ['status', getEscrowStatusEncoder()], ['bump', getU8Encoder()], ['vaultBump', getU8Encoder()]]), (value) => ({ ...value, discriminator: ESCROW_DISCRIMINATOR }));
+    return transformEncoder(getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)], ['buyer', getAddressEncoder()], ['agent', getAddressEncoder()], ['creator', getAddressEncoder()], ['rentPayer', getAddressEncoder()], ['nonce', getU64Encoder()], ['total', getU64Encoder()], ['milestones', getArrayEncoder(getMilestoneStateEncoder())], ['reviewWindowSecs', getI64Encoder()], ['autoReleaseAt', getI64Encoder()], ['status', getEscrowStatusEncoder()], ['bump', getU8Encoder()], ['vaultBump', getU8Encoder()], ['feeBps', getU16Encoder()], ['deliveryDeadline', getI64Encoder()]]), (value) => ({ ...value, discriminator: ESCROW_DISCRIMINATOR }));
 }
 
 /** Gets the decoder for {@link Escrow} account data. */
 export function getEscrowDecoder(): Decoder<Escrow> {
-    return getStructDecoder([['discriminator', fixDecoderSize(getBytesDecoder(), 8)], ['buyer', getAddressDecoder()], ['agent', getAddressDecoder()], ['creator', getAddressDecoder()], ['rentPayer', getAddressDecoder()], ['nonce', getU64Decoder()], ['total', getU64Decoder()], ['milestones', getArrayDecoder(getMilestoneStateDecoder())], ['reviewWindowSecs', getI64Decoder()], ['autoReleaseAt', getI64Decoder()], ['status', getEscrowStatusDecoder()], ['bump', getU8Decoder()], ['vaultBump', getU8Decoder()]]);
+    return getStructDecoder([['discriminator', fixDecoderSize(getBytesDecoder(), 8)], ['buyer', getAddressDecoder()], ['agent', getAddressDecoder()], ['creator', getAddressDecoder()], ['rentPayer', getAddressDecoder()], ['nonce', getU64Decoder()], ['total', getU64Decoder()], ['milestones', getArrayDecoder(getMilestoneStateDecoder())], ['reviewWindowSecs', getI64Decoder()], ['autoReleaseAt', getI64Decoder()], ['status', getEscrowStatusDecoder()], ['bump', getU8Decoder()], ['vaultBump', getU8Decoder()], ['feeBps', getU16Decoder()], ['deliveryDeadline', getI64Decoder()]]);
 }
 
 /** Gets the codec for {@link Escrow} account data. */

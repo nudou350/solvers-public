@@ -1,15 +1,19 @@
-import { readFileSync, readdirSync, statSync, existsSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, resolve, relative, sep } from "node:path";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { address } from "@solvers/chain";
+import * as gen from "@solvers/client";
 import { authorities, chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
-import { badRequest, forbidden, notFound } from "../lib/http.js";
-import { randomToken, sha256, sha256Hex } from "../lib/crypto.js";
+import { badRequest, forbidden, HttpError, notFound } from "../lib/http.js";
+import { bytesToHexStr, randomId, randomToken, sha256, sha256Hex } from "../lib/crypto.js";
 import { syncEscrow } from "../indexer/sync.js";
 import { notifyCreator } from "../notify/telegram.js";
 import { a11yCheck } from "../runtime/tools.js";
+import { installDeliverable, type Installed } from "./install.js";
+import { withKeyLock } from "./lock.js";
+import { planMarkPassed, type ChainMilestone } from "./report.js";
 import { runTests, sanitizeAcceptance, sanitizeFiles, writeFiles, type Files, type TestReport } from "./sandbox.js";
 
 // Fluxo da garantia (INSTRUCTIONS.md 5.7): a IA entrega; o servidor roda a bateria de aceite
@@ -43,13 +47,14 @@ export function criteriaHash(title: string, criteria: string, acceptanceHash?: s
   return sha256(`${title}\n${criteria}${acceptanceHash ? `\n${acceptanceHash}` : ""}`);
 }
 
+/** Lê uma pasta de entrega/bateria gravada pelo servidor. Só arquivos comuns (symlink e afins são ignorados). */
 export function readDeliverable(dir: string): Files {
   const out: Files = {};
   const walk = (d: string) => {
-    for (const name of readdirSync(d)) {
-      const full = join(d, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else out[relative(dir, full).split(sep).join("/")] = readFileSync(full, "utf8");
+    for (const ent of readdirSync(d, { withFileTypes: true })) {
+      const full = join(d, ent.name);
+      if (ent.isDirectory()) walk(full);
+      else if (ent.isFile()) out[relative(dir, full).split(sep).join("/")] = readFileSync(full, "utf8");
     }
   };
   if (existsSync(dir)) walk(dir);
@@ -58,9 +63,28 @@ export function readDeliverable(dir: string): Files {
 
 type FinalReport = TestReport & { a11y?: ReturnType<typeof a11yCheck>; selfWrittenTestsOnly?: boolean };
 
+/**
+ * Bateria de aceite da etapa. Se ela foi combinada (hash no banco e on-chain), o que está em disco
+ * tem que existir e bater com o hash: senão a verificação PARA (nunca cai para "testes da própria
+ * entrega", que enfraqueceria a garantia em silêncio).
+ */
+function loadAcceptance(m: typeof schema.milestones.$inferSelect): Files | null {
+  if (!m.acceptanceHash) return m.acceptancePath && existsSync(m.acceptancePath) ? readDeliverable(m.acceptancePath) : null;
+  const files = m.acceptancePath ? readDeliverable(m.acceptancePath) : {};
+  if (Object.keys(files).length === 0 || filesHash(files).toString("hex") !== m.acceptanceHash) {
+    console.error(`[verifier] bateria de aceite ausente ou diferente do hash combinado (${m.escrowId}/${m.idx})`);
+    throw new HttpError(
+      500,
+      "A bateria de aceite combinada para esta etapa não está disponível. A verificação foi interrompida; fale com o suporte.",
+      "acceptance_unavailable",
+    );
+  }
+  return files;
+}
+
 /** Etapa com testes: roda a bateria de aceite combinada (ou os testes da entrega) e o a11y, se combinado. */
 async function verifyWithTests(files: Files, m: typeof schema.milestones.$inferSelect): Promise<{ report: FinalReport; previewHtml: string | null }> {
-  const acceptance = m.acceptancePath && existsSync(m.acceptancePath) ? readDeliverable(m.acceptancePath) : null;
+  const acceptance = loadAcceptance(m);
   const { report, previewHtml } = await runTests(files, { acceptance });
 
   // Critério de acessibilidade combinado: checagem estática no código da entrega.
@@ -94,8 +118,31 @@ function manualReview(files: Files): { report: FinalReport; previewHtml: string 
   };
 }
 
-export async function submitDeliverable(input: { wallet: string; agentId: string; escrowId: string; index: number; files: Files }) {
+
+/** Estado da etapa on-chain (null se a conta ou a etapa não puderam ser lidas). */
+async function readChainMilestone(escrowId: string, idx: number): Promise<ChainMilestone> {
+  try {
+    const acc = await gen.fetchMaybeEscrow(chain().rpc, address(escrowId));
+    const cm = acc.exists ? acc.data.milestones[idx] : undefined;
+    return cm ? { status: Number(cm.status), deliverableHash: bytesToHexStr(cm.deliverableHash) } : null;
+  } catch (e) {
+    console.warn("[verifier] não consegui ler a etapa on-chain:", (e as Error).message);
+    return null;
+  }
+}
+
+type SubmitInput = { wallet: string; agentId: string; escrowId: string; index: number; files: Files };
+
+/**
+ * Envio de uma entrega. Serializado por etapa (escrow:idx): dois envios da mesma etapa nunca rodam
+ * juntos, então um não apaga nem sobrescreve o resultado do outro.
+ */
+export function submitDeliverable(input: SubmitInput) {
   const files = sanitizeFiles(input.files);
+  return withKeyLock(`${input.escrowId}:${input.index}`, () => submitLocked(input, files));
+}
+
+async function submitLocked(input: SubmitInput, files: Files) {
   const [escrow] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, input.escrowId));
   if (!escrow) throw notFound("Tarefa com garantia não encontrada");
   if (escrow.buyerWallet !== input.wallet) throw forbidden("Esta garantia pertence a outra carteira");
@@ -103,40 +150,123 @@ export async function submitDeliverable(input: { wallet: string; agentId: string
   const where = and(eq(schema.milestones.escrowId, escrow.id), eq(schema.milestones.idx, input.index));
   const [m] = await db.select().from(schema.milestones).where(where);
   if (!m) throw notFound("Etapa não encontrada");
-  if (!["pending", "submitted"].includes(m.status)) throw badRequest(`Esta etapa já está ${m.status}`);
 
-  // Cada envio substitui o anterior por completo (sem sobras de tentativas que falharam).
-  const dir = join(milestoneDir(escrow.id, input.index), "files");
-  rmSync(dir, { recursive: true, force: true });
-  writeFiles(dir, files);
-  rmSync(join(milestoneDir(escrow.id, input.index), "preview.html"), { force: true });
   const hash = filesHash(files);
-  await db.update(schema.milestones).set({ status: "submitted", deliverablePath: dir, deliverableHash: hash.toString("hex") }).where(where);
+  const hashHex = hash.toString("hex");
+  // "passed" com o mesmo hash: a etapa já foi aprovada on-chain com esta mesma entrega (reenvio depois de
+  // timeout do cliente, ou queda no meio de um envio anterior).
+  const sameDelivery = m.status === "passed" && m.deliverableHash === hashHex;
+  if (sameDelivery && m.previewUrl) {
+    return {
+      passed: true as const,
+      report: (m.verifierReport ?? {}) as unknown as FinalReport,
+      previewUrl: m.previewUrl,
+      autoReleaseAt: escrow.autoReleaseAt?.toISOString() ?? null,
+    };
+  }
+  if (!["pending", "submitted"].includes(m.status) && !sameDelivery) throw badRequest(`Esta etapa já está ${m.status}`);
 
-  const { report: finalReport, previewHtml } = m.verify === "manual" ? manualReview(files) : await verifyWithTests(files, m);
+  // Só o estado off-chain muda aqui; nada da tentativa anterior em disco é tocado antes de passar.
+  const onlySubmitted = and(where, eq(schema.milestones.status, "submitted"));
+  // Devolve a etapa a "pending" (só se ainda "submitted", ou seja, desta tentativa). Nunca mascara o erro original.
+  const backToPending = async () => {
+    try {
+      await db.update(schema.milestones).set({ status: "pending" }).where(onlySubmitted);
+    } catch (e) {
+      console.error("[verifier] não consegui devolver a etapa a pending:", (e as Error).message);
+    }
+  };
+  if (m.status === "pending") await db.update(schema.milestones).set({ status: "submitted" }).where(where);
+
+  let verified: { report: FinalReport; previewHtml: string | null };
+  try {
+    verified = m.verify === "manual" ? manualReview(files) : await verifyWithTests(files, m);
+  } catch (e) {
+    await backToPending();
+    throw e;
+  }
+  const { report: finalReport, previewHtml } = verified;
 
   if (!finalReport.passed) {
+    // Falha: só registra o relatório e devolve a etapa a "pending" (se ainda estiver "submitted").
+    // Não há arquivos desta tentativa em disco para apagar, e uma etapa "passed" nunca é alterada.
     await db
       .update(schema.milestones)
-      .set({ status: "pending", deliverablePath: null, deliverableHash: null, verifierReport: finalReport as unknown as Record<string, unknown> })
-      .where(where);
-    rmSync(dir, { recursive: true, force: true });
+      .set({ status: "pending", verifierReport: finalReport as unknown as Record<string, unknown> })
+      .where(onlySubmitted);
     return { passed: false as const, report: finalReport, previewUrl: null, autoReleaseAt: null };
   }
 
-  if (previewHtml) {
-    mkdirSync(milestoneDir(escrow.id, input.index), { recursive: true });
-    writeFileSync(join(milestoneDir(escrow.id, input.index), "preview.html"), previewHtml);
+  const c = chain();
+  const escrowAddr = address(escrow.id);
+  // Antes de qualquer coisa irreversível: o que está on-chain permite esta entrega?
+  const plan = planMarkPassed(await readChainMilestone(escrow.id, input.index), hashHex);
+  if (plan === "conflict") {
+    await backToPending();
+    throw badRequest("Esta etapa já foi marcada on-chain com outra entrega.", "milestone_conflict");
   }
 
-  const c = chain();
-  const ix = await c.markPassedIx(authorities().verifier, address(escrow.id), input.index, hash);
-  await c.sendAsServer([ix]);
-  await syncEscrow(address(escrow.id));
+  // Persiste entrega, prévia e relatório ANTES do mark_passed. A rota /preview só serve com a etapa
+  // "passed"/"approved", então a URL não fica acessível antes da confirmação on-chain.
+  const previewUrl = `${env.PUBLIC_API_URL.replace(/\/$/, "")}/preview/${escrow.id}/${input.index}?t=${randomToken(18)}`;
+  let installed: Installed | null = null;
+  try {
+    installed = installDeliverable(milestoneDir(escrow.id, input.index), files, previewHtml);
+    await db
+      .update(schema.milestones)
+      .set({ deliverablePath: installed.dir, deliverableHash: hashHex, previewUrl, verifierReport: finalReport as unknown as Record<string, unknown> })
+      .where(where);
+  } catch (e) {
+    // Nada foi enviado à cadeia: desfaz a instalação e a etapa volta a pending.
+    try {
+      installed?.undo();
+    } catch (u) {
+      console.error("[verifier] não consegui desfazer a instalação:", (u as Error).message);
+    }
+    await backToPending();
+    throw e;
+  }
 
-  const token = randomToken(18);
-  const previewUrl = `${env.PUBLIC_API_URL.replace(/\/$/, "")}/preview/${escrow.id}/${input.index}?t=${token}`;
-  await db.update(schema.milestones).set({ previewUrl, verifierReport: finalReport as unknown as Record<string, unknown> }).where(where);
+  if (plan === "send") {
+    try {
+      const ix = await c.markPassedIx(authorities().verifier, escrowAddr, input.index, hash);
+      await c.sendAsServer([ix]);
+    } catch (e) {
+      // A transação pode ter entrado mesmo com erro (ex: timeout de confirmação): confere antes de falhar.
+      const outcome = planMarkPassed(await readChainMilestone(escrow.id, input.index), hashHex);
+      if (outcome !== "already") {
+        if (outcome === "conflict") {
+          // Outra entrega (tentativa anterior em voo) ficou aprovada on-chain: disco e banco voltam a
+          // refletir a entrega que a cadeia tem, e o banco sincroniza o status.
+          try {
+            installed.undo();
+            await db
+              .update(schema.milestones)
+              .set({ deliverablePath: m.deliverablePath, deliverableHash: m.deliverableHash, previewUrl: m.previewUrl, verifierReport: m.verifierReport })
+              .where(where);
+          } catch (u) {
+            console.error("[verifier] não consegui restaurar a entrega anterior:", (u as Error).message);
+          }
+          await backToPending();
+          await syncEscrow(escrowAddr).catch(() => undefined);
+          throw badRequest("Esta etapa já foi marcada on-chain com outra entrega.", "milestone_conflict");
+        }
+        // Resultado incerto (a transação ainda pode entrar): mantém esta entrega salva, coerente com o que
+        // será aprovado; o syncEscrow preserva "passed" se ela entrar.
+        installed.commit();
+        await backToPending();
+        throw e;
+      }
+    }
+  }
+  installed.commit();
+  try {
+    await syncEscrow(escrowAddr);
+  } catch (e) {
+    // Já está aprovada on-chain e salva; o indexer sincroniza o banco.
+    console.warn("[verifier] syncEscrow falhou depois do mark_passed:", (e as Error).message);
+  }
+
   const [after] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, escrow.id));
   void notifyCreator(escrow.agentId, `Solvers: etapa ${input.index + 1} da garantia ${escrow.id.slice(0, 8)}… passou na verificação.`);
   return { passed: true as const, report: finalReport, previewUrl, autoReleaseAt: after?.autoReleaseAt?.toISOString() ?? null };

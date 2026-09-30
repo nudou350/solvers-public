@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { address } from "@solvers/chain";
 import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
@@ -54,6 +54,8 @@ async function openEscrowOf(wallet: string, agentId: string): Promise<string | n
         inArray(schema.escrows.status, [...OPEN_ESCROW_STATUSES]),
       ),
     )
+    // Mais de uma aberta: a mais recente (resultado estável, não depende da ordem do banco).
+    .orderBy(desc(schema.escrows.createdAt))
     .limit(1);
   return row?.id ?? null;
 }

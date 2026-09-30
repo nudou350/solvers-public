@@ -1,8 +1,7 @@
 import { Router } from "express";
-import { and, desc, eq, gt, inArray, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { address, createNoopSigner } from "@solvers/chain";
-import { findReviewPda } from "@solvers/client";
 import {
   DELIST_MAX_RATING,
   DELIST_MIN_REVIEWS,
@@ -25,10 +24,12 @@ import { randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { processSignature } from "../indexer/processor.js";
 import { refreshLicenseOwner } from "../indexer/sync.js";
-import { criteriaHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
+import { criteriaHash, filesHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
+import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, deliveryDeadlineFrom, deliveryIntact, resolveDeliveryDays } from "./delivery-rules.js";
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
 import { notifyCreator } from "../notify/telegram.js";
+import { splitCriteria } from "../runtime/guarantee-text.js";
 
 export const escrowRouter = Router();
 
@@ -106,15 +107,11 @@ const CreateBody = z.object({
     )
     .max(5)
     .optional(),
+  /** Prazo para o especialista entregar, em dias (ausente ou 0: 14; máximo 60). Vencido, o comprador cancela e recebe de volta. */
+  deliveryDays: z.number().optional(),
 });
 
-/** Critérios combinados de uma etapa, um por item. */
-export function splitCriteria(criteria: string): string[] {
-  return criteria
-    .split(/\n|;/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+export { splitCriteria };
 
 escrowRouter.post(
   "/tx/escrow",
@@ -122,6 +119,7 @@ escrowRouter.post(
   h(async (req): Promise<TxResponse> => {
     const wallet = address(requireWallet(req));
     const body = parse(CreateBody, req.body);
+    const deliveryDays = resolveDeliveryDays(body.deliveryDays);
     const agent = await findAgentRow(body.agentId);
     // Garantia é uma venda nova: especialista fora da vitrine não abre tarefas.
     if (agent.status !== "active" || !agent.listed) throw badRequest("Este especialista ainda não está disponível.");
@@ -175,7 +173,9 @@ escrowRouter.post(
       amount: usdcToUnits(m.amountUsdc),
       criteriaHash: criteriaHash(m.title, m.criteria, acceptance[idx]?.hash),
     }));
-    const { instructions } = await c.createEscrowIxs(wallet, agent.id, nonce, milestones, BigInt(env.ESCROW_REVIEW_WINDOW_SECS));
+    const { instructions } = await c.createEscrowIxs(wallet, agent.id, nonce, milestones, BigInt(env.ESCROW_REVIEW_WINDOW_SECS), deliveryDays);
+    // Prazo e taxa ficam gravados já na criação; o indexador confirma com o valor on-chain.
+    const deliveryDeadline = deliveryDeadlineFrom(new Date(), deliveryDays);
 
     const [creatorRow] = await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, agent.creatorId));
     await db.transaction(async (tx) => {
@@ -203,6 +203,8 @@ escrowRouter.post(
         total: usdcToUnits(total),
         status: "pending",
         reviewWindowSecs: env.ESCROW_REVIEW_WINDOW_SECS,
+        deliveryDeadline,
+        feeBps: config.data.feeBps,
       });
       await tx.insert(schema.milestones).values(
         plan.map((m, idx) => ({
@@ -237,6 +239,37 @@ escrowRouter.post(
     const c = chain();
     const ixs = await c.releaseMilestoneIxs(createNoopSigner(address(wallet)), address(row.id), index);
     return c.buildForUser(ixs, { kind: "release", escrowId: row.id, index });
+  }),
+);
+
+/** Cancelar etapa não entregue depois do prazo: o comprador recebe o valor da etapa de volta, sem taxa. */
+async function buildCancelUndelivered(idParam: string, wallet: string, index: number): Promise<TxResponse> {
+  const { row, ms } = await loadEscrow(idParam, wallet);
+  const m = ms.find((x) => x.idx === index);
+  if (!m) throw notFound("Etapa não encontrada");
+  const blocked = cancelUndeliveredBlock({ closed: row.closed, deliveryDeadline: row.deliveryDeadline }, m, new Date());
+  if (blocked) throw badRequest(blocked, "cancel_not_allowed");
+  const c = chain();
+  const ixs = await c.cancelUndeliveredIxs(address(wallet), address(row.id), index);
+  return c.buildForUser(ixs, { kind: "cancel", escrowId: row.id, index });
+}
+
+escrowRouter.post(
+  "/tx/escrow/:id/cancel-undelivered",
+  requireAuth,
+  h(async (req) => {
+    const { index } = parse(z.object({ index: z.number().int().min(0).max(4) }), req.body);
+    return buildCancelUndelivered(String(req.params.id), requireWallet(req), index);
+  }),
+);
+
+// Mesma ação no formato da spec do programa v2 (índice na URL).
+escrowRouter.post(
+  "/tx/escrows/:id/milestones/:index/cancel-undelivered",
+  requireAuth,
+  h(async (req) => {
+    const { index } = parse(z.object({ index: z.coerce.number().int().min(0).max(4) }), req.params);
+    return buildCancelUndelivered(String(req.params.id), requireWallet(req), index);
   }),
 );
 
@@ -276,7 +309,8 @@ escrowRouter.post(
 
 // ---------- Consultas ----------
 
-function milestoneExtras(m: MilestoneRow, reviewWindowSecs: number) {
+function milestoneExtras(m: MilestoneRow, row: typeof schema.escrows.$inferSelect) {
+  const reviewWindowSecs = row.reviewWindowSecs;
   const report = (m.verifierReport ?? null) as { numPassed?: number; numTests?: number; mode?: string } | null;
   return {
     index: m.idx,
@@ -290,6 +324,9 @@ function milestoneExtras(m: MilestoneRow, reviewWindowSecs: number) {
     hasAcceptanceTests: !!m.acceptanceHash,
     disputeCriterion: m.disputeCriterion,
     downloadable: m.status === "approved" && !!m.deliverablePath,
+    disputedAt: m.disputedAt?.toISOString() ?? null,
+    disputeDeadline: disputeDeadlineOf(m, row.deliveryDeadline)?.toISOString() ?? null,
+    canCancelUndelivered: canCancelUndelivered({ closed: row.closed, deliveryDeadline: row.deliveryDeadline }, m, new Date()),
   };
 }
 
@@ -320,7 +357,7 @@ escrowRouter.get(
       description: row.description,
       createdAt: row.createdAt.toISOString(),
       agent: { id: agent.id, slug: agent.slug, name: agent.name },
-      milestones: ms.sort((a, b) => a.idx - b.idx).map((m) => milestoneExtras(m, row.reviewWindowSecs)),
+      milestones: ms.sort((a, b) => a.idx - b.idx).map((m) => milestoneExtras(m, row)),
       explorerUrl: explorerUrl("address", row.id),
     };
   }),
@@ -334,7 +371,13 @@ escrowRouter.get(
     const m = ms.find((x) => x.idx === Number(req.params.idx));
     if (!m?.deliverablePath) throw notFound("Entrega não encontrada");
     if (m.status !== "approved") throw forbidden("O arquivo final fica disponível depois da aprovação.");
-    return { files: readDeliverable(m.deliverablePath) };
+    // O arquivo em disco precisa ser o que foi verificado e aprovado (o hash foi gravado no envio).
+    const files = readDeliverable(m.deliverablePath);
+    if (!deliveryIntact(Object.keys(files).length, filesHash(files).toString("hex"), m.deliverableHash)) {
+      console.error(`[download] entrega diferente do hash aprovado (${m.escrowId}/${m.idx})`);
+      throw new HttpError(409, "Os arquivos desta entrega não conferem com o que foi aprovado, então o download foi bloqueado. Fale com o suporte.", "deliverable_changed");
+    }
+    return { files };
   }),
 );
 
@@ -347,6 +390,7 @@ escrowRouter.post(
     const wallet = address(requireWallet(req));
     const body = parse(z.object({ agentId: z.string(), rating: z.number().int().min(1).max(5), text: z.string().max(2000).default("") }), req.body);
     const agent = await findAgentRow(body.agentId);
+    if (!agent.onchainAddress) throw badRequest("Este especialista ainda não está disponível para avaliação.");
     const lic = await db
       .select()
       .from(schema.licenses)
@@ -369,15 +413,20 @@ escrowRouter.post(
     const contentHash = sha256(body.text);
     const c = chain();
     const ixs = await c.submitReviewIxs(wallet, agent.id, body.rating, contentHash, licenseAsset ? { licenseAsset: address(licenseAsset) } : { hasCredits: true });
-    // Texto fica off-chain; o hash vai on-chain e o indexador marca como publicada.
-    const [pda] = await findReviewPda({ agent: address(agent.onchainAddress!), author: wallet });
+    // Texto fica off-chain, só como rascunho por hash: nada público muda antes da assinatura. O indexador
+    // (syncReview) promove o rascunho quando o mesmo hash aparece confirmado on-chain.
+    const hashHex = contentHash.toString("hex");
     await db
-      .insert(schema.reviews)
-      .values({ id: pda, agentId: agent.id, authorWallet: wallet, rating: body.rating, text: body.text, contentHash: contentHash.toString("hex") })
+      .insert(schema.reviewDrafts)
+      .values({ agentId: agent.id, authorWallet: wallet, contentHash: hashHex, rating: body.rating, text: body.text })
       .onConflictDoUpdate({
-        target: [schema.reviews.agentId, schema.reviews.authorWallet],
-        set: { text: body.text, contentHash: contentHash.toString("hex"), rating: body.rating },
+        target: [schema.reviewDrafts.agentId, schema.reviewDrafts.authorWallet, schema.reviewDrafts.contentHash],
+        set: { rating: body.rating, text: body.text, createdAt: new Date() },
       });
+    // Rascunhos velhos nunca assinados não ficam guardados.
+    await db
+      .delete(schema.reviewDrafts)
+      .where(and(eq(schema.reviewDrafts.authorWallet, wallet), lt(schema.reviewDrafts.createdAt, sql`now() - interval '1 day'`)));
     return c.buildForUser(ixs, { kind: "review", agentId: agent.id });
   }),
 );

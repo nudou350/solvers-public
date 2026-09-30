@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomBytes } from "node:crypto";
-import { and, count, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, count, eq, gt, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { address } from "@solvers/chain";
 import { unitsToUsdc, usdcToUnits, type PixCharge, type PixConfig } from "@solvers/shared";
@@ -11,7 +11,9 @@ import { env } from "../env.js";
 import { badRequest, h, HttpError, notFound, parse, unauthorized } from "../lib/http.js";
 import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { brlPerUsd } from "../store/fx.js";
+import { assertFreshPrice } from "../store/fresh-price.js";
 import { ensureProfile } from "../store/profile.js";
+import { credit, markApproved } from "./credit.js";
 import { createPixOrder, getOrder, orderPayment, verifyWebhookSignature } from "./mercadopago.js";
 
 // Pix na demo (FRONT_PLAN.md, Fase B): o comprador paga Pix e recebe USDC de TESTE na carteira,
@@ -41,15 +43,17 @@ function toPixCharge(r: Row): PixCharge {
   return {
     id: r.id,
     provider: r.provider as PixCharge["provider"],
-    status: r.status as PixCharge["status"],
+    // "crediting" é interno (emissão em andamento): para o cliente segue "approved" até virar "credited".
+    status: (r.status === "crediting" ? "approved" : r.status) as PixCharge["status"],
     amountBrl: r.amountBrl / 100,
     amountUsdc: unitsToUsdc(r.amountUsdc),
     qrCode: r.qrCode,
     qrCodeBase64: r.qrBase64,
     ticketUrl: r.ticketUrl,
     expiresAt: r.expiresAt.toISOString(),
-    creditSignature: r.creditSignature,
-    explorerUrl: r.creditSignature ? explorerUrl("tx", r.creditSignature) : null,
+    // A assinatura é gravada antes do envio: só é exposta depois que o crédito se confirma.
+    creditSignature: r.status === "credited" ? r.creditSignature : null,
+    explorerUrl: r.status === "credited" && r.creditSignature ? explorerUrl("tx", r.creditSignature) : null,
     // Cobranças antigas de créditos (pagamento por uso acabou) saem sem purpose.
     purpose: r.purpose && (r.purpose.type as string) !== "credits" ? r.purpose : null,
     simulated: r.provider === "simulated",
@@ -62,36 +66,13 @@ async function load(id: string): Promise<Row | undefined> {
   return row;
 }
 
-/** Pago: pending/expired/failed -> approved (um Pix pago depois de "expirar" localmente ainda vale). */
-async function markApproved(id: string) {
-  await db
-    .update(schema.pixCharges)
-    .set({ status: "approved", updatedAt: new Date() })
-    .where(and(eq(schema.pixCharges.id, id), inArray(schema.pixCharges.status, ["pending", "expired", "failed"])));
-}
-
-/**
- * Crédito idempotente: a transação do banco troca approved -> credited (a linha fica travada),
- * emite o USDC de teste e grava a assinatura. Uma segunda chamada concorrente espera a trava e
- * não encontra mais "approved"; se o faucet falhar, o rollback devolve a cobrança para "approved"
- * e a próxima consulta tenta de novo.
- */
-async function credit(id: string): Promise<void> {
-  await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(schema.pixCharges)
-      .set({ status: "credited", updatedAt: new Date() })
-      .where(and(eq(schema.pixCharges.id, id), eq(schema.pixCharges.status, "approved")))
-      .returning();
-    if (!row) return;
-    const signature = await chain().faucet(address(row.wallet), row.amountUsdc);
-    await tx.update(schema.pixCharges).set({ creditSignature: signature }).where(eq(schema.pixCharges.id, id));
-  });
-}
+// O crédito (assinar -> gravar -> enviar -> reconciliar) está em ./credit.ts.
 
 /** Atualiza a cobrança pelo provedor (nunca pelo corpo do webhook) e credita se estiver paga. */
 async function sync(row: Row): Promise<Row> {
   if (row.status === "credited") return row;
+  // "crediting": a emissão já foi iniciada; quem conclui é o job de reconciliação (pela transação gravada).
+  if (row.status === "crediting") return row;
   if (row.status === "approved") {
     await credit(row.id).catch((e) => console.error("[pix] crédito falhou", row.id, e));
     return (await load(row.id))!;
@@ -128,7 +109,11 @@ async function neededUnits(wallet: string, agentId: string, type: "permanent" | 
   const row = await findAgentRow(agentId);
   if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
-  if (type === "permanent") total = row.price;
+  if (type === "permanent") {
+    // O preço pode ter mudado on-chain sem evento: confere antes de cobrar o Pix do valor antigo.
+    await assertFreshPrice(row);
+    total = row.price;
+  }
   else {
     const offer = guaranteeOffer(row, 1);
     if (!offer) throw badRequest("Este especialista não oferece tarefa com garantia.");

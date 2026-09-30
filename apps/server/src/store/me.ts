@@ -128,12 +128,20 @@ meRouter.get(
       creatorSharePct: 90,
       agents: [],
       daily: [],
+      guarantee: { earnedUsdc: 0, last30Usdc: 0, releases: 0, recent: [] },
       disputes: [],
     };
     if (!creatorRow) return empty;
+    // A taxa atual só serve para exibir "sua parte" e para linhas antigas sem valores gravados. A receita
+    // soma o que cada transação de fato repassou ao criador (chain_txs.creator_amount), sem recalcular.
     const feeBps = (await chain().fetchConfig().catch(() => null))?.data.feeBps ?? 1000;
     const share = 1 - feeBps / 10_000;
-    const net = (usdc: number) => Math.round(usdc * share * 100) / 100;
+    const tx = schema.chainTxs;
+    // Data da transação = horário do bloco (created_at é a hora em que o indexador a viu).
+    const when = sql`coalesce(${tx.blockTime}, ${tx.createdAt})`;
+    // Parte do criador em cada transação: o valor executado; sem ele (linhas anteriores ao backfill), usa a
+    // taxa gravada na própria transação e, só se faltar, a taxa atual.
+    const creatorCut = sql`coalesce(${tx.creatorAmount}, ${tx.amount} - (${tx.amount} * coalesce(${tx.feeBps}, ${sql.raw(String(Math.trunc(feeBps)))}) / 10000))`;
     empty.creatorSharePct = Math.round(share * 1000) / 10;
     const agents = await db.select().from(schema.agents).where(eq(schema.agents.creatorId, creatorRow.id));
     if (agents.length === 0) return { ...empty, creator: await getCreator(creatorRow.id) };
@@ -175,12 +183,12 @@ meRouter.get(
     const disputesBy = new Map<string, number>();
     for (const d of disputes) disputesBy.set(d.agentId, (disputesBy.get(d.agentId) ?? 0) + 1);
 
-    // Receita pelo valor efetivamente pago (licenças e pacotes de créditos), já sem a taxa da plataforma.
+    // Receita pelo que o criador recebeu de fato (licenças e pacotes de créditos), já sem a taxa da plataforma.
     const paid = await db
-      .select({ agentId: schema.chainTxs.agentId, sum: sql<string>`coalesce(sum(${schema.chainTxs.amount}), 0)` })
-      .from(schema.chainTxs)
-      .where(and(inArray(schema.chainTxs.agentId, ids), inArray(schema.chainTxs.kind, ["purchase", "credits"])))
-      .groupBy(schema.chainTxs.agentId);
+      .select({ agentId: tx.agentId, sum: sql<string>`coalesce(sum(${creatorCut}), 0)` })
+      .from(tx)
+      .where(and(inArray(tx.agentId, ids), inArray(tx.kind, ["purchase", "credits"])))
+      .groupBy(tx.agentId);
     const paidBy = new Map(paid.map((p) => [p.agentId, unitsToUsdc(BigInt(p.sum))]));
 
     const perAgent = agents.map((a) => ({
@@ -195,19 +203,19 @@ meRouter.get(
       evalScore: bpsToScore(a.evalScoreBps),
       sales: Number(a.totalSales),
       uses: Number(a.verifiedUses),
-      revenueUsdc: net(paidBy.get(a.id) ?? 0),
+      revenueUsdc: Math.round((paidBy.get(a.id) ?? 0) * 100) / 100,
       disputes: disputesBy.get(a.id) ?? 0,
     }));
 
     const daily = await db
       .select({
-        date: sql<string>`to_char(date_trunc('day', ${schema.chainTxs.createdAt}), 'YYYY-MM-DD')`,
+        date: sql<string>`to_char(date_trunc('day', ${when}), 'YYYY-MM-DD')`,
         // "Vendas" = licenças (mesma conta do total on-chain); a receita inclui os pacotes de créditos.
-        sales: sql<number>`count(*) filter (where ${schema.chainTxs.kind} = 'purchase')`.mapWith(Number),
-        revenue: sql<number>`coalesce(sum(${schema.chainTxs.amount}) filter (where ${schema.chainTxs.kind} in ('purchase', 'credits')), 0)`.mapWith(Number),
+        sales: sql<number>`count(*) filter (where ${tx.kind} = 'purchase')`.mapWith(Number),
+        revenue: sql<number>`coalesce(sum(${creatorCut}) filter (where ${tx.kind} in ('purchase', 'credits')), 0)`.mapWith(Number),
       })
-      .from(schema.chainTxs)
-      .where(and(inArray(schema.chainTxs.agentId, ids), gt(schema.chainTxs.createdAt, sql`now() - interval '30 days'`)))
+      .from(tx)
+      .where(and(inArray(tx.agentId, ids), gt(when, sql`now() - interval '30 days'`)))
       .groupBy(sql`1`)
       .orderBy(sql`1`);
     const usesDaily = await db
@@ -226,9 +234,37 @@ meRouter.get(
         date,
         sales: d?.sales ?? 0,
         uses: usesBy.get(date) ?? 0,
-        revenueUsdc: net(unitsToUsdc(BigInt(Math.round(d?.revenue ?? 0)))),
+        revenueUsdc: Math.round(unitsToUsdc(BigInt(Math.round(d?.revenue ?? 0))) * 100) / 100,
       };
     });
+
+    // Ganhos de garantia: etapas liberadas ao criador (aprovação, liberação automática ou disputa ganha).
+    const guaranteeKinds = ["milestone", "dispute_resolved"];
+    const [g] = await db
+      .select({
+        total: sql<string>`coalesce(sum(${tx.creatorAmount}), 0)`,
+        releases: sql<number>`count(*) filter (where ${tx.creatorAmount} > 0)`.mapWith(Number),
+        last30: sql<string>`coalesce(sum(${tx.creatorAmount}) filter (where ${when} > now() - interval '30 days'), 0)`,
+      })
+      .from(tx)
+      .where(and(inArray(tx.agentId, ids), inArray(tx.kind, guaranteeKinds)));
+    const recentGuarantee = await db
+      .select({
+        signature: tx.signature,
+        agentId: tx.agentId,
+        amount: tx.creatorAmount,
+        at: sql<string>`to_char(${when} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`,
+      })
+      .from(tx)
+      .where(and(inArray(tx.agentId, ids), inArray(tx.kind, guaranteeKinds), gt(tx.creatorAmount, 0n)))
+      .orderBy(desc(when))
+      .limit(10);
+    const guarantee = {
+      earnedUsdc: Math.round(unitsToUsdc(BigInt(g?.total ?? 0)) * 100) / 100,
+      last30Usdc: Math.round(unitsToUsdc(BigInt(g?.last30 ?? 0)) * 100) / 100,
+      releases: g?.releases ?? 0,
+      recent: recentGuarantee.map((r) => ({ signature: r.signature, agentId: r.agentId, amountUsdc: unitsToUsdc(r.amount ?? 0n), at: r.at })),
+    };
 
     const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + f(x), 0);
     return {
@@ -251,6 +287,7 @@ meRouter.get(
       creatorSharePct: Math.round(share * 1000) / 10,
       agents: perAgent,
       daily: dailyOut,
+      guarantee,
       disputes,
     };
   }),

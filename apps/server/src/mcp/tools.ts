@@ -20,6 +20,8 @@ import {
 import { paidAccessLine } from "../runtime/access-rules.js";
 import {
   advance,
+  saveSummary,
+  bindSessionEscrow,
   createSession,
   expireSession,
   findOpenSession,
@@ -31,6 +33,9 @@ import {
   watermark,
 } from "../runtime/engine.js";
 import { getPackage, type SolverPackage } from "../runtime/packages.js";
+import { guaranteesText, milestoneDeliveryBlock, resolveEscrowId } from "../runtime/guarantee-text.js";
+import { openGuarantees } from "../runtime/guarantees.js";
+import { assertSessionCurrent, planNextStep } from "../runtime/session-rules.js";
 import { runServerTool } from "../runtime/tools.js";
 import { times, trialAccessLine, trialEndText, trialLimits, trialStepLocked, type TrialLimits } from "../runtime/trial.js";
 import { memoryKeyFor, readMemories, saveMemory } from "../memory/crypto.js";
@@ -90,6 +95,18 @@ function requirePackage(agentId: string): SolverPackage {
   return pkg;
 }
 
+/** Pacote da sessão: se o especialista foi atualizado depois de a sessão abrir, pede nova ativação (nada de método novo com base antiga). */
+function requireSessionPackage(session: { agentId: string; version: string }): SolverPackage {
+  const pkg = requirePackage(session.agentId);
+  assertSessionCurrent(session.version, pkg.manifest.version, pkg.manifest.name);
+  return pkg;
+}
+
+/** Tarefas com garantia abertas do usuário com este especialista, já em texto para a IA ("" se não houver). */
+async function guaranteeBlock(wallet: string, agentId: string): Promise<string> {
+  return guaranteesText(await openGuarantees(wallet, agentId));
+}
+
 function purchaseLink(slug: string) {
   return webUrl(`/checkout?agent=${encodeURIComponent(slug)}&type=permanent`);
 }
@@ -143,16 +160,20 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "list_my_solvers", async () => {
       const owned = await ownedAgents(ctx.wallet);
-      if (owned.size === 0) {
+      const tasks = await openGuarantees(ctx.wallet);
+      const ids = new Set([...owned, ...tasks.map((t) => t.agentId)]);
+      if (ids.size === 0) {
         return { text: "O usuário ainda não tem especialistas. Use find_solver com a necessidade dele para sugerir opções (alguns têm teste grátis)." };
       }
       const lines: string[] = [];
-      for (const agentId of owned) {
+      for (const agentId of ids) {
         const row = await findAgentRow(agentId).catch(() => null);
         if (!row) continue;
-        lines.push(`- ${row.name} (agent_id: ${row.id}): ${row.tagline} [licença vitalícia]`);
+        const open = tasks.filter((t) => t.agentId === agentId).length;
+        const kind = [owned.has(agentId) ? "licença vitalícia" : null, open ? `${open} tarefa(s) com garantia aberta` : null].filter(Boolean).join("; ");
+        lines.push(`- ${row.name} (agent_id: ${row.id}): ${row.tagline} [${kind}]`);
       }
-      return { text: `Especialistas do usuário:\n${lines.join("\n")}\n\nPara usar, chame activate_solver com o agent_id.` };
+      return { text: `Especialistas do usuário:\n${lines.join("\n")}\n\nPara usar, chame activate_solver com o agent_id. Para ver as tarefas com garantia abertas, chame list_open_guarantees.` };
     }),
   );
 
@@ -197,6 +218,26 @@ export function buildMcpServer(ctx: McpContext): McpServer {
   );
 
   server.registerTool(
+    "list_open_guarantees",
+    {
+      title: "Tarefas com garantia abertas",
+      description:
+        "Lista as tarefas com garantia que o usuário já pagou e ainda estão abertas (escrow_id, briefing, etapas e critérios combinados). Use quando o usuário falar de uma tarefa contratada ou antes de submit_deliverable se você não tiver o escrow_id.",
+      inputSchema: { agent_id: z.string().optional().describe("Filtra por especialista (agent_id)") },
+      annotations: { readOnlyHint: true },
+    },
+    tool(ctx, "list_open_guarantees", async ({ agent_id }: { agent_id?: string }) => {
+      const tasks = await openGuarantees(ctx.wallet, agent_id);
+      if (tasks.length === 0) return { text: "O usuário não tem tarefas com garantia abertas.", agentId: agent_id ?? null };
+      // Uma seção por especialista (a regra do escrow_id vale por especialista).
+      const byAgent = new Map<string, typeof tasks>();
+      for (const t of tasks) byAgent.set(t.agentId, [...(byAgent.get(t.agentId) ?? []), t]);
+      const blocks = [...byAgent].map(([id, group]) => `### Especialista agent_id: ${id}\n${guaranteesText(group)}`);
+      return { text: `${tasks.length} tarefa(s) com garantia aberta(s):\n\n${blocks.join("\n\n")}`, agentId: agent_id ?? null };
+    }),
+  );
+
+  server.registerTool(
     "activate_solver",
     {
       title: "Ativar especialista",
@@ -226,8 +267,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           return { text: `session_id: ${open.id}\n${endText(pkg, trial)}`, agentId: row.id, sessionId: open.id };
         }
         const accessNote = open.access === "license" || open.access === "guarantee" ? ` ${paidAccessLine(open.access)}` : "";
+        const task = await guaranteeBlock(ctx.wallet, row.id);
         return {
-          text: `session_id: ${open.id}\nSessão já aberta reaproveitada (sem consumir outro uso).${accessNote} Continue de onde parou: etapa ${step} de ${pkg.steps.length}. Chame next_step para seguir.`,
+          text: `session_id: ${open.id}\nSessão já aberta reaproveitada (sem consumir outro uso).${accessNote} Continue de onde parou: etapa ${step} de ${pkg.steps.length}. Chame next_step para seguir.${task ? `\n\n${task}` : ""}`,
           agentId: row.id,
           sessionId: open.id,
         };
@@ -251,6 +293,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
               toolNames: pkg.manifest.tools.map((t) => t.name),
               usage: access.usage,
             })} Quando o teste acabar, ofereça o link de compra: ${purchaseLink(row.slug)}`;
+      const task = await guaranteeBlock(ctx.wallet, row.id);
       const reqs = pkg.manifest.requirements.map((r) => `- [${r.type}] ${r.label}${r.key ? ` (chave: ${r.key})` : ""}${r.optional ? " (opcional)" : ""}`).join("\n") || "- nenhum";
       const memoryHint = pkg.usesMemory ? `\nEste especialista usa memória: chame get_memory com agent_id="${row.id}" antes da etapa 1.` : "";
       const out = [
@@ -259,6 +302,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         "",
         overview(pkg),
         "",
+        ...(task ? [task, ""] : []),
         "## Requisitos",
         reqs,
         "",
@@ -282,7 +326,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "preflight_check", async ({ session_id, available_tools }: { session_id: string; available_tools: string[] }) => {
       const session = await getSession(session_id, ctx.wallet);
-      const pkg = requirePackage(session.agentId);
+      const pkg = requireSessionPackage(session);
       const out = preflightText(pkg.manifest.requirements, available_tools, session.id);
       return { text: out, agentId: session.agentId, sessionId: session.id };
     }),
@@ -293,29 +337,42 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Próxima etapa",
       description:
-        "Entrega a próxima etapa do método do especialista (objetivo, instruções e checklist). Chame depois do preflight e sempre que o checklist da etapa atual estiver completo, passando o resumo do resultado.",
+        "Entrega a próxima etapa do método do especialista (objetivo, instruções e checklist). Chame depois do preflight e sempre que o checklist da etapa atual estiver completo, passando o resumo do resultado e completed_step (o número da última etapa que você concluiu; 0 logo após o preflight). Se a resposta se perder e você repetir a chamada com o mesmo completed_step, a etapa é reenviada sem pular nenhuma.",
       inputSchema: {
         session_id: z.string(),
+        completed_step: z.number().int().min(0).max(100).optional().describe("Número da última etapa concluída (0 se ainda não recebeu nenhuma). Evita pular etapa se a chamada for repetida."),
         result_summary: z.string().max(4000).optional().describe("Resumo do resultado da etapa anterior, no formato que ela pediu"),
       },
     },
-    tool(ctx, "next_step", async ({ session_id, result_summary }: { session_id: string; result_summary?: string }) => {
-      let session = await getSession(session_id, ctx.wallet);
-      const pkg = requirePackage(session.agentId);
-      const index = session.stepIndex;
-      // Teste grátis: a etapa fora do teste não é entregue (e a sessão não avança), a não ser que a carteira já tenha acesso pago.
-      const trial = await sessionTrial(session, pkg);
-      let note = "";
-      if (trial && trialStepLocked(trial, index, pkg.steps.length)) {
-        const up = await upgraded(session);
-        if (!up) return { text: endText(pkg, trial), agentId: session.agentId, sessionId: session.id };
-        session = up;
-        note = `${UPGRADED_NOTE}\n\n`;
-      }
-      const updated = await advance(session, result_summary);
-      const { text: out } = renderStep(pkg, updated, index);
-      return { text: note + out, agentId: session.agentId, sessionId: session.id };
-    }),
+    tool(
+      ctx,
+      "next_step",
+      async ({ session_id, result_summary, completed_step }: { session_id: string; result_summary?: string; completed_step?: number }) => {
+        let session = await getSession(session_id, ctx.wallet);
+        const pkg = requireSessionPackage(session);
+        const plan = planNextStep(session.stepIndex, completed_step);
+        const index = plan.index;
+        // Teste grátis: a etapa fora do teste não é entregue (e a sessão não avança), a não ser que a carteira já tenha acesso pago.
+        const trial = await sessionTrial(session, pkg);
+        let note = "";
+        if (trial && trialStepLocked(trial, index, pkg.steps.length)) {
+          const up = await upgraded(session);
+          if (!up) return { text: endText(pkg, trial), agentId: session.agentId, sessionId: session.id };
+          session = up;
+          note = `${UPGRADED_NOTE}\n\n`;
+        }
+        let updated: Session;
+        if (plan.kind === "replay") {
+          // Repetição depois de resposta perdida: reenvia a etapa sem avançar; o resumo vai para o slot certo.
+          updated = result_summary && index > 0 ? await saveSummary(session, index - 1, result_summary) : session;
+          note += `Reenvio: esta é a etapa ${index + 1} de novo (a sessão não avançou).\n\n`;
+        } else {
+          updated = await advance(session, result_summary);
+        }
+        const { text: out } = renderStep(pkg, updated, index);
+        return { text: note + out, agentId: session.agentId, sessionId: session.id };
+      },
+    ),
   );
 
   server.registerTool(
@@ -329,7 +386,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "search_knowledge", async ({ session_id, query }: { session_id: string; query: string }) => {
       const session = await getSession(session_id, ctx.wallet);
-      const pkg = requirePackage(session.agentId);
+      const pkg = requireSessionPackage(session);
       const trial = await sessionTrial(session, pkg);
       if (trial && !(await consumeTrialSearch(ctx.wallet, session.agentId, trial.searches)) && !(await upgraded(session))) {
         const out = `As consultas à base do teste grátis acabaram (${trial.searches} no total).\n\n${endText(pkg, trial)}`;
@@ -358,7 +415,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "run_tool", async ({ session_id, tool: name, input }: { session_id: string; tool: string; input: Record<string, unknown> }) => {
       const session = await getSession(session_id, ctx.wallet);
-      const pkg = requirePackage(session.agentId);
+      const pkg = requireSessionPackage(session);
       const trial = await sessionTrial(session, pkg);
       // No teste, só as ferramentas liberadas, contando no total. Nome inexistente cai no erro normal do runServerTool.
       if (trial && pkg.manifest.tools.some((t) => t.name === name)) {
@@ -429,7 +486,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         "Entrega os arquivos de uma etapa de uma tarefa com garantia. Em etapas com testes, o servidor roda a verificação combinada e, se passar, libera a etapa para aprovação do usuário com um link de prévia. Em etapas de revisão manual (ex: plano), envie o texto (ex: PLANO.md): ele vai direto para o usuário revisar na prévia.",
       inputSchema: {
         session_id: z.string(),
-        escrow_id: z.string(),
+        escrow_id: z.string().optional().describe("Omita se houver uma só tarefa com garantia aberta; com mais de uma é obrigatório (veja list_open_guarantees). Precisa ser de uma tarefa aberta deste especialista."),
         milestone: z.number().int().min(0).max(4),
         artifact: z.object({ files: z.record(z.string()) }).describe("Arquivos da entrega: { files: { 'LoginForm.tsx': '...', 'LoginForm.test.tsx': '...' } }"),
       },
@@ -437,9 +494,17 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     tool(
       ctx,
       "submit_deliverable",
-      async ({ session_id, escrow_id, milestone, artifact }: { session_id: string; escrow_id: string; milestone: number; artifact: { files: Record<string, string> } }) => {
+      async ({ session_id, escrow_id, milestone, artifact }: { session_id: string; escrow_id?: string; milestone: number; artifact: { files: Record<string, string> } }) => {
         const session = await getSession(session_id, ctx.wallet);
-        const r = await submitDeliverable({ wallet: ctx.wallet, agentId: session.agentId, escrowId: escrow_id, index: milestone, files: artifact.files });
+        const sessionEscrowId = (session.context as { escrowId?: unknown }).escrowId;
+        // Garantias abertas deste especialista: o id informado precisa estar entre elas; com mais de uma, o id é obrigatório.
+        const open = await openGuarantees(ctx.wallet, session.agentId);
+        const choice = resolveEscrowId({ sessionEscrowId, given: escrow_id, open });
+        const escrowId = choice.escrowId;
+        const blocked = milestoneDeliveryBlock(open.find((x) => x.id === escrowId)!, milestone);
+        if (blocked) throw new HttpError(400, blocked);
+        if (choice.rebind) await bindSessionEscrow(session, escrowId);
+        const r = await submitDeliverable({ wallet: ctx.wallet, agentId: session.agentId, escrowId, index: milestone, files: artifact.files });
         const out = r.passed
           ? `${r.report.mode === "manual" ? "Entrega recebida para a revisão do usuário." : `Verificação aprovada (${r.report.numPassed}/${r.report.numTests} testes). A etapa foi marcada como aprovada nos testes.`}\nPrévia: ${r.previewUrl}\nO usuário tem até ${r.autoReleaseAt} para aprovar ou contestar na loja; depois disso o pagamento é liberado automaticamente.`
           : `A verificação falhou (${r.report.numFailed} falha(s)). Corrija e envie de novo:\n${r.report.failures.map((f) => `- ${f.test}: ${f.message}`).join("\n")}`;

@@ -39,12 +39,23 @@ export type TxErrorInfo = {
   text: string;
   /** Ação sugerida na tela: receber USDC de teste, entrar de novo ou só tentar outra vez. */
   action: "faucet" | "login" | "retry" | null;
+  /** Só em `price_changed`: o preço on-chain mudou desde o que a tela mostrava (valores em USDC). */
+  priceChange?: { previousUsdc: number; usdc: number };
 };
 
 /** Mensagem em português para qualquer erro de transação/API. */
 export function txErrorMessage(err: unknown): TxErrorInfo {
   if (err instanceof ApiError) {
     const b = err.body;
+    // /api/tx/submit não conseguiu confirmar: a transação pode ter sido enviada. Não diz que nada foi cobrado
+    // e não sugere tentar de novo já (evita pagar em dobro).
+    if (err.code === "unconfirmed")
+      return {
+        code: err.code,
+        title: "Ainda não conseguimos confirmar",
+        text: "Sua transação foi enviada, mas ainda não conseguimos confirmar. Aguarde um instante e confira em Minha conta antes de tentar de novo.",
+        action: null,
+      };
     // /api/tx/submit: a rede recusou a transação (HTTP 422, {status:"failed", error} sem código). O caso comum é
     // o blockhash expirar enquanto a pessoa assina; tentar de novo monta uma transação nova.
     if (err.status === 422 || b.status === "failed")
@@ -66,6 +77,20 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
               ? `Você tem ${fmt(bal)} USDC e precisa de ${fmt(need)} USDC.`
               : "Seu saldo em USDC não cobre esta compra.",
           action: "faucet",
+        };
+      }
+      case "price_changed": {
+        const now = typeof b.priceUsdc === "number" ? b.priceUsdc : null;
+        const before = typeof b.previousPriceUsdc === "number" ? b.previousPriceUsdc : null;
+        return {
+          code: err.code,
+          title: "O preço do especialista mudou",
+          text:
+            now != null && before != null
+              ? `O preço do especialista mudou de ${fmt(before)} USDC para ${fmt(now)} USDC. Confira o novo valor e confirme de novo.`
+              : "O preço do especialista mudou. Confira o novo valor e confirme de novo.",
+          action: null,
+          priceChange: now != null && before != null ? { previousUsdc: before, usdc: now } : undefined,
         };
       }
       case "guarantee_limit":

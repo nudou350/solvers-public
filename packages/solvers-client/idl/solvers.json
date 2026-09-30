@@ -226,6 +226,108 @@
       ]
     },
     {
+      "name": "cancel_undelivered",
+      "discriminator": [
+        43,
+        91,
+        165,
+        86,
+        28,
+        197,
+        65,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "signer": true,
+          "relations": [
+            "escrow"
+          ]
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.buyer",
+                "account": "Escrow"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "Escrow"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.nonce",
+                "account": "Escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "close_escrow",
       "discriminator": [
         139,
@@ -240,6 +342,9 @@
       "accounts": [
         {
           "name": "caller",
+          "docs": [
+            "Só quem pagou o rent (a plataforma) fecha; o rent volta para essa mesma carteira."
+          ],
           "signer": true
         },
         {
@@ -688,6 +793,10 @@
         {
           "name": "review_window_secs",
           "type": "i64"
+        },
+        {
+          "name": "delivery_days",
+          "type": "u16"
         }
       ]
     },
@@ -1821,6 +1930,192 @@
       ]
     },
     {
+      "name": "resolve_stale_dispute",
+      "discriminator": [
+        7,
+        105,
+        115,
+        242,
+        229,
+        53,
+        212,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.buyer",
+                "account": "Escrow"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.agent",
+                "account": "Escrow"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.nonce",
+                "account": "Escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "escrow.buyer",
+                "account": "Escrow"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "set_eval",
       "discriminator": [
         110,
@@ -2639,6 +2934,19 @@
       ]
     },
     {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
       "name": "CreditConsumed",
       "discriminator": [
         60,
@@ -2675,6 +2983,19 @@
         128,
         236,
         187
+      ]
+    },
+    {
+      "name": "EscrowClosed",
+      "discriminator": [
+        109,
+        20,
+        57,
+        51,
+        217,
+        118,
+        3,
+        173
       ]
     },
     {
@@ -2727,6 +3048,19 @@
         231,
         73,
         147
+      ]
+    },
+    {
+      "name": "PricingUpdated",
+      "discriminator": [
+        29,
+        21,
+        233,
+        77,
+        53,
+        198,
+        67,
+        37
       ]
     },
     {
@@ -2909,6 +3243,36 @@
       "code": 6027,
       "name": "LicenseAlreadyReviewed",
       "msg": "Esta licença já foi usada em outra avaliação"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidDeliveryDays",
+      "msg": "Prazo de entrega inválido"
+    },
+    {
+      "code": 6029,
+      "name": "DeliveryDeadlineNotReached",
+      "msg": "O prazo de entrega ainda não venceu"
+    },
+    {
+      "code": 6030,
+      "name": "DisputeSlaNotReached",
+      "msg": "O prazo de julgamento da disputa ainda não venceu"
+    },
+    {
+      "code": 6031,
+      "name": "FeeTooHigh",
+      "msg": "Taxa acima do teto da plataforma"
+    },
+    {
+      "code": 6032,
+      "name": "NotRentPayer",
+      "msg": "Somente quem pagou o rent pode fechar o escrow"
+    },
+    {
+      "code": 6033,
+      "name": "StaleDisputeNeedsJudgment",
+      "msg": "Etapa já entregue e contestada: só o admin julga"
     }
   ],
   "types": [
@@ -3194,6 +3558,34 @@
       }
     },
     {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "verifier",
+            "type": "pubkey"
+          },
+          {
+            "name": "usage_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "min_stake",
+            "type": "u64"
+          },
+          {
+            "name": "min_price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "CreditConsumed",
       "type": {
         "kind": "struct",
@@ -3355,6 +3747,40 @@
           {
             "name": "vault_bump",
             "type": "u8"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Taxa da plataforma no momento da criação: mudar `Config` depois não afeta esta garantia."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "delivery_deadline",
+            "docs": [
+              "Prazo (unix) para o solver entregar cada etapa; vencido, o comprador cancela as pendentes."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
           }
         ]
       }
@@ -3550,6 +3976,13 @@
                 32
               ]
             }
+          },
+          {
+            "name": "disputed_at",
+            "docs": [
+              "Quando a etapa foi contestada (0 = sem contestação); conta o prazo de julgamento."
+            ],
+            "type": "i64"
           }
         ]
       }
@@ -3593,6 +4026,26 @@
           {
             "name": "status",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PricingUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "price_per_use",
+            "type": "u64"
           }
         ]
       }

@@ -57,6 +57,20 @@
       "when": 1790790385016,
       "tag": "0007_agent_search_vectors",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790799290011,
+      "tag": "0008_review_drafts_batches_indexer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790801633134,
+      "tag": "0009_escrow_v2_deadline_fee",
+      "breakpoints": true
     }
   ]
 }

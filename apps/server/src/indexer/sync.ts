@@ -5,6 +5,8 @@ import { bytesToHex } from "@solvers/shared";
 import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { bytesToHexStr } from "../lib/crypto.js";
+import { resolvePublishedText } from "../store/review-rules.js";
+import { canApplyMilestoneStatus, closedEscrowStatus, type MilestoneStatusName } from "./escrow-status.js";
 
 // Sincronização "busca a conta on-chain e espelha no banco". Idempotente: pode rodar quantas
 // vezes quiser para o mesmo endereço (webhook, polling e a própria API chamam).
@@ -131,26 +133,74 @@ export async function syncReview(agentAddr: Address, author: Address, agentId: s
   if (!acc.exists) return;
   const contentHash = bytesToHexStr(acc.data.contentHash);
   const createdAt = acc.data.createdAt > 0n ? new Date(Number(acc.data.createdAt) * 1000) : new Date();
+  // O texto é off-chain: só publica o que o hash confirmado prova (rascunho do mesmo hash, ou o texto já publicado).
+  const [draft] = await db
+    .select()
+    .from(schema.reviewDrafts)
+    .where(and(eq(schema.reviewDrafts.agentId, agentId), eq(schema.reviewDrafts.authorWallet, author), eq(schema.reviewDrafts.contentHash, contentHash)));
+  const [current] = await db
+    .select({ text: schema.reviews.text })
+    .from(schema.reviews)
+    .where(and(eq(schema.reviews.agentId, agentId), eq(schema.reviews.authorWallet, author)));
+  const text = resolvePublishedText(contentHash, [draft?.text, current?.text]);
   await db
     .insert(schema.reviews)
-    .values({ id: pda, agentId, authorWallet: author, rating: acc.data.rating, contentHash, onchain: true, createdAt })
+    .values({ id: pda, agentId, authorWallet: author, rating: acc.data.rating, text, contentHash, onchain: true, createdAt })
     .onConflictDoUpdate({
       target: [schema.reviews.agentId, schema.reviews.authorWallet],
-      set: { id: pda, rating: acc.data.rating, onchain: true, contentHash },
+      set: { id: pda, rating: acc.data.rating, text, onchain: true, contentHash },
     });
+  if (draft) {
+    await db
+      .delete(schema.reviewDrafts)
+      .where(and(eq(schema.reviewDrafts.agentId, agentId), eq(schema.reviewDrafts.authorWallet, author), eq(schema.reviewDrafts.contentHash, contentHash)));
+  }
 }
 
-export async function syncEscrow(escrowAddr: Address): Promise<void> {
-  const acc = await gen.fetchMaybeEscrow(chain().rpc, escrowAddr);
-  if (!acc.exists) {
-    await db.update(schema.escrows).set({ closed: true }).where(eq(schema.escrows.id, escrowAddr));
-    return;
+/**
+ * Fechado o escrow (close_escrow) antes de o indexador ver o evento, a conta não existe mais e o estado
+ * da etapa só sobrou no próprio evento: aplica esse status à etapa e recalcula o status do escrow em vez de
+ * só marcar `closed`, senão a etapa paga ficaria "pendente" no espelho (e a entrega paga travada).
+ */
+export async function applyMilestoneToClosedEscrow(escrowAddr: string, hint: { index: number; status: MilestoneStatusName }): Promise<void> {
+  const [m] = await db
+    .select()
+    .from(schema.milestones)
+    .where(and(eq(schema.milestones.escrowId, escrowAddr), eq(schema.milestones.idx, hint.index)));
+  if (m && m.status !== hint.status && canApplyMilestoneStatus(m.status, hint.status)) {
+    await db
+      .update(schema.milestones)
+      .set({ status: hint.status, ...(hint.status === "disputed" && !m.disputedAt ? { disputedAt: new Date() } : {}) })
+      .where(and(eq(schema.milestones.escrowId, escrowAddr), eq(schema.milestones.idx, hint.index)));
   }
-  const e = acc.data;
+  const rows = await db.select({ status: schema.milestones.status }).from(schema.milestones).where(eq(schema.milestones.escrowId, escrowAddr));
+  await db
+    .update(schema.escrows)
+    .set({ status: rows.length > 0 ? closedEscrowStatus(rows.map((r) => r.status)) : undefined, closed: true })
+    .where(eq(schema.escrows.id, escrowAddr));
+}
+
+/** Espelha o escrow. Devolve false se a conta on-chain já não existe (escrow fechado). */
+export async function syncEscrow(escrowAddr: Address, hint?: { index: number; status: MilestoneStatusName }): Promise<boolean> {
+  const layout = await chain().fetchEscrowLayout(escrowAddr);
+  if (layout.kind === "legacy") {
+    // Conta do programa v1 (o cliente v2 a decodifica sem erro, mas os campos novos são lixo): não espelha nada.
+    // O espelho fica como está; cli:retire-escrows encerra essas tarefas.
+    console.warn(`[indexer] escrow ${escrowAddr} em layout antigo (${layout.size} bytes); ignorado (use cli:retire-escrows)`);
+    return true;
+  }
+  if (layout.kind === "missing") {
+    if (hint) await applyMilestoneToClosedEscrow(escrowAddr, hint);
+    else await db.update(schema.escrows).set({ closed: true }).where(eq(schema.escrows.id, escrowAddr));
+    return false;
+  }
+  const e = layout.data;
   const agentId = await agentIdByAddress(e.agent);
-  if (!agentId) return;
+  if (!agentId) return true;
   const status = ESCROW_STATUS[e.status as keyof typeof ESCROW_STATUS] ?? "active";
   const autoReleaseAt = e.autoReleaseAt > 0n ? new Date(Number(e.autoReleaseAt) * 1000) : null;
+  // Programa v2: prazo de entrega e a taxa congelada na criação (tarefas antigas ficam com nulo).
+  const deliveryDeadline = e.deliveryDeadline > 0n ? new Date(Number(e.deliveryDeadline) * 1000) : null;
   await db
     .insert(schema.escrows)
     .values({
@@ -163,12 +213,19 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
       status,
       autoReleaseAt,
       reviewWindowSecs: Number(e.reviewWindowSecs),
+      deliveryDeadline,
+      feeBps: e.feeBps,
     })
-    .onConflictDoUpdate({ target: schema.escrows.id, set: { status, autoReleaseAt, total: e.total, creatorWallet: e.creator } });
+    .onConflictDoUpdate({
+      target: schema.escrows.id,
+      set: { status, autoReleaseAt, total: e.total, creatorWallet: e.creator, deliveryDeadline, feeBps: e.feeBps },
+    });
 
   for (const [idx, m] of e.milestones.entries()) {
     const chainStatus = MILESTONE_STATUS[m.status as keyof typeof MILESTONE_STATUS] ?? "pending";
     const passedAt = m.passedAt > 0n ? new Date(Number(m.passedAt) * 1000) : null;
+    // Horário da contestação vindo da conta (prazo de julgamento de 7 dias conta daqui).
+    const chainDisputedAt = m.disputedAt > 0n ? new Date(Number(m.disputedAt) * 1000) : null;
     const [existing] = await db
       .select()
       .from(schema.milestones)
@@ -179,7 +236,12 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
       await db
         .update(schema.milestones)
         // A contestação só conta (painel do criador) quando confirmada on-chain.
-        .set({ status: statusOut, passedAt, amount: m.amount, ...(statusOut === "disputed" && !existing.disputedAt ? { disputedAt: new Date() } : {}) })
+        .set({
+          status: statusOut,
+          passedAt,
+          amount: m.amount,
+          ...(chainDisputedAt ? { disputedAt: chainDisputedAt } : statusOut === "disputed" && !existing.disputedAt ? { disputedAt: new Date() } : {}),
+        })
         .where(and(eq(schema.milestones.escrowId, escrowAddr), eq(schema.milestones.idx, idx)));
     } else {
       await db.insert(schema.milestones).values({
@@ -191,17 +253,58 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
         amount: m.amount,
         status: statusOut,
         passedAt,
-        disputedAt: statusOut === "disputed" ? new Date() : null,
+        disputedAt: chainDisputedAt ?? (statusOut === "disputed" ? new Date() : null),
       });
     }
   }
+  return true;
 }
 
-export async function recordChainTx(signature: string, kind: string, wallet: string | null, agentId: string | null, amount?: bigint) {
+/** Valores executados e horário do bloco de uma transação (todos opcionais: dependem do que a transação mostra). */
+export type ChainTxExtra = {
+  blockTime?: Date | null;
+  fee?: bigint | null;
+  creatorAmount?: bigint | null;
+  creatorWallet?: string | null;
+  feeBps?: number | null;
+};
+
+/**
+ * Registra a transação. Reprocessar a mesma assinatura preenche o que faltava (horário do bloco, valores
+ * executados) sem apagar o que já existe; é assim que o backfill do histórico antigo funciona.
+ */
+export async function recordChainTx(
+  signature: string,
+  kind: string,
+  wallet: string | null,
+  agentId: string | null,
+  amount?: bigint,
+  extra: ChainTxExtra = {},
+) {
+  const values = {
+    amount: amount ?? null,
+    blockTime: extra.blockTime ?? null,
+    fee: extra.fee ?? null,
+    creatorAmount: extra.creatorAmount ?? null,
+    creatorWallet: extra.creatorWallet ?? null,
+    feeBps: extra.feeBps ?? null,
+  };
+  const t = schema.chainTxs;
   await db
-    .insert(schema.chainTxs)
-    .values({ signature, kind, wallet, agentId, amount: amount ?? null })
-    .onConflictDoNothing();
+    .insert(t)
+    .values({ signature, kind, wallet, agentId, ...values })
+    .onConflictDoUpdate({
+      target: t.signature,
+      set: {
+        // O valor novo vence quando existe (vem dos saldos reais); o horário do bloco só entra uma vez.
+        amount: sql`coalesce(excluded.amount, ${t.amount})`,
+        fee: sql`coalesce(excluded.fee, ${t.fee})`,
+        creatorAmount: sql`coalesce(excluded.creator_amount, ${t.creatorAmount})`,
+        creatorWallet: sql`coalesce(excluded.creator_wallet, ${t.creatorWallet})`,
+        feeBps: sql`coalesce(excluded.fee_bps, ${t.feeBps})`,
+        blockTime: sql`coalesce(${t.blockTime}, excluded.block_time)`,
+      },
+    });
 }
 
 export async function bumpAgentUpdated(agentId: string) {

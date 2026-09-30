@@ -16,4 +16,4 @@ cluster = "devnet"
 wallet = "~/.config/solana/solvers-admin.json"
 
 [scripts]
-test = "true"
+test = "bash scripts/chain/test-program.sh"

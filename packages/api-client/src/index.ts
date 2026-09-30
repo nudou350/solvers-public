@@ -160,10 +160,15 @@ export function createApi(opts: ApiOptions = {}) {
     /**
      * Tarefa com garantia: as etapas e os critérios vêm do modelo do criador (getAgent().guarantee);
      * o comprador só dá um título e descreve o que quer. acceptanceTests é opcional, por etapa.
+     * deliveryDays é o prazo de entrega em dias (opcional; 0 ou ausente = 14, máximo 60).
      */
-    buildEscrow: (agentId: string, task: { title: string; description: string; acceptanceTests?: (Record<string, string> | null)[] }) =>
-      post(TxResponse, "/api/tx/escrow", { agentId, ...task }),
+    buildEscrow: (
+      agentId: string,
+      task: { title: string; description: string; acceptanceTests?: (Record<string, string> | null)[]; deliveryDays?: number },
+    ) => post(TxResponse, "/api/tx/escrow", { agentId, ...task }),
     buildRelease: (escrowId: string, index: number) => post(TxResponse, `/api/tx/escrow/${escrowId}/release`, { index }),
+    /** Etapa não entregue com o prazo vencido: o valor desta etapa volta para o comprador, sem taxa. */
+    buildCancelUndelivered: (escrowId: string, index: number) => post(TxResponse, `/api/tx/escrow/${escrowId}/cancel-undelivered`, { index }),
     buildDispute: (escrowId: string, index: number, criterion: string, reason: string) =>
       post(TxResponse, `/api/tx/escrow/${escrowId}/dispute`, { index, criterion, reason }),
     submit: (transaction: string) => post(SubmitResponse.passthrough(), "/api/tx/submit", { transaction }),

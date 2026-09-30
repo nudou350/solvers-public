@@ -149,6 +149,23 @@ export const reviews = pgTable(
   (t) => [uniqueIndex("reviews_agent_author_idx").on(t.agentId, t.authorWallet)],
 );
 
+/**
+ * Rascunhos de avaliação: o texto e a nota preparados em /tx/review, por hash do conteúdo. Só viram
+ * `reviews.text` quando o indexador vê o mesmo hash confirmado on-chain (syncReview).
+ */
+export const reviewDrafts = pgTable(
+  "review_drafts",
+  {
+    agentId: text("agent_id").notNull(),
+    authorWallet: text("author_wallet").notNull(),
+    contentHash: text("content_hash").notNull(),
+    rating: smallint("rating").notNull(),
+    text: text("text").notNull().default(""),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.agentId, t.authorWallet, t.contentHash] })],
+);
+
 export const escrows = pgTable(
   "escrows",
   {
@@ -163,6 +180,10 @@ export const escrows = pgTable(
     status: text("status").notNull().default("pending"), // pending (tx não confirmada) | active | approved | disputed | refunded
     autoReleaseAt: ts("auto_release_at"),
     reviewWindowSecs: integer("review_window_secs").notNull(),
+    /** Prazo de entrega fixado na criação (nulo em tarefas anteriores ao programa v2). */
+    deliveryDeadline: ts("delivery_deadline"),
+    /** Taxa da plataforma fixada na criação, em pontos-base (nulo em tarefas anteriores ao programa v2). */
+    feeBps: integer("fee_bps"),
     closed: boolean("closed").notNull().default(false),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
@@ -228,6 +249,28 @@ export const usageEvents = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("usage_agent_created_idx").on(t.agentId, t.createdAt), index("usage_wallet_idx").on(t.wallet)],
+);
+
+/**
+ * Lotes de uso enviados on-chain (record_usage_batch). A transação é assinada e gravada ANTES do envio:
+ * a assinatura permite reconciliar (confirmada, falhou ou expirou) sem contar o mesmo uso duas vezes.
+ * `usage_events.batch_id` aponta para `id`.
+ */
+export const usageBatches = pgTable(
+  "usage_batches",
+  {
+    id: text("id").primaryKey(),
+    agentId: text("agent_id").notNull(),
+    count: integer("count").notNull(),
+    merkleRoot: text("merkle_root").notNull(),
+    signature: text("signature").notNull(),
+    wire: text("wire").notNull(),
+    lastValidHeight: u64("last_valid_height").notNull(),
+    status: text("status").notNull().default("pending"), // pending | confirmed | released
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("usage_batches_status_idx").on(t.status)],
 );
 
 export const sessions = pgTable("sessions", {
@@ -349,8 +392,14 @@ export const processedEvents = pgTable(
 /** Transações que falharam no indexador: tentadas de novo sem travar o cursor. */
 export const indexerFailures = pgTable("indexer_failures", {
   signature: text("signature").primaryKey(),
+  /** Só falhas que não são de infraestrutura contam (RPC fora do ar não gasta tentativas). */
   attempts: integer("attempts").notNull().default(1),
   lastError: text("last_error").notNull(),
+  /** Backoff: a próxima tentativa só roda depois deste horário. */
+  nextAttemptAt: ts("next_attempt_at").notNull().defaultNow(),
+  /** pending (será tentada de novo) | dead (desistiu: precisa de reprocesso manual, ver cli:reindex). */
+  status: text("status").notNull().default("pending"),
+  createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
@@ -368,10 +417,19 @@ export const chainTxs = pgTable(
     wallet: text("wallet"),
     kind: text("kind").notNull(),
     agentId: text("agent_id"),
+    /** Valor bruto movimentado (compra, pacote, depósito do escrow ou etapa liberada). */
     amount: u64("amount"),
+    /** Horário do bloco (created_at é o momento da indexação, que pode atrasar ou repetir). */
+    blockTime: ts("block_time"),
+    /** Valores efetivamente executados, lidos dos saldos de token da transação. */
+    fee: u64("fee"),
+    creatorAmount: u64("creator_amount"),
+    creatorWallet: text("creator_wallet"),
+    /** Taxa da plataforma no momento da transação (bps). */
+    feeBps: integer("fee_bps"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (t) => [index("chain_txs_wallet_idx").on(t.wallet)],
+  (t) => [index("chain_txs_wallet_idx").on(t.wallet), index("chain_txs_agent_idx").on(t.agentId)],
 );
 
 export const escalations = pgTable("escalations", {
@@ -404,12 +462,15 @@ export const pixCharges = pgTable(
     externalReference: text("external_reference").notNull().unique(),
     amountBrl: integer("amount_brl").notNull(), // centavos
     amountUsdc: u64("amount_usdc").notNull(), // unidades de 6 casas
-    status: text("status").notNull().default("pending"), // pending | approved | credited | expired | failed
+    status: text("status").notNull().default("pending"), // pending | approved | crediting | credited | expired | failed
     qrCode: text("qr_code"),
     qrBase64: text("qr_base64"),
     ticketUrl: text("ticket_url"),
     expiresAt: ts("expires_at").notNull(),
     creditSignature: text("credit_signature"),
+    /** Transação do crédito já assinada, gravada antes do envio (reenviar a mesma nunca emite duas vezes). */
+    creditWire: text("credit_wire"),
+    creditLastValidHeight: u64("credit_last_valid_height"),
     // Cobranças antigas podem ter type "credits" (pagamento por uso acabou): a API as mostra sem purpose.
     purpose: jsonb("purpose").$type<{ agentId: string; type: "permanent" | "guarantee" }>(),
     createdAt: ts("created_at").notNull().defaultNow(),

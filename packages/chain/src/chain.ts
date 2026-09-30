@@ -13,11 +13,13 @@ import {
   getProgramDerivedAddress,
   getSignatureFromTransaction,
   getTransactionDecoder,
+  isSolanaError,
   partiallySignTransactionMessageWithSigners,
   pipe,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   type Address,
   type Base64EncodedWireTransaction,
   type Instruction,
@@ -64,14 +66,115 @@ export type BuiltTx = {
   meta?: Record<string, unknown>;
 };
 
+/**
+ * Em que ponto o envio falhou. Decide se a transação pode ou não ter entrado na rede:
+ * - rejected: o RPC recusou na simulação (preflight); nada foi transmitido.
+ * - failed: entrou na rede e falhou (sem efeito no estado).
+ * - expired: o blockhash venceu sem a transação aparecer; ela não pode mais entrar.
+ * - unconfirmed: sem resposta conclusiva (timeout, erro de rede); PODE ter entrado.
+ */
+export type TxPhase = "rejected" | "failed" | "expired" | "unconfirmed";
+
 export class TxError extends Error {
   constructor(
     message: string,
     public readonly logs: readonly string[] = [],
+    public readonly phase?: TxPhase,
+    public readonly signature?: Signature,
   ) {
     super(message);
   }
 }
+
+/** Verdadeiro só quando temos certeza de que a transação não produziu (nem produzirá) efeito. */
+export function isDefinitelyNotLanded(e: unknown): boolean {
+  return e instanceof TxError && (e.phase === "rejected" || e.phase === "failed" || e.phase === "expired");
+}
+
+/** Transação assinada (por inteiro) e pronta para enviar: a assinatura é conhecida antes do envio. */
+export type SignedTx = {
+  signature: Signature;
+  wire: Base64EncodedWireTransaction;
+  lastValidBlockHeight: number;
+};
+
+/** Resultado de consultar uma assinatura: confirmada, falhou, não pode mais entrar, ou ainda em aberto. */
+export type SignatureOutcome = "confirmed" | "failed" | "expired" | "pending";
+
+/** Variação de saldo de uma conta de token causada por uma transação. */
+export type TokenDelta = { account: Address; owner: string | null; mint: string; delta: bigint };
+
+type RawTokenBalance = { accountIndex: number; mint: string; owner?: string; uiTokenAmount: { amount: string } };
+
+/** Diferença entre os saldos de token depois e antes da transação (só contas que mudaram). */
+export function parseTokenDeltas(
+  accounts: readonly Address[],
+  pre: readonly RawTokenBalance[] | null | undefined,
+  post: readonly RawTokenBalance[] | null | undefined,
+): TokenDelta[] {
+  const byIndex = new Map<number, { mint: string; owner: string | null; pre: bigint; post: bigint }>();
+  const slot = (b: RawTokenBalance) => {
+    let s = byIndex.get(b.accountIndex);
+    if (!s) byIndex.set(b.accountIndex, (s = { mint: b.mint, owner: b.owner ?? null, pre: 0n, post: 0n }));
+    if (b.owner) s.owner = b.owner;
+    return s;
+  };
+  for (const b of pre ?? []) slot(b).pre = BigInt(b.uiTokenAmount.amount);
+  for (const b of post ?? []) slot(b).post = BigInt(b.uiTokenAmount.amount);
+  const out: TokenDelta[] = [];
+  for (const [idx, s] of byIndex) {
+    const account = accounts[idx];
+    if (account && s.post !== s.pre) out.push({ account, owner: s.owner, mint: s.mint, delta: s.post - s.pre });
+  }
+  return out;
+}
+
+/** Folga de blocos além do `lastValidBlockHeight` antes de considerar a transação expirada de vez. */
+const EXPIRY_MARGIN = 20;
+
+/** Logs, contas e variações de saldo de uma transação confirmada. */
+export type TxInfo = {
+  logs: readonly string[];
+  failed: boolean;
+  blockTime: number | null;
+  accounts: Address[];
+  tokenDeltas: TokenDelta[];
+};
+
+/** Etapas por garantia no programa (Vec com capacidade fixa: a conta é alocada para o máximo). */
+export const MAX_MILESTONES = 5;
+
+/** Tamanho (bytes) de uma conta Escrow no layout v2 = 8 + Escrow::INIT_SPACE. Derivado do cliente gerado. */
+export const ESCROW_ACCOUNT_SIZE: number = (() => {
+  const ms = Array.from({ length: MAX_MILESTONES }, () => ({
+    amount: 0n,
+    criteriaHash: new Uint8Array(32),
+    status: gen.MilestoneStatus.Pending,
+    deliverableHash: new Uint8Array(32),
+    passedAt: 0n,
+    disputeReasonHash: new Uint8Array(32),
+    disputedAt: 0n,
+  }));
+  const zero = "11111111111111111111111111111111" as Address;
+  return gen.getEscrowEncoder().encode({
+    buyer: zero,
+    agent: zero,
+    creator: zero,
+    rentPayer: zero,
+    nonce: 0n,
+    total: 0n,
+    milestones: ms,
+    reviewWindowSecs: 0n,
+    autoReleaseAt: 0n,
+    status: gen.EscrowStatus.Active,
+    bump: 0,
+    vaultBump: 0,
+    feeBps: 0,
+    deliveryDeadline: 0n,
+  }).length;
+})();
+
+export type EscrowLayout = { kind: "missing" } | { kind: "legacy"; size: number } | { kind: "ok"; data: gen.Escrow };
 
 const COMPUTE_UNITS = 400_000;
 
@@ -187,8 +290,8 @@ export class SolversChain {
     };
   }
 
-  /** Assina tudo no servidor e envia (operações de autoridade: verificador, uso, admin, faucet). */
-  async sendAsServer(instructions: Instruction[]): Promise<{ signature: Signature; events: SolversEvent[] }> {
+  /** Assina tudo no servidor sem enviar: a assinatura fica conhecida antes do envio (para persistir). */
+  async signServerTx(instructions: Instruction[]): Promise<SignedTx> {
     const { value: latest } = await this.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
     const message = pipe(
       createTransactionMessage({ version: 0 }),
@@ -197,9 +300,25 @@ export class SolversChain {
       (m) => appendTransactionMessageInstructions([...this.budget(), ...instructions], m),
     );
     const signed = await signTransactionMessageWithSigners(message);
-    const wire = getBase64EncodedWireTransaction(signed);
-    const signature = getSignatureFromTransaction(signed);
-    return this.sendWire(wire, signature, Number(latest.lastValidBlockHeight));
+    return {
+      signature: getSignatureFromTransaction(signed),
+      wire: getBase64EncodedWireTransaction(signed),
+      lastValidBlockHeight: Number(latest.lastValidBlockHeight),
+    };
+  }
+
+  /** Assina tudo no servidor e envia (operações de autoridade: verificador, uso, admin, faucet). */
+  async sendAsServer(instructions: Instruction[]): Promise<{ signature: Signature; events: SolversEvent[] }> {
+    return this.sendSigned(await this.signServerTx(instructions));
+  }
+
+  /**
+   * Envia uma transação já assinada e espera a confirmação. `resume` retransmite uma transação que pode já
+   * ter sido enviada (sem preflight, ignorando "já processada") e só espera o desfecho.
+   * `events: false` dispensa a leitura dos logs (o chamador só precisa da confirmação).
+   */
+  async sendSigned(tx: SignedTx, opts: { events?: boolean; resume?: boolean } = {}): Promise<{ signature: Signature; events: SolversEvent[] }> {
+    return this.sendWire(tx.wire, tx.signature, tx.lastValidBlockHeight, opts);
   }
 
   /** Recebe a transação já assinada pelo usuário (base64) e transmite. */
@@ -226,21 +345,37 @@ export class SolversChain {
     wire: Base64EncodedWireTransaction,
     signature: Signature,
     lastValidBlockHeight: number,
+    opts: { events?: boolean; resume?: boolean } = {},
   ): Promise<{ signature: Signature; events: SolversEvent[] }> {
-    try {
-      await this.rpc.sendTransaction(wire, { encoding: "base64", preflightCommitment: "confirmed" }).send();
-    } catch (e) {
-      const logs = extractLogs(e);
-      throw new TxError(friendlyError(e, logs), logs);
-    }
     // Na devnet transações somem com frequência: reenvia (sem preflight) enquanto aguarda.
     const resend = () =>
       this.rpc
         .sendTransaction(wire, { encoding: "base64", skipPreflight: true, maxRetries: 0n })
         .send()
         .catch(() => undefined);
-    await this.waitConfirmed(signature, lastValidBlockHeight, resend);
-    return { signature, events: await this.eventsOf(signature) };
+    if (opts.resume) {
+      await resend();
+    } else {
+      try {
+        await this.rpc.sendTransaction(wire, { encoding: "base64", preflightCommitment: "confirmed" }).send();
+      } catch (e) {
+        const logs = extractLogs(e);
+        // Só a recusa do preflight garante que nada foi transmitido; erro de rede pode ter chegado ao RPC.
+        const phase: TxPhase = isSolanaError(e, SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE) ? "rejected" : "unconfirmed";
+        throw new TxError(friendlyError(e, logs), logs, phase, signature);
+      }
+    }
+    try {
+      await this.waitConfirmed(signature, lastValidBlockHeight, resend);
+    } catch (e) {
+      if (e instanceof TxError) throw e;
+      // Falha ao consultar o RPC: não sabemos o desfecho.
+      throw new TxError(e instanceof Error ? e.message : String(e), [], "unconfirmed", signature);
+    }
+    if (opts.events === false) return { signature, events: [] };
+    // Já confirmada: não conseguir ler os logs a tempo não pode virar erro (o indexador reprocessa pela assinatura).
+    const events = await this.eventsOf(signature).catch(() => [] as SolversEvent[]);
+    return { signature, events };
   }
 
   async waitConfirmed(signature: Signature, lastValidBlockHeight: number, resend?: () => Promise<unknown>): Promise<void> {
@@ -248,21 +383,36 @@ export class SolversChain {
       if (resend && i > 0 && i % 4 === 0) void resend();
       const { value } = await this.rpc.getSignatureStatuses([signature]).send();
       const st = value[0];
-      if (st?.err) throw new TxError(`Transação falhou: ${JSON.stringify(st.err, bigintJson)}`);
+      if (st?.err) throw new TxError(`Transação falhou: ${JSON.stringify(st.err, bigintJson)}`, [], "failed", signature);
       if (st && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) return;
       if (i % 10 === 9) {
-        const h = await this.rpc.getBlockHeight({ commitment: "confirmed" }).send();
-        if (Number(h) > lastValidBlockHeight) throw new TxError("Transação expirou antes de confirmar");
+        const outcome = await this.signatureOutcome(signature, lastValidBlockHeight);
+        if (outcome === "confirmed") return;
+        if (outcome === "failed") throw new TxError("Transação falhou na rede", [], "failed", signature);
+        if (outcome === "expired") throw new TxError("Transação expirou antes de confirmar", [], "expired", signature);
       }
       await sleep(500);
     }
-    throw new TxError("Tempo esgotado aguardando confirmação");
+    throw new TxError("Tempo esgotado aguardando confirmação", [], "unconfirmed", signature);
   }
 
-  /** Logs e contas de uma transação confirmada (null se ainda não visível no RPC). */
-  async txLogs(
-    signature: Signature,
-  ): Promise<{ logs: readonly string[]; failed: boolean; blockTime: number | null; accounts: Address[] } | null> {
+  /**
+   * Desfecho de uma assinatura já enviada: confirmada, falhou, expirada (blockhash vencido e nunca vista:
+   * não pode mais entrar) ou ainda em aberto. Busca também no histórico para não perder transações antigas.
+   */
+  async signatureOutcome(signature: Signature, lastValidBlockHeight: number): Promise<SignatureOutcome> {
+    const { value } = await this.rpc.getSignatureStatuses([signature], { searchTransactionHistory: true }).send();
+    const st = value[0];
+    if (st) {
+      if (st.err) return "failed";
+      if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") return "confirmed";
+    }
+    const height = await this.rpc.getBlockHeight({ commitment: "confirmed" }).send();
+    return Number(height) > lastValidBlockHeight + EXPIRY_MARGIN ? "expired" : "pending";
+  }
+
+  /** Logs, contas e variações de saldo de uma transação confirmada (null se ainda não visível no RPC). */
+  async txLogs(signature: Signature): Promise<TxInfo | null> {
     const tx = await this.rpc
       .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0, encoding: "json" })
       .send();
@@ -275,6 +425,11 @@ export class SolversChain {
       failed: tx.meta?.err != null,
       blockTime: tx.blockTime == null ? null : Number(tx.blockTime),
       accounts,
+      tokenDeltas: parseTokenDeltas(
+        accounts,
+        tx.meta?.preTokenBalances as unknown as readonly RawTokenBalance[] | undefined,
+        tx.meta?.postTokenBalances as unknown as readonly RawTokenBalance[] | undefined,
+      ),
     };
   }
 
@@ -316,9 +471,9 @@ export class SolversChain {
     });
   }
 
-  /** Faucet: emite USDC de teste para uma carteira (só funciona com o mint de teste próprio). */
-  async faucet(owner: Address, units: bigint): Promise<Signature> {
-    const { signature } = await this.sendAsServer([
+  /** Faucet assinado mas ainda não enviado: quem precisa de idempotência grava a assinatura antes de enviar. */
+  async signFaucetTx(owner: Address, units: bigint): Promise<SignedTx> {
+    return this.signServerTx([
       await this.ensureAtaIx(owner),
       getMintToCheckedInstruction({
         mint: this.usdcMint,
@@ -328,6 +483,11 @@ export class SolversChain {
         decimals: 6,
       }),
     ]);
+  }
+
+  /** Faucet: emite USDC de teste para uma carteira (só funciona com o mint de teste próprio). */
+  async faucet(owner: Address, units: bigint): Promise<Signature> {
+    const { signature } = await this.sendSigned(await this.signFaucetTx(owner, units), { events: false });
     return signature;
   }
 
@@ -519,6 +679,8 @@ export class SolversChain {
     nonce: bigint,
     milestones: { amount: bigint; criteriaHash: Uint8Array }[],
     reviewWindowSecs: bigint,
+    /** Prazo de entrega em dias (programa v2): 0 usa o padrão do programa (14); máximo 60. */
+    deliveryDays = 0,
   ): Promise<{ instructions: Instruction[]; escrow: Address }> {
     this.assertNotFeePayer(buyer);
     const agent = await this.agentPda(agentIdHex);
@@ -533,6 +695,7 @@ export class SolversChain {
       nonce,
       milestones,
       reviewWindowSecs,
+      deliveryDays,
     });
     return { instructions: [ix], escrow };
   }
@@ -598,6 +761,53 @@ export class SolversChain {
       index,
       reasonHash,
     });
+  }
+
+  /** O comprador recebe de volta (sem taxa) uma etapa ainda pendente depois do prazo de entrega. */
+  async cancelUndeliveredIxs(buyer: Address, escrowAddr: Address, index: number): Promise<Instruction[]> {
+    this.assertNotFeePayer(buyer);
+    return [
+      // A ATA do comprador pode ter sido fechada: recria (idempotente, a plataforma paga o rent).
+      await this.ensureAtaFor(buyer),
+      await gen.getCancelUndeliveredInstructionAsync({
+        buyer: createNoopSigner(buyer),
+        escrow: escrowAddr,
+        buyerUsdc: await this.ata(buyer),
+        usdcMint: this.usdcMint,
+        index,
+      }),
+    ];
+  }
+
+  /**
+   * Disputa parada além do prazo de julgamento: qualquer carteira (aqui, o servidor) devolve o valor
+   * ao comprador. `caller` paga a taxa da transação; não precisa ser o comprador nem o admin.
+   */
+  async resolveStaleDisputeIxs(caller: TransactionSigner, escrowAddr: Address, index: number): Promise<Instruction[]> {
+    const escrow = await gen.fetchEscrow(this.rpc, escrowAddr);
+    return [
+      await this.ensureAtaFor(escrow.data.buyer),
+      await gen.getResolveStaleDisputeInstructionAsync({
+        caller,
+        escrow: escrowAddr,
+        buyerUsdc: await this.ata(escrow.data.buyer),
+        usdcMint: this.usdcMint,
+        index,
+      }),
+    ];
+  }
+
+  /**
+   * Lê um escrow e diz em que layout está. O cliente v2 DECODIFICA sem erro uma conta v1 (740 bytes, com
+   * padding: fee_bps 0, prazo 0 e disputed_at lido do lugar errado), então o layout só se reconhece pelo
+   * TAMANHO: contas v2 têm ESCROW_ACCOUNT_SIZE bytes. "legacy" nunca deve ser espelhado nem usado em transação.
+   */
+  async fetchEscrowLayout(escrowAddr: Address): Promise<EscrowLayout> {
+    const { value } = await this.rpc.getAccountInfo(escrowAddr, { encoding: "base64" }).send();
+    if (!value) return { kind: "missing" };
+    const bytes = Uint8Array.from(getBase64Encoder().encode(value.data[0]));
+    if (value.owner !== this.programId || bytes.length !== ESCROW_ACCOUNT_SIZE) return { kind: "legacy", size: bytes.length };
+    return { kind: "ok", data: gen.getEscrowDecoder().decode(bytes) };
   }
 
   async closeEscrowIxs(caller: TransactionSigner, escrowAddr: Address): Promise<Instruction[]> {
@@ -704,9 +914,21 @@ const FRIENDLY: Record<string, string> = {
   InvalidMilestoneStatus: "Esta etapa não está no estado certo para esta ação.",
 };
 
-function friendlyError(e: unknown, logs: string[]): string {
+/** Motivo bruto do erro (mensagem + causa, p.ex. "Blockhash not found" da simulação), sem URLs do RPC nem chaves. */
+function rawReason(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  const cause = (e as { cause?: { message?: unknown } } | null)?.cause?.message;
+  const full = typeof cause === "string" && cause && !msg.includes(cause) ? `${msg}: ${cause}` : msg;
+  return full
+    .replace(/https?:\/\/\S+/gi, "[url]")
+    .replace(/(api[-_]?key|token|secret)=\S+/gi, "$1=[oculto]")
+    .slice(0, 300);
+}
+
+export function friendlyError(e: unknown, logs: readonly string[]): string {
   const joined = logs.join("\n");
   for (const [code, msg] of Object.entries(FRIENDLY)) if (joined.includes(code)) return msg;
   if (/insufficient funds/i.test(joined)) return "Saldo de USDC insuficiente.";
-  return e instanceof Error ? e.message : String(e);
+  // Simulação recusada sem logs do programa (blockhash vencido, conta inexistente...): mostra o motivo bruto.
+  return rawReason(e);
 }

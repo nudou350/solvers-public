@@ -35,7 +35,8 @@ export function getCloseEscrowInstructionDataCodec(): FixedSizeCodec<CloseEscrow
 }
 
 export type CloseEscrowAsyncInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
-  caller: TAccountCaller;
+  /** Só quem pagou o rent (a plataforma) fecha; o rent volta para essa mesma carteira. */
+caller: TAccountCaller;
 rentPayer: TAccountRentPayer;
 escrow: TAccountEscrow;
 vault?: TAccountVault;
@@ -69,7 +70,8 @@ return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), get
 }
 
 export type CloseEscrowInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
-  caller: TAccountCaller;
+  /** Só quem pagou o rent (a plataforma) fecha; o rent volta para essa mesma carteira. */
+caller: TAccountCaller;
 rentPayer: TAccountRentPayer;
 escrow: TAccountEscrow;
 vault: TAccountVault;
@@ -101,6 +103,7 @@ return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), get
 
 export type ParsedCloseEscrowInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
 accounts: {
+/** Só quem pagou o rent (a plataforma) fecha; o rent volta para essa mesma carteira. */
 caller: TAccountMetas[0];
 rentPayer: TAccountMetas[1];
 escrow: TAccountMetas[2];

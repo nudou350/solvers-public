@@ -10,8 +10,9 @@ import { h, HttpError, parse } from "../lib/http.js";
 import { randomId, randomToken, sha256Hex } from "../lib/crypto.js";
 import { mcpAudience, signAccessToken, verifyToken } from "../auth/jwt.js";
 import { createNonce, decodeVerifiedSignature, MEMORY_KEY_MESSAGE, verifySiws } from "../auth/siws.js";
-import { deriveMemoryKey, storeMemoryKey, wrapKey } from "../memory/crypto.js";
+import { deriveMemoryKey, storeMemoryKey, wrapKey, type DbExecutor } from "../memory/crypto.js";
 import { authorizePage } from "./page.js";
+import { refreshRejection } from "./rules.js";
 
 // Autorização do conector MCP (INSTRUCTIONS.md 5.2): o /mcp é um resource server e este app
 // também é o authorization server (OAuth 2.1 + PKCE S256 + registro dinâmico de cliente).
@@ -121,13 +122,14 @@ function s256(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-async function issueTokens(clientId: string, wallet: string, wrappedMemoryKey: Buffer | null) {
+/** `exec` permite emitir dentro de uma transação (rotação do refresh: tudo ou nada). */
+async function issueTokens(clientId: string, wallet: string, wrappedMemoryKey: Buffer | null, exec: DbExecutor = db) {
   const tokenId = `tok_${randomId(12)}`;
   const refresh = randomToken(32);
   const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
-  await db.insert(schema.oauthTokens).values({ id: tokenId, clientId, wallet, refreshHash: sha256Hex(refresh), expiresAt });
+  await exec.insert(schema.oauthTokens).values({ id: tokenId, clientId, wallet, refreshHash: sha256Hex(refresh), expiresAt });
   // A chave de memória vive enquanto a autorização vale; revogar ou expirar a apaga.
-  if (wrappedMemoryKey) await storeMemoryKey(tokenId, wallet, wrappedMemoryKey, expiresAt);
+  if (wrappedMemoryKey) await storeMemoryKey(tokenId, wallet, wrappedMemoryKey, expiresAt, exec);
   const access = await signAccessToken(wallet, tokenId, clientId, ACCESS_TTL_SECS);
   return {
     access_token: access,
@@ -315,16 +317,19 @@ oauthRouter.post(
     }
     if (b.grant_type === "refresh_token") {
       if (!b.refresh_token) throw new OAuthError("invalid_request", "refresh_token é obrigatório");
-      // Rotação atômica: só uma requisição consegue revogar o refresh antigo.
-      const [tok] = await db
-        .update(schema.oauthTokens)
-        .set({ revoked: true })
-        .where(and(eq(schema.oauthTokens.refreshHash, sha256Hex(b.refresh_token)), eq(schema.oauthTokens.revoked, false)))
-        .returning();
-      if (!tok || tok.expiresAt < new Date()) throw new OAuthError("invalid_grant", "Refresh token inválido ou expirado");
-      if (b.client_id && b.client_id !== tok.clientId) throw new OAuthError("invalid_grant", "Refresh token de outro cliente");
-      const [mk] = await db.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tok.id)).returning();
-      return issueTokens(tok.clientId, tok.wallet, mk?.wrappedKey ?? null);
+      const refreshHash = sha256Hex(b.refresh_token);
+      // Rotação tudo ou nada: revogar o refresh antigo, mover a chave de memória e emitir o sucessor numa só
+      // transação. Falha no meio desfaz tudo e o cliente continua com o refresh antigo válido. A linha fica
+      // travada (for update): uma segunda requisição com o mesmo refresh espera e depois o vê revogado.
+      return db.transaction(async (tx) => {
+        const [tok] = await tx.select().from(schema.oauthTokens).where(eq(schema.oauthTokens.refreshHash, refreshHash)).for("update");
+        // Valida antes de revogar: pedido inválido não consome o token do cliente legítimo.
+        const rejection = refreshRejection(tok, b.client_id, new Date());
+        if (rejection || !tok) throw new OAuthError("invalid_grant", rejection ?? "Refresh token inválido ou expirado");
+        await tx.update(schema.oauthTokens).set({ revoked: true }).where(eq(schema.oauthTokens.id, tok.id));
+        const [mk] = await tx.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tok.id)).returning();
+        return issueTokens(tok.clientId, tok.wallet, mk?.wrappedKey ?? null, tx);
+      });
     }
     throw new OAuthError("unsupported_grant_type", "grant_type não suportado");
   }),
