@@ -11,3 +11,4 @@ keys/
 *.keypair.json
 deliverables/
 .DS_Store
+.keys/

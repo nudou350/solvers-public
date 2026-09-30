@@ -23,6 +23,8 @@ authRouter.post(
         wallet: z.string(),
         message: z.string().max(2000),
         signature: z.union([z.string(), z.array(z.number())]),
+        /** Só para clientes fora do navegador (ex: SSR); a vitrine usa o cookie httpOnly. */
+        returnToken: z.boolean().optional(),
       }),
       req.body,
     );
@@ -35,7 +37,7 @@ authRouter.post(
       maxAge: 24 * 3600 * 1000,
       path: "/",
     });
-    return { wallet, token, expiresIn: 24 * 3600 };
+    return { wallet, expiresIn: 24 * 3600, ...(body.returnToken ? { token } : {}) };
   }),
 );
 

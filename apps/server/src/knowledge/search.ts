@@ -1,17 +1,19 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { embed, toVectorLiteral } from "./embeddings.js";
+import { embed, embeddingsLoaded, toVectorLiteral } from "./embeddings.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
 /** Busca em linguagem natural na vitrine e no find_solver: top N solvers ativos para a necessidade. */
 export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow[]> {
-  const vec = (await embed([need], "query"))?.[0];
+  const listed = and(eq(schema.agents.status, "active"), eq(schema.agents.listed, true));
+  // Enquanto o modelo carrega (primeiro boot), usa full text para não travar a requisição.
+  const vec = embeddingsLoaded() ? (await embed([need], "query"))?.[0] : undefined;
   if (vec) {
     const rows = await db
       .select()
       .from(schema.agents)
-      .where(and(eq(schema.agents.status, "active"), sql`${schema.agents.embedding} is not null`))
+      .where(and(listed, sql`${schema.agents.embedding} is not null`))
       .orderBy(sql`${schema.agents.embedding} <=> ${toVectorLiteral(vec)}::vector`)
       .limit(limit);
     if (rows.length > 0) return rows;
@@ -20,12 +22,7 @@ export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow
   const rows = await db
     .select()
     .from(schema.agents)
-    .where(
-      and(
-        eq(schema.agents.status, "active"),
-        sql`to_tsvector('portuguese', ${schema.agents.searchText}) @@ websearch_to_tsquery('portuguese', ${need})`,
-      ),
-    )
+    .where(and(listed, sql`to_tsvector('portuguese', ${schema.agents.searchText}) @@ websearch_to_tsquery('portuguese', ${need})`))
     .orderBy(desc(rank))
     .limit(limit);
   if (rows.length > 0) return rows;
@@ -41,10 +38,7 @@ export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow
       .select()
       .from(schema.agents)
       .where(
-        and(
-          eq(schema.agents.status, "active"),
-          sql`to_tsvector('portuguese', ${schema.agents.searchText}) @@ to_tsquery('portuguese', ${orQuery})`,
-        ),
+        and(listed, sql`to_tsvector('portuguese', ${schema.agents.searchText}) @@ to_tsquery('portuguese', ${orQuery})`),
       )
       .orderBy(desc(sql`ts_rank(to_tsvector('portuguese', ${schema.agents.searchText}), to_tsquery('portuguese', ${orQuery}))`))
       .limit(limit);
@@ -58,7 +52,7 @@ export type KnowledgeHit = { source: string; content: string; score: number };
 /** Até N trechos da base de conhecimento do solver (versão atual) mais relevantes para a pergunta. */
 export async function searchKnowledge(agentId: string, version: string, query: string, limit = 5): Promise<KnowledgeHit[]> {
   const base = and(eq(schema.knowledgeChunks.agentId, agentId), eq(schema.knowledgeChunks.version, version));
-  const vec = (await embed([query], "query"))?.[0];
+  const vec = embeddingsLoaded() ? (await embed([query], "query"))?.[0] : undefined;
   if (vec) {
     const dist = sql<number>`${schema.knowledgeChunks.embedding} <=> ${toVectorLiteral(vec)}::vector`;
     const rows = await db

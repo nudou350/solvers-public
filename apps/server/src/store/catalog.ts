@@ -42,8 +42,20 @@ export async function mapAgents(rows: AgentRow[]): Promise<Agent[]> {
 
 export type ListQuery = { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number };
 
+/** Usos (ativações) dos últimos 7 dias contra os 7 anteriores, calculado no banco para ordenar. */
+const trendSql = sql`(
+  select case when prev = 0 then (case when recent > 0 then 100 else 0 end) else (recent - prev)::float / prev * 100 end
+  from (
+    select
+      count(*) filter (where u.created_at > now() - interval '7 days') as recent,
+      count(*) filter (where u.created_at <= now() - interval '7 days' and u.created_at > now() - interval '14 days') as prev
+    from usage_events u
+    where u.agent_id = ${schema.agents.id} and u.tool = 'activate_solver'
+  ) t
+)`;
+
 export async function listAgents(query: ListQuery): Promise<Agent[]> {
-  const conds = [eq(schema.agents.status, "active")];
+  const conds = [eq(schema.agents.status, "active"), eq(schema.agents.listed, true)];
   if (query.category) conds.push(eq(schema.agents.category, query.category));
   if (query.q) {
     const like = `%${query.q}%`;
@@ -60,16 +72,16 @@ export async function listAgents(query: ListQuery): Promise<Agent[]> {
       ? [desc(schema.agents.verifiedUses)]
       : query.sort === "new"
         ? [desc(schema.agents.createdAt)]
-        : [desc(sql`case when ${schema.agents.ratingCount} = 0 then 0 else ${schema.agents.ratingSum}::float / ${schema.agents.ratingCount} end`), desc(schema.agents.ratingCount)];
+        : query.sort === "trend"
+          ? [desc(trendSql), desc(schema.agents.verifiedUses)]
+          : [desc(sql`case when ${schema.agents.ratingCount} = 0 then 0 else ${schema.agents.ratingSum}::float / ${schema.agents.ratingCount} end`), desc(schema.agents.ratingCount)];
   const rows = await db
     .select()
     .from(schema.agents)
     .where(and(...conds))
     .orderBy(...order)
     .limit(query.limit ?? 100);
-  const agents = await mapAgents(rows);
-  if (query.sort === "trend") agents.sort((a, b) => b.trend7d - a.trend7d);
-  return agents;
+  return mapAgents(rows);
 }
 
 export async function findAgentRow(idOrSlug: string): Promise<AgentRow> {
@@ -113,7 +125,7 @@ export async function getCreatorProfile(creatorId: string): Promise<CreatorProfi
   const rows = await db
     .select()
     .from(schema.agents)
-    .where(and(eq(schema.agents.creatorId, creatorId), eq(schema.agents.status, "active")));
+    .where(and(eq(schema.agents.creatorId, creatorId), eq(schema.agents.status, "active"), eq(schema.agents.listed, true)));
   return { creator, agents: await mapAgents(rows) };
 }
 
@@ -166,7 +178,7 @@ export async function listCategories(): Promise<{ category: string; count: numbe
   return db
     .select({ category: schema.agents.category, count: sql<number>`count(*)`.mapWith(Number) })
     .from(schema.agents)
-    .where(eq(schema.agents.status, "active"))
+    .where(and(eq(schema.agents.status, "active"), eq(schema.agents.listed, true)))
     .groupBy(schema.agents.category)
     .orderBy(schema.agents.category);
 }

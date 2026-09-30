@@ -1,0 +1,100 @@
+# /etc/nginx/sites-available/solvers  (ln -s em sites-enabled)
+# Um domínio só: a vitrine (Next.js) em / e o servidor Node em /api, /mcp, /oauth, /.well-known,
+# /webhooks, /preview e /health. Assim não há CORS e o cookie de sessão é do mesmo site.
+
+upstream solvers_api {
+    server 127.0.0.1:3017;
+    keepalive 64;
+}
+
+upstream solvers_web {
+    server 127.0.0.1:4017;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name solvers.wondervelop.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name solvers.wondervelop.com;
+
+    ssl_certificate /etc/letsencrypt/live/solvers.wondervelop.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/solvers.wondervelop.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 2m;
+
+    # Conector MCP: sem buffer (streaming) e com timeout longo.
+    location = /mcp {
+        proxy_pass http://solvers_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+
+    location ~ ^/(oauth|\.well-known/oauth-|\.well-known/openid-configuration|webhooks|preview|health) {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://solvers_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/auth {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://solvers_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://solvers_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # Vitrine (Next.js). Enquanto o front não estiver no ar, o nginx devolve 502 aqui.
+    location / {
+        limit_req zone=general burst=20 nodelay;
+        proxy_pass http://solvers_web;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/javascript application/json application/javascript image/svg+xml;
+}

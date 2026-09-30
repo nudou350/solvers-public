@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { randomBytes } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { env } from "../env.js";
 import { unauthorized } from "../lib/http.js";
@@ -14,6 +15,7 @@ export async function signSession(wallet: string): Promise<string> {
   return new SignJWT({})
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(wallet)
+    .setJti(`web_${randomBytes(12).toString("hex")}`)
     .setAudience(WEB_AUDIENCE)
     .setIssuer(env.PUBLIC_API_URL)
     .setIssuedAt()
@@ -47,6 +49,8 @@ declare global {
     interface Request {
       /** Carteira autenticada (sessão da vitrine ou token do conector). */
       wallet?: string;
+      /** Id da sessão/token (jti): liga a chave de memória à sessão. */
+      tokenId?: string;
     }
   }
 }
@@ -61,7 +65,9 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   const token = extractToken(req);
   if (token) {
     try {
-      req.wallet = (await verifyToken(token, WEB_AUDIENCE)).sub;
+      const claims = await verifyToken(token, WEB_AUDIENCE);
+      req.wallet = claims.sub;
+      req.tokenId = claims.jti;
     } catch {
       /* sessão inválida: segue anônimo */
     }
@@ -73,7 +79,9 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   const token = extractToken(req);
   if (!token) return next(unauthorized());
   try {
-    req.wallet = (await verifyToken(token, WEB_AUDIENCE)).sub;
+    const claims = await verifyToken(token, WEB_AUDIENCE);
+    req.wallet = claims.sub;
+    req.tokenId = claims.jti;
     next();
   } catch {
     next(unauthorized("Sessão expirada, entre novamente"));

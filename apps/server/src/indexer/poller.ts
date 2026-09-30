@@ -6,7 +6,7 @@ import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { h, unauthorized } from "../lib/http.js";
-import { processSignature, processTransaction } from "./processor.js";
+import { processSignature, processTransaction, recordFailure, retryFailures } from "./processor.js";
 
 // Indexador (INSTRUCTIONS.md 5.11): webhook da Helius + polling de fallback obrigatório.
 
@@ -27,29 +27,50 @@ async function setCursor(sig: string) {
 /** Uma rodada de polling: busca assinaturas novas do programa e processa da mais antiga para a mais nova. */
 export async function pollOnce(): Promise<number> {
   const c = chain();
-  const until = (await getCursor()) ?? undefined;
+  let until = (await getCursor()) ?? undefined;
   const pending: string[] = [];
   let before: string | undefined;
-  // Pagina para trás até chegar no cursor (ou no começo do programa).
-  for (let page = 0; page < 20; page++) {
-    const sigs = await c.rpc
-      .getSignaturesForAddress(c.programId, {
-        limit: 1000,
-        until: until as Signature | undefined,
-        before: before as Signature | undefined,
-        commitment: "confirmed",
-      })
-      .send();
+  // Pagina para trás até chegar no cursor (ou no começo do histórico disponível).
+  for (;;) {
+    let sigs;
+    try {
+      sigs = await c.rpc
+        .getSignaturesForAddress(c.programId, {
+          limit: 1000,
+          until: until as Signature | undefined,
+          before: before as Signature | undefined,
+          commitment: "confirmed",
+        })
+        .send();
+    } catch (e) {
+      // O RPC pode ter podado a transação do cursor: recomeça pelo histórico disponível
+      // (o processamento é idempotente, reprocessar não duplica nada).
+      if (until && /not found/i.test((e as Error).message)) {
+        console.warn("[indexer] cursor não existe mais no RPC; varrendo o histórico recente");
+        until = undefined;
+        before = undefined;
+        pending.length = 0;
+        continue;
+      }
+      throw e;
+    }
     if (sigs.length === 0) break;
     for (const s of sigs) if (!s.err) pending.push(s.signature);
     before = sigs[sigs.length - 1]!.signature;
     if (sigs.length < 1000) break;
   }
-  const newest = pending[0];
+  // Processa da mais antiga para a mais nova. Uma falha não trava o cursor: vai para a fila de
+  // novas tentativas (indexer_failures) e o resto segue.
   for (const sig of pending.reverse()) {
-    await processSignature(sig);
+    try {
+      await processSignature(sig);
+    } catch (e) {
+      console.error(`[indexer] falha em ${sig}:`, (e as Error).message);
+      await recordFailure(sig, e);
+    }
+    await setCursor(sig);
   }
-  if (newest) await setCursor(newest);
+  await retryFailures();
   return pending.length;
 }
 
@@ -105,10 +126,12 @@ webhookRouter.post(
       const sig = tx.transaction?.signatures?.[0];
       if (!sig) continue;
       const logs = tx.meta?.logMessages;
-      if (logs) {
-        count += (await processTransaction(sig, logs, { failed: tx.meta?.err != null, blockTime: tx.blockTime ?? null })).length;
-      } else {
-        count += (await processSignature(sig)).length;
+      try {
+        count += logs
+          ? (await processTransaction(sig, logs, { failed: tx.meta?.err != null, blockTime: tx.blockTime ?? null })).length
+          : (await processSignature(sig)).length;
+      } catch (e) {
+        await recordFailure(sig, e);
       }
     }
     return { ok: true, events: count };

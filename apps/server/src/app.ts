@@ -37,17 +37,34 @@ export function createApp(mounts: Mount[] = []): Express {
     credentials: true,
   });
 
-  // Limite por carteira (quando autenticada) ou por IP.
-  const limiter = rateLimit({
+  // Sempre por IP; por carteira em cima (trocar de carteira não burla o limite do IP).
+  const byIp = rateLimit({
+    windowMs: 60_000,
+    limit: env.RATE_LIMIT_PER_MINUTE * 3,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
+  });
+  const byWallet = rateLimit({
     windowMs: 60_000,
     limit: env.RATE_LIMIT_PER_MINUTE * 2,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    keyGenerator: (req) => req.wallet ?? ipKeyGenerator(req.ip ?? "0.0.0.0"),
+    skip: (req) => !req.wallet,
+    keyGenerator: (req) => req.wallet ?? "anon",
+  });
+  // Rotas caras (embedding na CPU, polling de RPC, transações).
+  const costly = rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
   });
 
   app.use("/webhooks", express.json({ limit: "2mb" }), webhookRouter);
-  app.use("/api", webCors, express.json({ limit: "256kb" }), cookieParser(), optionalAuth, limiter);
+  app.use("/api", webCors, express.json({ limit: "256kb" }), cookieParser(), byIp, optionalAuth, byWallet);
+  app.use(["/api/search", "/api/tx", "/api/faucet"], costly);
   app.use("/api/auth", authRouter);
   app.use("/api", storeRouter);
 

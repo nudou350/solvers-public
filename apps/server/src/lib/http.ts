@@ -35,6 +35,15 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(err.status).json({ error: err.message, code: err.code, ...err.extra });
     return;
   }
+  const status = (err as { status?: number; type?: string })?.status;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    const type = (err as { type?: string }).type;
+    res.status(status).json({
+      error: type === "entity.parse.failed" ? "JSON inválido" : type === "entity.too.large" ? "Corpo grande demais" : "Requisição inválida",
+      code: type ?? "bad_request",
+    });
+    return;
+  }
   if (err instanceof ZodError) {
     res.status(400).json({ error: err.message, code: "validation" });
     return;

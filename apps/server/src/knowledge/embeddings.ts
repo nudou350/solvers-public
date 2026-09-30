@@ -7,6 +7,18 @@ import { env } from "../env.js";
 type Extractor = (texts: string[], opts: { pooling: "mean"; normalize: boolean }) => Promise<{ tolist(): number[][] }>;
 
 let extractor: Promise<Extractor | null> | null = null;
+let loaded = false;
+
+/** true quando o modelo já está pronto em memória (não bloqueia). */
+export function embeddingsLoaded(): boolean {
+  return loaded;
+}
+
+/** Carrega o modelo em segundo plano no boot. */
+export function warmEmbeddings() {
+  extractor ??= load();
+  void extractor.then((x) => (loaded = x != null));
+}
 export const EMBEDDING_DIMS = 384;
 
 async function load(): Promise<Extractor | null> {

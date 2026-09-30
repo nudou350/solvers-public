@@ -1,0 +1,10 @@
+{
+  "name": "solvers",
+  "displayName": "Solvers",
+  "version": "0.1.0",
+  "domain": "solvers.wondervelop.com",
+  "port": 3017,
+  "webPort": 4017,
+  "pm2Name": "solvers-api",
+  "database": "solvers (PG16 :5433, pgvector)"
+}

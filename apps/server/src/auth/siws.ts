@@ -77,29 +77,37 @@ export function assertWallet(wallet: string): Uint8Array {
   }
 }
 
-/** Aceita assinatura em base58, base64, hex ou array de bytes (cada carteira devolve de um jeito). */
-export function decodeSignature(sig: string | number[]): Uint8Array {
-  if (Array.isArray(sig)) return Uint8Array.from(sig);
-  const tries: Array<() => Uint8Array> = [
-    () => (/^[0-9a-f]{128}$/i.test(sig) ? Uint8Array.from(Buffer.from(sig, "hex")) : new Uint8Array()),
-    () => Uint8Array.from(getBase58Encoder().encode(sig)),
-    () => Uint8Array.from(Buffer.from(sig, "base64")),
-  ];
-  for (const t of tries) {
-    try {
-      const b = t();
-      if (b.length === 64) return b;
-    } catch {
-      /* tenta o próximo formato */
-    }
+/** Candidatos de 64 bytes para a assinatura: base58, base64/base64url, hex ou array de bytes. */
+function signatureCandidates(sig: string | number[]): Uint8Array[] {
+  if (Array.isArray(sig)) {
+    if (sig.length !== 64 || sig.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) throw badRequest("Assinatura em formato inválido");
+    return [Uint8Array.from(sig)];
   }
-  throw badRequest("Assinatura em formato inválido");
+  const out: Uint8Array[] = [];
+  const add = (f: () => Uint8Array) => {
+    try {
+      const b = f();
+      if (b.length === 64) out.push(b);
+    } catch {
+      /* formato não se aplica */
+    }
+  };
+  if (/^[0-9a-f]{128}$/i.test(sig)) add(() => Uint8Array.from(Buffer.from(sig, "hex")));
+  add(() => Uint8Array.from(getBase58Encoder().encode(sig)));
+  add(() => Uint8Array.from(Buffer.from(sig.replace(/-/g, "+").replace(/_/g, "/"), "base64")));
+  if (out.length === 0) throw badRequest("Assinatura em formato inválido");
+  return out;
+}
+
+/** Decodifica a assinatura escolhendo o formato que de fato verifica para a carteira e mensagem. */
+export function decodeVerifiedSignature(wallet: string, message: string | Uint8Array, sig: string | number[]): Uint8Array | null {
+  const pk = assertWallet(wallet);
+  const msg = typeof message === "string" ? new TextEncoder().encode(message) : message;
+  return signatureCandidates(sig).find((c) => nacl.sign.detached.verify(msg, c, pk)) ?? null;
 }
 
 export function verifySignature(wallet: string, message: string | Uint8Array, signature: string | number[]): boolean {
-  const pk = assertWallet(wallet);
-  const msg = typeof message === "string" ? new TextEncoder().encode(message) : message;
-  return nacl.sign.detached.verify(msg, decodeSignature(signature), pk);
+  return decodeVerifiedSignature(wallet, message, signature) != null;
 }
 
 function field(message: string, name: string): string | undefined {
@@ -119,11 +127,15 @@ export async function verifySiws(
   if ((lines[1] ?? "").trim() !== wallet) throw unauthorized("Carteira da mensagem não confere");
   const nonce = field(message, "Nonce");
   if (!nonce) throw unauthorized("Mensagem sem nonce");
-  const exp = field(message, "Expiration Time");
-  if (exp && new Date(exp).getTime() < Date.now()) throw unauthorized("Mensagem expirada");
-  const issued = field(message, "Issued At");
-  if (issued && Date.now() - new Date(issued).getTime() > NONCE_TTL_MS + 60_000) {
-    throw unauthorized("Mensagem antiga demais");
+  const chain = field(message, "Chain ID");
+  if (chain && chain !== chainId() && chain !== `solana:${chainId()}`) throw unauthorized("Rede da mensagem não confere");
+  const issued = Date.parse(field(message, "Issued At") ?? "");
+  if (!Number.isFinite(issued)) throw unauthorized("Mensagem sem data de emissão");
+  if (Date.now() - issued > NONCE_TTL_MS + 60_000 || issued - Date.now() > 60_000) throw unauthorized("Mensagem fora do prazo");
+  const expRaw = field(message, "Expiration Time");
+  if (expRaw !== undefined) {
+    const exp = Date.parse(expRaw);
+    if (!Number.isFinite(exp) || exp < Date.now()) throw unauthorized("Mensagem expirada");
   }
 
   if (!verifySignature(wallet, message, signature)) throw unauthorized("Assinatura inválida");

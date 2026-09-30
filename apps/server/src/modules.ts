@@ -1,10 +1,22 @@
 import type { Mount } from "./app.js";
+import { jobs } from "./jobs.js";
+import { mountMcp } from "./mcp/routes.js";
+import { mountOAuth } from "./oauth/routes.js";
+import { escrowRouter } from "./store/escrow.js";
+import { meRouter } from "./store/me.js";
+import { mountPreview } from "./verifier/preview.js";
 
-// Ponto único onde os módulos das próximas fases (OAuth, MCP, garantia, jobs) se registram.
+// Ponto único onde os módulos se registram no app (rotas extras e jobs periódicos).
 
-export const mounts: Mount[] = [];
-
-const jobs: Array<{ start: () => void; stop: () => void }> = [];
+export const mounts: Mount[] = [
+  mountOAuth,
+  mountMcp,
+  mountPreview,
+  (app) => {
+    app.use("/api", escrowRouter);
+    app.use("/api", meRouter);
+  },
+];
 
 export function startJobs() {
   for (const j of jobs) j.start();

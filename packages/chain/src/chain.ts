@@ -259,13 +259,23 @@ export class SolversChain {
     throw new TxError("Tempo esgotado aguardando confirmação");
   }
 
-  /** Logs de uma transação confirmada (null se ainda não visível no RPC). */
-  async txLogs(signature: Signature): Promise<{ logs: readonly string[]; failed: boolean; blockTime: number | null } | null> {
+  /** Logs e contas de uma transação confirmada (null se ainda não visível no RPC). */
+  async txLogs(
+    signature: Signature,
+  ): Promise<{ logs: readonly string[]; failed: boolean; blockTime: number | null; accounts: Address[] } | null> {
     const tx = await this.rpc
       .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0, encoding: "json" })
       .send();
     if (!tx) return null;
-    return { logs: tx.meta?.logMessages ?? [], failed: tx.meta?.err != null, blockTime: tx.blockTime == null ? null : Number(tx.blockTime) };
+    const keys = tx.transaction.message.accountKeys as readonly Address[];
+    const loaded = tx.meta?.loadedAddresses;
+    const accounts = [...keys, ...((loaded?.writable ?? []) as Address[]), ...((loaded?.readonly ?? []) as Address[])];
+    return {
+      logs: tx.meta?.logMessages ?? [],
+      failed: tx.meta?.err != null,
+      blockTime: tx.blockTime == null ? null : Number(tx.blockTime),
+      accounts,
+    };
   }
 
   async eventsOf(signature: Signature): Promise<SolversEvent[]> {

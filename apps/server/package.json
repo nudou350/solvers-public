@@ -11,7 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --env-file-if-exists=.env.test --import tsx --test --test-concurrency=1 test/*.test.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
+    "cli:publish": "tsx --env-file-if-exists=.env src/cli/publish.ts",
+    "cli:seed": "tsx --env-file-if-exists=.env src/cli/seed.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

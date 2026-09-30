@@ -50,6 +50,7 @@ export async function syncAgent(agentAddr: Address): Promise<string | null> {
         description: "",
         category: "Outros",
         creatorId: a.creator,
+        listed: false,
         ...values,
       })
       .onConflictDoNothing();
@@ -99,7 +100,7 @@ export async function syncLicense(asset: Address, agentId: string, signature?: s
     await new Promise((r) => setTimeout(r, 500));
     core = await chain().fetchCoreAsset(asset);
   }
-  if (!core) return;
+  if (!core) throw new Error(`licença ${asset} ainda não visível no RPC`);
   await db
     .insert(schema.licenses)
     .values({

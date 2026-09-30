@@ -47,11 +47,20 @@ function startsWith(data: Uint8Array, prefix: ArrayLike<number>): boolean {
  * chamadas, para ignorar dados de outros programas chamados via CPI.
  */
 export function parseEvents(logs: readonly string[], programId: Address): SolversEvent[] {
+  return parseEventsDetailed(logs, programId).events;
+}
+
+/** Como parseEvents, mas avisa quando os logs vieram truncados (eventos podem estar faltando). */
+export function parseEventsDetailed(logs: readonly string[], programId: Address): { events: SolversEvent[]; truncated: boolean } {
   const b64 = getBase64Encoder();
   const stack: string[] = [];
   const out: SolversEvent[] = [];
+  let truncated = false;
   for (const line of logs) {
-    if (line === "Log truncated") throw new Error("Logs truncados: não é possível extrair eventos com segurança");
+    if (line === "Log truncated") {
+      truncated = true;
+      break;
+    }
     const invoke = /^Program (\w+) invoke \[\d+\]$/.exec(line);
     if (invoke) {
       stack.push(invoke[1]!);
@@ -75,5 +84,5 @@ export function parseEvents(logs: readonly string[], programId: Address): Solver
       }
     }
   }
-  return out;
+  return { events: out, truncated };
 }

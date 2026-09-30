@@ -72,6 +72,8 @@ export const agents = pgTable(
     requirements: jsonb("requirements").$type<Requirement[]>().notNull().default([]),
     packageContents: jsonb("package_contents").$type<string[]>().notNull().default([]),
     guaranteeAvailable: boolean("guarantee_available").notNull().default(false),
+    /** Só aparece na loja depois que o catálogo (publish-agent) preencheu os dados. */
+    listed: boolean("listed").notNull().default(false),
     details: jsonb("details").$type<AgentDetails>().notNull().default({}),
     onchainAddress: text("onchain_address"),
     collectionAddress: text("collection_address"),
@@ -108,6 +110,7 @@ export const credits = pgTable(
     ownerWallet: text("owner_wallet").notNull(),
     remaining: integer("remaining").notNull().default(0),
     purchased: integer("purchased").notNull().default(0),
+    createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.agentId, t.ownerWallet] })],
@@ -302,6 +305,14 @@ export const processedEvents = pgTable(
   },
   (t) => [primaryKey({ columns: [t.signature, t.idx] })],
 );
+
+/** Transações que falharam no indexador: tentadas de novo sem travar o cursor. */
+export const indexerFailures = pgTable("indexer_failures", {
+  signature: text("signature").primaryKey(),
+  attempts: integer("attempts").notNull().default(1),
+  lastError: text("last_error").notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
 
 export const kv = pgTable("kv", {
   key: text("key").primaryKey(),

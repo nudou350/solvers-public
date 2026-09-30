@@ -7,6 +7,8 @@ import { chain, explorerUrl } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { processSignature } from "../indexer/processor.js";
+import type { Signature } from "@solvers/chain";
+import { sql } from "drizzle-orm";
 import { refreshLicenseOwner } from "../indexer/sync.js";
 import { searchAgentRows } from "../knowledge/search.js";
 import { badRequest, h, HttpError, parse } from "../lib/http.js";
@@ -230,9 +232,16 @@ storeRouter.post(
 storeRouter.post(
   "/tx/submit",
   requireAuth,
-  h(async (req) => {
+  h(async (req, res) => {
     const { transaction } = parse(z.object({ transaction: z.string().min(100).max(2000) }), req.body);
-    const { signature } = await chain().submitSigned(transaction);
+    let signature: string;
+    try {
+      ({ signature } = await chain().submitSigned(transaction));
+    } catch (e) {
+      // Mesmo formato do contrato (SubmitResponse), com HTTP 422 para o front tratar como erro.
+      res.status(422);
+      return { signature: "", status: "failed", error: (e as Error).message };
+    }
     // Indexa na hora: a licença aparece para o conector sem esperar webhook/polling.
     const events = await processSignature(signature).catch(() => []);
     return { signature, status: "confirmed", events: events.map((e) => e.name), explorerUrl: explorerUrl("tx", signature) };
@@ -243,16 +252,49 @@ storeRouter.post(
 storeRouter.post(
   "/tx/confirm",
   requireAuth,
-  h(async (req) => {
+  h(async (req, res) => {
     const { signature } = parse(z.object({ signature: z.string().min(60).max(100) }), req.body);
-    const events = await processSignature(signature);
-    return { signature, status: events.length > 0 ? "confirmed" : "pending", events: events.map((e) => e.name) };
+    const tx = await chain().txLogs(signature as Signature);
+    if (!tx) {
+      res.status(202);
+      return { signature, status: "failed", error: "Transação ainda não encontrada; tente de novo em alguns segundos" };
+    }
+    if (tx.failed) return { signature, status: "failed", error: "Transação falhou na rede" };
+    const events = await processSignature(signature).catch(() => []);
+    return { signature, status: "confirmed", events: events.map((e) => e.name) };
   }),
 );
 
 // ---------- Faucet de USDC de teste ----------
 
-const FAUCET_COOLDOWN_MS = 3600_000;
+const FAUCET_DAILY_CAP = 200;
+
+/**
+ * Reserva atômica de uma chave de cooldown: só uma requisição por janela consegue gravar.
+ * Retorna false se ainda está no cooldown.
+ */
+async function claimCooldown(key: string, windowSecs: number): Promise<boolean> {
+  const rows = await db
+    .insert(schema.kv)
+    .values({ key, value: new Date().toISOString() })
+    .onConflictDoUpdate({
+      target: schema.kv.key,
+      set: { value: new Date().toISOString(), updatedAt: new Date() },
+      setWhere: sql`${schema.kv.updatedAt} < now() - make_interval(secs => ${windowSecs})`,
+    })
+    .returning();
+  return rows.length > 0;
+}
+
+async function faucetDailyCount(): Promise<number> {
+  const day = new Date().toISOString().slice(0, 10);
+  const [row] = await db
+    .insert(schema.kv)
+    .values({ key: `faucet:day:${day}`, value: 1 })
+    .onConflictDoUpdate({ target: schema.kv.key, set: { value: sql`to_jsonb((${schema.kv.value})::text::int + 1)`, updatedAt: new Date() } })
+    .returning();
+  return Number(row?.value ?? 0);
+}
 
 storeRouter.post(
   "/faucet",
@@ -260,16 +302,17 @@ storeRouter.post(
   h(async (req) => {
     if (!env.FAUCET_ENABLED) throw badRequest("Faucet desativado nesta rede");
     const wallet = address(requireWallet(req));
-    const key = `faucet:${wallet}`;
-    const [last] = await db.select().from(schema.kv).where(eq(schema.kv.key, key));
-    if (last && Date.now() - new Date(last.value as string).getTime() < FAUCET_COOLDOWN_MS) {
+    // Cooldown por carteira e por IP (carteiras novas são grátis de criar).
+    if (!(await claimCooldown(`faucet:w:${wallet}`, 3600))) {
       throw new HttpError(429, "Você já recebeu USDC de teste há pouco. Tente de novo em 1 hora.", "faucet_cooldown");
     }
+    if (!(await claimCooldown(`faucet:ip:${req.ip}`, 600))) {
+      throw new HttpError(429, "Muitos pedidos de USDC de teste desta rede. Tente de novo em 10 minutos.", "faucet_cooldown");
+    }
+    if ((await faucetDailyCount()) > FAUCET_DAILY_CAP) {
+      throw new HttpError(429, "O faucet atingiu o limite de hoje.", "faucet_daily_cap");
+    }
     const signature = await chain().faucet(wallet, usdcToUnits(env.FAUCET_AMOUNT_USDC));
-    await db
-      .insert(schema.kv)
-      .values({ key, value: new Date().toISOString() })
-      .onConflictDoUpdate({ target: schema.kv.key, set: { value: new Date().toISOString(), updatedAt: new Date() } });
     return { signature, amountUsdc: env.FAUCET_AMOUNT_USDC, explorerUrl: explorerUrl("tx", signature) };
   }),
 );

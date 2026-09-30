@@ -77,7 +77,7 @@ export function creditsToLicense(row: typeof schema.credits.$inferSelect): Licen
     id: `credits:${row.agentId}:${row.ownerWallet}`,
     agentId: row.agentId,
     ownerWallet: row.ownerWallet,
-    acquiredAt: row.updatedAt.toISOString(),
+    acquiredAt: row.createdAt.toISOString(),
     type: "credits",
     creditsLeft: row.remaining,
     listedForResale: false,
