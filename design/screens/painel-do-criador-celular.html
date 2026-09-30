@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<title>Solver Painel do criador celular</title>
+<script src="88127a83-5547-4645-8b71-21fe2d86f1e9"></script>
+<style>/* Solver: sistema visual compartilhado. Tema claro por padrão, escuro com data-theme="dark". */
+.sv {
+  --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --line: #E3DED3; --line-strong: #CBC4B6;
+  --ink: #17161B; --ink-2: #4F4C57; --ink-3: #6B6873;
+  --brand: #4A3CB0; --brand-hover: #3B2E99; --on-brand: #FFFFFF; --brand-soft: #ECE9FA; --brand-ink: #3B2E99;
+  --mint: #0B7A55; --mint-soft: #DDF3E9; --amber: #8A5200; --amber-soft: #FBEBC8; --red: #B42318; --red-soft: #FCE4E0;
+  --star: #E09A00; --wm: rgba(23,22,27,.16);
+  --shadow: 0 1px 2px rgba(30,24,60,.05), 0 10px 28px -14px rgba(30,24,60,.16);
+  --shadow-lg: 0 2px 4px rgba(30,24,60,.05), 0 24px 48px -20px rgba(30,24,60,.28);
+  --tb1: .95; --tb2: .88; --tc: .38;
+  font-family: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px; line-height: 1.55; color: var(--ink); background: var(--bg);
+  container: sv / inline-size; box-sizing: border-box; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.sv[data-theme="dark"] {
+  --bg: #121116; --surface: #1B1A21; --surface-2: #24222C; --line: #2F2D39; --line-strong: #494656;
+  --ink: #F3F1F6; --ink-2: #BAB6C4; --ink-3: #98949F;
+  --brand: #A79CFF; --brand-hover: #BDB4FF; --on-brand: #17131F; --brand-soft: #2A2649; --brand-ink: #C9C2FF;
+  --mint: #4FD9A4; --mint-soft: #15332A; --amber: #F2B04C; --amber-soft: #3A2C14; --red: #FF9084; --red-soft: #3B1B18;
+  --star: #F2B04C; --wm: rgba(243,241,246,.2);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px -14px rgba(0,0,0,.6);
+  --shadow-lg: 0 2px 4px rgba(0,0,0,.3), 0 24px 48px -20px rgba(0,0,0,.7);
+  --tb1: .34; --tb2: .27; --tc: .9;
+}
+.sv *, .sv *::before, .sv *::after { box-sizing: border-box; }
+.sv h1, .sv h2, .sv h3, .sv h4, .sv p, .sv ul, .sv ol, .sv figure { margin: 0; padding: 0; }
+.sv ul, .sv ol { list-style: none; }
+:where(.sv) a { color: inherit; text-decoration: none; }
+:where(.sv) button, :where(.sv) input, :where(.sv) textarea, :where(.sv) select { font: inherit; color: inherit; }
+.sv button { cursor: pointer; }
+.sv :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 8px; }
+.sv svg.ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.sv svg.ic-s { width: 16px; height: 16px; }
+.sv svg.ic-l { width: 24px; height: 24px; }
+.sv svg.ic-xl { width: 32px; height: 32px; }
+
+/* tipografia */
+.display { text-wrap: balance; font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: -.012em; line-height: 1.04; }
+.h1 { font-size: 68px; } .h1s { font-size: 54px; } .big { font-size: 72px; } .h2 { font-size: 42px; } .h2s { font-size: 34px; } .h3 { font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+.h4 { font-size: 17px; font-weight: 700; line-height: 1.3; }
+.lead { font-size: 19px; line-height: 1.55; color: var(--ink-2); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
+.muted { color: var(--ink-2); } .faint { color: var(--ink-3); }
+.small { font-size: 13.5px; line-height: 1.45; } .tiny { font-size: 12.5px; line-height: 1.4; }
+.bold { font-weight: 700; } .semi { font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 13px; }
+.ok { color: var(--mint); } .warn { color: var(--amber); } .bad { color: var(--red); } .brand { color: var(--brand); }
+.center { text-align: center; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* layout */
+.wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 40px; }
+.main { flex: 1 0 auto; }
+.sec { padding-block: 72px; }
+.sec-s { padding-block: 40px; }
+.g2, .g3, .g4, .g5, .g6 { display: grid; gap: var(--gap, 24px); }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.g5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.g6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.gs1 { grid-template-columns: minmax(0, 1.3fr) minmax(0, .8fr); } .gs2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); } .gs3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.g3.gn { grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); }
+.split { display: grid; gap: 40px; grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
+.split-l { grid-template-columns: 280px minmax(0, 1fr); }
+.row { display: flex; align-items: center; gap: var(--gap, 12px); }
+.wrapx { flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: var(--gap, 12px); }
+.between { justify-content: space-between; }
+.grow { flex: 1 1 0; min-width: 0; }
+.start { align-items: flex-start; }
+.end { align-items: flex-end; }
+.sticky { position: sticky; top: 24px; }
+.only-m { display: none !important; }
+
+/* cabeçalho, rodapé, barra inferior */
+.nav { height: 76px; border-bottom: 1px solid var(--line); display: flex; align-items: center; flex: none; }
+.nav .wrap { display: flex; align-items: center; gap: 28px; }
+.logo { display: inline-flex; align-items: center; gap: 10px; font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1; letter-spacing: -.01em; }
+.logo-mark { width: 32px; height: 32px; border-radius: 10px; background: var(--ink); color: var(--bg); display: grid; place-items: center; }
+.nav-links { display: flex; gap: 4px; flex: 1; }
+.nav-links a { padding: 10px 14px; border-radius: 999px; font-weight: 600; color: var(--ink-2); }
+.nav-links a:hover { background: var(--surface-2); color: var(--ink); }
+.nav-links a.on { background: var(--surface-2); color: var(--ink); }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--ink-2); }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.me-pill { display: inline-flex; align-items: center; gap: 10px; padding: 4px 14px 4px 4px; border-radius: 999px; border: 1px solid var(--line); min-height: 44px; font-weight: 600; background: var(--surface); }
+.foot { border-top: 1px solid var(--line); padding: 44px 0 48px; margin-top: 40px; flex: none; }
+.tabbar { display: none; }
+.tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 56px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.tabbar a.on { color: var(--brand); }
+.sol-line { height: 3px; border-radius: 99px; background: linear-gradient(90deg, #9C7BFF, #19D68F); }
+.sol-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.sol-chip i { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #9C7BFF, #19D68F); }
+
+/* botões e chips */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; font-weight: 600; font-size: 15px; line-height: 1; border: 1px solid transparent; background: transparent; white-space: nowrap; transition: background .15s, border-color .15s, transform .15s; }
+.btn-primary { background: var(--brand); color: var(--on-brand); }
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost { color: var(--ink-2); padding: 0 14px; }
+.btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn-ok { background: var(--mint-soft); color: var(--mint); }
+.btn-danger { background: var(--surface); color: var(--red); border-color: var(--line-strong); }
+.btn-danger:hover { background: var(--red-soft); }
+.btn-lg { min-height: 54px; padding: 0 30px; font-size: 16px; }
+.btn-block { width: 100%; }
+.btn[disabled], .btn.off { opacity: .45; cursor: not-allowed; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; line-height: 1.2; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
+.chip-ok { background: var(--mint-soft); color: var(--mint); border-color: transparent; }
+.chip-brand { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
+.chip-warn { background: var(--amber-soft); color: var(--amber); border-color: transparent; }
+.chip-red { background: var(--red-soft); color: var(--red); border-color: transparent; }
+.chip-plain { background: transparent; }
+a.chip, button.chip { min-height: 44px; padding: 0 16px; font-size: 14px; }
+button.chip.on, a.chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.link { color: var(--brand); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.link-btn { background: none; border: 0; padding: 0; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; color: var(--brand); font-weight: 600; }
+
+/* cartões */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
+.pad { padding: 28px; } .pad-s { padding: 20px; } .pad-l { padding: 36px; }
+.card-flat { background: var(--surface-2); border-radius: 22px; }
+a.card { display: block; transition: transform .18s, box-shadow .18s, border-color .18s; }
+a.card:hover { transform: translateY(-3px); border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
+.divider { height: 1px; background: var(--line); border: 0; }
+.rowline { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
+.rowline:first-child { border-top: 0; }
+
+/* identidade visual do especialista */
+.tile { --h: 260; width: 56px; height: 56px; border-radius: 17px; display: grid; place-items: center; flex: none; background: linear-gradient(145deg, oklch(var(--tb1) .06 var(--h)), oklch(var(--tb2) .1 calc(var(--h) + 26))); color: oklch(var(--tc) .14 var(--h)); }
+.tile svg.ic { width: 26px; height: 26px; stroke-width: 1.6; }
+.tile-s { width: 44px; height: 44px; border-radius: 13px; } .tile-s svg.ic { width: 22px; height: 22px; }
+.tile-l { width: 96px; height: 96px; border-radius: 28px; } .tile-l svg.ic { width: 44px; height: 44px; stroke-width: 1.4; }
+.av { width: 40px; height: 40px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: none; }
+.av-s { width: 28px; height: 28px; font-size: 11px; } .av-l { width: 88px; height: 88px; font-size: 30px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+.stars { display: inline-block; width: 84px; height: 16px; flex: none; background: linear-gradient(90deg, var(--star) var(--p, 100%), var(--line-strong) var(--p, 100%)); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 16'%3E%3Cg fill='black'%3E%3Cpath id='s' d='M8 .8l2.2 4.6 5 .7-3.6 3.5.9 5L8 12.2 3.5 14.6l.9-5L.8 6.100l5-.7z'/%3E%3Cuse href='%23s' x='17'/%3E%3Cuse href='%23s' x='34'/%3E%3Cuse href='%23s' x='51'/%3E%3Cuse href='%23s' x='68'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 16'%3E%3Cg fill='black'%3E%3Cpath id='s' d='M8 .8l2.2 4.6 5 .7-3.6 3.5.9 5L8 12.2 3.5 14.6l.9-5L.8 6.100l5-.7z'/%3E%3Cuse href='%23s' x='17'/%3E%3Cuse href='%23s' x='34'/%3E%3Cuse href='%23s' x='51'/%3E%3Cuse href='%23s' x='68'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+.verified { display: inline-flex; align-items: center; gap: 6px; color: var(--mint); font-weight: 600; font-size: 13px; }
+.rep { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 2px 10px 2px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: var(--mint-soft); color: var(--mint); }
+.rep.brand { background: var(--brand-soft); color: var(--brand-ink); } .rep.soft { background: var(--surface-2); color: var(--ink-2); } .rep.warn { background: var(--amber-soft); color: var(--amber); }
+.trend { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 13px; }
+.trend.up { color: var(--mint); } .trend.down { color: var(--red); } .trend.flat { color: var(--ink-3); }
+
+/* notas */
+.score-card { border-radius: 22px; padding: 28px; border: 1px solid var(--line); background: var(--surface); }
+.score-verified { background: linear-gradient(180deg, var(--mint-soft), var(--surface) 82%); border-color: color-mix(in oklab, var(--mint) 30%, var(--line)); }
+.score-users { background: linear-gradient(180deg, var(--amber-soft), var(--surface) 82%); border-color: color-mix(in oklab, var(--amber) 25%, var(--line)); }
+.ring { --p: 90; width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; flex: none; background: conic-gradient(var(--mint) calc(var(--p) * 1%), color-mix(in oklab, var(--mint) 18%, var(--surface)) 0); }
+.ring > div { width: 84px; height: 84px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+.bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+.bar.mint > i { background: var(--mint); } .bar.amber > i { background: var(--star); }
+
+/* formulários */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 14px; font-weight: 600; }
+.hint { font-size: 13px; color: var(--ink-3); }
+.input, .select, .textarea { width: 100%; min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 15.5px; }
+.input::placeholder, .textarea::placeholder { color: var(--ink-3); }
+.textarea { padding: 14px 16px; min-height: 108px; resize: vertical; line-height: 1.5; }
+.input:focus, .textarea:focus, .select:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.input-lg { min-height: 60px; font-size: 17px; padding: 0 20px; border-radius: 18px; }
+.seg { display: inline-flex; padding: 4px; gap: 4px; border-radius: 999px; background: var(--surface-2); }
+.seg button, .seg a { min-height: 44px; padding: 0 20px; border-radius: 999px; border: 0; background: transparent; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 8px; }
+.seg .on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.opt { display: flex; gap: 14px; align-items: flex-start; padding: 18px 20px; border: 1.5px solid var(--line-strong); border-radius: 18px; background: var(--surface); text-align: left; width: 100%; }
+.opt.on { border-color: var(--brand); background: var(--brand-soft); }
+.opt .dot-r { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); flex: none; margin-top: 2px; display: grid; place-items: center; background: var(--surface); }
+.opt.on .dot-r { border-color: var(--brand); } .opt.on .dot-r::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); }
+.check { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--line-strong); flex: none; display: grid; place-items: center; background: var(--surface); color: var(--on-brand); }
+.check.on { background: var(--brand); border-color: var(--brand); }
+.drop { border: 2px dashed var(--line-strong); border-radius: 20px; padding: 32px; text-align: center; background: var(--surface-2); }
+
+/* etapas e linha do tempo */
+.steps { display: flex; flex-direction: column; }
+.step { position: relative; display: flex; gap: 16px; padding-bottom: 22px; }
+.step:last-child { padding-bottom: 0; }
+.step:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 34px; bottom: 4px; width: 2px; background: var(--line); }
+.dot { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 2px solid var(--line-strong); background: var(--surface); color: var(--ink-3); font-weight: 700; font-size: 13px; }
+.dot svg.ic { width: 16px; height: 16px; stroke-width: 2.4; }
+.dot-ok { background: var(--mint); border-color: var(--mint); color: #fff; }
+.sv[data-theme="dark"] .dot-ok { color: #0B2B21; }
+.dot-now { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.dot-bad { background: var(--red); border-color: var(--red); color: #fff; }
+.sv[data-theme="dark"] .dot-bad { color: #2A0E0B; }
+.hstep { display: flex; align-items: center; gap: 10px; }
+
+/* marca d'água e prévias */
+.preview { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+.wm { position: absolute; inset: 0; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120'%3E%3Ctext x='120' y='64' text-anchor='middle' font-family='sans-serif' font-size='17' font-weight='700' letter-spacing='3' fill='%23808080' fill-opacity='.42' transform='rotate(-24 120 60)'%3EPRÉVIA SOLVER%3C/text%3E%3C/svg%3E"); background-size: 240px 120px; }
+.skel { background: var(--line); border-radius: 6px; height: 10px; }
+.skel.redact { background: var(--ink); opacity: .82; }
+
+/* gráfico de barras simples */
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+.bars > div { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+.bars i { display: block; }
+.bars .b-sales { background: var(--brand); border-radius: 3px 3px 0 0; }
+.bars .b-roy { background: var(--mint); }
+
+/* confete decorativo */
+.confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; width: 10px; height: 18px; border-radius: 3px; opacity: .92; transform: rotate(var(--r, 20deg)); }
+.confetti i:nth-child(4n+1) { background: var(--brand); }
+.confetti i:nth-child(4n+2) { background: var(--mint); }
+.confetti i:nth-child(4n+3) { background: var(--star); }
+.confetti i:nth-child(4n) { background: var(--red); opacity: .7; width: 8px; height: 8px; border-radius: 50%; }
+@keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.pop { animation: pop .6s cubic-bezier(.2, .8, .3, 1) both; }
+
+/* ilustração de instalação */
+.ill { border: 1px solid var(--line); border-radius: 18px; background: var(--surface-2); padding: 18px; }
+.ill-win { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+.ill-bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.ill-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.ill-hi { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 10px; background: var(--brand-soft); }
+
+@media print { .sv { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* celular */
+.lib-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .8fr) auto; gap: 24px; align-items: center; }
+.resale-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .9fr) minmax(0, .8fr) minmax(0, .8fr) 120px; gap: 20px; align-items: center; padding: 20px 24px; }
+.cr-table { display: grid; grid-template-columns: minmax(0, 2.2fr) repeat(5, minmax(0, 1fr)); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+.cr-head { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); border-top: 0; padding-bottom: 8px; }
+.gsp { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); } .gcol { border-left: 1px solid var(--line); }
+.seg { max-width: 100%; overflow-x: auto; }
+@container sv (max-width: 700px) {
+  .sv { font-size: 15px; }
+  .lib-row, .resale-row { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .cr-table { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; } .cr-table > :first-child { grid-column: 1 / -1; }
+  .resale-row { padding: 20px; }
+  .g2.cr-table { display: grid; grid-template-columns: minmax(0, 2.2fr) repeat(5, minmax(0, 1fr)); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+.cr-head { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); border-top: 0; padding-bottom: 8px; }
+.gsp { grid-template-columns: minmax(0, 1fr); } .gcol { border-left: 0; border-top: 1px solid var(--line); }
+  .seg button, .seg a { padding: 0 14px; }
+  .h1 { font-size: 46px; } .h1s { font-size: 38px; } .big { font-size: 56px; } .h2 { font-size: 34px; } .h2s { font-size: 28px; } .lead { font-size: 17px; }
+  .wrap { padding: 0 20px; }
+  .sec { padding-block: 44px; } .sec-s { padding-block: 28px; }
+  .g2, .g3, .g4, .g2.gs1, .g2.gs2, .g2.gs3, .g3.gn { grid-template-columns: minmax(0, 1fr); }
+  .g4.m2, .g3.m2, .g5.m2, .g6.m2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g5, .g6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g2.m1, .g3.m1, .g4.m1, .g5.m1, .g6.m1 { grid-template-columns: minmax(0, 1fr); }
+  .split, .split-l { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .sticky { position: static; }
+  .hide-m { display: none !important; }
+  .only-m { display: revert !important; }
+  .row.m-col { flex-direction: column; align-items: stretch; }
+  .row.m-wrap { flex-wrap: wrap; }
+  .nav { height: 64px; } .nav .wrap { gap: 12px; }
+  .nav-links { display: none; }
+  .nav .logo { flex: 1; }
+  .me-pill .me-name { display: none; } .me-pill { padding: 4px; }
+  .pad { padding: 22px; } .pad-l { padding: 24px; }
+  .card, .card-flat, .score-card { border-radius: 20px; }
+  .rail { display: flex !important; overflow-x: auto; gap: 14px; margin: 0 -20px; padding: 4px 20px 16px; scroll-snap-type: x mandatory; }
+  .rail > * { flex: 0 0 82%; scroll-snap-align: start; }
+  .rail.slim > * { flex-basis: 64%; }
+  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: sticky; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line); padding: 4px 4px 8px; flex: none; box-shadow: 0 -6px 20px -12px rgba(0,0,0,.25); }
+  .foot { padding: 32px 0 28px; margin-top: 16px; }
+  .btn-lg { min-height: 52px; }
+  .m-col-x { flex-direction: column; align-items: flex-start; }
+  .stack-m { flex-direction: column; align-items: stretch; }
+  .full-m { width: 100%; }
+}
+
+/* barra de busca e cartões de categoria */
+.searchbar { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 22px; border-radius: 28px; background: var(--surface); border: 1.5px solid var(--line-strong); box-shadow: var(--shadow-lg); }
+.searchbar .input { border: 0; min-height: 52px; font-size: 18px; padding: 0 6px; background: transparent; box-shadow: none; }
+.searchbar .input:focus { outline: none; }
+.searchbar:focus-within { border-color: var(--brand); }
+.cat { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-align: left; width: 100%; min-height: 72px; transition: border-color .15s, background .15s; }
+.cat:hover { border-color: var(--line-strong); }
+.cat.on { border-color: var(--brand); background: var(--brand-soft); }
+.rank { font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; line-height: 1; width: 44px; color: var(--ink-3); flex: none; text-align: center; }
+.ticket { position: relative; border-radius: 26px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-lg); overflow: hidden; }
+.ticket .cut { border-top: 2px dashed var(--line-strong); position: relative; }
+.spark { color: var(--mint); flex: none; } .spark.down { color: var(--red); } .spark.flat { color: var(--ink-3); }
+@container sv (max-width: 700px) {
+  .searchbar { flex-direction: column; align-items: stretch; padding: 14px; gap: 10px; border-radius: 24px; }
+  .searchbar .input { min-height: 48px; padding: 0 6px; font-size: 17px; }
+  .searchbar > .faint { display: none; }
+  .searchbar .btn { width: 100%; }
+  .rank { font-size: 34px; width: 30px; }
+}
+
+.crumbs { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-3); flex-wrap: wrap; }
+.phone { width: 100%; max-width: 210px; margin: 0 auto; border-radius: 26px; border: 6px solid var(--ink); background: var(--surface); padding: 14px 12px; display: flex; flex-direction: column; gap: 9px; min-height: 340px; }
+.phone .ln { height: 9px; border-radius: 5px; background: var(--line-strong); } .phone .blk { border-radius: 10px; background: var(--surface-2); }
+.bubble { border-radius: 18px; padding: 14px 16px; background: var(--surface-2); }
+.bubble.me { background: var(--brand-soft); color: var(--brand-ink); border-bottom-right-radius: 6px; }
+.tech { border: 1px dashed var(--line-strong); border-radius: 16px; padding: 18px 20px; background: var(--surface-2); }
+.tech dt { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.tech dd { margin: 2px 0 12px; word-break: break-all; }
+.tech dd:last-child { margin-bottom: 0; }
+
+@container sv (max-width: 700px) {
+  .price-big { font-size: 44px !important; }
+  .price-row { flex-wrap: wrap; row-gap: 2px; }
+  .countdown-box { flex-wrap: wrap; }
+  .countdown-box .cd-note { max-width: none !important; flex-basis: 100%; }
+  .act-row .btn { white-space: normal; flex: 1 1 100%; justify-content: center; }
+  .kpi-n { font-size: 32px !important; }
+}
+</style>
+<script src="7211bb28-046d-4c39-aef5-a0e785ebaf22"></script>
+<script src="c0e8c2b8-057d-4531-a2ca-e5e9fc9487c0"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* latin-ext */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("ae352a44-5ba5-4b6d-b2a2-1f0289111ff8") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("1c78f7b5-c001-401c-b9e8-cb7d101141c0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("ae352a44-5ba5-4b6d-b2a2-1f0289111ff8") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("1c78f7b5-c001-401c-b9e8-cb7d101141c0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("ae352a44-5ba5-4b6d-b2a2-1f0289111ff8") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("1c78f7b5-c001-401c-b9e8-cb7d101141c0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("ae352a44-5ba5-4b6d-b2a2-1f0289111ff8") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("1c78f7b5-c001-401c-b9e8-cb7d101141c0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("ae352a44-5ba5-4b6d-b2a2-1f0289111ff8") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("1c78f7b5-c001-401c-b9e8-cb7d101141c0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("48217c1e-4532-46e0-b359-2ec1671cb3b3") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("e8df1bf9-bca3-4109-91cb-d7cacf8bbdab") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("04f0f966-c427-4840-8594-d7370282015d") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("83000976-196a-4804-92f9-eb499dd9f8a6") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>body{margin:0;background:#F7F5F0}</style>
+</helmet>
+<div class="sv" data-theme="{{theme}}" style="width:390px;height:3201px">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="i-search" sc-camel-view-box="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></symbol><symbol id="i-star" sc-camel-view-box="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z" fill="currentColor"></path></symbol><symbol id="i-shield-check" sc-camel-view-box="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.6-7 9.5-4.1-1.9-7-5.2-7-9.5V6z"></path><path d="m8.8 12l2.2 2.2 4.2-4.4"></path></symbol><symbol id="i-shield" sc-camel-view-box="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.6-7 9.5-4.1-1.9-7-5.2-7-9.5V6z"></path></symbol><symbol id="i-check" sc-camel-view-box="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></symbol><symbol id="i-check-circle" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.3 2.8 2.8L16 9.6"></path></symbol><symbol id="i-arrow-right" sc-camel-view-box="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></symbol><symbol id="i-arrow-left" sc-camel-view-box="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></symbol><symbol id="i-arrow-up-right" sc-camel-view-box="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"></path></symbol><symbol id="i-copy" sc-camel-view-box="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"></path></symbol><symbol id="i-lock" sc-camel-view-box="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"></rect><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"></path></symbol><symbol id="i-clock" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></symbol><symbol id="i-bag" sc-camel-view-box="0 0 24 24"><path d="M5 8h14l-1 12H6z"></path><path d="M9 8V6.5a3 3 0 0 1 6 0V8"></path></symbol><symbol id="i-users" sc-camel-view-box="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"></circle><path d="M3.5 19c.6-3 2.8-4.7 5.5-4.7s4.9 1.7 5.5 4.7"></path><path d="M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.6c1.8.5 3 2 3.5 4.4"></path></symbol><symbol id="i-wallet" sc-camel-view-box="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"></path><rect x="4" y="8" width="16" height="11" rx="2.5"></rect><circle cx="16" cy="13.5" r="1.1" fill="currentColor"></circle></symbol><symbol id="i-spark" sc-camel-view-box="0 0 24 24"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"></path></symbol><symbol id="i-diamond" sc-camel-view-box="0 0 24 24"><path d="M12 4l8 8-8 8-8-8z"></path></symbol><symbol id="i-layers" sc-camel-view-box="0 0 24 24"><path d="M12 3 3.5 7.5 12 12l8.5-4.5z"></path><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"></path></symbol><symbol id="i-book" sc-camel-view-box="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5c-.8 0-1.5-.7-1.5-1.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5-.7 1.5-1.5z"></path></symbol><symbol id="i-wrench" sc-camel-view-box="0 0 24 24"><path d="M14.5 6.2a4 4 0 0 0 5 5L10 20.700a2 2 0 0 1-3-3L16.500 8.200"></path><path d="M14.500 6.200 17 8.700"></path></symbol><symbol id="i-file" sc-camel-view-box="0 0 24 24"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M14 3v5h5M9 13h6M9 16.5h6"></path></symbol><symbol id="i-refresh" sc-camel-view-box="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 9M4 4v5h5M4 13a8 8 0 0 0 14 4.5L20 15M20 20v-5h-5"></path></symbol><symbol id="i-message" sc-camel-view-box="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"></path></symbol><symbol id="i-plug" sc-camel-view-box="0 0 24 24"><path d="M9 3v5M15 3v5M6.5 8h11v3.500a5.500 5.500 0 0 1-11 0zM12 17v4"></path></symbol><symbol id="i-monitor" sc-camel-view-box="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.500"></rect><path d="M8 20h8M12 16v4"></path></symbol><symbol id="i-card" sc-camel-view-box="0 0 24 24"><rect x="3" y="5.500" width="18" height="13" rx="2.500"></rect><path d="M3 10h18M7 15h4"></path></symbol><symbol id="i-trend-up" sc-camel-view-box="0 0 24 24"><path d="m4 16 5-5 4 4 7-8"></path><path d="M15 7h5v5"></path></symbol><symbol id="i-trend-down" sc-camel-view-box="0 0 24 24"><path d="m4 8 5 5 4-4 7 8"></path><path d="M15 17h5v-5"></path></symbol><symbol id="i-minus" sc-camel-view-box="0 0 24 24"><path d="M5 12h14"></path></symbol><symbol id="i-sun" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600 7 7M17 17l1.400 1.400M5.600 18.400 7 17M17 7l1.400-1.400"></path></symbol><symbol id="i-moon" sc-camel-view-box="0 0 24 24"><path d="M20 14.500A8 8 0 0 1 9.500 4a8 8 0 1 0 10.500 10.500z"></path></symbol><symbol id="i-home" sc-camel-view-box="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"></path></symbol><symbol id="i-library" sc-camel-view-box="0 0 24 24"><rect x="4" y="4" width="4.500" height="16" rx="1"></rect><rect x="10" y="4" width="4.500" height="16" rx="1"></rect><path d="m16.500 7 3-.8 2.500 12-3 .8z"></path></symbol><symbol id="i-tag" sc-camel-view-box="0 0 24 24"><path d="M3.500 12.500v-8a1 1 0 0 1 1-1h8l8 8-9 9z"></path><circle cx="8.500" cy="8.500" r="1.300"></circle></symbol><symbol id="i-user" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="3.600"></circle><path d="M4.500 20c.8-4 3.800-6 7.500-6s6.700 2 7.500 6"></path></symbol><symbol id="i-menu" sc-camel-view-box="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></symbol><symbol id="i-chevron-down" sc-camel-view-box="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol><symbol id="i-chevron-right" sc-camel-view-box="0 0 24 24"><path d="m9 6 6 6-6 6"></path></symbol><symbol id="i-x" sc-camel-view-box="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></symbol><symbol id="i-upload" sc-camel-view-box="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path></symbol><symbol id="i-download" sc-camel-view-box="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"></path></symbol><symbol id="i-eye" sc-camel-view-box="0 0 24 24"><path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12z"></path><circle cx="12" cy="12" r="2.800"></circle></symbol><symbol id="i-trash" sc-camel-view-box="0 0 24 24"><path d="M4.500 7h15M9.500 7V4.500h5V7M6.500 7l.8 12.500h9.400L17.500 7M10 11v5M14 11v5"></path></symbol><symbol id="i-warning" sc-camel-view-box="0 0 24 24"><path d="M12 4 2.500 20h19z"></path><path d="M12 10v4.500M12 17.300v.1"></path></symbol><symbol id="i-info" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5.500M12 7.700v.1"></path></symbol><symbol id="i-bolt" sc-camel-view-box="0 0 24 24"><path d="M13 3 5 13.500h6L10 21l8-10.500h-6z"></path></symbol><symbol id="i-external" sc-camel-view-box="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.500a1.500 1.500 0 0 1-1.500 1.500h-11A1.500 1.500 0 0 1 4 18.500v-11A1.500 1.500 0 0 1 5.500 6H10"></path></symbol><symbol id="i-code" sc-camel-view-box="0 0 24 24"><path d="m8.500 8-4 4 4 4M15.500 8l4 4-4 4M13.500 5.500l-3 13"></path></symbol><symbol id="i-pen" sc-camel-view-box="0 0 24 24"><path d="M4 20l1-4.500L16.500 4a2.100 2.100 0 0 1 3 3L8 18.500z"></path><path d="m14.500 6 3.500 3.500"></path></symbol><symbol id="i-server" sc-camel-view-box="0 0 24 24"><rect x="4" y="4" width="16" height="6.500" rx="2"></rect><rect x="4" y="13.500" width="16" height="6.500" rx="2"></rect><path d="M8 7.300v.1M8 16.800v.1"></path></symbol><symbol id="i-scale" sc-camel-view-box="0 0 24 24"><path d="M12 4v16M7 20h10M5 7h14M5 7l-2.500 6a3 3 0 0 0 5 0zM19 7l-2.500 6a3 3 0 0 0 5 0z"></path></symbol><symbol id="i-plane" sc-camel-view-box="0 0 24 24"><path d="M10.500 13.500 3.500 11.500 5 10l6.500.4 4-5.200a1.800 1.800 0 0 1 3 1.800L15 12.500l.6 6.500-1.500 1.500-2.500-7z"></path></symbol><symbol id="i-list-check" sc-camel-view-box="0 0 24 24"><path d="m4 7 1.800 1.800L9 5.500M4 15l1.800 1.800L9 13.500M12.500 7H20M12.500 15H20"></path></symbol><symbol id="i-coin" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M14.800 9.200C14.200 8.300 13.200 7.800 12 7.800c-1.600 0-2.700.8-2.700 2 0 3 5.700 1.400 5.700 4.300 0 1.200-1.200 2.100-2.900 2.100-1.300 0-2.400-.5-3-1.500M12 6v1.800M12 16.200V18"></path></symbol><symbol id="i-mail" sc-camel-view-box="0 0 24 24"><rect x="3" y="5.500" width="18" height="13" rx="2.500"></rect><path d="m4 8 8 5.500L20 8"></path></symbol><symbol id="i-briefcase" sc-camel-view-box="0 0 24 24"><rect x="3" y="7.500" width="18" height="12" rx="2.500"></rect><path d="M9 7.500V6a1.500 1.500 0 0 1 1.500-1.500h3A1.500 1.500 0 0 1 15 6v1.500M3 13h18"></path></symbol><symbol id="i-grad" sc-camel-view-box="0 0 24 24"><path d="m2.500 9.500 9.500-5 9.500 5-9.500 5z"></path><path d="M6.500 12v4.500c1.500 1.500 3.300 2 5.500 2s4-.5 5.500-2V12"></path></symbol><symbol id="i-chart" sc-camel-view-box="0 0 24 24"><path d="M4 4v16h16"></path><rect x="7.500" y="12" width="3" height="5" rx=".7"></rect><rect x="12.500" y="8" width="3" height="9" rx=".7"></rect><rect x="17" y="10.500" width="2.500" height="6.500" rx=".7"></rect></symbol><symbol id="i-database" sc-camel-view-box="0 0 24 24"><ellipse cx="12" cy="6" rx="7.500" ry="3"></ellipse><path d="M4.500 6v12c0 1.700 3.400 3 7.500 3s7.500-1.300 7.500-3V6M4.500 12c0 1.700 3.400 3 7.500 3s7.500-1.300 7.500-3"></path></symbol><symbol id="i-play" sc-camel-view-box="0 0 24 24"><path d="m8 5 11 7-11 7z"></path></symbol><symbol id="i-flag" sc-camel-view-box="0 0 24 24"><path d="M5 21V4M5 5h11l-1.500 3.500L16 12H5"></path></symbol><symbol id="i-repeat" sc-camel-view-box="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"></path></symbol><symbol id="i-plus" sc-camel-view-box="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol><symbol id="i-help" sc-camel-view-box="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 17v.1"></path></symbol><symbol id="i-key" sc-camel-view-box="0 0 24 24"><circle cx="8" cy="15" r="4"></circle><path d="m11 12 8-8M16 7l2.500 2.500"></path></symbol><symbol id="i-link" sc-camel-view-box="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"></path></symbol><symbol id="i-sliders" sc-camel-view-box="0 0 24 24"><path d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></symbol><symbol id="i-gift" sc-camel-view-box="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"></rect><path d="M12 9v11M3 9h18M12 9c-3 0-4.500-1-4.500-2.500S9 4 10.500 5 12 9 12 9zm0 0c3 0 4.500-1 4.500-2.500S15 4 13.500 5 12 9 12 9z"></path></symbol><symbol id="i-history" sc-camel-view-box="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.400-5.700L4 8.500M4 4v4.500h4.500M12 8v4l3 1.500"></path></symbol><symbol id="i-sparkles" sc-camel-view-box="0 0 24 24"><path d="M10 4c.5 3.800 2 5.300 5.800 5.800C12 10.300 10.500 11.800 10 15.600 9.500 11.800 8 10.300 4.200 9.800 8 9.300 9.500 7.800 10 4zM18 14.500c.3 2 1 2.700 3 3-2 .3-2.700 1-3 3-.3-2-1-2.700-3-3 2-.3 2.700-1 3-3z"></path></symbol></defs></svg>
+<header class="nav"><div class="wrap">
+  <a class="logo" href="Home-Mobile.dc.html" aria-label="Solver, página inicial"><span class="logo-mark"><svg class="ic ic-s" aria-hidden="true"><use href="#i-diamond"></use></svg></span><span>Solver</span></a>
+  <nav class="nav-links" aria-label="Principal"><a href="Home-Mobile.dc.html">Explorar</a><a href="Revenda-Mobile.dc.html">Revenda</a><a href="Biblioteca-Mobile.dc.html">Minha biblioteca</a><a href="Garantias-Mobile.dc.html">Garantias</a><a href="Criador-Mobile.dc.html" class="on" aria-current="page">Para criadores</a></nav>
+  <button class="icon-btn" sc-camel-on-click="{{toggleTheme}}" aria-label="Alternar entre tema claro e escuro">
+    <sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg class="ic" aria-hidden="true"><use href="#i-sun"></use></svg></sc-if>
+    <sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg class="ic" aria-hidden="true"><use href="#i-moon"></use></svg></sc-if>
+  </button>
+  <a class="me-pill" href="Perfil-Criador-Mobile.dc.html" aria-label="Meu perfil"><span class="av av-s">{{meInitials}}</span><span class="me-name">{{meFirst}}</span></a>
+</div></header>
+<main class="main">
+
+<section class="wrap" style="padding-top:44px;padding-bottom:56px">
+  <div class="row between end wrapx" style="--gap:24px;margin-bottom:28px">
+    <div class="col" style="--gap:12px"><div class="row wrapx" style="--gap:10px"><span class="eyebrow">Painel do criador</span><span class="rep"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield-check"></use></svg><span>{{rep.level}} · {{rep.score}}/100</span></span></div>
+      <h1 class="display h1s">Olá, {{meFirst}}</h1></div>
+    <div class="seg"><button class="{{tabs.overview}}" sc-camel-on-click="{{pickOverview}}">Visão geral</button><button class="{{tabs.publish}}" sc-camel-on-click="{{pickPublish}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg>Publicar especialista</button></div>
+  </div>
+
+  <sc-if value="{{isOverview}}" hint-placeholder-val="{{ true }}">
+  <div class="g5" style="--gap:16px;margin-bottom:24px">
+    <div class="card pad-s col" style="--gap:6px"><span class="small muted">Vendas em 30 dias</span><span class="display num" style="font-size:44px;line-height:1">{{kpi.sales}}</span><span class="tiny ok">licenças novas</span></div>
+    <div class="card pad-s col" style="--gap:6px"><span class="small muted">Usos verificados</span><span class="display num" style="font-size:44px;line-height:1">{{kpi.uses}}</span><span class="tiny faint">nos últimos 30 dias</span></div>
+    <div class="card pad-s col" style="--gap:6px"><span class="small muted">Receita de vendas</span><span class="display num kpi-n" style="font-size:40px;line-height:1;white-space:nowrap">{{kpi.revenue}}</span><span class="tiny faint">{{kpi.revenueUsdc}}</span></div>
+    <div class="card pad-s col" style="--gap:6px"><span class="small muted">Royalties de revenda</span><span class="display num kpi-n" style="font-size:40px;line-height:1;white-space:nowrap">{{kpi.royalties}}</span><span class="tiny faint">{{kpi.royaltiesUsdc}}</span></div>
+    <div class="card pad-s col" style="--gap:6px"><span class="small muted">Contestações</span><span class="display num" style="font-size:44px;line-height:1">{{kpi.disputes}}</span><span class="tiny warn">{{kpi.disputesNote}}</span></div>
+  </div>
+
+  <div class="g2 gs2" style="--gap:24px;margin-bottom:24px">
+    <div class="card pad col" style="--gap:16px">
+      <div class="row between wrapx"><h2 class="h3">Receita por dia</h2>
+        <div class="row" style="--gap:16px"><span class="row small muted" style="--gap:6px"><i style="width:12px;height:12px;border-radius:3px;background:var(--brand)"></i>Vendas</span><span class="row small muted" style="--gap:6px"><i style="width:12px;height:12px;border-radius:3px;background:var(--mint)"></i>Royalties de revenda</span></div></div>
+      <div class="bars" role="img" aria-label="Receita por dia nos últimos 30 dias, em vendas e royalties">
+        <sc-for list="{{bars}}" as="b" hint-placeholder-count="30"><div title="{{b.tip}}"><i class="b-roy" style="height:{{b.hr}}px"></i><i class="b-sales" style="height:{{b.hs}}px"></i></div></sc-for>
+      </div>
+      <div class="row between tiny faint"><span>{{axis.start}}</span><span>Máximo em um dia: {{axis.max}}</span><span>Hoje</span></div>
+    </div>
+    <div class="card pad col" style="--gap:16px;align-items:flex-start">
+      <h2 class="h3">Seu selo de reputação</h2>
+      <div class="row" style="--gap:20px"><div class="ring" style="--p:{{rep.score}}"><div><span class="display num" style="font-size:36px">{{rep.score}}</span></div></div>
+        <div class="col" style="--gap:4px"><span class="rep" style="align-self:flex-start"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield-check"></use></svg><span>{{rep.level}}</span></span><span class="small muted">{{rep.disputes}}</span></div></div>
+      <p class="small muted">A reputação sobe com boas notas, testes aprovados e contestações resolvidas a favor do comprador. Contestações perdidas descontam pontos e reduzem a visibilidade.</p>
+      <a class="link small" href="Perfil-Criador-Mobile.dc.html">Ver meu perfil público</a>
+    </div>
+  </div>
+
+  <div class="card pad-s" style="padding:8px 24px;margin-bottom:24px">
+    <div class="row between wrapx" style="padding:14px 0"><h2 class="h3">Seus especialistas</h2><button class="btn btn-secondary" sc-camel-on-click="{{pickPublish}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg>Publicar novo</button></div>
+    <div class="cr-table cr-head hide-m"><span>Especialista</span><span>Vendas</span><span>Usos</span><span>Nota</span><span>Desempenho</span><span>Receita</span></div>
+    <sc-for list="{{agents}}" as="a" hint-placeholder-count="4">
+      <div class="cr-table">
+        <span class="row" style="--gap:12px;min-width:0"><span class="tile tile-s" style="--h:{{a.hue}}"><svg class="ic" aria-hidden="true"><use href="#i-{{a.icon}}"></use></svg></span><span class="col" style="--gap:0;min-width:0"><b class="trunc">{{a.name}}</b><span class="tiny faint">v{{a.version}} · {{a.status}}</span></span></span>
+        <span class="num"><span class="only-m tiny faint">Vendas </span>{{a.sales}}</span><span class="num"><span class="only-m tiny faint">Usos </span>{{a.uses}}</span><span class="num"><span class="only-m tiny faint">Nota </span>{{a.rating}}</span><span class="num ok"><span class="only-m tiny faint">Desempenho </span>{{a.eval}}%</span><b class="num">{{a.revenue}}</b>
+      </div>
+    </sc-for>
+  </div>
+
+  <div class="card pad-s" style="padding:8px 24px">
+    <div class="row between wrapx" style="padding:14px 0"><h2 class="h3">Contestações recentes</h2><span class="small muted">{{rep.disputes}}</span></div>
+    <sc-for list="{{disputes}}" as="d" hint-placeholder-count="3">
+      <div class="rowline start"><span class="{{d.tone}}" style="margin-top:2px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flag"></use></svg></span><div class="grow"><b>{{d.task}}</b><div class="small muted">Critério apontado: {{d.criterion}}</div><div class="tiny faint">{{d.when}} · {{d.amount}}</div></div><span class="chip {{d.cls}}">{{d.result}}</span></div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{isPublish}}" hint-placeholder-val="{{ false }}">
+  <div class="row wrapx" style="--gap:10px;margin-bottom:28px">
+      <sc-for list="{{wsteps}}" as="s" hint-placeholder-count="5"><button class="chip {{s.cls}}" sc-camel-on-click="{{s.go}}" style="min-height:44px"><span class="dot {{s.dot}}" style="width:24px;height:24px;font-size:12px;border-width:1.5px">{{s.mark}}</span>{{s.name}}</button></sc-for></div>
+  <div class="split">
+    <div class="card pad-l col" style="--gap:22px">
+      <div class="col" style="--gap:4px"><span class="eyebrow">Etapa {{step}} de 5</span><h2 class="display h2s">{{stepInfo.title}}</h2><p class="muted">{{stepInfo.text}}</p></div>
+
+      <sc-if value="{{is1}}" hint-placeholder-val="{{ false }}"><div class="col" style="--gap:18px">
+        <div class="field"><label class="label" for="f-nome">Nome do especialista</label><input id="f-nome" class="input" value="{{form.name}}" sc-camel-on-change="{{f.name}}"></div>
+        <div class="field"><label class="label" for="f-slogan">Frase curta</label><input id="f-slogan" class="input" value="{{form.tagline}}" sc-camel-on-change="{{f.tagline}}"><span class="hint">Aparece no cartão. Diga o resultado, não a tecnologia.</span></div>
+        <div class="field"><label class="label" for="f-desc">Descrição</label><textarea id="f-desc" class="textarea" value="{{form.description}}" sc-camel-on-change="{{f.description}}"></textarea></div>
+        <div class="g2" style="--gap:16px"><div class="field"><label class="label" for="f-p1">Preço da licença permanente (USDC)</label><input id="f-p1" class="input" value="{{form.price}}" sc-camel-on-change="{{f.price}}" inputmode="decimal"><span class="hint">Equivale a {{form.priceBrl}}</span></div>
+          <div class="field"><label class="label" for="f-p2">Preço por uso (USDC)</label><input id="f-p2" class="input" value="{{form.perUse}}" sc-camel-on-change="{{f.perUse}}" inputmode="decimal"><span class="hint">Equivale a {{form.perUseBrl}}</span></div></div>
+      </div></sc-if>
+
+      <sc-if value="{{is2}}" hint-placeholder-val="{{ false }}"><div class="col" style="--gap:22px">
+        <div class="col" style="--gap:10px"><span class="label">IAs compatíveis</span><div class="row wrapx" style="--gap:10px">
+          <sc-for list="{{reqClients}}" as="k" hint-placeholder-count="2"><button class="opt {{k.cls}}" sc-camel-on-click="{{k.toggle}}" style="width:auto;padding:12px 18px;align-items:center"><span class="check {{k.cls}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg></span><b>{{k.name}}</b></button></sc-for></div></div>
+        <div class="col" style="--gap:10px"><span class="label">Conectores necessários</span><div class="row wrapx" style="--gap:10px">
+          <sc-for list="{{reqConns}}" as="k" hint-placeholder-count="4"><button class="chip {{k.cls}}" sc-camel-on-click="{{k.toggle}}" aria-pressed="{{k.on}}">{{k.name}}</button></sc-for></div>
+          <span class="hint">Escolha só o que o especialista realmente usa. Cada conector pede autorização do comprador.</span></div>
+        <div class="col" style="--gap:10px"><span class="label">Plano recomendado</span>
+          <sc-for list="{{reqPlans}}" as="k" hint-placeholder-count="3"><button class="opt {{k.cls}}" sc-camel-on-click="{{k.pick}}" style="align-items:center"><span class="dot-r"></span><b>{{k.name}}</b></button></sc-for></div>
+      </div></sc-if>
+
+      <sc-if value="{{is3}}" hint-placeholder-val="{{ false }}"><div class="col" style="--gap:18px">
+        <div class="drop col" style="--gap:10px;align-items:center"><span class="brand"><svg class="ic ic-xl" aria-hidden="true"><use href="#i-upload"></use></svg></span><b>Arraste os arquivos aqui</b><span class="small muted">Conhecimento (PDF, Markdown), modelos prontos e o servidor de ferramentas.</span><button class="btn btn-secondary" sc-camel-on-click="{{addFile}}">Escolher arquivos</button></div>
+        <div class="col" style="--gap:0"><sc-for list="{{files}}" as="f" hint-placeholder-count="3"><div class="rowline"><span class="tile tile-s" style="--h:{{f.hue}}"><svg class="ic" aria-hidden="true"><use href="#i-{{f.icon}}"></use></svg></span><div class="grow"><b class="mono" style="font-size:14px">{{f.name}}</b><div class="tiny faint">{{f.kind}} · {{f.size}}</div></div><span class="chip chip-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Enviado</span></div></sc-for></div>
+      </div></sc-if>
+
+      <sc-if value="{{is4}}" hint-placeholder-val="{{ false }}"><div class="col" style="--gap:18px">
+        <div class="card-flat pad-s row start" style="--gap:12px"><svg class="ic" aria-hidden="true"><use href="#i-info"></use></svg><span class="small">São necessários pelo menos 30 casos de teste, cada um com o que a resposta precisa conter. A nota que aparece para os compradores é a porcentagem de casos resolvidos.</span></div>
+        <div class="card pad-s" style="padding:4px 20px"><sc-for list="{{cases}}" as="t" hint-placeholder-count="5"><div class="rowline start"><span class="mono tiny faint" style="width:30px;margin-top:3px">{{t.n}}</span><div class="grow"><b class="small">{{t.title}}</b><div class="tiny muted">Precisa: {{t.expect}}</div></div><span class="chip {{t.cls}}">{{t.res}}</span></div></sc-for></div>
+        <div class="row wrapx" style="--gap:14px"><button class="btn btn-primary btn-lg" sc-camel-on-click="{{runTests}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>{{runLabel}}</button><span class="small muted">{{runNote}}</span></div>
+        <sc-if value="{{tested}}" hint-placeholder-val="{{ false }}"><div class="row card pad-s" style="--gap:16px;border-color:var(--mint)"><div class="ring" style="--p:{{score}};width:76px;height:76px"><div style="width:58px;height:58px"><b class="num">{{score}}%</b></div></div><div><b>{{score}}% dos casos resolvidos</b><div class="small muted">{{passed}} de {{total}} casos. Acima do mínimo de 80% para publicar.</div></div></div></sc-if>
+      </div></sc-if>
+
+      <sc-if value="{{is5}}" hint-placeholder-val="{{ false }}"><div class="col" style="--gap:18px">
+        <div class="card-flat pad-s row start" style="--gap:12px"><svg class="ic" aria-hidden="true"><use href="#i-shield-check"></use></svg><span class="small">O depósito de garantia cobre contestações procedentes. Se um comprador vencer uma contestação, o valor devolvido sai daqui. O que não for usado volta para você se você despublicar.</span></div>
+        <div class="field"><label class="label" for="f-dep">Valor do depósito (USDC)</label><input id="f-dep" class="input" value="{{deposit}}" sc-camel-on-change="{{onDeposit}}" inputmode="decimal"><span class="hint">Equivale a {{depositBrl}}. Mínimo recomendado: {{minDeposit}}.</span></div>
+        <div class="card pad-s col" style="--gap:10px"><b>Resumo da publicação</b>
+          <div class="row between small"><span class="muted">Especialista</span><b>{{form.name}}</b></div>
+          <div class="row between small"><span class="muted">Licença permanente</span><b>{{form.priceBrl}}</b></div>
+          <div class="row between small"><span class="muted">Por uso</span><b>{{form.perUseBrl}}</b></div>
+          <div class="row between small"><span class="muted">Nota de desempenho</span><b class="ok">{{score}}%</b></div></div>
+        <sc-if value="{{published}}" hint-placeholder-val="{{ false }}"><div class="row card pad-s" style="--gap:12px;border-color:var(--mint)" role="status"><span class="dot dot-ok"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span><div><b>Enviado para revisão</b><div class="small muted">Você será avisado quando o especialista estiver no ar.</div></div></div></sc-if>
+      </div></sc-if>
+
+      <div class="row between wrapx" style="--gap:12px;padding-top:8px"><button class="btn btn-ghost {{backCls}}" sc-camel-on-click="{{back}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-arrow-left"></use></svg>Voltar</button>
+        <sc-if value="{{notLast}}" hint-placeholder-val="{{ true }}"><button class="btn btn-primary btn-lg" sc-camel-on-click="{{next}}">Continuar <svg class="ic" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button></sc-if>
+        <sc-if value="{{isLast}}" hint-placeholder-val="{{ false }}"><button class="btn btn-primary btn-lg" sc-camel-on-click="{{publish}}">Publicar especialista</button></sc-if></div>
+    </div>
+
+    <aside class="sticky col" style="--gap:16px">
+      <span class="eyebrow">Como os compradores vão ver</span>
+      <div class="card pad-s col" style="--gap:14px">
+        <div class="row start" style="--gap:14px"><span class="tile" style="--h:300"><svg class="ic" aria-hidden="true"><use href="#i-pen"></use></svg></span><div class="grow"><b class="h4">{{form.name}}</b><div class="small muted">por {{meName}}</div></div></div>
+        <p class="small muted">{{form.tagline}}</p>
+        <div class="row between" style="padding-top:12px;border-top:1px solid var(--line)"><div><b class="num" style="font-size:20px">{{form.priceBrl}}</b><div class="tiny faint">ou {{form.perUseBrl}} por uso</div></div><span class="verified"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield-check"></use></svg>{{scoreLabel}}</span></div>
+      </div>
+      <p class="small muted">A nota de desempenho só aparece depois que a bateria de testes é rodada.</p>
+    </aside>
+  </div>
+  </sc-if>
+</section>
+
+</main>
+<footer class="foot"><div class="wrap col" style="--gap:14px"><a class="logo" href="Home-Mobile.dc.html" aria-label="Solver, página inicial"><span class="logo-mark"><svg class="ic ic-s" aria-hidden="true"><use href="#i-diamond"></use></svg></span><span>Solver</span></a><p class="small muted">Especialistas de IA para usar com o Claude e o ChatGPT que você já tem.</p><span class="sol-chip"><i></i>Licenças registradas na rede Solana</span></div></footer>
+<nav class="tabbar" aria-label="Navegação"><a href="Home-Mobile.dc.html"><svg class="ic ic-l" aria-hidden="true"><use href="#i-home"></use></svg><span>Explorar</span></a><a href="Revenda-Mobile.dc.html"><svg class="ic ic-l" aria-hidden="true"><use href="#i-tag"></use></svg><span>Revenda</span></a><a href="Biblioteca-Mobile.dc.html"><svg class="ic ic-l" aria-hidden="true"><use href="#i-library"></use></svg><span>Biblioteca</span></a><a href="Garantias-Mobile.dc.html"><svg class="ic ic-l" aria-hidden="true"><use href="#i-shield-check"></use></svg><span>Garantias</span></a><a href="Criador-Mobile.dc.html" class="on" aria-current="page"><svg class="ic ic-l" aria-hidden="true"><use href="#i-pen"></use></svg><span>Criador</span></a></nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;theme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;section&quot;: &quot;Aparência&quot;}, &quot;$preview&quot;: {&quot;width&quot;: 390, &quot;height&quot;: 3201}}">
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = Object.assign({ dark: null }, { tab: 'overview', step: 1, published: false, tested: false, deposit: '60', clients: ['Claude', 'ChatGPT'], conns: ['Figma'], plan: 'Claude Pro ou ChatGPT Plus', form: { name: 'Sistemas de Design', tagline: 'Do rascunho a uma biblioteca de componentes pronta para o time.', description: 'Ajuda a criar e documentar um sistema de design: cores, tipografia, espaçamento e componentes, com regras de uso claras.', price: '32', perUse: '0.6' }, files: [['guia-de-sistemas-de-design.pdf', 'Conhecimento', '2,4 MB'], ['componentes-base.json', 'Modelos', '84 KB'], ['servidor-figma.js', 'Ferramentas', '38 KB']] });
+  }
+
+  renderVals() {
+    const L = window.SolverLib, D = window.SOLVER, c = this, st = this.state;
+    const ch = L.chrome(this, 'creator');
+    
+    const cr = L.creator(D.session.creator.creatorId), lv = L.repLevel(cr.reputationScore), S = D.aux.creatorStats[cr.id];
+    const ch2 = L.chrome(this, 'creator');
+    const days = S.daily, maxDay = Math.max.apply(null, days.map(d => d.sales + d.royalties));
+    const H = 160;
+    const bars = days.map(d => ({ hs: Math.max(3, Math.round(H * d.sales / maxDay)), hr: Math.round(H * d.royalties / maxDay), tip: 'Dia ' + d.day + ': vendas ' + L.brl(d.sales) + ', royalties ' + L.brl(d.royalties) }));
+    const agentsRows = S.agents.map(x => { const a = x.agentId === 'ag_design' ? L.agent('ag_design') : null;
+      return { name: a ? a.name : x.name, version: a ? a.version : x.version, hue: a ? L.hue(a.category) : 300, icon: a ? L.icon(a.category) : 'pen', status: x.status, sales: x.sales, uses: L.int(x.uses),
+        rating: L.dec1(a ? a.userRating : x.userRating), eval: a ? a.evalScore : x.evalScore, revenue: L.brl0(x.revenueUsdc) }; });
+    const form = st.form, pr = (v) => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; };
+    const STEPS = [
+      { title: 'Descrição', text: 'Conte o que o especialista faz e quanto ele custa.' },
+      { title: 'Requisitos', text: 'O que o comprador precisa ter para usar.' },
+      { title: 'Arquivos', text: 'O conhecimento, os modelos e as ferramentas do pacote.' },
+      { title: 'Bateria de testes', text: 'Os casos que provam que o especialista funciona.' },
+      { title: 'Depósito de garantia', text: 'O valor que protege os compradores.' } ];
+    const step = st.step;
+    const setF = (k) => (e) => c.setState({ form: Object.assign({}, st.form, { [k]: e.target.value }) });
+    const clientsAll = ['Claude', 'ChatGPT'], connAll = ['Figma', 'GitHub', 'Google Drive', 'Google Agenda', 'Google Planilhas'], plansAll = ['Gratuito ou pago', 'Claude Pro ou ChatGPT Plus', 'Plano pago com execução de código'];
+    const tog = (arr, v) => arr.indexOf(v) >= 0 ? arr.filter(x => x !== v) : arr.concat([v]);
+    const CASES = [
+      ['Criar tela de cadastro para celular', 'campos, estados de erro e contraste mínimo de 4,5:1'],
+      ['Organizar um arquivo desorganizado no Figma', 'componentes nomeados e estilos criados'],
+      ['Revisar uma tela e apontar problemas', 'pelo menos 3 problemas reais, com correção'],
+      ['Criar um sistema de cores com modo escuro', 'tokens de cor com nomes e pares de contraste'],
+      ['Adaptar uma tela de desktop para celular', 'áreas de toque de 44 px ou mais'] ];
+    const tested = st.tested;
+    const files = st.files.map(n => ({ name: n[0], kind: n[1], size: n[2], hue: n[1] === 'Conhecimento' ? 250 : n[1] === 'Ferramentas' ? 300 : 60, icon: n[1] === 'Conhecimento' ? 'book' : n[1] === 'Ferramentas' ? 'wrench' : 'file' }));
+    return Object.assign({}, ch2, {
+      rep: { level: lv.label, score: cr.reputationScore, disputes: cr.disputesLost === 0 ? 'Nenhuma contestação perdida' : cr.disputesLost + ' contestação perdida', lost: cr.disputesLost },
+      isOverview: st.tab === 'overview', isPublish: st.tab === 'publish',
+      tabs: { overview: st.tab === 'overview' ? 'on' : '', publish: st.tab === 'publish' ? 'on' : '' },
+      pickOverview: () => c.setState({ tab: 'overview' }), pickPublish: () => c.setState({ tab: 'publish' }),
+      kpi: { sales: S.salesLast30, uses: L.int(S.usesLast30), revenue: L.brl0(S.salesRevenueUsdc), revenueUsdc: L.usdc(S.salesRevenueUsdc), royalties: L.brl0(S.royaltiesUsdc), royaltiesUsdc: L.usdc(S.royaltiesUsdc),
+        disputes: S.disputesTotal, disputesNote: S.disputesOpen + ' em análise' },
+      bars, axis: { start: '30 dias atrás', max: L.brl0(maxDay) }, agents: agentsRows,
+      disputes: S.disputes.map(d => ({ task: d.taskTitle, criterion: d.criterion, when: L.ago(d.openedAt), amount: L.brl(d.amountUsdc), result: d.result,
+        cls: d.result === 'Em análise' ? 'chip-warn' : d.result.indexOf('criador') > 0 ? 'chip-ok' : 'chip-red', tone: d.result === 'Em análise' ? 'warn' : d.result.indexOf('criador') > 0 ? 'ok' : 'bad' })),
+      step, stepInfo: STEPS[step - 1], is1: step === 1, is2: step === 2, is3: step === 3, is4: step === 4, is5: step === 5, isLast: step === 5, notLast: step < 5,
+      wsteps: STEPS.map((s, i) => ({ name: s.title, cls: step === i + 1 ? 'on' : '', dot: step > i + 1 ? 'dot-ok' : 'dot-now', mark: step > i + 1 ? '\u2713' : String(i + 1), go: () => c.setState({ step: i + 1 }) })),
+      back: () => c.setState({ step: Math.max(1, step - 1) }), backCls: step === 1 ? 'off' : '', next: () => c.setState({ step: Math.min(5, step + 1) }),
+      publish: () => c.setState({ published: true }), published: st.published,
+      form: { name: form.name, tagline: form.tagline, description: form.description, price: form.price, perUse: form.perUse, priceBrl: L.brl(pr(form.price)), perUseBrl: L.brl(pr(form.perUse)) },
+      f: { name: setF('name'), tagline: setF('tagline'), description: setF('description'), price: setF('price'), perUse: setF('perUse') },
+      reqClients: clientsAll.map(n => ({ name: n, cls: st.clients.indexOf(n) >= 0 ? 'on' : '', toggle: () => c.setState({ clients: tog(st.clients, n) }) })),
+      reqConns: connAll.map(n => ({ name: n, on: st.conns.indexOf(n) >= 0, cls: st.conns.indexOf(n) >= 0 ? 'on' : '', toggle: () => c.setState({ conns: tog(st.conns, n) }) })),
+      reqPlans: plansAll.map(n => ({ name: n, cls: st.plan === n ? 'on' : '', pick: () => c.setState({ plan: n }) })),
+      files, addFile: () => c.setState({ files: st.files.concat([['modelo-de-tela-' + (st.files.length + 1) + '.json', 'Modelos', '18 KB']]) }),
+      cases: CASES.map((t, i) => ({ n: String(i + 1).padStart(2, '0'), title: t[0], expect: t[1], res: tested ? (i === 3 ? 'Parcial' : 'Resolvido') : 'Não rodado', cls: tested ? (i === 3 ? 'chip-warn' : 'chip-ok') : '' })),
+      tested, runTests: () => c.setState({ tested: true }), runLabel: tested ? 'Rodar de novo' : 'Rodar bateria de testes', runNote: tested ? 'Última execução agora há pouco.' : 'Leva cerca de 3 minutos.',
+      score: 96, passed: 48, total: 50, scoreLabel: tested ? '96% nos testes' : 'Testes pendentes',
+      deposit: st.deposit, onDeposit: (e) => c.setState({ deposit: e.target.value }), depositBrl: L.brl(pr(st.deposit)), minDeposit: L.usdc(Math.max(20, Math.round(pr(form.price) * 1.5)))
+    });
+  }
+}
+</script>
+
+
+</body></html>

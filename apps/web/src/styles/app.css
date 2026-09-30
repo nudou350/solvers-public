@@ -1,0 +1,82 @@
+/* Acréscimos do app ao sistema visual (sv.css). Mesmos tokens; nada aqui muda o design. */
+
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; }
+body.sv { min-height: 100dvh; overflow: visible; overflow-x: clip; color-scheme: light; }
+body.sv[data-theme="dark"] { color-scheme: dark; }
+/* O <body> é o contêiner "sv": as @container sv (max-width: 700px) do design valem para a largura da tela. */
+.app-main { flex: 1 0 auto; display: flex; flex-direction: column; }
+.app-main > * { flex: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 50; background: var(--surface); padding: 10px 16px; border-radius: 12px; box-shadow: var(--shadow); font-weight: 600; }
+.skip-link:focus { top: 12px; }
+
+/* cabeçalho */
+.nav-actions { display: flex; align-items: center; gap: 10px; }
+.me-pill:hover { background: var(--surface-2); }
+.tabbar a { text-decoration: none; }
+.seg { align-self: flex-start; }
+
+/* botão em carregamento */
+.btn { position: relative; }
+.btn.is-loading { color: transparent !important; pointer-events: none; }
+.btn.is-loading .spin { position: absolute; inset: 0; margin: auto; color: var(--on-brand); }
+.btn-secondary.is-loading .spin, .btn-ghost.is-loading .spin, .btn-danger.is-loading .spin { color: var(--ink-2); }
+.btn-sm { min-height: 36px; padding: 0 14px; font-size: 13.5px; }
+
+/* spinner */
+@keyframes sv-spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: sv-spin .7s linear infinite; flex: none; vertical-align: middle; }
+.spin-s { width: 14px; height: 14px; }
+.spin-l { width: 32px; height: 32px; border-width: 3px; }
+.loading-block { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 48px 20px; color: var(--ink-3); }
+
+/* esqueleto de carregamento */
+@keyframes sv-pulse { 50% { opacity: .5; } }
+.skel.pulse, .skel-box { animation: sv-pulse 1.4s ease-in-out infinite; }
+.skel-box { background: var(--surface-2); border-radius: 22px; }
+
+/* estado vazio */
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 48px 24px; }
+.empty-ic { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-3); }
+.empty-ic svg.ic { width: 28px; height: 28px; }
+.empty p { max-width: 460px; }
+
+/* aviso (inline) */
+.note { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 18px; background: var(--surface-2); color: var(--ink); }
+.note > svg.ic { margin-top: 1px; color: var(--ink-2); }
+.note-ok { background: var(--mint-soft); } .note-ok > svg.ic { color: var(--mint); }
+.note-warn { background: var(--amber-soft); } .note-warn > svg.ic { color: var(--amber); }
+.note-bad { background: var(--red-soft); } .note-bad > svg.ic { color: var(--red); }
+.note-brand { background: var(--brand-soft); } .note-brand > svg.ic { color: var(--brand); }
+.note-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.note-title { font-weight: 700; }
+.note-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* toasts */
+.toasts { position: fixed; z-index: 60; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; width: min(400px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; animation: pop .35s cubic-bezier(.2, .8, .3, 1) both; }
+.toast > svg.ic { margin-top: 1px; }
+.toast-ok > svg.ic { color: var(--mint); } .toast-warn > svg.ic { color: var(--amber); } .toast-bad > svg.ic { color: var(--red); } .toast-info > svg.ic { color: var(--brand); }
+.toast .x { margin: -6px -6px 0 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; border: 0; background: transparent; color: var(--ink-3); flex: none; }
+.toast .x:hover { background: var(--surface-2); color: var(--ink); }
+
+/* preço */
+.price { display: inline-flex; flex-direction: column; gap: 2px; }
+.price-main { font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.price-sub { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.price.inline { flex-direction: row; align-items: baseline; gap: 8px; }
+.price-s .price-main { font-size: 16px; } .price-m .price-main { font-size: 22px; } .price-l .price-main { font-size: 34px; }
+.price-xl .price-main { font-family: var(--font-serif), Georgia, serif; font-weight: 400; font-size: 56px; line-height: 1; }
+
+.stars-row { display: inline-flex; align-items: center; gap: 8px; }
+
+@container sv (max-width: 700px) {
+  .toasts { right: 16px; left: 16px; width: auto; bottom: 84px; }
+  .price-xl .price-main { font-size: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv *, .sv *::before, .sv *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

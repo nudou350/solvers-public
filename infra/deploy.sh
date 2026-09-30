@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy do Solvers na VPS (rodar na máquina de desenvolvimento, na raiz do repositório).
-# Envia o commit atual (git archive), instala, compila, migra e recarrega o PM2.
+# Envia o commit atual (git archive), instala, compila (API e vitrine), migra e recarrega o PM2.
 #   bash infra/deploy.sh            # usa deploy@<VPS_IP>
 set -euo pipefail
 HOST=${DEPLOY_HOST:-deploy@<VPS_IP>}
@@ -24,16 +24,23 @@ cd $APP/releases/$SHA
 ln -sfn $APP/shared/.env apps/server/.env
 pnpm install --frozen-lockfile --prod=false >/dev/null
 pnpm --filter @solvers/shared --filter @solvers/client --filter @solvers/chain --filter @solvers/server build
+# Vitrine: as variáveis NEXT_PUBLIC_* (ex: NEXT_PUBLIC_PRIVY_APP_ID) entram no build; ficam em shared/web.env.
+pnpm --filter @solvers/api-client build
+( set -a; [ -f $APP/shared/web.env ] && . $APP/shared/web.env; set +a; pnpm --filter @solvers/web build )
 ln -sfn $APP/releases/$SHA $APP/app
 ln -sfn $APP/app/apps/server $APP/backend
+ln -sfn $APP/app/apps/web $APP/frontend
 ln -sfn $APP/app/agents $APP/agents
 cd $APP/backend && node --env-file=.env dist/db/migrate.js
 # Imagem do verificador da garantia (só reconstrói se o harness mudar).
 docker build -q -t solvers-react-test $APP/app/agents/frontend-react/verifier >/dev/null && echo "✔ imagem solvers-react-test"
 cd $APP
-if pm2 describe solvers-api >/dev/null 2>&1; then pm2 reload solvers-api --update-env; else pm2 start app/infra/ecosystem.config.cjs; fi
+for P in solvers-api solvers-web; do
+  if pm2 describe $P >/dev/null 2>&1; then pm2 reload $P --update-env; else pm2 start app/infra/ecosystem.config.cjs --only $P; fi
+done
 pm2 save >/dev/null
 # Mantém só os 3 releases mais recentes.
 ls -1t $APP/releases | tail -n +4 | xargs -r -I{} rm -rf $APP/releases/{}
 sleep 3; curl -fsS http://127.0.0.1:3017/health && echo " ✔ solvers-api no ar ($SHA)"
+curl -fsS -o /dev/null http://127.0.0.1:4017/ && echo "✔ solvers-web no ar ($SHA)"
 REMOTE
