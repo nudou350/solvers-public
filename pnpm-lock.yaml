@@ -94,6 +94,19 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  packages/api-client:
+    dependencies:
+      '@solvers/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   packages/chain:
     dependencies:
       '@solana-program/compute-budget':
