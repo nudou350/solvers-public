@@ -195,11 +195,43 @@ oauthRouter.get(
     }
     const clientName = client.meta.client_name ?? "Seu assistente de IA";
     const id = await saveAuthRequest({ ...q.data, clientName });
-    const { host, verified } = redirectInfo(q.data.redirect_uri);
+    // A autorização acontece na vitrine (/conectar), onde o login por e-mail (Privy) e a carteira embutida funcionam.
+    res.redirect(302, `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/conectar?req=${encodeURIComponent(id)}`);
+  }),
+);
+
+/** Dados do pedido para a tela de consentimento da vitrine. */
+oauthRouter.get(
+  "/authorize/info",
+  h(async (req) => {
+    const { req: id } = parse(z.object({ req: z.string() }), req.query);
+    const ar = await loadAuthRequest(id);
+    const { host, verified } = redirectInfo(ar.redirect_uri);
+    return {
+      clientName: ar.clientName,
+      redirectHost: host,
+      verified,
+      memoryMessage: MEMORY_KEY_MESSAGE,
+      extensionUrl: `${base()}/oauth/authorize/extension?req=${encodeURIComponent(id)}`,
+    };
+  }),
+);
+
+/** Alternativa para quem usa carteira de extensão (Phantom, Solflare, Backpack): a página servida pelo servidor. */
+oauthRouter.get(
+  "/authorize/extension",
+  h(async (req, res) => {
+    const id = typeof req.query.req === "string" ? req.query.req : "";
     res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
     res.setHeader("X-Frame-Options", "DENY");
+    const ar = await loadAuthRequest(id).catch(() => null);
+    if (!ar) {
+      res.status(400).type("html").send(authorizePage({ error: "Pedido de autorização expirou. Volte ao Claude/ChatGPT e conecte de novo." }));
+      return;
+    }
+    const { host, verified } = redirectInfo(ar.redirect_uri);
     res.type("html").send(
-      authorizePage({ requestId: id, clientName, redirectHost: host, verified, apiBase: base(), webUrl: env.PUBLIC_WEB_URL, memoryMessage: MEMORY_KEY_MESSAGE }),
+      authorizePage({ requestId: id, clientName: ar.clientName, redirectHost: host, verified, apiBase: base(), webUrl: env.PUBLIC_WEB_URL, memoryMessage: MEMORY_KEY_MESSAGE }),
     );
   }),
 );

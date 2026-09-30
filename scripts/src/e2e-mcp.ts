@@ -44,9 +44,15 @@ export async function connect(signer: KeyPairSigner, withMemory = true): Promise
     scope: "solvers",
     resource: prm.resource,
   }).forEach(([k, v]) => authUrl.searchParams.set(k, v));
-  const html = await (await fetch(authUrl)).text();
-  const req = /"req":"(ar_[0-9a-f]+)"/.exec(html)?.[1];
-  if (!req) throw new Error("página de autorização sem request id");
+  // O servidor guarda o pedido e redireciona para a tela de consentimento da vitrine (/conectar?req=...).
+  const redirect = await fetch(authUrl, { redirect: "manual" });
+  const location = redirect.headers.get("location") ?? "";
+  const req = /[?&]req=(ar_[0-9a-f]+)/.exec(location)?.[1];
+  if (redirect.status !== 302 || !location.includes("/conectar?") || !req) throw new Error(`autorização deveria redirecionar para /conectar: ${redirect.status} ${location}`);
+  const info = (await (await fetch(`${API}/oauth/authorize/info?req=${req}`)).json()) as { clientName?: string; extensionUrl?: string };
+  if (!info.clientName || !info.extensionUrl) throw new Error(`dados do pedido incompletos: ${JSON.stringify(info)}`);
+  const ext = await fetch(info.extensionUrl);
+  if (ext.status !== 200 || !(await ext.text()).includes(`"req":"${req}"`)) throw new Error("página para carteira de extensão indisponível");
 
   const nonce = (await (await fetch(`${API}/oauth/authorize/nonce?req=${req}&wallet=${signer.address}`)).json()) as { message: string };
   const done = (await (

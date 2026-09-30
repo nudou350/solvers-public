@@ -9,6 +9,18 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@solvers/api-client", "@solvers/shared"],
   poweredByHeader: false,
+  async headers() {
+    // A tela de consentimento do conector nunca pode ser embutida (clickjacking).
+    return [
+      {
+        source: "/conectar",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     if (process.env.NODE_ENV === "production") return [];
     return PROXIED.flatMap((p) => [
