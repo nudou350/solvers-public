@@ -22,7 +22,15 @@ export const Manifest = z.object({
   /** Usa get_memory/save_memory (se ausente, deduz pelas etapas). */
   usesMemory: z.boolean().optional(),
   creator: z.object({ id: z.string(), name: z.string(), bio: z.string(), avatarUrl: z.string().nullable().optional() }),
-  requirements: z.array(z.object({ type: z.enum(["client", "connector", "plan"]), label: z.string(), key: z.string().optional() })),
+  requirements: z.array(
+    z.object({
+      type: z.enum(["client", "connector", "plan"]),
+      label: z.string(),
+      key: z.string().optional(),
+      /** Se faltar, o preflight só avisa (o método tem caminho alternativo). */
+      optional: z.boolean().optional(),
+    }),
+  ),
   packageContents: z.array(z.string()),
   steps: z.array(z.object({ file: z.string(), title: z.string().optional(), gate: z.array(z.string()).default([]) })),
   tools: z.array(z.object({ name: z.string(), description: z.string(), runner: z.string() })).default([]),

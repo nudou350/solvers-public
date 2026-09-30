@@ -14,7 +14,7 @@ import { runServerTool } from "../runtime/tools.js";
 import { memoryKeyFor, readMemories, saveMemory } from "../memory/crypto.js";
 import { escalate } from "../notify/telegram.js";
 import { submitDeliverable } from "../verifier/deliverables.js";
-import { INSTALL_GUIDES } from "./guides.js";
+import { preflightText } from "./preflight.js";
 
 // Conector MCP (INSTRUCTIONS.md 5.3): sempre as mesmas ferramentas; o conteúdo muda conforme
 // as licenças da carteira do token. As descrições dizem QUANDO a IA deve usar cada uma.
@@ -215,23 +215,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     tool(ctx, "preflight_check", async ({ session_id, available_tools }: { session_id: string; available_tools: string[] }) => {
       const session = await getSession(session_id, ctx.wallet);
       const pkg = requirePackage(session.agentId);
-      const tools = available_tools.map((t) => t.toLowerCase());
-      const missing: string[] = [];
-      const ok: string[] = [];
-      for (const r of pkg.manifest.requirements) {
-        if (r.type === "connector") {
-          const key = (r.key ?? r.label).toLowerCase();
-          if (tools.some((t) => t.includes(key))) ok.push(`${r.label}: conectado`);
-          else missing.push(`${r.label}: NÃO encontrado.\n${INSTALL_GUIDES[key] ?? `Peça ao usuário para adicionar o conector ${r.label} nas configurações da IA.`}`);
-        } else if (r.type === "plan") {
-          ok.push(`${r.label}: recomendado (não bloqueia)`);
-        } else {
-          ok.push(`${r.label}: ok`);
-        }
-      }
-      const out = missing.length
-        ? `Faltam requisitos:\n${missing.map((m) => `- ${m}`).join("\n")}\n\nOriente o usuário a instalar e, quando ele confirmar, rode preflight_check de novo. Não avance para next_step antes disso.${ok.length ? `\n\nJá ok:\n- ${ok.join("\n- ")}` : ""}`
-        : `Tudo pronto:\n- ${ok.join("\n- ") || "sem requisitos"}\n\nAgora chame next_step com session_id="${session.id}" para receber a etapa 1.`;
+      const out = preflightText(pkg.manifest.requirements, available_tools, session.id);
       return { text: out, agentId: session.agentId, sessionId: session.id };
     }),
   );

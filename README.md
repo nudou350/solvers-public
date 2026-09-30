@@ -11,7 +11,7 @@ packages/shared        Contrato de dados (zod) usado por servidor e vitrine
 packages/solvers-client  Cliente TS gerado com Codama a partir do IDL
 packages/chain         Transações com a plataforma como fee payer, eventos, Metaplex Core
 packages/api-client    Cliente tipado da API para a vitrine (troca os mocks sem mudar telas)
-agents/                Pacotes dos 8 solvers (3 completos + 5 de catálogo)
+agents/                Pacotes dos solvers (6 publicados; backend-node e planilhas-dados fora da vitrine)
 scripts/               bootstrap da rede, e2e (compra, API, conector, fluxo completo)
 infra/                 PM2, nginx e scripts de deploy no padrão da VPS
 ```
@@ -47,13 +47,16 @@ bash scripts/chain/local-validator.sh      # validador local com o programa e o 
 # rede + servidor
 cd scripts && npx tsx src/bootstrap-chain.ts          # mint de USDC de teste + Config
 cd apps/server && cp ../../infra/.env.example .env     # ajuste para localnet
-pnpm --filter @solvers/server cli:publish             # publica os 8 solvers
+pnpm --filter @solvers/server cli:publish             # publica todos os pacotes (ou só os slugs passados)
 pnpm --filter @solvers/server cli:seed                # compras, avaliações, usos, garantias
 pnpm --filter @solvers/server dev
 
 # testes ponta a ponta (servidor rodando)
 cd scripts && npx tsx src/e2e-purchase.ts && npx tsx src/e2e-api.ts && npx tsx src/e2e-mcp.ts && npx tsx src/e2e-full.ts
 ```
+
+Evals dos solvers: as respostas ficam em `agents/<slug>/evals/outputs/` (geradas às cegas, com o solver ativo) e
+`cd scripts && npm run eval [slug]` aplica as checagens de `evals/cases/` e grava `evals/report.json`, cuja nota o publish leva on-chain.
 
 Chaves de desenvolvimento ficam fora do repositório (`~/solvers-keys` no WSL, `apps/server/.keys`).
 

@@ -6,6 +6,7 @@
   "scripts": {
     "bootstrap": "tsx src/bootstrap-chain.ts",
     "e2e:purchase": "tsx src/e2e-purchase.ts",
+    "eval": "tsx src/eval.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

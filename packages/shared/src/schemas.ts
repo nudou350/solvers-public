@@ -7,6 +7,8 @@ export const Requirement = z.object({
   type: z.enum(["client", "connector", "plan"]),
   label: z.string(),
   key: z.string().optional(),
+  /** Opcional: se faltar, o preflight avisa sem bloquear (ex.: Figma com caminho sem conector). */
+  optional: z.boolean().optional(),
 });
 
 export const Agent = z.object({
