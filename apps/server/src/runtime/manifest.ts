@@ -78,6 +78,8 @@ export const Manifest = z.object({
       lockedSummary: z.string().min(3).max(300),
     })
     .optional(),
+  /** Pedidos típicos com as palavras de quem compra ("quero um site bonito"): cada um vira um vetor da busca. */
+  searchPhrases: z.array(z.string().min(3).max(120)).max(20).default([]),
   beforeAfter: z.array(z.object({ prompt: z.string(), withoutSolver: z.string(), withSolver: z.string() })).default([]),
   versions: z
     .array(z.object({ version: z.string(), releasedAt: z.string(), notes: z.string() }))

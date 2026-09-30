@@ -4,19 +4,27 @@ import { embed, embeddingsLoaded, toVectorLiteral } from "./embeddings.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
+/** Distância de cosseno máxima acima do melhor resultado para ainda aparecer como sugestão. */
+const RELEVANCE_MARGIN = 0.01;
+
 /** Busca em linguagem natural na vitrine e no find_solver: top N solvers ativos para a necessidade. */
 export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow[]> {
   const listed = and(eq(schema.agents.status, "active"), eq(schema.agents.listed, true));
   // Enquanto o modelo carrega (primeiro boot), usa full text para não travar a requisição.
   const vec = embeddingsLoaded() ? (await embed([need], "query"))?.[0] : undefined;
   if (vec) {
+    // Distância do solver = a do vetor que casar melhor (texto todo, tagline ou uma das searchPhrases).
+    const q = sql`${toVectorLiteral(vec)}::vector`;
+    const dist = sql<number>`least(${schema.agents.embedding} <=> ${q}, (select min(v.embedding <=> ${q}) from ${schema.agentSearchVectors} v where v.agent_id = ${schema.agents.id}))`;
     const rows = await db
-      .select()
+      .select({ agent: schema.agents, dist })
       .from(schema.agents)
       .where(and(listed, sql`${schema.agents.embedding} is not null`))
-      .orderBy(sql`${schema.agents.embedding} <=> ${toVectorLiteral(vec)}::vector`)
+      .orderBy(dist)
       .limit(limit);
-    if (rows.length > 0) return rows;
+    // As distâncias do e5 ficam todas numa faixa estreita: só entra quem está colado no melhor,
+    // senão um pedido claro ("site bonito") vem acompanhado de viagens e copy só para completar 3.
+    if (rows.length > 0) return rows.filter((r) => Number(r.dist) - Number(rows[0]!.dist) <= RELEVANCE_MARGIN).map((r) => r.agent);
   }
   const rank = sql`ts_rank(to_tsvector('portuguese', ${schema.agents.searchText}), websearch_to_tsquery('portuguese', ${need}))`;
   const rows = await db

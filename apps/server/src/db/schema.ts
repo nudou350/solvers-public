@@ -323,6 +323,18 @@ export const knowledgeChunks = pgTable(
   ],
 );
 
+/** Vetores extras da busca na vitrine (tagline e searchPhrases): o solver vale pelo que casar melhor. */
+export const agentSearchVectors = pgTable(
+  "agent_search_vectors",
+  {
+    id: serial("id").primaryKey(),
+    agentId: text("agent_id").notNull(),
+    content: text("content").notNull(),
+    embedding: vector("embedding", { dimensions: 384 }).notNull(),
+  },
+  (t) => [index("agent_search_vectors_agent_idx").on(t.agentId)],
+);
+
 export const processedEvents = pgTable(
   "processed_events",
   {

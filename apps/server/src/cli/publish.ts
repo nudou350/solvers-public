@@ -46,7 +46,7 @@ function searchText(pkg: SolverPackage) {
   return [m.name, m.tagline, m.description, m.category, ...m.packageContents, ...m.requirements.map((r) => r.label)].join("\n");
 }
 
-async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
+export async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
   const m = pkg.manifest;
   await db
     .insert(schema.creators)
@@ -54,7 +54,9 @@ async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
     .onConflictDoUpdate({ target: schema.creators.id, set: { name: m.creator.name, bio: m.creator.bio, avatarUrl: m.creator.avatarUrl ?? null } });
 
   const text = searchText(pkg);
-  const vec = (await embed([text], "passage"))?.[0] ?? null;
+  // Um vetor para o texto todo e um para cada frase curta: pedido vago casa com a frase, não se perde na descrição.
+  const phrases = [`${m.name}: ${m.tagline}`, ...m.searchPhrases];
+  const [vec = null, ...phraseVecs] = (await embed([text, ...phrases], "passage")) ?? [];
   const details = {
     beforeAfter: m.beforeAfter,
     versions: (m.versions.length ? m.versions : [{ version: m.version, releasedAt: new Date().toISOString(), notes: "Primeira versão" }]).map((v) => ({
@@ -99,6 +101,10 @@ async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
     .insert(schema.agents)
     .values({ id: m.id, ...values })
     .onConflictDoUpdate({ target: schema.agents.id, set: values });
+  await db.delete(schema.agentSearchVectors).where(eq(schema.agentSearchVectors.agentId, m.id));
+  if (phraseVecs.length > 0) {
+    await db.insert(schema.agentSearchVectors).values(phraseVecs.map((embedding, i) => ({ agentId: m.id, content: phrases[i]!, embedding })));
+  }
 }
 
 async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
