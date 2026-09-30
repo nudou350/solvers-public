@@ -43,7 +43,9 @@ pub struct RegisterAgent<'info> {
     /// CHECK: PDA do programa usada como update authority das coleções.
     #[account(seeds = [COLLECTION_AUTHORITY_SEED], bump)]
     pub collection_authority: UncheckedAccount<'info>,
-    #[account(mut, token::mint = usdc_mint, token::authority = creator)]
+    /// Precisa ser a ATA do criador: se for fechada, qualquer um pode recriá-la no mesmo endereço,
+    /// então pagamentos e reembolsos nunca ficam travados.
+    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = creator)]
     pub creator_usdc: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
@@ -69,6 +71,7 @@ pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> R
     require!(args.royalty_bps <= MAX_BPS, SolversError::InvalidBps);
     let config = &ctx.accounts.config;
     require!(args.price >= config.min_price, SolversError::PriceTooLow);
+    require!(args.price_per_use <= args.price, SolversError::InvalidAmount);
 
     let min_stake = config.min_stake;
     if min_stake > 0 {
@@ -160,6 +163,7 @@ pub struct UpdatePricing<'info> {
 
 pub fn update_pricing(ctx: Context<UpdatePricing>, price: u64, price_per_use: u64) -> Result<()> {
     require!(price >= ctx.accounts.config.min_price, SolversError::PriceTooLow);
+    require!(price_per_use <= price, SolversError::InvalidAmount);
     let agent = &mut ctx.accounts.agent;
     agent.price = price;
     agent.price_per_use = price_per_use;

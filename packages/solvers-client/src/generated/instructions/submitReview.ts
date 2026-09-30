@@ -8,15 +8,15 @@
 
 import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
 import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
-import { findReviewPda, findSubmitReviewCreditsPda } from '../pdas/index.js';
+import { findLicenseReviewPda, findReviewPda } from '../pdas/index.js';
 import { SOLVERS_PROGRAM_ADDRESS } from '../programs/index.js';
 
 export const SUBMIT_REVIEW_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([106, 30, 50, 83, 89, 46, 213, 239]);
 
 export function getSubmitReviewDiscriminatorBytes(): ReadonlyUint8Array { return fixEncoderSize(getBytesEncoder(), 8).encode(SUBMIT_REVIEW_DISCRIMINATOR); }
 
-export type SubmitReviewInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountPayer extends string | AccountMeta<string> = string, TAccountAuthor extends string | AccountMeta<string> = string, TAccountAgent extends string | AccountMeta<string> = string, TAccountReview extends string | AccountMeta<string> = string, TAccountLicenseAsset extends string | AccountMeta<string> = string, TAccountCredits extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountPayer extends string ? WritableSignerAccount<TAccountPayer> & AccountSignerMeta<TAccountPayer> : TAccountPayer, TAccountAuthor extends string ? ReadonlySignerAccount<TAccountAuthor> & AccountSignerMeta<TAccountAuthor> : TAccountAuthor, TAccountAgent extends string ? WritableAccount<TAccountAgent> : TAccountAgent, TAccountReview extends string ? WritableAccount<TAccountReview> : TAccountReview, TAccountLicenseAsset extends string ? ReadonlyAccount<TAccountLicenseAsset> : TAccountLicenseAsset, TAccountCredits extends string ? ReadonlyAccount<TAccountCredits> : TAccountCredits, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+export type SubmitReviewInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountPayer extends string | AccountMeta<string> = string, TAccountAuthor extends string | AccountMeta<string> = string, TAccountAgent extends string | AccountMeta<string> = string, TAccountReview extends string | AccountMeta<string> = string, TAccountLicenseAsset extends string | AccountMeta<string> = string, TAccountLicenseReview extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountPayer extends string ? WritableSignerAccount<TAccountPayer> & AccountSignerMeta<TAccountPayer> : TAccountPayer, TAccountAuthor extends string ? ReadonlySignerAccount<TAccountAuthor> & AccountSignerMeta<TAccountAuthor> : TAccountAuthor, TAccountAgent extends string ? WritableAccount<TAccountAgent> : TAccountAgent, TAccountReview extends string ? WritableAccount<TAccountReview> : TAccountReview, TAccountLicenseAsset extends string ? ReadonlyAccount<TAccountLicenseAsset> : TAccountLicenseAsset, TAccountLicenseReview extends string ? WritableAccount<TAccountLicenseReview> : TAccountLicenseReview, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
 
 export type SubmitReviewInstructionData = { discriminator: ReadonlyUint8Array; rating: number; contentHash: ReadonlyUint8Array;  };
 
@@ -34,19 +34,20 @@ export function getSubmitReviewInstructionDataCodec(): FixedSizeCodec<SubmitRevi
     return combineCodec(getSubmitReviewInstructionDataEncoder(), getSubmitReviewInstructionDataDecoder());
 }
 
-export type SubmitReviewAsyncInput<TAccountPayer extends InstructionSignerInput = InstructionSignerInput, TAccountAuthor extends InstructionSignerInput = InstructionSignerInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountReview extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput = InstructionAccountInput, TAccountCredits extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+export type SubmitReviewAsyncInput<TAccountPayer extends InstructionSignerInput = InstructionSignerInput, TAccountAuthor extends InstructionSignerInput = InstructionSignerInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountReview extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseReview extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
   payer: TAccountPayer;
 author: TAccountAuthor;
 agent: TAccountAgent;
 review?: TAccountReview;
-licenseAsset?: TAccountLicenseAsset;
-credits?: TAccountCredits;
+licenseAsset: TAccountLicenseAsset;
+/** Liga o asset à primeira avaliação feita com ele. */
+licenseReview?: TAccountLicenseReview;
 systemProgram?: TAccountSystemProgram;
 rating: SubmitReviewInstructionDataArgs["rating"];
 contentHash: SubmitReviewInstructionDataArgs["contentHash"];
 }
 
-export async function getSubmitReviewInstructionAsync<TAccountPayer extends InstructionSignerInput, TAccountAuthor extends InstructionSignerInput, TAccountAgent extends InstructionAccountInput, TAccountReview extends InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput, TAccountCredits extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: SubmitReviewAsyncInput<TAccountPayer, TAccountAuthor, TAccountAgent, TAccountReview, TAccountLicenseAsset, TAccountCredits, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountCredits, InstructionAccountInputAddress<TAccountCredits>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
+export async function getSubmitReviewInstructionAsync<TAccountPayer extends InstructionSignerInput, TAccountAuthor extends InstructionSignerInput, TAccountAgent extends InstructionAccountInput, TAccountReview extends InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput, TAccountLicenseReview extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: SubmitReviewAsyncInput<TAccountPayer, TAccountAuthor, TAccountAgent, TAccountReview, TAccountLicenseAsset, TAccountLicenseReview, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountLicenseReview, InstructionAccountInputAddress<TAccountLicenseReview>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -54,7 +55,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { payer: { value: input.payer ?? null, isSigner: true, isWritable: true }, author: { value: input.author ?? null, isSigner: true, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: true }, review: { value: input.review ?? null, isSigner: false, isWritable: true }, licenseAsset: { value: input.licenseAsset ?? null, isSigner: false, isWritable: false }, credits: { value: input.credits ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { payer: { value: input.payer ?? null, isSigner: true, isWritable: true }, author: { value: input.author ?? null, isSigner: true, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: true }, review: { value: input.review ?? null, isSigner: false, isWritable: true }, licenseAsset: { value: input.licenseAsset ?? null, isSigner: false, isWritable: false }, licenseReview: { value: input.licenseReview ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -66,29 +67,30 @@ const args = { ...input,  };
 if (!accounts.review.value) {
 accounts.review.value = await findReviewPda({ agent: getAddressFromResolvedInstructionAccount("agent", accounts.agent.value), author: getAddressFromResolvedInstructionAccount("author", accounts.author.value) }, { programAddress });
 }
-if (!accounts.credits.value) {
-accounts.credits.value = await findSubmitReviewCreditsPda({ agent: getAddressFromResolvedInstructionAccount("agent", accounts.agent.value), author: getAddressFromResolvedInstructionAccount("author", accounts.author.value) }, { programAddress });
+if (!accounts.licenseReview.value) {
+accounts.licenseReview.value = await findLicenseReviewPda({ licenseAsset: getAddressFromResolvedInstructionAccount("licenseAsset", accounts.licenseAsset.value) }, { programAddress });
 }
 if (!accounts.systemProgram.value) {
 accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("payer", accounts.payer), getAccountMeta("author", accounts.author), getAccountMeta("agent", accounts.agent), getAccountMeta("review", accounts.review), getAccountMeta("licenseAsset", accounts.licenseAsset), getAccountMeta("credits", accounts.credits), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSubmitReviewInstructionDataEncoder().encode(args as SubmitReviewInstructionDataArgs), programAddress } as SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountCredits, InstructionAccountInputAddress<TAccountCredits>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("payer", accounts.payer), getAccountMeta("author", accounts.author), getAccountMeta("agent", accounts.agent), getAccountMeta("review", accounts.review), getAccountMeta("licenseAsset", accounts.licenseAsset), getAccountMeta("licenseReview", accounts.licenseReview), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSubmitReviewInstructionDataEncoder().encode(args as SubmitReviewInstructionDataArgs), programAddress } as SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountLicenseReview, InstructionAccountInputAddress<TAccountLicenseReview>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
 }
 
-export type SubmitReviewInput<TAccountPayer extends InstructionSignerInput = InstructionSignerInput, TAccountAuthor extends InstructionSignerInput = InstructionSignerInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountReview extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput = InstructionAccountInput, TAccountCredits extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+export type SubmitReviewInput<TAccountPayer extends InstructionSignerInput = InstructionSignerInput, TAccountAuthor extends InstructionSignerInput = InstructionSignerInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountReview extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput = InstructionAccountInput, TAccountLicenseReview extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
   payer: TAccountPayer;
 author: TAccountAuthor;
 agent: TAccountAgent;
 review: TAccountReview;
-licenseAsset?: TAccountLicenseAsset;
-credits?: TAccountCredits;
+licenseAsset: TAccountLicenseAsset;
+/** Liga o asset à primeira avaliação feita com ele. */
+licenseReview: TAccountLicenseReview;
 systemProgram?: TAccountSystemProgram;
 rating: SubmitReviewInstructionDataArgs["rating"];
 contentHash: SubmitReviewInstructionDataArgs["contentHash"];
 }
 
-export function getSubmitReviewInstruction<TAccountPayer extends InstructionSignerInput, TAccountAuthor extends InstructionSignerInput, TAccountAgent extends InstructionAccountInput, TAccountReview extends InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput, TAccountCredits extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: SubmitReviewInput<TAccountPayer, TAccountAuthor, TAccountAgent, TAccountReview, TAccountLicenseAsset, TAccountCredits, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountCredits, InstructionAccountInputAddress<TAccountCredits>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
+export function getSubmitReviewInstruction<TAccountPayer extends InstructionSignerInput, TAccountAuthor extends InstructionSignerInput, TAccountAgent extends InstructionAccountInput, TAccountReview extends InstructionAccountInput, TAccountLicenseAsset extends InstructionAccountInput, TAccountLicenseReview extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: SubmitReviewInput<TAccountPayer, TAccountAuthor, TAccountAgent, TAccountReview, TAccountLicenseAsset, TAccountLicenseReview, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountLicenseReview, InstructionAccountInputAddress<TAccountLicenseReview>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -96,7 +98,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { payer: { value: input.payer ?? null, isSigner: true, isWritable: true }, author: { value: input.author ?? null, isSigner: true, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: true }, review: { value: input.review ?? null, isSigner: false, isWritable: true }, licenseAsset: { value: input.licenseAsset ?? null, isSigner: false, isWritable: false }, credits: { value: input.credits ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { payer: { value: input.payer ?? null, isSigner: true, isWritable: true }, author: { value: input.author ?? null, isSigner: true, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: true }, review: { value: input.review ?? null, isSigner: false, isWritable: true }, licenseAsset: { value: input.licenseAsset ?? null, isSigner: false, isWritable: false }, licenseReview: { value: input.licenseReview ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -109,7 +111,7 @@ if (!accounts.systemProgram.value) {
 accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("payer", accounts.payer), getAccountMeta("author", accounts.author), getAccountMeta("agent", accounts.agent), getAccountMeta("review", accounts.review), getAccountMeta("licenseAsset", accounts.licenseAsset), getAccountMeta("credits", accounts.credits), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSubmitReviewInstructionDataEncoder().encode(args as SubmitReviewInstructionDataArgs), programAddress } as SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountCredits, InstructionAccountInputAddress<TAccountCredits>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("payer", accounts.payer), getAccountMeta("author", accounts.author), getAccountMeta("agent", accounts.agent), getAccountMeta("review", accounts.review), getAccountMeta("licenseAsset", accounts.licenseAsset), getAccountMeta("licenseReview", accounts.licenseReview), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSubmitReviewInstructionDataEncoder().encode(args as SubmitReviewInstructionDataArgs), programAddress } as SubmitReviewInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountPayer, InstructionAccountInputAddress<TAccountPayer>>, ResolvedInstructionAccountMeta<TAccountAuthor, InstructionAccountInputAddress<TAccountAuthor>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountReview, InstructionAccountInputAddress<TAccountReview>>, ResolvedInstructionAccountMeta<TAccountLicenseAsset, InstructionAccountInputAddress<TAccountLicenseAsset>>, ResolvedInstructionAccountMeta<TAccountLicenseReview, InstructionAccountInputAddress<TAccountLicenseReview>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
 }
 
 export type ParsedSubmitReviewInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
@@ -118,8 +120,9 @@ payer: TAccountMetas[0];
 author: TAccountMetas[1];
 agent: TAccountMetas[2];
 review: TAccountMetas[3];
-licenseAsset?: TAccountMetas[4] | undefined;
-credits?: TAccountMetas[5] | undefined;
+licenseAsset: TAccountMetas[4];
+/** Liga o asset à primeira avaliação feita com ele. */
+licenseReview: TAccountMetas[5];
 systemProgram: TAccountMetas[6];
 };
 data: SubmitReviewInstructionData; };
@@ -134,9 +137,5 @@ const getNextAccount = () => {
   accountIndex += 1;
   return accountMeta;
 }
-const getNextOptionalAccount = () => {
-  const accountMeta = getNextAccount();
-  return accountMeta.address === SOLVERS_PROGRAM_ADDRESS ? undefined : accountMeta;
-};
-  return { programAddress: instruction.programAddress, accounts: { payer: getNextAccount(), author: getNextAccount(), agent: getNextAccount(), review: getNextAccount(), licenseAsset: getNextOptionalAccount(), credits: getNextOptionalAccount(), systemProgram: getNextAccount() }, data: getSubmitReviewInstructionDataDecoder().decode(instruction.data) };
+  return { programAddress: instruction.programAddress, accounts: { payer: getNextAccount(), author: getNextAccount(), agent: getNextAccount(), review: getNextAccount(), licenseAsset: getNextAccount(), licenseReview: getNextAccount(), systemProgram: getNextAccount() }, data: getSubmitReviewInstructionDataDecoder().decode(instruction.data) };
 }

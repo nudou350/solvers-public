@@ -54,4 +54,8 @@ pub enum SolversError {
     MathOverflow,
     #[msg("Janela de revisão inválida")]
     InvalidReviewWindow,
+    #[msg("O preço mudou; atualize a página e tente de novo")]
+    PriceChanged,
+    #[msg("Esta licença já foi usada em outra avaliação")]
+    LicenseAlreadyReviewed,
 }

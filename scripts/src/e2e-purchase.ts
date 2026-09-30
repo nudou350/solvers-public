@@ -37,7 +37,7 @@ const buyerSolBefore = await c.solBalance(buyer.address);
 const treasuryBefore = await c.usdcBalance(admin.address);
 
 // Servidor monta, carteira do usuário assina (simulado aqui), servidor transmite.
-const { instructions, asset } = await c.purchaseLicenseIxs(buyer.address, agentId);
+const { instructions, asset } = await c.purchaseLicenseIxs(buyer.address, agentId, usdcToUnits(12));
 const built = await c.buildForUser(instructions);
 const tx = getTransactionDecoder().decode(getBase64Encoder().encode(built.transaction));
 const signedByUser = await partiallySignTransaction([buyer.keyPair], tx);

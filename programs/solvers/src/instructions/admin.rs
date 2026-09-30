@@ -16,10 +16,15 @@ pub struct ConfigParams {
 
 #[derive(Accounts)]
 pub struct InitializeConfig<'info> {
+    /// Precisa ser a upgrade authority do programa: evita que outra pessoa inicialize primeiro.
     #[account(mut)]
     pub admin: Signer<'info>,
     #[account(init, payer = admin, space = 8 + Config::INIT_SPACE, seeds = [CONFIG_SEED], bump)]
     pub config: Account<'info, Config>,
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ SolversError::NotAdmin)]
+    pub program: Program<'info, crate::program::Solvers>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(admin.key()) @ SolversError::NotAdmin)]
+    pub program_data: Account<'info, ProgramData>,
     pub usdc_mint: Account<'info, Mint>,
     #[account(token::mint = usdc_mint)]
     pub treasury: Account<'info, TokenAccount>,
@@ -70,8 +75,9 @@ pub struct SetAgentStatus<'info> {
 
 pub fn approve_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
     let agent = &mut ctx.accounts.agent;
-    // Aprovar também reativa um solver suspenso.
+    // Aprovar também reativa um solver suspenso, desde que o stake esteja completo.
     require!(agent.status != AgentStatus::Active, SolversError::AgentNotPending);
+    require!(agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     agent.status = AgentStatus::Active;
     emit!(AgentStatusChanged { agent: agent.key(), status: agent.status as u8 });
     Ok(())

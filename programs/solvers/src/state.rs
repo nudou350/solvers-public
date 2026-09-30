@@ -9,6 +9,7 @@ pub const CREDITS_SEED: &[u8] = b"credits";
 pub const ESCROW_SEED: &[u8] = b"escrow";
 pub const ESCROW_VAULT_SEED: &[u8] = b"escrow_vault";
 pub const COLLECTION_AUTHORITY_SEED: &[u8] = b"collection_authority";
+pub const LICENSE_REVIEW_SEED: &[u8] = b"license_review";
 
 pub const MAX_URI_LEN: usize = 200;
 pub const MAX_VERSION_LEN: usize = 16;
@@ -30,7 +31,8 @@ pub struct Config {
     pub fee_bps: u16,
     /// Stake mínimo do criador (USDC, 6 casas).
     pub min_stake: u64,
-    /// Preço mínimo de licença permanente: cobre o rent da licença pago pela plataforma.
+    /// Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
+    /// das contas que a plataforma paga como fee payer.
     pub min_price: u64,
     pub bump: u8,
 }
@@ -90,6 +92,16 @@ pub struct Review {
     pub rating: u8,
     pub content_hash: [u8; 32],
     pub created_at: i64,
+    pub bump: u8,
+}
+
+/// Marca que um asset de licença já foi usado como prova numa avaliação.
+/// Impede que a mesma licença, transferida entre carteiras, gere várias avaliações.
+#[account]
+#[derive(InitSpace)]
+pub struct LicenseReview {
+    pub asset: Pubkey,
+    pub review: Pubkey,
     pub bump: u8,
 }
 

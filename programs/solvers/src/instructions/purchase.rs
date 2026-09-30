@@ -88,10 +88,13 @@ pub struct PurchaseLicense<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn purchase_license(ctx: Context<PurchaseLicense>) -> Result<()> {
+/// `expected_price` é o preço mostrado ao comprador: se o criador mudar o preço entre a montagem
+/// e a execução da transação, a compra falha em vez de cobrar outro valor.
+pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> Result<()> {
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     let price = agent.price;
+    require!(price == expected_price, SolversError::PriceChanged);
 
     pay_split(
         &ctx.accounts.token_program,
@@ -182,12 +185,16 @@ pub struct BuyCredits<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32) -> Result<()> {
+/// `max_total` protege o comprador de mudança de preço entre a montagem e a execução.
+pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32, max_total: u64) -> Result<()> {
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     require!(agent.price_per_use > 0, SolversError::PayPerUseDisabled);
     require!(amount > 0, SolversError::InvalidAmount);
     let total = agent.price_per_use.checked_mul(amount as u64).ok_or(SolversError::MathOverflow)?;
+    require!(total <= max_total, SolversError::PriceChanged);
+    // Pacote mínimo: cobre o rent das contas que a plataforma paga.
+    require!(total >= ctx.accounts.config.min_price, SolversError::PriceTooLow);
 
     pay_split(
         &ctx.accounts.token_program,
@@ -209,13 +216,13 @@ pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32) -> Result<()> {
     credits.remaining = credits.remaining.checked_add(amount).ok_or(SolversError::MathOverflow)?;
     credits.purchased = credits.purchased.checked_add(amount).ok_or(SolversError::MathOverflow)?;
 
+    // Cada compra (licença ou pacote de créditos) conta na reputação.
     let rep = &mut ctx.accounts.reputation;
     if rep.wallet == Pubkey::default() {
         rep.wallet = ctx.accounts.buyer.key();
         rep.bump = ctx.bumps.reputation;
-        // Primeira compra de créditos conta como compra na reputação.
-        rep.purchases = rep.purchases.saturating_add(1);
     }
+    rep.purchases = rep.purchases.saturating_add(1);
 
     emit!(CreditsBought { agent: agent.key(), buyer: ctx.accounts.buyer.key(), amount });
     Ok(())

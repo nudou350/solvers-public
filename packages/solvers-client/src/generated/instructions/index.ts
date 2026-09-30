@@ -22,6 +22,7 @@ export * from './resolveDispute.js';
 export * from './setEval.js';
 export * from './slashStake.js';
 export * from './submitReview.js';
+export * from './submitReviewWithCredits.js';
 export * from './suspendAgent.js';
 export * from './updateConfig.js';
 export * from './updatePricing.js';

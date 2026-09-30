@@ -8,12 +8,12 @@
 
 import { getAddressEncoder, getBytesEncoder, getProgramDerivedAddress, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
-export type SubmitReviewCreditsSeeds = {
+export type SubmitReviewWithCreditsCreditsSeeds = {
 agent: Address;
 author: Address;
 };
 
-export async function findSubmitReviewCreditsPda(seeds: SubmitReviewCreditsSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+export async function findSubmitReviewWithCreditsCreditsPda(seeds: SubmitReviewWithCreditsCreditsSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
   const { programAddress = 'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW' as Address<'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW'> } = config;
   return await getProgramDerivedAddress({ programAddress, seeds: [getBytesEncoder().encode(new Uint8Array([99, 114, 101, 100, 105, 116, 115])), getAddressEncoder().encode(seeds.agent), getAddressEncoder().encode(seeds.author)]});
 }

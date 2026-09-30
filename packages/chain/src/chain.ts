@@ -93,6 +93,14 @@ export class SolversChain {
 
   // ---------- PDAs e contas ----------
 
+  async programDataAddress() {
+    const [pda] = await getProgramDerivedAddress({
+      programAddress: address("BPFLoaderUpgradeab1e11111111111111111111111"),
+      seeds: [getAddressEncoder().encode(this.programId)],
+    });
+    return pda;
+  }
+
   async configPda() {
     return (await gen.findConfigPda())[0];
   }
@@ -145,6 +153,11 @@ export class SolversChain {
 
   // ---------- Envio ----------
 
+  /** O fee payer (também mint authority do USDC de teste) nunca pode ser a carteira do usuário. */
+  private assertNotFeePayer(user: Address) {
+    if (user === this.feePayer.address) throw new TxError("Carteira reservada da plataforma");
+  }
+
   private budget(): Instruction[] {
     const ixs: Instruction[] = [getSetComputeUnitLimitInstruction({ units: COMPUTE_UNITS })];
     if (this.opts.priorityFee && this.opts.priorityFee > 0n) {
@@ -191,7 +204,13 @@ export class SolversChain {
 
   /** Recebe a transação já assinada pelo usuário (base64) e transmite. */
   async submitSigned(wireBase64: string): Promise<{ signature: Signature; events: SolversEvent[] }> {
-    const bytes = getBase64Encoder().encode(wireBase64);
+    if (wireBase64.length > 2000) throw new TxError("Transação grande demais");
+    let bytes: ReturnType<ReturnType<typeof getBase64Encoder>["encode"]>;
+    try {
+      bytes = getBase64Encoder().encode(wireBase64);
+    } catch {
+      throw new TxError("Transação em formato inválido");
+    }
     const tx = getTransactionDecoder().decode(bytes);
     const feePayerSig = tx.signatures[this.feePayer.address];
     if (!feePayerSig) throw new TxError("Transação não foi montada por este servidor");
@@ -214,12 +233,19 @@ export class SolversChain {
       const logs = extractLogs(e);
       throw new TxError(friendlyError(e, logs), logs);
     }
-    await this.waitConfirmed(signature, lastValidBlockHeight);
+    // Na devnet transações somem com frequência: reenvia (sem preflight) enquanto aguarda.
+    const resend = () =>
+      this.rpc
+        .sendTransaction(wire, { encoding: "base64", skipPreflight: true, maxRetries: 0n })
+        .send()
+        .catch(() => undefined);
+    await this.waitConfirmed(signature, lastValidBlockHeight, resend);
     return { signature, events: await this.eventsOf(signature) };
   }
 
-  async waitConfirmed(signature: Signature, lastValidBlockHeight: number): Promise<void> {
+  async waitConfirmed(signature: Signature, lastValidBlockHeight: number, resend?: () => Promise<unknown>): Promise<void> {
     for (let i = 0; i < 120; i++) {
+      if (resend && i > 0 && i % 4 === 0) void resend();
       const { value } = await this.rpc.getSignatureStatuses([signature]).send();
       const st = value[0];
       if (st?.err) throw new TxError(`Transação falhou: ${JSON.stringify(st.err, bigintJson)}`);
@@ -233,15 +259,22 @@ export class SolversChain {
     throw new TxError("Tempo esgotado aguardando confirmação");
   }
 
+  /** Logs de uma transação confirmada (null se ainda não visível no RPC). */
+  async txLogs(signature: Signature): Promise<{ logs: readonly string[]; failed: boolean; blockTime: number | null } | null> {
+    const tx = await this.rpc
+      .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0, encoding: "json" })
+      .send();
+    if (!tx) return null;
+    return { logs: tx.meta?.logMessages ?? [], failed: tx.meta?.err != null, blockTime: tx.blockTime == null ? null : Number(tx.blockTime) };
+  }
+
   async eventsOf(signature: Signature): Promise<SolversEvent[]> {
-    for (let i = 0; i < 10; i++) {
-      const tx = await this.rpc
-        .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0, encoding: "json" })
-        .send();
-      if (tx) return parseEvents(tx.meta?.logMessages ?? [], this.programId);
-      await sleep(400);
+    for (let i = 0; i < 20; i++) {
+      const tx = await this.txLogs(signature);
+      if (tx) return tx.failed ? [] : parseEvents(tx.logs, this.programId);
+      await sleep(500);
     }
-    return [];
+    throw new TxError(`Transação ${signature} confirmada mas ainda não visível no RPC`);
   }
 
   // ---------- USDC de teste ----------
@@ -303,6 +336,7 @@ export class SolversChain {
       await this.ensureAtaIx(treasuryOwner),
       await gen.getInitializeConfigInstructionAsync({
         admin,
+        programData: await this.programDataAddress(),
         usdcMint: this.usdcMint,
         treasury: await this.ata(treasuryOwner),
         args: params,
@@ -370,9 +404,16 @@ export class SolversChain {
     return gen.getUpdateVersionInstruction({ creator, agent: await this.agentPda(agentIdHex), version, versionHash });
   }
 
-  async purchaseLicenseIxs(buyer: Address, agentIdHex: string): Promise<{ instructions: Instruction[]; asset: KeyPairSigner }> {
+  /** `expectedPrice` = preço mostrado ao comprador; se mudar antes da execução, a compra falha. */
+  async purchaseLicenseIxs(
+    buyer: Address,
+    agentIdHex: string,
+    expectedPrice?: bigint,
+  ): Promise<{ instructions: Instruction[]; asset: KeyPairSigner; price: bigint }> {
+    this.assertNotFeePayer(buyer);
     const agentAddr = await this.agentPda(agentIdHex);
     const agent = await gen.fetchAgent(this.rpc, agentAddr);
+    const price = expectedPrice ?? agent.data.price;
     const config = await this.fetchConfig();
     const asset = await generateKeyPairSigner();
     const ix = await gen.getPurchaseLicenseInstructionAsync({
@@ -385,11 +426,13 @@ export class SolversChain {
       creatorUsdc: agent.data.creatorUsdc,
       treasury: config.data.treasury,
       usdcMint: this.usdcMint,
+      expectedPrice: price,
     });
-    return { instructions: [ix], asset };
+    return { instructions: [ix], asset, price };
   }
 
-  async buyCreditsIxs(buyer: Address, agentIdHex: string, amount: number): Promise<Instruction[]> {
+  async buyCreditsIxs(buyer: Address, agentIdHex: string, amount: number, maxTotal?: bigint): Promise<Instruction[]> {
+    this.assertNotFeePayer(buyer);
     const agentAddr = await this.agentPda(agentIdHex);
     const agent = await gen.fetchAgent(this.rpc, agentAddr);
     const config = await this.fetchConfig();
@@ -403,6 +446,7 @@ export class SolversChain {
         treasury: config.data.treasury,
         usdcMint: this.usdcMint,
         amount,
+        maxTotal: maxTotal ?? agent.data.pricePerUse * BigInt(amount),
       }),
     ];
   }
@@ -432,14 +476,27 @@ export class SolversChain {
     contentHash: Uint8Array,
     proof: { licenseAsset?: Address; hasCredits?: boolean },
   ): Promise<Instruction[]> {
+    this.assertNotFeePayer(author);
     const agent = await this.agentPda(agentIdHex);
+    if (proof.licenseAsset) {
+      return [
+        await gen.getSubmitReviewInstructionAsync({
+          payer: this.feePayer,
+          author: createNoopSigner(author),
+          agent,
+          licenseAsset: proof.licenseAsset,
+          rating,
+          contentHash,
+        }),
+      ];
+    }
+    if (!proof.hasCredits) throw new TxError("Avaliação exige licença ou créditos");
     return [
-      await gen.getSubmitReviewInstructionAsync({
+      await gen.getSubmitReviewWithCreditsInstructionAsync({
         payer: this.feePayer,
         author: createNoopSigner(author),
         agent,
-        licenseAsset: proof.licenseAsset,
-        credits: proof.hasCredits ? await this.creditsPda(agent, author) : undefined,
+        credits: await this.creditsPda(agent, author),
         rating,
         contentHash,
       }),
@@ -453,6 +510,7 @@ export class SolversChain {
     milestones: { amount: bigint; criteriaHash: Uint8Array }[],
     reviewWindowSecs: bigint,
   ): Promise<{ instructions: Instruction[]; escrow: Address }> {
+    this.assertNotFeePayer(buyer);
     const agent = await this.agentPda(agentIdHex);
     const escrow = await this.escrowPda(buyer, agent, nonce);
     const ix = await gen.getCreateEscrowInstructionAsync({
@@ -473,28 +531,53 @@ export class SolversChain {
     return gen.getMarkPassedInstructionAsync({ verifier, escrow, index, deliverableHash });
   }
 
-  private async payoutAccounts(escrowAddr: Address) {
+  private async escrowContext(escrowAddr: Address) {
     const escrow = await gen.fetchEscrow(this.rpc, escrowAddr);
     const agent = await gen.fetchAgent(this.rpc, escrow.data.agent);
     const config = await this.fetchConfig();
-    return {
-      agent: escrow.data.agent,
-      escrow: escrowAddr,
-      creatorUsdc: agent.data.creatorUsdc,
-      treasury: config.data.treasury,
-      buyerUsdc: await this.ata(escrow.data.buyer),
-      buyerReputation: await this.reputationPda(escrow.data.buyer),
-      usdcMint: this.usdcMint,
-    };
+    return { escrow, agent, config };
+  }
+
+  /** Recria (idempotente) a ATA de USDC de alguém caso tenha sido fechada. */
+  private async ensureAtaFor(owner: Address): Promise<Instruction> {
+    return this.ensureAtaIx(owner);
   }
 
   /** caller = comprador (aprovação) ou qualquer signer (liberação automática). */
-  async releaseMilestoneIx(caller: TransactionSigner, escrow: Address, index: number) {
-    return gen.getReleaseMilestoneInstructionAsync({ caller, ...(await this.payoutAccounts(escrow)), index });
+  async releaseMilestoneIxs(caller: TransactionSigner, escrowAddr: Address, index: number): Promise<Instruction[]> {
+    const { escrow, agent, config } = await this.escrowContext(escrowAddr);
+    return [
+      await this.ensureAtaFor(agent.data.creator),
+      await gen.getReleaseMilestoneInstructionAsync({
+        caller,
+        agent: escrow.data.agent,
+        escrow: escrowAddr,
+        creatorUsdc: agent.data.creatorUsdc,
+        treasury: config.data.treasury,
+        usdcMint: this.usdcMint,
+        index,
+      }),
+    ];
   }
 
-  async resolveDisputeIx(admin: TransactionSigner, escrow: Address, index: number, refund: boolean) {
-    return gen.getResolveDisputeInstructionAsync({ caller: admin, ...(await this.payoutAccounts(escrow)), index, refund });
+  async resolveDisputeIxs(admin: TransactionSigner, escrowAddr: Address, index: number, refund: boolean): Promise<Instruction[]> {
+    const { escrow, agent, config } = await this.escrowContext(escrowAddr);
+    return [
+      await this.ensureAtaFor(agent.data.creator),
+      await this.ensureAtaFor(escrow.data.buyer),
+      await gen.getResolveDisputeInstructionAsync({
+        admin,
+        agent: escrow.data.agent,
+        escrow: escrowAddr,
+        creatorUsdc: agent.data.creatorUsdc,
+        treasury: config.data.treasury,
+        buyerUsdc: await this.ata(escrow.data.buyer),
+        buyerReputation: await this.reputationPda(escrow.data.buyer),
+        usdcMint: this.usdcMint,
+        index,
+        refund,
+      }),
+    ];
   }
 
   async openDisputeIx(buyer: Address, escrow: Address, index: number, reasonHash: Uint8Array) {
@@ -507,9 +590,18 @@ export class SolversChain {
     });
   }
 
-  async closeEscrowIx(caller: TransactionSigner, escrowAddr: Address) {
+  async closeEscrowIxs(caller: TransactionSigner, escrowAddr: Address): Promise<Instruction[]> {
     const escrow = await gen.fetchEscrow(this.rpc, escrowAddr);
-    return gen.getCloseEscrowInstructionAsync({ caller, rentPayer: escrow.data.rentPayer, escrow: escrowAddr });
+    return [
+      await this.ensureAtaFor(escrow.data.buyer),
+      await gen.getCloseEscrowInstructionAsync({
+        caller,
+        rentPayer: escrow.data.rentPayer,
+        escrow: escrowAddr,
+        buyerUsdc: await this.ata(escrow.data.buyer),
+        usdcMint: this.usdcMint,
+      }),
+    ];
   }
 
   // ---------- Licenças (Metaplex Core) ----------

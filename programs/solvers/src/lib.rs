@@ -45,11 +45,11 @@ pub mod solvers {
     }
 
     // Compra e uso
-    pub fn purchase_license(ctx: Context<PurchaseLicense>) -> Result<()> {
-        instructions::purchase::purchase_license(ctx)
+    pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> Result<()> {
+        instructions::purchase::purchase_license(ctx, expected_price)
     }
-    pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32) -> Result<()> {
-        instructions::purchase::buy_credits(ctx, amount)
+    pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32, max_total: u64) -> Result<()> {
+        instructions::purchase::buy_credits(ctx, amount, max_total)
     }
     pub fn consume_credit(ctx: Context<ConsumeCredit>) -> Result<()> {
         instructions::purchase::consume_credit(ctx)
@@ -59,6 +59,13 @@ pub mod solvers {
     }
     pub fn submit_review(ctx: Context<SubmitReview>, rating: u8, content_hash: [u8; 32]) -> Result<()> {
         instructions::review::submit_review(ctx, rating, content_hash)
+    }
+    pub fn submit_review_with_credits(
+        ctx: Context<SubmitReviewWithCredits>,
+        rating: u8,
+        content_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::review::submit_review_with_credits(ctx, rating, content_hash)
     }
 
     // Garantia
@@ -73,13 +80,13 @@ pub mod solvers {
     pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 32]) -> Result<()> {
         instructions::escrow::mark_passed(ctx, index, deliverable_hash)
     }
-    pub fn release_milestone(ctx: Context<PayoutMilestone>, index: u8) -> Result<()> {
+    pub fn release_milestone(ctx: Context<ReleaseMilestone>, index: u8) -> Result<()> {
         instructions::escrow::release_milestone(ctx, index)
     }
     pub fn open_dispute(ctx: Context<OpenDispute>, index: u8, reason_hash: [u8; 32]) -> Result<()> {
         instructions::escrow::open_dispute(ctx, index, reason_hash)
     }
-    pub fn resolve_dispute(ctx: Context<PayoutMilestone>, index: u8, refund: bool) -> Result<()> {
+    pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) -> Result<()> {
         instructions::escrow::resolve_dispute(ctx, index, refund)
     }
     pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {

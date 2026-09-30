@@ -51,6 +51,7 @@ export function parseEvents(logs: readonly string[], programId: Address): Solver
   const stack: string[] = [];
   const out: SolversEvent[] = [];
   for (const line of logs) {
+    if (line === "Log truncated") throw new Error("Logs truncados: não é possível extrair eventos com segurança");
     const invoke = /^Program (\w+) invoke \[\d+\]$/.exec(line);
     if (invoke) {
       stack.push(invoke[1]!);

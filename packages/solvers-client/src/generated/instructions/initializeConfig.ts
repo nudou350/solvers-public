@@ -16,8 +16,8 @@ export const INITIALIZE_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Arra
 
 export function getInitializeConfigDiscriminatorBytes(): ReadonlyUint8Array { return fixEncoderSize(getBytesEncoder(), 8).encode(INITIALIZE_CONFIG_DISCRIMINATOR); }
 
-export type InitializeConfigInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountConfig extends string | AccountMeta<string> = string, TAccountUsdcMint extends string | AccountMeta<string> = string, TAccountTreasury extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? WritableSignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountConfig extends string ? WritableAccount<TAccountConfig> : TAccountConfig, TAccountUsdcMint extends string ? ReadonlyAccount<TAccountUsdcMint> : TAccountUsdcMint, TAccountTreasury extends string ? ReadonlyAccount<TAccountTreasury> : TAccountTreasury, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+export type InitializeConfigInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountConfig extends string | AccountMeta<string> = string, TAccountProgram extends string | AccountMeta<string> = "DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW", TAccountProgramData extends string | AccountMeta<string> = string, TAccountUsdcMint extends string | AccountMeta<string> = string, TAccountTreasury extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? WritableSignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountConfig extends string ? WritableAccount<TAccountConfig> : TAccountConfig, TAccountProgram extends string ? ReadonlyAccount<TAccountProgram> : TAccountProgram, TAccountProgramData extends string ? ReadonlyAccount<TAccountProgramData> : TAccountProgramData, TAccountUsdcMint extends string ? ReadonlyAccount<TAccountUsdcMint> : TAccountUsdcMint, TAccountTreasury extends string ? ReadonlyAccount<TAccountTreasury> : TAccountTreasury, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
 
 export type InitializeConfigInstructionData = { discriminator: ReadonlyUint8Array; args: ConfigParams;  };
 
@@ -35,16 +35,19 @@ export function getInitializeConfigInstructionDataCodec(): FixedSizeCodec<Initia
     return combineCodec(getInitializeConfigInstructionDataEncoder(), getInitializeConfigInstructionDataDecoder());
 }
 
-export type InitializeConfigAsyncInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTreasury extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
-  admin: TAccountAdmin;
+export type InitializeConfigAsyncInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountProgram extends InstructionAccountInput = InstructionAccountInput, TAccountProgramData extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTreasury extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  /** Precisa ser a upgrade authority do programa: evita que outra pessoa inicialize primeiro. */
+admin: TAccountAdmin;
 config?: TAccountConfig;
+program?: TAccountProgram;
+programData: TAccountProgramData;
 usdcMint: TAccountUsdcMint;
 treasury: TAccountTreasury;
 systemProgram?: TAccountSystemProgram;
 args: InitializeConfigInstructionDataArgs["args"];
 }
 
-export async function getInitializeConfigInstructionAsync<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTreasury extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: InitializeConfigAsyncInput<TAccountAdmin, TAccountConfig, TAccountUsdcMint, TAccountTreasury, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
+export async function getInitializeConfigInstructionAsync<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountProgram extends InstructionAccountInput, TAccountProgramData extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTreasury extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: InitializeConfigAsyncInput<TAccountAdmin, TAccountConfig, TAccountProgram, TAccountProgramData, TAccountUsdcMint, TAccountTreasury, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountProgram, InstructionAccountInputAddress<TAccountProgram>>, ResolvedInstructionAccountMeta<TAccountProgramData, InstructionAccountInputAddress<TAccountProgramData>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -52,7 +55,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: true }, config: { value: input.config ?? null, isSigner: false, isWritable: true }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, treasury: { value: input.treasury ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: true }, config: { value: input.config ?? null, isSigner: false, isWritable: true }, program: { value: input.program ?? null, isSigner: false, isWritable: false }, programData: { value: input.programData ?? null, isSigner: false, isWritable: false }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, treasury: { value: input.treasury ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -64,23 +67,29 @@ const args = { ...input,  };
 if (!accounts.config.value) {
 accounts.config.value = await findConfigPda({ programAddress });
 }
+if (!accounts.program.value) {
+accounts.program.value = 'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW' as Address<'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW'>;
+}
 if (!accounts.systemProgram.value) {
 accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("treasury", accounts.treasury), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeConfigInstructionDataEncoder().encode(args as InitializeConfigInstructionDataArgs), programAddress } as InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("program", accounts.program), getAccountMeta("programData", accounts.programData), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("treasury", accounts.treasury), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeConfigInstructionDataEncoder().encode(args as InitializeConfigInstructionDataArgs), programAddress } as InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountProgram, InstructionAccountInputAddress<TAccountProgram>>, ResolvedInstructionAccountMeta<TAccountProgramData, InstructionAccountInputAddress<TAccountProgramData>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
 }
 
-export type InitializeConfigInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTreasury extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
-  admin: TAccountAdmin;
+export type InitializeConfigInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountProgram extends InstructionAccountInput = InstructionAccountInput, TAccountProgramData extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTreasury extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  /** Precisa ser a upgrade authority do programa: evita que outra pessoa inicialize primeiro. */
+admin: TAccountAdmin;
 config: TAccountConfig;
+program?: TAccountProgram;
+programData: TAccountProgramData;
 usdcMint: TAccountUsdcMint;
 treasury: TAccountTreasury;
 systemProgram?: TAccountSystemProgram;
 args: InitializeConfigInstructionDataArgs["args"];
 }
 
-export function getInitializeConfigInstruction<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTreasury extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: InitializeConfigInput<TAccountAdmin, TAccountConfig, TAccountUsdcMint, TAccountTreasury, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
+export function getInitializeConfigInstruction<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountProgram extends InstructionAccountInput, TAccountProgramData extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTreasury extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: InitializeConfigInput<TAccountAdmin, TAccountConfig, TAccountProgram, TAccountProgramData, TAccountUsdcMint, TAccountTreasury, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountProgram, InstructionAccountInputAddress<TAccountProgram>>, ResolvedInstructionAccountMeta<TAccountProgramData, InstructionAccountInputAddress<TAccountProgramData>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -88,7 +97,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: true }, config: { value: input.config ?? null, isSigner: false, isWritable: true }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, treasury: { value: input.treasury ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: true }, config: { value: input.config ?? null, isSigner: false, isWritable: true }, program: { value: input.program ?? null, isSigner: false, isWritable: false }, programData: { value: input.programData ?? null, isSigner: false, isWritable: false }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, treasury: { value: input.treasury ?? null, isSigner: false, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -97,26 +106,32 @@ const args = { ...input,  };
 
 
 // Resolve default values.
+if (!accounts.program.value) {
+accounts.program.value = 'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW' as Address<'DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW'>;
+}
 if (!accounts.systemProgram.value) {
 accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("treasury", accounts.treasury), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeConfigInstructionDataEncoder().encode(args as InitializeConfigInstructionDataArgs), programAddress } as InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("program", accounts.program), getAccountMeta("programData", accounts.programData), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("treasury", accounts.treasury), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeConfigInstructionDataEncoder().encode(args as InitializeConfigInstructionDataArgs), programAddress } as InitializeConfigInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountProgram, InstructionAccountInputAddress<TAccountProgram>>, ResolvedInstructionAccountMeta<TAccountProgramData, InstructionAccountInputAddress<TAccountProgramData>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTreasury, InstructionAccountInputAddress<TAccountTreasury>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
 }
 
 export type ParsedInitializeConfigInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
 accounts: {
+/** Precisa ser a upgrade authority do programa: evita que outra pessoa inicialize primeiro. */
 admin: TAccountMetas[0];
 config: TAccountMetas[1];
-usdcMint: TAccountMetas[2];
-treasury: TAccountMetas[3];
-systemProgram: TAccountMetas[4];
+program: TAccountMetas[2];
+programData: TAccountMetas[3];
+usdcMint: TAccountMetas[4];
+treasury: TAccountMetas[5];
+systemProgram: TAccountMetas[6];
 };
 data: InitializeConfigInstructionData; };
 
 export function parseInitializeConfigInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializeConfigInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 5 });
+  if (instruction.accounts.length < 7) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 7 });
 }
 let accountIndex = 0;
 const getNextAccount = () => {
@@ -124,5 +139,5 @@ const getNextAccount = () => {
   accountIndex += 1;
   return accountMeta;
 }
-  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), config: getNextAccount(), usdcMint: getNextAccount(), treasury: getNextAccount(), systemProgram: getNextAccount() }, data: getInitializeConfigInstructionDataDecoder().decode(instruction.data) };
+  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), config: getNextAccount(), program: getNextAccount(), programData: getNextAccount(), usdcMint: getNextAccount(), treasury: getNextAccount(), systemProgram: getNextAccount() }, data: getInitializeConfigInstructionDataDecoder().decode(instruction.data) };
 }

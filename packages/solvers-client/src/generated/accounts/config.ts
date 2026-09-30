@@ -17,7 +17,10 @@ export type Config = { discriminator: ReadonlyUint8Array; admin: Address; verifi
 treasury: Address; usdcMint: Address; feeBps: number; 
 /** Stake mínimo do criador (USDC, 6 casas). */
 minStake: bigint; 
-/** Preço mínimo de licença permanente: cobre o rent da licença pago pela plataforma. */
+/**
+ * Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
+ * das contas que a plataforma paga como fee payer.
+ */
 minPrice: bigint; bump: number;  };
 
 export type ConfigArgs = { admin: Address; verifier: Address; usageAuthority: Address; 
@@ -25,7 +28,10 @@ export type ConfigArgs = { admin: Address; verifier: Address; usageAuthority: Ad
 treasury: Address; usdcMint: Address; feeBps: number; 
 /** Stake mínimo do criador (USDC, 6 casas). */
 minStake: number | bigint; 
-/** Preço mínimo de licença permanente: cobre o rent da licença pago pela plataforma. */
+/**
+ * Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
+ * das contas que a plataforma paga como fee payer.
+ */
 minPrice: number | bigint; bump: number;  };
 
 /** Gets the encoder for {@link ConfigArgs} account data. */

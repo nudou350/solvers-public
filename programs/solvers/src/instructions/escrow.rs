@@ -82,6 +82,8 @@ pub fn create_escrow(
         require!(m.amount > 0, SolversError::InvalidAmount);
         total = total.checked_add(m.amount).ok_or(SolversError::MathOverflow)?;
     }
+    // Garantia mínima: a plataforma paga o rent do escrow e do cofre.
+    require!(total >= ctx.accounts.config.min_price, SolversError::PriceTooLow);
 
     token::transfer_checked(
         CpiContext::new(
@@ -157,13 +159,61 @@ pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 3
     Ok(())
 }
 
+/// Transfere do cofre do escrow assinando com a PDA do escrow.
+fn vault_transfer<'info>(
+    escrow: &Account<'info, Escrow>,
+    vault: &Account<'info, TokenAccount>,
+    mint: &Account<'info, Mint>,
+    to: &Account<'info, TokenAccount>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+) -> Result<()> {
+    if amount == 0 {
+        return Ok(());
+    }
+    let nonce = escrow.nonce.to_le_bytes();
+    let seeds: &[&[u8]] = &[ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &nonce, &[escrow.bump]];
+    token::transfer_checked(
+        CpiContext::new_with_signer(
+            token_program.key(),
+            TransferChecked {
+                from: vault.to_account_info(),
+                mint: mint.to_account_info(),
+                to: to.to_account_info(),
+                authority: escrow.to_account_info(),
+            },
+            &[seeds],
+        ),
+        amount,
+        mint.decimals,
+    )
+}
+
+/// Paga a etapa ao criador descontando a taxa da plataforma.
+#[allow(clippy::too_many_arguments)]
+fn pay_creator<'info>(
+    escrow: &Account<'info, Escrow>,
+    vault: &Account<'info, TokenAccount>,
+    mint: &Account<'info, Mint>,
+    treasury: &Account<'info, TokenAccount>,
+    creator_usdc: &Account<'info, TokenAccount>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+    fee_bps: u16,
+) -> Result<()> {
+    let (fee, rest) = fee_split(amount, fee_bps)?;
+    vault_transfer(escrow, vault, mint, treasury, token_program, fee)?;
+    vault_transfer(escrow, vault, mint, creator_usdc, token_program, rest)
+}
+
+/// Liberação de etapa: só precisa das contas de quem recebe (criador e tesouraria).
 #[derive(Accounts)]
-pub struct PayoutMilestone<'info> {
-    /// Comprador, admin, ou qualquer um (liberação automática).
+pub struct ReleaseMilestone<'info> {
+    /// Comprador (aprovação) ou qualquer um (liberação automática depois do prazo).
     pub caller: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = usdc_mint, has_one = treasury)]
     pub config: Box<Account<'info, Config>>,
-    #[account(mut, seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump, has_one = creator_usdc)]
+    #[account(seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump, has_one = creator_usdc)]
     pub agent: Box<Account<'info, Agent>>,
     #[account(
         mut,
@@ -178,58 +228,17 @@ pub struct PayoutMilestone<'info> {
     pub creator_usdc: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     pub treasury: Box<Account<'info, TokenAccount>>,
-    #[account(mut, token::mint = usdc_mint, token::authority = escrow.buyer)]
-    pub buyer_usdc: Box<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        seeds = [REP_SEED, escrow.buyer.as_ref()],
-        bump = buyer_reputation.bump
-    )]
-    pub buyer_reputation: Box<Account<'info, UserReputation>>,
     pub usdc_mint: Box<Account<'info, Mint>>,
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> PayoutMilestone<'info> {
-    fn vault_transfer(&self, to: &Account<'info, TokenAccount>, amount: u64) -> Result<()> {
-        if amount == 0 {
-            return Ok(());
-        }
-        let escrow = &self.escrow;
-        let nonce = escrow.nonce.to_le_bytes();
-        let seeds: &[&[u8]] = &[ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &nonce, &[escrow.bump]];
-        token::transfer_checked(
-            CpiContext::new_with_signer(
-                self.token_program.key(),
-                TransferChecked {
-                    from: self.vault.to_account_info(),
-                    mint: self.usdc_mint.to_account_info(),
-                    to: to.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                &[seeds],
-            ),
-            amount,
-            self.usdc_mint.decimals,
-        )
-    }
-
-    /// Paga a etapa ao criador descontando a taxa da plataforma.
-    fn pay_creator(&self, amount: u64) -> Result<()> {
-        let (fee, rest) = fee_split(amount, self.config.fee_bps)?;
-        self.vault_transfer(&self.treasury, fee)?;
-        self.vault_transfer(&self.creator_usdc, rest)
-    }
-}
-
-pub fn release_milestone(ctx: Context<PayoutMilestone>, index: u8) -> Result<()> {
+pub fn release_milestone(ctx: Context<ReleaseMilestone>, index: u8) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let caller = ctx.accounts.caller.key();
     let escrow = &ctx.accounts.escrow;
     let window = escrow.review_window_secs;
     let m = escrow.milestones.get(index as usize).ok_or(SolversError::InvalidMilestoneIndex)?;
-    let is_buyer = caller == escrow.buyer;
-    if is_buyer {
+    if caller == escrow.buyer {
         require!(
             matches!(m.status, MilestoneStatus::Pending | MilestoneStatus::Passed),
             SolversError::InvalidMilestoneStatus
@@ -239,7 +248,17 @@ pub fn release_milestone(ctx: Context<PayoutMilestone>, index: u8) -> Result<()>
         require!(now >= m.passed_at + window, SolversError::AutoReleaseNotReached);
     }
     let amount = m.amount;
-    ctx.accounts.pay_creator(amount)?;
+    let a = &ctx.accounts;
+    pay_creator(
+        &a.escrow,
+        &a.vault,
+        &a.usdc_mint,
+        &a.treasury,
+        &a.creator_usdc,
+        &a.token_program,
+        amount,
+        a.config.fee_bps,
+    )?;
 
     let escrow = &mut ctx.accounts.escrow;
     escrow.milestones[index as usize].status = MilestoneStatus::Approved;
@@ -281,8 +300,43 @@ pub fn open_dispute(ctx: Context<OpenDispute>, index: u8, reason_hash: [u8; 32])
     Ok(())
 }
 
-pub fn resolve_dispute(ctx: Context<PayoutMilestone>, index: u8, refund: bool) -> Result<()> {
-    require_keys_eq!(ctx.accounts.caller.key(), ctx.accounts.config.admin, SolversError::NotAdmin);
+/// Resolução de disputa pelo admin. As contas do comprador e do criador são ATAs: se alguém
+/// fechar a sua, ela pode ser recriada no mesmo endereço e a resolução nunca trava.
+#[derive(Accounts)]
+pub struct ResolveDispute<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump = config.bump,
+        has_one = admin @ SolversError::NotAdmin,
+        has_one = usdc_mint,
+        has_one = treasury
+    )]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump, has_one = creator_usdc)]
+    pub agent: Box<Account<'info, Agent>>,
+    #[account(
+        mut,
+        seeds = [ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &escrow.nonce.to_le_bytes()],
+        bump = escrow.bump,
+        has_one = agent
+    )]
+    pub escrow: Box<Account<'info, Escrow>>,
+    #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
+    pub vault: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub creator_usdc: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub treasury: Box<Account<'info, TokenAccount>>,
+    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    pub buyer_usdc: Box<Account<'info, TokenAccount>>,
+    #[account(mut, seeds = [REP_SEED, escrow.buyer.as_ref()], bump = buyer_reputation.bump)]
+    pub buyer_reputation: Box<Account<'info, UserReputation>>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) -> Result<()> {
     let m = ctx
         .accounts
         .escrow
@@ -292,13 +346,23 @@ pub fn resolve_dispute(ctx: Context<PayoutMilestone>, index: u8, refund: bool) -
     require!(m.status == MilestoneStatus::Disputed, SolversError::InvalidMilestoneStatus);
     let amount = m.amount;
 
+    let a = &ctx.accounts;
     let new_status = if refund {
-        ctx.accounts.vault_transfer(&ctx.accounts.buyer_usdc, amount)?;
+        vault_transfer(&a.escrow, &a.vault, &a.usdc_mint, &a.buyer_usdc, &a.token_program, amount)?;
         let agent = &mut ctx.accounts.agent;
         agent.disputes_lost = agent.disputes_lost.saturating_add(1);
         MilestoneStatus::Refunded
     } else {
-        ctx.accounts.pay_creator(amount)?;
+        pay_creator(
+            &a.escrow,
+            &a.vault,
+            &a.usdc_mint,
+            &a.treasury,
+            &a.creator_usdc,
+            &a.token_program,
+            amount,
+            a.config.fee_bps,
+        )?;
         let rep = &mut ctx.accounts.buyer_reputation;
         rep.disputes_lost = rep.disputes_lost.saturating_add(1);
         MilestoneStatus::Approved
@@ -328,24 +392,29 @@ pub struct CloseEscrow<'info> {
     pub escrow: Account<'info, Escrow>,
     #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
     pub vault: Account<'info, TokenAccount>,
+    /// Recebe qualquer sobra do cofre (ex: USDC enviado por fora).
+    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    pub buyer_usdc: Account<'info, TokenAccount>,
+    pub usdc_mint: Account<'info, Mint>,
     pub token_program: Program<'info, Token>,
 }
 
-/// Fecha um escrow encerrado e devolve o rent a quem pagou (a plataforma).
+/// Fecha um escrow encerrado: devolve sobras ao comprador e o rent a quem pagou (a plataforma).
 pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {
-    let escrow = &ctx.accounts.escrow;
+    let a = &ctx.accounts;
     require!(
-        matches!(escrow.status, EscrowStatus::Completed | EscrowStatus::Refunded),
+        matches!(a.escrow.status, EscrowStatus::Completed | EscrowStatus::Refunded),
         SolversError::InvalidMilestoneStatus
     );
-    require!(ctx.accounts.vault.amount == 0, SolversError::InvalidAmount);
+    vault_transfer(&a.escrow, &a.vault, &a.usdc_mint, &a.buyer_usdc, &a.token_program, a.vault.amount)?;
+    let escrow = &a.escrow;
     let nonce = escrow.nonce.to_le_bytes();
     let seeds: &[&[u8]] = &[ESCROW_SEED, escrow.buyer.as_ref(), escrow.agent.as_ref(), &nonce, &[escrow.bump]];
     token::close_account(CpiContext::new_with_signer(
-        ctx.accounts.token_program.key(),
+        a.token_program.key(),
         CloseAccount {
-            account: ctx.accounts.vault.to_account_info(),
-            destination: ctx.accounts.rent_payer.to_account_info(),
+            account: a.vault.to_account_info(),
+            destination: a.rent_payer.to_account_info(),
             authority: escrow.to_account_info(),
         },
         &[seeds],

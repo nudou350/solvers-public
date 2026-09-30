@@ -218,6 +218,10 @@
         {
           "name": "amount",
           "type": "u32"
+        },
+        {
+          "name": "max_total",
+          "type": "u64"
         }
       ]
     },
@@ -304,6 +308,103 @@
               }
             ]
           }
+        },
+        {
+          "name": "buyer_usdc",
+          "docs": [
+            "Recebe qualquer sobra do cofre (ex: USDC enviado por fora)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "escrow.buyer",
+                "account": "Escrow"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
         },
         {
           "name": "token_program",
@@ -605,6 +706,9 @@
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "Precisa ser a upgrade authority do programa: evita que outra pessoa inicialize primeiro."
+          ],
           "writable": true,
           "signer": true
         },
@@ -626,6 +730,13 @@
               }
             ]
           }
+        },
+        {
+          "name": "program",
+          "address": "DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW"
+        },
+        {
+          "name": "program_data"
         },
         {
           "name": "usdc_mint"
@@ -939,7 +1050,12 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "expected_price",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "record_usage_batch",
@@ -1127,7 +1243,97 @@
         },
         {
           "name": "creator_usdc",
-          "writable": true
+          "docs": [
+            "Precisa ser a ATA do criador: se for fechada, qualquer um pode recriá-la no mesmo endereço,",
+            "então pagamentos e reembolsos nunca ficam travados."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
           "name": "stake_vault",
@@ -1197,7 +1403,7 @@
         {
           "name": "caller",
           "docs": [
-            "Comprador, admin, ou qualquer um (liberação automática)."
+            "Comprador (aprovação) ou qualquer um (liberação automática depois do prazo)."
           ],
           "signer": true
         },
@@ -1221,7 +1427,6 @@
         },
         {
           "name": "agent",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1321,31 +1526,6 @@
           "relations": [
             "config"
           ]
-        },
-        {
-          "name": "buyer_usdc",
-          "writable": true
-        },
-        {
-          "name": "buyer_reputation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow.buyer",
-                "account": "Escrow"
-              }
-            ]
-          }
         },
         {
           "name": "usdc_mint",
@@ -1379,11 +1559,11 @@
       ],
       "accounts": [
         {
-          "name": "caller",
-          "docs": [
-            "Comprador, admin, ou qualquer um (liberação automática)."
-          ],
-          "signer": true
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
@@ -1508,7 +1688,94 @@
         },
         {
           "name": "buyer_usdc",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "escrow.buyer",
+                "account": "Escrow"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
           "name": "buyer_reputation",
@@ -1812,12 +2079,137 @@
           }
         },
         {
-          "name": "license_asset",
-          "optional": true
+          "name": "license_asset"
+        },
+        {
+          "name": "license_review",
+          "docs": [
+            "Liga o asset à primeira avaliação feita com ele."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  99,
+                  101,
+                  110,
+                  115,
+                  101,
+                  95,
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "license_asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rating",
+          "type": "u8"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_review_with_credits",
+      "discriminator": [
+        154,
+        13,
+        130,
+        14,
+        249,
+        251,
+        255,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "author",
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "author"
+              }
+            ]
+          }
         },
         {
           "name": "credits",
-          "optional": true,
           "pda": {
             "seeds": [
               {
@@ -2167,6 +2559,19 @@
       ]
     },
     {
+      "name": "LicenseReview",
+      "discriminator": [
+        200,
+        110,
+        114,
+        206,
+        27,
+        83,
+        19,
+        94
+      ]
+    },
+    {
       "name": "Review",
       "discriminator": [
         124,
@@ -2494,6 +2899,16 @@
       "code": 6025,
       "name": "InvalidReviewWindow",
       "msg": "Janela de revisão inválida"
+    },
+    {
+      "code": 6026,
+      "name": "PriceChanged",
+      "msg": "O preço mudou; atualize a página e tente de novo"
+    },
+    {
+      "code": 6027,
+      "name": "LicenseAlreadyReviewed",
+      "msg": "Esta licença já foi usada em outra avaliação"
     }
   ],
   "types": [
@@ -2738,7 +3153,8 @@
           {
             "name": "min_price",
             "docs": [
-              "Preço mínimo de licença permanente: cobre o rent da licença pago pela plataforma."
+              "Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent",
+              "das contas que a plataforma paga como fee payer."
             ],
             "type": "u64"
           },
@@ -3032,6 +3448,30 @@
           {
             "name": "price",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LicenseReview",
+      "docs": [
+        "Marca que um asset de licença já foi usado como prova numa avaliação.",
+        "Impede que a mesma licença, transferida entre carteiras, gere várias avaliações."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "review",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

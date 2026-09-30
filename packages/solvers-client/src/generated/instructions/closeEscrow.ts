@@ -15,8 +15,8 @@ export const CLOSE_ESCROW_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([13
 
 export function getCloseEscrowDiscriminatorBytes(): ReadonlyUint8Array { return fixEncoderSize(getBytesEncoder(), 8).encode(CLOSE_ESCROW_DISCRIMINATOR); }
 
-export type CloseEscrowInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountCaller extends string | AccountMeta<string> = string, TAccountRentPayer extends string | AccountMeta<string> = string, TAccountEscrow extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountTokenProgram extends string | AccountMeta<string> = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountCaller extends string ? ReadonlySignerAccount<TAccountCaller> & AccountSignerMeta<TAccountCaller> : TAccountCaller, TAccountRentPayer extends string ? WritableAccount<TAccountRentPayer> : TAccountRentPayer, TAccountEscrow extends string ? WritableAccount<TAccountEscrow> : TAccountEscrow, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, ...TRemainingAccounts]>;
+export type CloseEscrowInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountCaller extends string | AccountMeta<string> = string, TAccountRentPayer extends string | AccountMeta<string> = string, TAccountEscrow extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountBuyerUsdc extends string | AccountMeta<string> = string, TAccountUsdcMint extends string | AccountMeta<string> = string, TAccountTokenProgram extends string | AccountMeta<string> = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountCaller extends string ? ReadonlySignerAccount<TAccountCaller> & AccountSignerMeta<TAccountCaller> : TAccountCaller, TAccountRentPayer extends string ? WritableAccount<TAccountRentPayer> : TAccountRentPayer, TAccountEscrow extends string ? WritableAccount<TAccountEscrow> : TAccountEscrow, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountBuyerUsdc extends string ? WritableAccount<TAccountBuyerUsdc> : TAccountBuyerUsdc, TAccountUsdcMint extends string ? ReadonlyAccount<TAccountUsdcMint> : TAccountUsdcMint, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, ...TRemainingAccounts]>;
 
 export type CloseEscrowInstructionData = { discriminator: ReadonlyUint8Array;  };
 
@@ -34,15 +34,18 @@ export function getCloseEscrowInstructionDataCodec(): FixedSizeCodec<CloseEscrow
     return combineCodec(getCloseEscrowInstructionDataEncoder(), getCloseEscrowInstructionDataDecoder());
 }
 
-export type CloseEscrowAsyncInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+export type CloseEscrowAsyncInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
   caller: TAccountCaller;
 rentPayer: TAccountRentPayer;
 escrow: TAccountEscrow;
 vault?: TAccountVault;
+/** Recebe qualquer sobra do cofre (ex: USDC enviado por fora). */
+buyerUsdc: TAccountBuyerUsdc;
+usdcMint: TAccountUsdcMint;
 tokenProgram?: TAccountTokenProgram;
 }
 
-export async function getCloseEscrowInstructionAsync<TAccountCaller extends InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput, TAccountEscrow extends InstructionAccountInput, TAccountVault extends InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CloseEscrowAsyncInput<TAccountCaller, TAccountRentPayer, TAccountEscrow, TAccountVault, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): Promise<CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>> {
+export async function getCloseEscrowInstructionAsync<TAccountCaller extends InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput, TAccountEscrow extends InstructionAccountInput, TAccountVault extends InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CloseEscrowAsyncInput<TAccountCaller, TAccountRentPayer, TAccountEscrow, TAccountVault, TAccountBuyerUsdc, TAccountUsdcMint, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): Promise<CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountBuyerUsdc, InstructionAccountInputAddress<TAccountBuyerUsdc>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -50,7 +53,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { caller: { value: input.caller ?? null, isSigner: true, isWritable: false }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true }, escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true }, vault: { value: input.vault ?? null, isSigner: false, isWritable: true }, tokenProgram: { value: input.tokenProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { caller: { value: input.caller ?? null, isSigner: true, isWritable: false }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true }, escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true }, vault: { value: input.vault ?? null, isSigner: false, isWritable: true }, buyerUsdc: { value: input.buyerUsdc ?? null, isSigner: false, isWritable: true }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, tokenProgram: { value: input.tokenProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -62,18 +65,21 @@ if (!accounts.tokenProgram.value) {
 accounts.tokenProgram.value = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), getAccountMeta("rentPayer", accounts.rentPayer), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getCloseEscrowInstructionDataEncoder().encode({}), programAddress } as CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), getAccountMeta("rentPayer", accounts.rentPayer), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("buyerUsdc", accounts.buyerUsdc), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getCloseEscrowInstructionDataEncoder().encode({}), programAddress } as CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountBuyerUsdc, InstructionAccountInputAddress<TAccountBuyerUsdc>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>);
 }
 
-export type CloseEscrowInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+export type CloseEscrowInput<TAccountCaller extends InstructionSignerInput = InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput, TAccountEscrow extends InstructionAccountInput = InstructionAccountInput, TAccountVault extends InstructionAccountInput = InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput = InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput = InstructionAccountInput> =  {
   caller: TAccountCaller;
 rentPayer: TAccountRentPayer;
 escrow: TAccountEscrow;
 vault: TAccountVault;
+/** Recebe qualquer sobra do cofre (ex: USDC enviado por fora). */
+buyerUsdc: TAccountBuyerUsdc;
+usdcMint: TAccountUsdcMint;
 tokenProgram?: TAccountTokenProgram;
 }
 
-export function getCloseEscrowInstruction<TAccountCaller extends InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput, TAccountEscrow extends InstructionAccountInput, TAccountVault extends InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CloseEscrowInput<TAccountCaller, TAccountRentPayer, TAccountEscrow, TAccountVault, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>> {
+export function getCloseEscrowInstruction<TAccountCaller extends InstructionSignerInput, TAccountRentPayer extends InstructionAccountInput, TAccountEscrow extends InstructionAccountInput, TAccountVault extends InstructionAccountInput, TAccountBuyerUsdc extends InstructionAccountInput, TAccountUsdcMint extends InstructionAccountInput, TAccountTokenProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CloseEscrowInput<TAccountCaller, TAccountRentPayer, TAccountEscrow, TAccountVault, TAccountBuyerUsdc, TAccountUsdcMint, TAccountTokenProgram>, config?: { programAddress?: TProgramAddress } ): CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountBuyerUsdc, InstructionAccountInputAddress<TAccountBuyerUsdc>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -81,7 +87,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { caller: { value: input.caller ?? null, isSigner: true, isWritable: false }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true }, escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true }, vault: { value: input.vault ?? null, isSigner: false, isWritable: true }, tokenProgram: { value: input.tokenProgram ?? null, isSigner: false, isWritable: false } }
+const originalAccounts = { caller: { value: input.caller ?? null, isSigner: true, isWritable: false }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true }, escrow: { value: input.escrow ?? null, isSigner: false, isWritable: true }, vault: { value: input.vault ?? null, isSigner: false, isWritable: true }, buyerUsdc: { value: input.buyerUsdc ?? null, isSigner: false, isWritable: true }, usdcMint: { value: input.usdcMint ?? null, isSigner: false, isWritable: false }, tokenProgram: { value: input.tokenProgram ?? null, isSigner: false, isWritable: false } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -90,7 +96,7 @@ if (!accounts.tokenProgram.value) {
 accounts.tokenProgram.value = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
 }
 
-return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), getAccountMeta("rentPayer", accounts.rentPayer), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getCloseEscrowInstructionDataEncoder().encode({}), programAddress } as CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>);
+return Object.freeze({ accounts: [getAccountMeta("caller", accounts.caller), getAccountMeta("rentPayer", accounts.rentPayer), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("buyerUsdc", accounts.buyerUsdc), getAccountMeta("usdcMint", accounts.usdcMint), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getCloseEscrowInstructionDataEncoder().encode({}), programAddress } as CloseEscrowInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountCaller, InstructionAccountInputAddress<TAccountCaller>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>, ResolvedInstructionAccountMeta<TAccountEscrow, InstructionAccountInputAddress<TAccountEscrow>>, ResolvedInstructionAccountMeta<TAccountVault, InstructionAccountInputAddress<TAccountVault>>, ResolvedInstructionAccountMeta<TAccountBuyerUsdc, InstructionAccountInputAddress<TAccountBuyerUsdc>>, ResolvedInstructionAccountMeta<TAccountUsdcMint, InstructionAccountInputAddress<TAccountUsdcMint>>, ResolvedInstructionAccountMeta<TAccountTokenProgram, InstructionAccountInputAddress<TAccountTokenProgram>>>);
 }
 
 export type ParsedCloseEscrowInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
@@ -99,13 +105,16 @@ caller: TAccountMetas[0];
 rentPayer: TAccountMetas[1];
 escrow: TAccountMetas[2];
 vault: TAccountMetas[3];
-tokenProgram: TAccountMetas[4];
+/** Recebe qualquer sobra do cofre (ex: USDC enviado por fora). */
+buyerUsdc: TAccountMetas[4];
+usdcMint: TAccountMetas[5];
+tokenProgram: TAccountMetas[6];
 };
 data: CloseEscrowInstructionData; };
 
 export function parseCloseEscrowInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedCloseEscrowInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 5 });
+  if (instruction.accounts.length < 7) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 7 });
 }
 let accountIndex = 0;
 const getNextAccount = () => {
@@ -113,5 +122,5 @@ const getNextAccount = () => {
   accountIndex += 1;
   return accountMeta;
 }
-  return { programAddress: instruction.programAddress, accounts: { caller: getNextAccount(), rentPayer: getNextAccount(), escrow: getNextAccount(), vault: getNextAccount(), tokenProgram: getNextAccount() }, data: getCloseEscrowInstructionDataDecoder().decode(instruction.data) };
+  return { programAddress: instruction.programAddress, accounts: { caller: getNextAccount(), rentPayer: getNextAccount(), escrow: getNextAccount(), vault: getNextAccount(), buyerUsdc: getNextAccount(), usdcMint: getNextAccount(), tokenProgram: getNextAccount() }, data: getCloseEscrowInstructionDataDecoder().decode(instruction.data) };
 }
