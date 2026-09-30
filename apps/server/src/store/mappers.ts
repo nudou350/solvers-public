@@ -102,7 +102,7 @@ export function creditsToLicense(row: typeof schema.credits.$inferSelect): Licen
   };
 }
 
-export function toReview(row: ReviewRow): Review {
+export function toReview(row: ReviewRow, authorName: string | null = null): Review {
   return {
     id: row.id,
     agentId: row.agentId,
@@ -111,6 +111,7 @@ export function toReview(row: ReviewRow): Review {
     text: row.text,
     createdAt: row.createdAt.toISOString(),
     verifiedPurchase: true,
+    authorName,
   };
 }
 

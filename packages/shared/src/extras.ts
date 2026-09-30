@@ -49,6 +49,8 @@ export const AgentDetail = z.object({
   resalePriceHistory: z.array(z.object({ date: z.string(), priceUsdc: z.number() })),
   /** Quantidade de avaliações por nota, de 5 a 1 estrela. */
   ratingDistribution: z.array(z.number()).length(5),
+  /** Contas on-chain do especialista (link "verificar na blockchain"). */
+  onchain: z.object({ agent: z.string().nullable(), collection: z.string().nullable(), creatorWallet: z.string().nullable() }),
   /** null quando o especialista não oferece garantia (ou ainda não atingiu o mínimo de vendas e nota). */
   guarantee: GuaranteeOffer.nullable(),
 });
@@ -80,6 +82,7 @@ export const CreatorDashboard = z.object({
       agentId: z.string(),
       slug: z.string(),
       name: z.string(),
+      category: z.string(),
       version: z.string(),
       status: z.enum(["active", "pending", "suspended"]),
       listed: z.boolean(),

@@ -63,6 +63,8 @@ export const Review = z.object({
   text: z.string(),
   createdAt: z.string(),
   verifiedPurchase: z.literal(true),
+  /** Nome do perfil de quem avaliou (null: a vitrine mostra a carteira encurtada). */
+  authorName: z.string().nullable(),
 });
 
 export const MilestoneStatus = z.enum(["pending", "submitted", "passed", "approved", "disputed", "refunded"]);

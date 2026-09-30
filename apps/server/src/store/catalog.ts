@@ -55,6 +55,12 @@ const trendSql = sql`(
   ) t
 )`;
 
+/** Data da primeira versão do manifest (a mesma de Agent.publishedAt), ou do cadastro. */
+const publishedAtSql = sql`coalesce(
+  (select min((v->>'releasedAt')::timestamptz) from jsonb_array_elements(coalesce(${schema.agents.details}->'versions', '[]'::jsonb)) v),
+  ${schema.agents.createdAt}
+)`;
+
 export async function listAgents(query: ListQuery): Promise<Agent[]> {
   const conds = [eq(schema.agents.status, "active"), eq(schema.agents.listed, true)];
   if (query.category) conds.push(eq(schema.agents.category, query.category));
@@ -72,7 +78,7 @@ export async function listAgents(query: ListQuery): Promise<Agent[]> {
     query.sort === "uses"
       ? [desc(schema.agents.verifiedUses)]
       : query.sort === "new"
-        ? [desc(schema.agents.createdAt)]
+        ? [desc(publishedAtSql)]
         : query.sort === "trend"
           ? [desc(trendSql), desc(schema.agents.verifiedUses)]
           : [desc(sql`case when ${schema.agents.ratingCount} = 0 then 0 else ${schema.agents.ratingSum}::float / ${schema.agents.ratingCount} end`), desc(schema.agents.ratingCount)];
@@ -149,7 +155,15 @@ export async function listReviews(agentId: string, limit = 50) {
     .where(and(eq(schema.reviews.agentId, agentId), eq(schema.reviews.onchain, true)))
     .orderBy(desc(schema.reviews.createdAt))
     .limit(limit);
-  return rows.map(toReview);
+  const wallets = [...new Set(rows.map((r) => r.authorWallet))];
+  const names = wallets.length
+    ? await db
+        .select({ wallet: schema.userProfiles.wallet, name: schema.userProfiles.displayName })
+        .from(schema.userProfiles)
+        .where(inArray(schema.userProfiles.wallet, wallets))
+    : [];
+  const nameOf = new Map(names.map((n) => [n.wallet, n.name]));
+  return rows.map((r) => toReview(r, nameOf.get(r.authorWallet) ?? null));
 }
 
 export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
@@ -190,6 +204,11 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     pricePerUseBrl: row.pricePerUse > 0n ? Math.round(unitsToUsdc(row.pricePerUse) * rate * 100) / 100 : null,
     resalePriceHistory: resale.map((r) => ({ date: r.at.toISOString(), priceUsdc: unitsToUsdc(r.price) })),
     ratingDistribution: [5, 4, 3, 2, 1].map((star) => dist.find((d) => d.rating === star)?.n ?? 0),
+    onchain: {
+      agent: row.onchainAddress,
+      collection: row.collectionAddress,
+      creatorWallet: (await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, row.creatorId)))[0]?.wallet ?? null,
+    },
     guarantee: guaranteeOffer(row, rate),
   };
 }

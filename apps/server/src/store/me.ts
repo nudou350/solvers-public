@@ -187,6 +187,7 @@ meRouter.get(
       agentId: a.id,
       slug: a.slug,
       name: a.name,
+      category: a.category,
       version: a.version,
       status: (["active", "pending", "suspended"].includes(a.status) ? a.status : "pending") as "active" | "pending" | "suspended",
       listed: a.listed,
