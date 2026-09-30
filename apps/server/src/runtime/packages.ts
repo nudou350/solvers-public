@@ -64,7 +64,9 @@ export function packageHash(dir: string): string {
     .filter((f) => f !== "evals/report.json")
     .sort();
   for (const rel of files) {
-    const content = readFileSync(join(dir, rel));
+    const raw = readFileSync(join(dir, rel));
+    // Texto com CRLF (checkout no Windows) e LF (VPS) precisa dar o mesmo hash.
+    const content = /\.(md|json|tsx?|jsx?|css|txt|ya?ml)$/.test(rel) ? Buffer.from(raw.toString("utf8").replace(/\r\n/g, "\n")) : raw;
     h.update(rel);
     h.update("\0");
     h.update(createHash("sha256").update(content).digest());

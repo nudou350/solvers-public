@@ -1,13 +1,14 @@
 import express, { Router, type Express } from "express";
 import cors from "cors";
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, like, lt } from "drizzle-orm";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { h, HttpError, parse } from "../lib/http.js";
 import { randomId, randomToken, sha256Hex } from "../lib/crypto.js";
-import { mcpAudience, signAccessToken } from "../auth/jwt.js";
+import { mcpAudience, signAccessToken, verifyToken } from "../auth/jwt.js";
 import { createNonce, decodeVerifiedSignature, MEMORY_KEY_MESSAGE, verifySiws } from "../auth/siws.js";
 import { deriveMemoryKey, storeMemoryKey, wrapKey } from "../memory/crypto.js";
 import { authorizePage } from "./page.js";
@@ -88,13 +89,23 @@ const AuthorizeQuery = z.object({
   resource: z.string().optional(),
 });
 
-type AuthRequest = z.infer<typeof AuthorizeQuery> & { clientName: string };
+type AuthRequest = z.infer<typeof AuthorizeQuery> & { clientName: string; nonce?: string };
 
 async function saveAuthRequest(req: AuthRequest): Promise<string> {
   const id = `ar_${randomId(12)}`;
-  await db.delete(schema.kv).where(lt(schema.kv.updatedAt, new Date(Date.now() - AUTH_REQ_TTL_MS)));
+  // Limpa só pedidos de autorização vencidos (o kv guarda outras coisas, como o cursor do indexador).
+  await db.delete(schema.kv).where(and(like(schema.kv.key, "oauth:req:%"), lt(schema.kv.updatedAt, new Date(Date.now() - AUTH_REQ_TTL_MS))));
   await db.insert(schema.kv).values({ key: `oauth:req:${id}`, value: req });
   return id;
+}
+
+/** Clientes conhecidos: a página mostra o destino como verificado; os demais recebem aviso. */
+const KNOWN_REDIRECT_HOSTS = ["claude.ai", "claude.com", "chatgpt.com", "chat.openai.com", "openai.com", "localhost", "127.0.0.1"];
+
+function redirectInfo(uri: string) {
+  const host = new URL(uri).hostname;
+  const verified = KNOWN_REDIRECT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  return { host, verified };
 }
 
 async function loadAuthRequest(id: string): Promise<AuthRequest> {
@@ -129,6 +140,16 @@ async function issueTokens(clientId: string, wallet: string, wrappedMemoryKey: B
 
 export const oauthRouter = Router();
 const open = cors({ origin: true });
+oauthRouter.use(
+  rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
+    message: { error: "too_many_requests", error_description: "Muitas tentativas. Aguarde um minuto." },
+  }),
+);
 
 oauthRouter.post(
   "/register",
@@ -174,7 +195,12 @@ oauthRouter.get(
     }
     const clientName = client.meta.client_name ?? "Seu assistente de IA";
     const id = await saveAuthRequest({ ...q.data, clientName });
-    res.type("html").send(authorizePage({ requestId: id, clientName, apiBase: base(), memoryMessage: MEMORY_KEY_MESSAGE }));
+    const { host, verified } = redirectInfo(q.data.redirect_uri);
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.type("html").send(
+      authorizePage({ requestId: id, clientName, redirectHost: host, verified, apiBase: base(), webUrl: env.PUBLIC_WEB_URL, memoryMessage: MEMORY_KEY_MESSAGE }),
+    );
   }),
 );
 
@@ -182,8 +208,12 @@ oauthRouter.get(
   "/authorize/nonce",
   h(async (req) => {
     const { req: id, wallet } = parse(z.object({ req: z.string(), wallet: z.string().min(32).max(44) }), req.query);
-    await loadAuthRequest(id);
-    return createNonce(wallet, "oauth");
+    const ar = await loadAuthRequest(id);
+    const { host } = redirectInfo(ar.redirect_uri);
+    // A mensagem assinada diz para quem o acesso vai; o nonce fica ligado a este pedido.
+    const n = await createNonce(wallet, "oauth", `Autorizar ${ar.clientName} (${host}) a usar seus especialistas do Solvers. Isto não autoriza pagamentos.`);
+    await db.update(schema.kv).set({ value: { ...ar, nonce: n.nonce } }).where(eq(schema.kv.key, `oauth:req:${id}`));
+    return n;
   }),
 );
 
@@ -202,6 +232,7 @@ oauthRouter.post(
       req.body,
     );
     const ar = await loadAuthRequest(body.req);
+    if (!ar.nonce || !body.message.includes(`Nonce: ${ar.nonce}`)) throw new OAuthError("invalid_request", "Assinatura não pertence a este pedido de autorização");
     const wallet = await verifySiws({ wallet: body.wallet, message: body.message, signature: body.signature }, "oauth");
 
     let wrapped: Buffer | null = null;
@@ -252,14 +283,14 @@ oauthRouter.post(
     }
     if (b.grant_type === "refresh_token") {
       if (!b.refresh_token) throw new OAuthError("invalid_request", "refresh_token é obrigatório");
+      // Rotação atômica: só uma requisição consegue revogar o refresh antigo.
       const [tok] = await db
-        .select()
-        .from(schema.oauthTokens)
-        .where(and(eq(schema.oauthTokens.refreshHash, sha256Hex(b.refresh_token)), eq(schema.oauthTokens.revoked, false)));
+        .update(schema.oauthTokens)
+        .set({ revoked: true })
+        .where(and(eq(schema.oauthTokens.refreshHash, sha256Hex(b.refresh_token)), eq(schema.oauthTokens.revoked, false)))
+        .returning();
       if (!tok || tok.expiresAt < new Date()) throw new OAuthError("invalid_grant", "Refresh token inválido ou expirado");
       if (b.client_id && b.client_id !== tok.clientId) throw new OAuthError("invalid_grant", "Refresh token de outro cliente");
-      // Rotação: o refresh antigo deixa de valer e a chave de memória passa para o novo token.
-      await db.update(schema.oauthTokens).set({ revoked: true }).where(eq(schema.oauthTokens.id, tok.id));
       const [mk] = await db.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tok.id)).returning();
       return issueTokens(tok.clientId, tok.wallet, mk?.wrappedKey ?? null);
     }
@@ -275,12 +306,22 @@ oauthRouter.post(
   h(async (req) => {
     const token = (req.body as Record<string, string>).token;
     if (token) {
-      const [tok] = await db
+      let tokenId: string | undefined;
+      const [byRefresh] = await db
         .update(schema.oauthTokens)
         .set({ revoked: true })
         .where(eq(schema.oauthTokens.refreshHash, sha256Hex(token)))
         .returning();
-      if (tok) await db.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tok.id));
+      tokenId = byRefresh?.id;
+      if (!tokenId) {
+        // Pode ser o access token (JWT): revoga pelo jti.
+        const claims = await verifyToken(token, mcpAudience()).catch(() => null);
+        if (claims?.jti) {
+          await db.update(schema.oauthTokens).set({ revoked: true }).where(eq(schema.oauthTokens.id, claims.jti));
+          tokenId = claims.jti;
+        }
+      }
+      if (tokenId) await db.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tokenId));
     }
     return {};
   }),

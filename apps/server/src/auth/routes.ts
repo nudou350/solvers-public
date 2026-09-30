@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { h, parse } from "../lib/http.js";
 import { SESSION_COOKIE, signSession, requireAuth, requireWallet } from "./jwt.js";
@@ -43,7 +45,9 @@ authRouter.post(
 
 authRouter.post(
   "/logout",
-  h(async (_req, res) => {
+  h(async (req, res) => {
+    // A chave de memória desta sessão some junto com ela.
+    if (req.tokenId) await db.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, req.tokenId));
     res.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
   }),

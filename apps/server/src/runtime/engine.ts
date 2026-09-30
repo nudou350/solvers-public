@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { db, schema } from "../db/index.js";
 import { forbidden, notFound } from "../lib/http.js";
@@ -10,7 +10,13 @@ import type { SolverPackage } from "./packages.js";
 
 export type Session = typeof schema.sessions.$inferSelect;
 
-export async function createSession(wallet: string, pkg: SolverPackage, access: string): Promise<Session> {
+/** Teste grátis: sessão curta e com teto de chamadas (evita baixar a base inteira de graça). */
+const TRIAL_TTL_MS = 2 * 3600_000;
+const PAID_TTL_MS = 24 * 3600_000;
+export const TRIAL_MAX_CALLS = 60;
+
+export async function createSession(wallet: string, pkg: SolverPackage, access: string, licenseId?: string): Promise<Session> {
+  const ttl = access === "trial" ? TRIAL_TTL_MS : PAID_TTL_MS;
   const [s] = await db
     .insert(schema.sessions)
     .values({
@@ -20,17 +26,59 @@ export async function createSession(wallet: string, pkg: SolverPackage, access: 
       version: pkg.manifest.version,
       stepIndex: 0,
       access,
+      licenseId: licenseId ?? null,
       context: { summaries: [] },
+      expiresAt: new Date(Date.now() + ttl),
     })
     .returning();
   return s!;
 }
 
-/** Carrega a sessão garantindo que pertence à carteira do token. */
+/** Sessão ainda aberta da mesma carteira e solver: reaproveitada sem cobrar outro uso. */
+export async function findOpenSession(wallet: string, agentId: string, version: string, totalSteps: number): Promise<Session | null> {
+  const [s] = await db
+    .select()
+    .from(schema.sessions)
+    .where(
+      and(
+        eq(schema.sessions.wallet, wallet),
+        eq(schema.sessions.agentId, agentId),
+        eq(schema.sessions.version, version),
+        gt(schema.sessions.expiresAt, new Date()),
+        sql`${schema.sessions.stepIndex} <= ${totalSteps}`,
+      ),
+    )
+    .orderBy(desc(schema.sessions.createdAt))
+    .limit(1);
+  return s ?? null;
+}
+
+/**
+ * Carrega a sessão garantindo que pertence à carteira do token, que não expirou, que o teste
+ * grátis não passou do teto e que a licença (se for o caso) continua com a mesma carteira.
+ */
 export async function getSession(sessionId: string, wallet: string): Promise<Session> {
-  const [s] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, sessionId));
-  if (!s) throw notFound("Sessão não encontrada. Ative o solver de novo com activate_solver.");
-  if (s.wallet !== wallet) throw forbidden("Esta sessão pertence a outra carteira.");
+  const [s] = await db
+    .update(schema.sessions)
+    .set({ calls: sql`${schema.sessions.calls} + 1` })
+    .where(and(eq(schema.sessions.id, sessionId), eq(schema.sessions.wallet, wallet)))
+    .returning();
+  if (!s) {
+    const [other] = await db.select({ id: schema.sessions.id }).from(schema.sessions).where(eq(schema.sessions.id, sessionId));
+    if (other) throw forbidden("Esta sessão pertence a outra carteira.");
+    throw notFound("Sessão não encontrada. Ative o solver de novo com activate_solver.");
+  }
+  if (s.expiresAt < new Date()) throw forbidden("Sessão expirada. Ative o solver de novo com activate_solver.");
+  if (s.access === "trial" && s.calls > TRIAL_MAX_CALLS) {
+    throw forbidden("Limite do teste grátis atingido nesta sessão. Para continuar, o usuário pode comprar o especialista.");
+  }
+  if (s.access === "license" && s.licenseId) {
+    const [lic] = await db
+      .select({ owner: schema.licenses.ownerWallet })
+      .from(schema.licenses)
+      .where(eq(schema.licenses.id, s.licenseId));
+    if (!lic || lic.owner !== wallet) throw forbidden("A licença deste especialista não pertence mais a esta carteira.");
+  }
   return s;
 }
 

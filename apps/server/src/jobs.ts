@@ -1,11 +1,11 @@
-import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { address } from "@solvers/chain";
 import * as gen from "@solvers/client";
 import { authorities, chain } from "./chain/index.js";
 import { db, schema } from "./db/index.js";
 import { env } from "./env.js";
 import { processSignature } from "./indexer/processor.js";
-import { sha256 } from "./lib/crypto.js";
+import { randomId, sha256 } from "./lib/crypto.js";
 
 // Jobs periódicos:
 // - auto release (a cada minuto): etapas aprovadas nos testes cujo prazo venceu são pagas ao criador.
@@ -91,6 +91,7 @@ export async function recordUsageBatchOnce(): Promise<number> {
       and(
         eq(schema.usageEvents.tool, "activate_solver"),
         eq(schema.usageEvents.batched, false),
+        isNull(schema.usageEvents.batchId),
         inArray(schema.sessions.access, ["license", "trial"]),
         lt(schema.usageEvents.createdAt, sql`now() - interval '10 seconds'`),
       ),
@@ -101,18 +102,26 @@ export async function recordUsageBatchOnce(): Promise<number> {
   const c = chain();
   let total = 0;
   for (const [agentId, list] of byAgent) {
+    // Marca o lote ANTES de enviar: se a transação confirmar e o processo cair, não reenvia.
+    // Um lote que ficar marcado sem confirmação é revisado manualmente (usage_events.batch_id).
+    const batchId = `batch_${randomId(8)}`;
+    const ids = list.map((l) => l.id);
+    await db.update(schema.usageEvents).set({ batchId }).where(inArray(schema.usageEvents.id, ids));
     try {
       const root = merkleRoot(list.map((l) => Buffer.from(l.hash ?? "", "hex")));
       const ix = await c.recordUsageBatchIx(authorities().usage, agentId, BigInt(list.length), root);
       const { signature } = await c.sendAsServer([ix]);
-      await db
-        .update(schema.usageEvents)
-        .set({ batched: true })
-        .where(inArray(schema.usageEvents.id, list.map((l) => l.id)));
-      await processSignature(signature);
+      await db.update(schema.usageEvents).set({ batched: true }).where(inArray(schema.usageEvents.id, ids));
+      await processSignature(signature).catch(() => undefined);
       total += list.length;
     } catch (e) {
-      console.error(`[jobs] lote de usos ${agentId}:`, (e as Error).message);
+      const msg = (e as Error).message;
+      // Falhou antes de chegar à rede: libera o lote para a próxima rodada. Timeout de confirmação
+      // fica marcado (a transação pode ter entrado) para não contar em dobro.
+      if (!/expirou|Tempo esgotado/.test(msg)) {
+        await db.update(schema.usageEvents).set({ batchId: null }).where(inArray(schema.usageEvents.id, ids));
+      }
+      console.error(`[jobs] lote de usos ${agentId} (${batchId}):`, msg);
     }
   }
   return total;

@@ -26,7 +26,7 @@ import { runMigrations } from "../db/migrate.js";
 import { processSignature } from "../indexer/processor.js";
 import { sha256 } from "../lib/crypto.js";
 import { getPackage } from "../runtime/packages.js";
-import { readDeliverable, submitDeliverable } from "../verifier/deliverables.js";
+import { criteriaHash, readDeliverable, saveAcceptance, submitDeliverable } from "../verifier/deliverables.js";
 
 const KEYS = join(process.cwd(), ".keys", "buyers");
 const BUYERS = ["ana", "bruno", "carla", "diego", "elisa", "fabio", "gabi", "novato"];
@@ -144,8 +144,9 @@ async function main() {
   // Usos verificados (lote on-chain) + histórico de 14 dias para a tendência da semana.
   for (const [i, a] of agents.entries()) {
     const base = 40 + ((i * 97) % 600);
-    const recent = Math.round(base * (0.35 + ((i * 13) % 7) / 10));
-    const previous = base - recent;
+    // Semanas parecidas com variação de -25% a +35%, como uma loja de verdade.
+    const previous = Math.round(base / 2);
+    const recent = Math.round(previous * (0.75 + ((i * 3) % 7) / 10));
     const [already] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(schema.usageEvents).where(eq(schema.usageEvents.agentId, a.id));
     if ((already?.n ?? 0) < 20) {
       const rows = [];
@@ -179,27 +180,31 @@ async function main() {
     const existing = await db.select().from(schema.escrows).where(eq(schema.escrows.buyerWallet, b.address));
     if (existing.length === 0) {
       const files = readDeliverable(join(example.dir, "verifier", "example"));
+      // A bateria de aceite combinada é o teste do exemplo; a entrega leva o componente e os próprios testes.
+      const acceptanceTests = Object.fromEntries(Object.entries(files).filter(([n]) => n.endsWith(".test.tsx")));
       for (const [n, done] of [
         [1, true],
         [2, false],
       ] as const) {
-        const nonce = BigInt(Date.now() + n);
+        const nonce = BigInt(Date.now()) * 10n + BigInt(n);
         const ms = [
           { title: "Formulário de login acessível", criteria: "Todos os testes passam; Sem erros de acessibilidade críticos", amountUsdc: 8 },
           { title: "Tela de recuperação de senha", criteria: "Todos os testes passam; Mensagens de erro anunciadas ao leitor de tela", amountUsdc: 6 },
         ];
+        const escrowAddr = await c.escrowPda(b.address, await c.agentPda(fe.id), nonce);
+        const acc = saveAcceptance(escrowAddr, 0, acceptanceTests);
         const { instructions, escrow } = await c.createEscrowIxs(
           b.address,
           fe.id,
           nonce,
-          ms.map((m) => ({ amount: usdcToUnits(m.amountUsdc), criteriaHash: sha256(`${m.title}\n${m.criteria}`) })),
+          ms.map((m, idx) => ({ amount: usdcToUnits(m.amountUsdc), criteriaHash: criteriaHash(m.title, m.criteria, idx === 0 ? acc.hash : null) })),
           BigInt(Number(process.env.ESCROW_REVIEW_WINDOW_SECS ?? 259200)),
         );
         await db.insert(schema.escrows).values({
           id: escrow,
           agentId: fe.id,
           buyerWallet: b.address,
-          creatorWallet: fe.creatorId,
+          creatorWallet: (await db.select().from(schema.creators).where(eq(schema.creators.id, fe.creatorId)))[0]?.wallet ?? fe.creatorId,
           nonce,
           total: usdcToUnits(14),
           status: "pending",
@@ -211,8 +216,10 @@ async function main() {
             idx,
             title: m.title,
             criteria: m.criteria,
-            criteriaHash: sha256(`${m.title}\n${m.criteria}`).toString("hex"),
+            criteriaHash: criteriaHash(m.title, m.criteria, idx === 0 ? acc.hash : null).toString("hex"),
             amount: usdcToUnits(m.amountUsdc),
+            acceptancePath: idx === 0 ? acc.path : null,
+            acceptanceHash: idx === 0 ? acc.hash : null,
           })),
         );
         await asUser(b, instructions);

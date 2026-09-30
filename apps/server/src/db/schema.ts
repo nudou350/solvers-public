@@ -175,6 +175,9 @@ export const milestones = pgTable(
     deliverablePath: text("deliverable_path"),
     deliverableHash: text("deliverable_hash"),
     previewUrl: text("preview_url"),
+    /** Bateria de aceite combinada na criação (a entrega não consegue trocá-la). */
+    acceptancePath: text("acceptance_path"),
+    acceptanceHash: text("acceptance_hash"),
     verifierReport: jsonb("verifier_report").$type<Record<string, unknown>>(),
     disputeReason: text("dispute_reason"),
     disputeCriterion: text("dispute_criterion"),
@@ -200,6 +203,8 @@ export const usageEvents = pgTable(
     tool: text("tool").notNull(),
     responseHash: text("response_hash"),
     batched: boolean("batched").notNull().default(false),
+    /** Lote em envio (marcado antes da transação para não contar duas vezes). */
+    batchId: text("batch_id"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("usage_agent_created_idx").on(t.agentId, t.createdAt), index("usage_wallet_idx").on(t.wallet)],
@@ -213,6 +218,9 @@ export const sessions = pgTable("sessions", {
   stepIndex: integer("step_index").notNull().default(0),
   access: text("access").notNull(), // license | credits | trial
   context: jsonb("context").$type<Record<string, unknown>>().notNull().default({}),
+  licenseId: text("license_id"),
+  calls: integer("calls").notNull().default(0),
+  expiresAt: ts("expires_at").notNull().default(sql`now() + interval '24 hours'`),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });

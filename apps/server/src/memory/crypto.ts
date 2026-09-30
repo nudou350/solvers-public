@@ -19,15 +19,18 @@ export function deriveMemoryKey(signature: Uint8Array, wallet: string): Buffer {
   return Buffer.from(hkdfSync("sha256", signature, Buffer.from(wallet), Buffer.from("solvers-memory"), 32));
 }
 
-function seal(key: Buffer, plaintext: Buffer) {
+/** AES-256-GCM. `aad` amarra o texto cifrado ao seu dono (carteira|solver): linhas não podem ser trocadas. */
+function seal(key: Buffer, plaintext: Buffer, aad?: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
+  if (aad) cipher.setAAD(Buffer.from(aad));
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   return { iv, tag: cipher.getAuthTag(), ciphertext };
 }
 
-function open(key: Buffer, iv: Buffer, tag: Buffer, ciphertext: Buffer): Buffer {
+function open(key: Buffer, iv: Buffer, tag: Buffer, ciphertext: Buffer, aad?: string): Buffer {
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  if (aad) decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
@@ -62,7 +65,7 @@ export async function memoryKeyFor(tokenId: string | undefined, wallet: string):
 type MemoryPayload = { summary: string };
 
 export async function saveMemory(wallet: string, agentId: string, key: Buffer, summary: string) {
-  const { iv, tag, ciphertext } = seal(key, Buffer.from(JSON.stringify({ summary } satisfies MemoryPayload)));
+  const { iv, tag, ciphertext } = seal(key, Buffer.from(JSON.stringify({ summary } satisfies MemoryPayload)), `${wallet}|${agentId}`);
   const [row] = await db
     .insert(schema.memories)
     .values({ id: `mem_${randomId(10)}`, wallet, agentId, ciphertext, iv, tag, updatedAt: new Date() })
@@ -84,7 +87,7 @@ export async function readMemories(wallet: string, key: Buffer, agentId?: string
   const out: OpenMemory[] = [];
   for (const r of rows) {
     try {
-      const payload = JSON.parse(open(key, r.iv, r.tag, r.ciphertext).toString("utf8")) as MemoryPayload;
+      const payload = JSON.parse(open(key, r.iv, r.tag, r.ciphertext, `${r.wallet}|${r.agentId}`).toString("utf8")) as MemoryPayload;
       out.push({ id: r.id, agentId: r.agentId, summary: payload.summary, updatedAt: r.updatedAt });
     } catch {
       // Chave diferente (outra carteira/assinatura): não dá para abrir. Nunca devolve bytes crus.

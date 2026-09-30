@@ -28,6 +28,8 @@ ln -sfn $APP/releases/$SHA $APP/app
 ln -sfn $APP/app/apps/server $APP/backend
 ln -sfn $APP/app/agents $APP/agents
 cd $APP/backend && node --env-file=.env dist/db/migrate.js
+# Imagem do verificador da garantia (só reconstrói se o harness mudar).
+docker build -q -t solvers-react-test $APP/app/agents/frontend-react/verifier >/dev/null && echo "✔ imagem solvers-react-test"
 cd $APP
 if pm2 describe solvers-api >/dev/null 2>&1; then pm2 reload solvers-api --update-env; else pm2 start app/infra/ecosystem.config.cjs; fi
 pm2 save >/dev/null

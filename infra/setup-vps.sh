@@ -21,7 +21,36 @@ if ! sudo -u postgres psql -p 5433 -tAc "select 1 from pg_roles where rolname='s
 fi
 sudo -u postgres psql -p 5433 -d solvers -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
-# Verificador da garantia: imagem de testes e acesso ao Docker.
+# .env de produção (segredos gerados aqui; nunca sai da VPS).
+if [ ! -f $APP/shared/.env ]; then
+  . $APP/shared/db.env
+  cat > $APP/shared/.env <<ENV
+NODE_ENV=production
+PORT=3017
+PUBLIC_API_URL=https://$DOMAIN
+PUBLIC_WEB_URL=https://$DOMAIN
+SIWS_DOMAIN=$DOMAIN
+DATABASE_URL=$DATABASE_URL
+SOLANA_CLUSTER=devnet
+SOLANA_RPC_URL=https://api.devnet.solana.com
+USDC_MINT=4Ut3YnnVQjQ6UgedWFtd3PmDN1E25iZpq47YtoNYdTi3
+FEE_PAYER_KEYPAIR=$APP/keys/fee-payer.json
+VERIFIER_KEYPAIR=$APP/keys/verifier.json
+USAGE_AUTHORITY_KEYPAIR=$APP/keys/usage.json
+HELIUS_WEBHOOK_SECRET=$(openssl rand -hex 24)
+JWT_SECRET=$(openssl rand -hex 32)
+SERVER_KEK=$(openssl rand -base64 32)
+FAUCET_ENABLED=true
+AGENTS_DIR=$APP/agents
+DELIVERABLES_DIR=$APP/deliverables
+VERIFIER_MODE=docker
+VERIFIER_IMAGE=solvers-react-test
+ENV
+  chmod 600 $APP/shared/.env
+  echo "✔ .env criado em $APP/shared/.env (copie as chaves fee-payer/verifier/usage para $APP/keys)"
+fi
+
+# Verificador da garantia: acesso ao Docker (o usuário deploy no grupo docker equivale a root no host).
 if ! id -nG deploy | grep -qw docker; then sudo usermod -aG docker deploy; echo "deploy adicionado ao grupo docker (relogar)"; fi
 
 # nginx + HTTPS: só quando o DNS já aponta para esta VPS.

@@ -4,7 +4,16 @@
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export function authorizePage(p: { requestId?: string; clientName?: string; apiBase?: string; memoryMessage?: string; error?: string }) {
+export function authorizePage(p: {
+  requestId?: string;
+  clientName?: string;
+  redirectHost?: string;
+  verified?: boolean;
+  apiBase?: string;
+  webUrl?: string;
+  memoryMessage?: string;
+  error?: string;
+}) {
   const config = JSON.stringify({ req: p.requestId, api: p.apiBase, memoryMessage: p.memoryMessage }).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="pt-BR">
@@ -31,6 +40,8 @@ export function authorizePage(p: { requestId?: string; clientName?: string; apiB
   .status { margin-top:14px; font-size:14px; color:var(--muted); min-height:20px; }
   .error { color:var(--err); }
   .fine { font-size:13px; margin-top:18px; }
+  .dest { font-size:14px; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:0 0 16px; }
+  .warn { border-color:#f79009; color:var(--ink); }
   a { color:var(--accent); }
 </style>
 </head>
@@ -42,13 +53,18 @@ export function authorizePage(p: { requestId?: string; clientName?: string; apiB
       ? `<h1>Não foi possível continuar</h1><p class="error">${esc(p.error)}</p>`
       : `<h1>Conectar ${esc(p.clientName ?? "seu assistente")} ao Solvers</h1>
   <p>Assim seus especialistas passam a funcionar dentro do chat.</p>
+  <p class="dest${p.verified ? "" : " warn"}">${
+    p.verified
+      ? `Destino verificado: <strong>${esc(p.redirectHost ?? "")}</strong>`
+      : `⚠ Aplicativo não verificado. O acesso será enviado para <strong>${esc(p.redirectHost ?? "")}</strong>. Continue só se você mesmo iniciou esta conexão.`
+  }</p>
   <ul>
     <li>Você confirma que a carteira é sua (sem custo e sem pagamento).</li>
     <li>Uma segunda assinatura protege suas memórias com criptografia.</li>
   </ul>
   <button id="go" type="button">Conectar carteira</button>
   <div id="status" class="status" role="status" aria-live="polite"></div>
-  <p class="fine">Não tem carteira? Entre pela <a href="#" id="web">loja do Solvers</a> com seu e-mail e volte aqui.</p>`
+  <p class="fine">Não tem carteira? Entre pela <a href="${esc(p.webUrl ?? "/")}" target="_blank" rel="noopener">loja do Solvers</a> com seu e-mail e volte aqui.</p>`
   }
 </main>
 ${

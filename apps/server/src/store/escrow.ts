@@ -9,10 +9,12 @@ import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { requireAuth, requireWallet } from "../auth/jwt.js";
 import { badRequest, forbidden, h, HttpError, notFound, parse } from "../lib/http.js";
-import { sha256, sha256Hex } from "../lib/crypto.js";
+import { sha256 } from "../lib/crypto.js";
+import { randomBytes } from "node:crypto";
+import { sql } from "drizzle-orm";
 import { processSignature } from "../indexer/processor.js";
 import { refreshLicenseOwner } from "../indexer/sync.js";
-import { readDeliverable } from "../verifier/deliverables.js";
+import { criteriaHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
 import { findAgentRow } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
 import { notifyCreator } from "../notify/telegram.js";
@@ -34,10 +36,27 @@ async function loadEscrow(id: string, wallet: string) {
 const CreateBody = z.object({
   agentId: z.string(),
   milestones: z
-    .array(z.object({ title: z.string().min(2).max(120), criteria: z.string().min(2).max(1000), amountUsdc: z.number().positive() }))
+    .array(
+      z.object({
+        title: z.string().min(2).max(120),
+        /** Critérios em texto; separe vários com ";" ou quebra de linha. */
+        criteria: z.string().min(2).max(1000),
+        amountUsdc: z.number().positive(),
+        /** Bateria de aceite (ex: { "LoginForm.test.tsx": "..." }): fixa, a entrega não consegue trocá-la. */
+        acceptanceTests: z.record(z.string().max(100_000)).optional(),
+      }),
+    )
     .min(1)
     .max(5),
 });
+
+/** Critérios combinados de uma etapa, um por item. */
+export function splitCriteria(criteria: string): string[] {
+  return criteria
+    .split(/\n|;/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 escrowRouter.post(
   "/tx/escrow",
@@ -53,14 +72,20 @@ escrowRouter.post(
     const rep = toReputation(wallet, repRow);
     const total = body.milestones.reduce((s, m) => s + m.amountUsdc, 0);
     const limit = GUARANTEE_LIMITS_USDC[rep.guaranteeLevel];
-    if (total > limit) {
+    // O limite vale para o total em garantias abertas da carteira, não por garantia.
+    const [open] = await db
+      .select({ sum: sql<string>`coalesce(sum(${schema.escrows.total}), 0)` })
+      .from(schema.escrows)
+      .where(and(eq(schema.escrows.buyerWallet, wallet), inArray(schema.escrows.status, ["pending", "active", "disputed"]), eq(schema.escrows.closed, false)));
+    const openUsdc = unitsToUsdc(BigInt(open?.sum ?? "0"));
+    if (total + openUsdc > limit) {
       throw new HttpError(
         400,
         rep.guaranteeLevel === "none"
           ? "Sua conta não pode abrir tarefas com garantia no momento."
-          : `Seu limite atual de garantia é de ${limit} USDC. Ele aumenta conforme você faz compras na loja.`,
+          : `Seu limite atual de garantias abertas é de ${limit} USDC (você já tem ${openUsdc} USDC em andamento). Ele aumenta conforme você faz compras na loja.`,
         "guarantee_limit",
-        { guaranteeLevel: rep.guaranteeLevel, limitUsdc: limit },
+        { guaranteeLevel: rep.guaranteeLevel, limitUsdc: limit, openUsdc },
       );
     }
     if (rep.guaranteeLevel === "limited" && body.milestones.length < 2 && total > 10) {
@@ -77,20 +102,24 @@ escrowRouter.post(
       throw new HttpError(400, "Saldo de USDC insuficiente", "insufficient_funds", { balanceUsdc: unitsToUsdc(balance), neededUsdc: total });
     }
 
-    const nonce = BigInt(Date.now());
-    const milestones = body.milestones.map((m) => ({
+    // 63 bits: cabe no bigint (com sinal) do Postgres e no u64 on-chain.
+    const nonce = randomBytes(8).readBigUInt64LE() >> 1n;
+    const escrow = await c.escrowPda(wallet, await c.agentPda(agent.id), nonce);
+    // Critérios combinados antes: texto + hash da bateria de aceite; o hash de tudo vai on-chain.
+    const acceptance = body.milestones.map((m, idx) => (m.acceptanceTests ? saveAcceptance(escrow, idx, m.acceptanceTests) : null));
+    const milestones = body.milestones.map((m, idx) => ({
       amount: usdcToUnits(m.amountUsdc),
-      // Critérios combinados antes: o hash vai on-chain, o texto fica aqui.
-      criteriaHash: sha256(`${m.title}\n${m.criteria}`),
+      criteriaHash: criteriaHash(m.title, m.criteria, acceptance[idx]?.hash),
     }));
-    const { instructions, escrow } = await c.createEscrowIxs(wallet, agent.id, nonce, milestones, BigInt(env.ESCROW_REVIEW_WINDOW_SECS));
+    const { instructions } = await c.createEscrowIxs(wallet, agent.id, nonce, milestones, BigInt(env.ESCROW_REVIEW_WINDOW_SECS));
 
+    const [creatorRow] = await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, agent.creatorId));
     await db.transaction(async (tx) => {
       await tx.insert(schema.escrows).values({
         id: escrow,
         agentId: agent.id,
         buyerWallet: wallet,
-        creatorWallet: agent.creatorId,
+        creatorWallet: creatorRow?.wallet ?? agent.creatorId,
         nonce,
         total: usdcToUnits(total),
         status: "pending",
@@ -102,9 +131,11 @@ escrowRouter.post(
           idx,
           title: m.title,
           criteria: m.criteria,
-          criteriaHash: sha256Hex(`${m.title}\n${m.criteria}`),
+          criteriaHash: criteriaHash(m.title, m.criteria, acceptance[idx]?.hash).toString("hex"),
           amount: usdcToUnits(m.amountUsdc),
           status: "pending",
+          acceptancePath: acceptance[idx]?.path ?? null,
+          acceptanceHash: acceptance[idx]?.hash ?? null,
         })),
       );
     });
@@ -149,8 +180,8 @@ escrowRouter.post(
     if (m.status === "passed" && m.passedAt && Date.now() > m.passedAt.getTime() + row.reviewWindowSecs * 1000) {
       throw badRequest("O prazo para contestar esta etapa já passou.");
     }
-    const criteria = m.criteria.split(/\n|;/).map((s) => s.trim()).filter(Boolean);
-    if (!criteria.some((c) => c === body.criterion.trim() || m.criteria.includes(body.criterion.trim()))) {
+    const criteria = splitCriteria(m.criteria);
+    if (!criteria.includes(body.criterion.trim())) {
       throw badRequest("Indique qual dos critérios combinados falhou.", "invalid_criterion", { criteria });
     }
     await db
@@ -172,6 +203,8 @@ function milestoneExtras(m: MilestoneRow) {
     passedAt: m.passedAt?.toISOString() ?? null,
     previewUrl: m.status === "passed" || m.status === "approved" ? m.previewUrl : null,
     tests: report ? { passed: report.numPassed ?? 0, total: report.numTests ?? 0, mode: report.mode ?? "docker" } : null,
+    criteria: splitCriteria(m.criteria),
+    hasAcceptanceTests: !!m.acceptanceHash,
     disputeCriterion: m.disputeCriterion,
     downloadable: m.status === "approved" && !!m.deliverablePath,
   };

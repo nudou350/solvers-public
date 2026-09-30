@@ -8,7 +8,7 @@ import { HttpError } from "../lib/http.js";
 import { findAgentRow } from "../store/catalog.js";
 import { searchAgentRows, searchKnowledge } from "../knowledge/search.js";
 import { ownedAgents, resolveAccess } from "../runtime/access.js";
-import { advance, createSession, getSession, overview, renderStep, responseHash, watermark } from "../runtime/engine.js";
+import { advance, createSession, findOpenSession, getSession, overview, renderStep, responseHash, watermark } from "../runtime/engine.js";
 import { getPackage, type SolverPackage } from "../runtime/packages.js";
 import { runServerTool } from "../runtime/tools.js";
 import { memoryKeyFor, readMemories, saveMemory } from "../memory/crypto.js";
@@ -151,13 +151,22 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Ativar especialista",
       description:
-        "Ativa um especialista para a tarefa atual e devolve session_id, visão geral e requisitos. Chame antes de começar a trabalhar com um especialista. Depois, rode preflight_check.",
+        "Ativa um especialista para a tarefa atual e devolve session_id, visão geral e requisitos. Cada ativação nova consome 1 uso (crédito ou teste grátis); se já existe uma sessão aberta deste especialista, ela é reaproveitada sem custo. Reutilize o session_id durante toda a tarefa. Depois, rode preflight_check.",
       inputSchema: { agent_id: z.string().describe("agent_id vindo de list_my_solvers ou find_solver") },
     },
     tool(ctx, "activate_solver", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
       const pkg = requirePackage(row.id);
       if (row.status !== "active") return { text: "Este especialista está temporariamente indisponível.", agentId: row.id };
+      const open = await findOpenSession(ctx.wallet, row.id, pkg.manifest.version, pkg.steps.length);
+      if (open) {
+        const step = Math.min(open.stepIndex + 1, pkg.steps.length);
+        return {
+          text: `session_id: ${open.id}\nSessão já aberta reaproveitada (sem consumir outro uso). Continue de onde parou: etapa ${step} de ${pkg.steps.length}. Chame next_step para seguir.`,
+          agentId: row.id,
+          sessionId: open.id,
+        };
+      }
       const access = await resolveAccess(ctx.wallet, row, { consume: true });
       if (!access.ok) {
         return {
@@ -167,7 +176,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           agentId: row.id,
         };
       }
-      const session = await createSession(ctx.wallet, pkg, access.kind);
+      const session = await createSession(ctx.wallet, pkg, access.kind, access.kind === "license" ? access.licenseId : undefined);
       const accessLine =
         access.kind === "license"
           ? "Acesso: licença permanente."

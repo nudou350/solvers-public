@@ -33,7 +33,7 @@ export async function login(signer: KeyPairSigner): Promise<string> {
   const signature = getBase58Decoder().decode(sig);
   const { token } = await api<{ token: string }>("/api/auth/verify", {
     method: "POST",
-    body: JSON.stringify({ wallet: signer.address, message, signature }),
+    body: JSON.stringify({ wallet: signer.address, message, signature, returnToken: true }),
   });
   return token;
 }

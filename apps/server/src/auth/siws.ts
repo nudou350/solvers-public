@@ -48,7 +48,7 @@ export function buildSiwsMessage(p: {
   ].join("\n");
 }
 
-export async function createNonce(wallet: string, purpose = "login") {
+export async function createNonce(wallet: string, purpose = "login", statement?: string) {
   assertWallet(wallet);
   await db.delete(schema.authNonces).where(lt(schema.authNonces.expiresAt, new Date()));
   const nonce = randomToken(12).replace(/[^a-zA-Z0-9]/g, "").slice(0, 16).padEnd(8, "0");
@@ -63,6 +63,7 @@ export async function createNonce(wallet: string, purpose = "login") {
     issuedAt: now.toISOString(),
     expirationTime: expiresAt.toISOString(),
     uri: env.PUBLIC_WEB_URL,
+    statement,
   });
   return { nonce, message, domain, issuedAt: now.toISOString(), expirationTime: expiresAt.toISOString() };
 }

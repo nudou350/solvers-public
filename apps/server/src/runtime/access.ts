@@ -20,7 +20,8 @@ async function licenseOf(wallet: string, agent: AgentRow): Promise<string | null
     .from(schema.licenses)
     .where(and(eq(schema.licenses.ownerWallet, wallet), eq(schema.licenses.agentId, agent.id)));
   for (const r of rows) {
-    const owner = await refreshLicenseOwner(r.id).catch(() => wallet);
+    // Se o RPC falhar, vale o dono registrado no banco (nunca "assume" a carteira que pediu).
+    const owner = await refreshLicenseOwner(r.id).catch(() => r.ownerWallet);
     if (owner === wallet) return r.id;
   }
   // Fallback on-chain: comprou e o indexador ainda não gravou (INSTRUCTIONS.md 5.11).
@@ -53,7 +54,10 @@ export async function resolveAccess(wallet: string, agent: AgentRow, opts: { con
     const c = chain();
     const ix = await c.consumeCreditIx(authorities().usage, agent.id, address(wallet));
     const { signature } = await c.sendAsServer([ix]);
-    await syncCredits(address(agent.onchainAddress), address(wallet), agent.id);
+    // O crédito já foi consumido on-chain: falha no espelho não pode impedir a sessão.
+    await syncCredits(address(agent.onchainAddress), address(wallet), agent.id).catch((e) =>
+      console.error("[access] syncCredits", (e as Error).message),
+    );
     return { ok: true, kind: "credits", remaining: cred.remaining - 1, signature };
   }
 

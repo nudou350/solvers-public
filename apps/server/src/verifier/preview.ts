@@ -1,65 +1,60 @@
 import type { Express } from "express";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { readDeliverable } from "./deliverables.js";
+import { milestoneDir, readDeliverable } from "./deliverables.js";
 
 // Prévia da entrega com marca d'água (INSTRUCTIONS.md 5.7). O link é secreto (token no query) e
-// mostra o componente renderizado num iframe isolado + o relatório dos testes. O código-fonte
-// completo só é liberado para download depois da aprovação.
+// mostra o HTML estático do componente, renderizado DENTRO do sandbox do verificador. Nenhum
+// código-fonte sai daqui: o download só existe depois da aprovação.
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-function componentEntry(files: Record<string, string>): [string, string] | null {
-  const entry = Object.entries(files).find(([n, c]) => /\.(tsx|jsx)$/.test(n) && !/\.test\./.test(n) && /export\s+(default\s+)?function|export\s+const/.test(c));
-  return entry ?? null;
-}
-
-/** HTML isolado que transpila o componente no navegador (Babel standalone) e o renderiza. */
-function sandboxDoc(name: string, code: string): string {
-  const exportName = /export\s+default\s+function\s+(\w+)/.exec(code)?.[1] ?? /export\s+(?:function|const)\s+(\w+)/.exec(code)?.[1] ?? "Component";
-  const src = code
-    .replace(/^import[^;]+;?$/gm, "")
-    .replace(/export\s+default\s+/g, "")
-    .replace(/export\s+(function|const)/g, "$1");
-  const payload = JSON.stringify({ src, exportName, name }).replace(/</g, "\\u003c");
-  return `<!doctype html><html><head><meta charset="utf-8">
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-<style>body{font-family:system-ui,sans-serif;margin:16px}</style></head><body><div id="root"></div>
-<script>
-const P = ${payload};
-try {
-  const { useState, useEffect, useRef, useId, useMemo, useCallback, useReducer, forwardRef } = React;
-  const out = Babel.transform(P.src + "\\nwindow.__C = " + P.exportName + ";", { presets: [["typescript", { isTSX: true, allExtensions: true }], "react"], filename: P.name }).code;
-  new Function("React", "useState", "useEffect", "useRef", "useId", "useMemo", "useCallback", "useReducer", "forwardRef", out)(React, useState, useEffect, useRef, useId, useMemo, useCallback, useReducer, forwardRef);
-  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.__C, { onSubmit: () => {} }));
-} catch (e) { document.body.textContent = "Não foi possível renderizar a prévia: " + e.message; }
-</script></body></html>`;
-}
+const FRAME_CSS = `body{font-family:system-ui,sans-serif;margin:16px;color:#1b1b1f}
+input,button,select,textarea{font:inherit;padding:8px 10px;margin:4px 0;border:1px solid #c9c9c3;border-radius:8px}
+button{background:#1b1b1f;color:#fff;border:0;cursor:default}
+label{display:block;margin-top:8px;font-weight:600}
+[role=alert]{color:#b42318}`;
 
 export function mountPreview(app: Express) {
   app.get("/preview/:escrow/:idx", async (req, res) => {
     const idx = Number(req.params.idx);
+    const token = typeof req.query.t === "string" ? req.query.t : "";
+    if (!Number.isInteger(idx) || idx < 0 || idx > 4 || !token) {
+      res.status(404).type("text").send("Prévia não encontrada");
+      return;
+    }
     const [m] = await db
       .select()
       .from(schema.milestones)
       .where(and(eq(schema.milestones.escrowId, String(req.params.escrow)), eq(schema.milestones.idx, idx)));
-    const token = typeof req.query.t === "string" ? req.query.t : "";
-    if (!m?.previewUrl || !token || !m.previewUrl.endsWith(`t=${token}`) || !m.deliverablePath) {
+    // Só enquanto a etapa está aprovada nos testes ou aprovada pelo comprador (não após disputa/reembolso).
+    if (!m?.previewUrl || !m.previewUrl.endsWith(`t=${token}`) || !["passed", "approved"].includes(m.status)) {
       res.status(404).type("text").send("Prévia não encontrada");
       return;
     }
-    const files = readDeliverable(m.deliverablePath);
-    const entry = componentEntry(files);
-    const report = (m.verifierReport ?? {}) as { numPassed?: number; numTests?: number; mode?: string };
-    const sandbox = entry ? sandboxDoc(entry[0], entry[1]) : null;
-    // O iframe srcdoc herda esta política: libera só React/Babel do unpkg. Ele roda com sandbox
-    // sem allow-same-origin (origem opaca), então não enxerga cookies nem a API.
+    const previewFile = join(milestoneDir(m.escrowId, idx), "preview.html");
+    const html = existsSync(previewFile) ? readFileSync(previewFile, "utf8") : null;
+    const fileNames = m.deliverablePath ? Object.keys(readDeliverable(m.deliverablePath)) : [];
+    const report = (m.verifierReport ?? {}) as {
+      numPassed?: number;
+      numTests?: number;
+      mode?: string;
+      acceptance?: { numTests: number; numPassed: number } | null;
+      selfWrittenTestsOnly?: boolean;
+    };
+    const frame = html
+      ? `<!doctype html><html><head><meta charset="utf-8"><style>${FRAME_CSS}</style></head><body>${html}</body></html>`
+      : null;
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'none'; script-src https://unpkg.com 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; frame-src 'self' about:",
+      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-src 'self' about:; frame-ancestors 'self'",
     );
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    const acceptanceLine = report.acceptance
+      ? `${report.acceptance.numPassed}/${report.acceptance.numTests} testes de aceite combinados`
+      : "testes escritos na própria entrega (sem bateria de aceite)";
     res.type("html").send(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Prévia da entrega</title>
 <style>
@@ -74,11 +69,12 @@ main{max-width:900px;margin:20px auto;padding:0 16px}
 ul{padding-left:18px}
 </style></head><body>
 <div class="band">PRÉVIA · SOLVERS</div>
-<header><strong>Etapa ${idx + 1}: ${esc(m.title)}</strong><br><span class="ok">✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} testes aprovados${report.mode === "simulated" ? " (verificação simulada)" : ""}</span></header>
+<header><strong>Etapa ${idx + 1}: ${esc(m.title)}</strong><br>
+<span class="ok">✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} testes aprovados · ${esc(acceptanceLine)}${report.mode === "simulated" ? " (verificação simulada)" : ""}</span></header>
 <main>
-${sandbox ? `<div class="frame"><iframe sandbox="allow-scripts" srcdoc="${esc(sandbox)}" title="Componente entregue"></iframe><div class="wm">PRÉVIA</div></div>` : "<p>Esta entrega não tem componente visual para pré-visualizar.</p>"}
+${frame ? `<div class="frame"><iframe sandbox srcdoc="${esc(frame)}" title="Componente entregue (prévia estática)"></iframe><div class="wm">PRÉVIA</div></div>` : "<p>Prévia visual indisponível para esta entrega.</p>"}
 <h3>Arquivos entregues</h3>
-<ul>${Object.keys(files).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+<ul>${fileNames.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
 <p>O código completo fica disponível para download depois que você aprovar a etapa (ou quando o prazo de aprovação automática terminar).</p>
 <h3>Critérios combinados</h3><p>${esc(m.criteria)}</p>
 </main></body></html>`);

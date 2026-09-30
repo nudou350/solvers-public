@@ -53,7 +53,7 @@ export function a11yCheck(files: Record<string, string>) {
 }
 
 const RUNNERS: Record<string, Runner> = {
-  "docker:solvers-react-test": async (input) => runTests(FilesInput.parse(input).files),
+  "docker:solvers-react-test": async (input) => (await runTests(FilesInput.parse(input).files)).report,
   "node:a11y": async (input) => a11yCheck(FilesInput.parse(input).files),
   "node:contrast": async (input) => {
     const { pairs } = z

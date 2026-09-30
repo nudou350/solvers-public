@@ -164,7 +164,7 @@ export async function syncEscrow(escrowAddr: Address): Promise<void> {
       autoReleaseAt,
       reviewWindowSecs: Number(e.reviewWindowSecs),
     })
-    .onConflictDoUpdate({ target: schema.escrows.id, set: { status, autoReleaseAt, total: e.total } });
+    .onConflictDoUpdate({ target: schema.escrows.id, set: { status, autoReleaseAt, total: e.total, creatorWallet: e.creator } });
 
   for (const [idx, m] of e.milestones.entries()) {
     const chainStatus = MILESTONE_STATUS[m.status as keyof typeof MILESTONE_STATUS] ?? "pending";
