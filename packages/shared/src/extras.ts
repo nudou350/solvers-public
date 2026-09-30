@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Agent, Creator, Review, UserReputation } from "./schemas.js";
+import { Agent, Creator, Escrow, License, Review, UserReputation } from "./schemas.js";
 
 // Extensões ao contrato para telas que o schema base não cobre.
 // Nunca alteram os campos de Agent/Creator/...; vêm em objetos separados.
@@ -76,6 +76,36 @@ export const Profile = z.object({
   history: z.array(z.object({ kind: z.string(), label: z.string(), at: z.string(), signature: z.string().nullable() })),
 });
 
+/** GET /api/me/escrows/:id */
+export const EscrowDetail = z.object({
+  escrow: Escrow,
+  agent: z.object({ id: z.string(), slug: z.string(), name: z.string() }),
+  milestones: z.array(
+    z.object({
+      index: z.number(),
+      amountUsdc: z.number(),
+      passedAt: z.string().nullable(),
+      autoReleaseAt: z.string().nullable(),
+      previewUrl: z.string().nullable(),
+      tests: z.object({ passed: z.number(), total: z.number(), mode: z.string() }).nullable(),
+      criteria: z.array(z.string()),
+      hasAcceptanceTests: z.boolean(),
+      disputeCriterion: z.string().nullable(),
+      downloadable: z.boolean(),
+    }),
+  ),
+  explorerUrl: z.string(),
+});
+
+/** GET /api/market/listings (revenda é P2: dados simulados na demo) */
+export const ResaleListing = z.object({
+  license: License,
+  agent: Agent,
+  priceUsdc: z.number(),
+  priceTrendPct: z.number(),
+  simulated: z.boolean(),
+});
+
 /** Resposta dos endpoints /api/tx/*: transação serializada pronta para a carteira assinar. */
 export const TxResponse = z.object({
   transaction: z.string(), // base64, já assinada pelo fee payer do servidor
@@ -95,4 +125,6 @@ export type CreatorDashboard = z.infer<typeof CreatorDashboard>;
 export type ConnectorStatus = z.infer<typeof ConnectorStatus>;
 export type Profile = z.infer<typeof Profile>;
 export type TxResponse = z.infer<typeof TxResponse>;
+export type EscrowDetail = z.infer<typeof EscrowDetail>;
+export type ResaleListing = z.infer<typeof ResaleListing>;
 export type SubmitResponse = z.infer<typeof SubmitResponse>;

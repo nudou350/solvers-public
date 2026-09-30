@@ -141,6 +141,10 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
 }
 
 export async function publish(slugs: string[]) {
+  // A URL de metadados vai on-chain e não pode ser trocada depois: nunca publicar localhost fora da localnet.
+  if (env.SOLANA_CLUSTER !== "localnet" && /localhost|127\.0\.0\.1/.test(env.PUBLIC_API_URL)) {
+    throw new Error(`PUBLIC_API_URL=${env.PUBLIC_API_URL} não pode ir on-chain na ${env.SOLANA_CLUSTER}; use .env.devnet`);
+  }
   const all = [...new Map([...packages().values()].map((p) => [p.manifest.id, p])).values()];
   const selected = slugs.length ? all.filter((p) => slugs.includes(p.manifest.slug) || slugs.includes(p.manifest.id)) : all;
   if (selected.length === 0) throw new Error(`nenhum pacote encontrado para: ${slugs.join(", ")}`);
@@ -156,7 +160,7 @@ export async function publish(slugs: string[]) {
   }
 }
 
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("cli/publish.ts")) {
+if (/cli\/publish\.(ts|js)$/.test(process.argv[1]?.replace(/\\/g, "/") ?? "")) {
   await runMigrations();
   await initChain();
   try {

@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
     "cli:publish": "tsx --env-file-if-exists=.env src/cli/publish.ts",
-    "cli:seed": "tsx --env-file-if-exists=.env src/cli/seed.ts"
+    "cli:seed": "tsx --env-file-if-exists=.env src/cli/seed.ts",
+    "cli:publish:devnet": "tsx --env-file=.env.devnet src/cli/publish.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

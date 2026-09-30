@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { address, type Address } from "@solvers/chain";
-import { MIN_PERMANENT_PRICE_USDC, unitsToUsdc, usdcToUnits, type License, type Profile, type TxResponse } from "@solvers/shared";
+import { FREE_TRIAL_USES, MIN_PERMANENT_PRICE_USDC, unitsToUsdc, usdcToUnits, type License, type Profile, type TxResponse } from "@solvers/shared";
 import { chain, explorerUrl } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { processSignature } from "../indexer/processor.js";
+import { brlPerUsd } from "./fx.js";
 import type { Signature } from "@solvers/chain";
-import { sql } from "drizzle-orm";
 import { refreshLicenseOwner } from "../indexer/sync.js";
 import { searchAgentRows } from "../knowledge/search.js";
 import { badRequest, h, HttpError, parse } from "../lib/http.js";
@@ -43,6 +43,7 @@ storeRouter.get(
       feeBps: config?.data.feeBps ?? null,
       minPurchaseUsdc: config ? unitsToUsdc(config.data.minPrice) : MIN_PERMANENT_PRICE_USDC,
       faucetEnabled: env.FAUCET_ENABLED,
+      brlPerUsd: await brlPerUsd(),
       faucetAmountUsdc: env.FAUCET_AMOUNT_USDC,
       connectorUrl: `${env.PUBLIC_API_URL.replace(/\/$/, "")}/mcp`,
     };
@@ -105,6 +106,37 @@ storeRouter.post(
 );
 
 storeRouter.get("/creators/:id", h(async (req) => getCreatorProfile(String(req.params.id))));
+
+/** Mercado de revenda (P2): anúncios de licenças. Na demo os anúncios e o histórico são simulados. */
+storeRouter.get(
+  "/market/listings",
+  h(async () => {
+    const rows = await db.select().from(schema.licenses).where(eq(schema.licenses.listedForResale, true)).orderBy(schema.licenses.resalePrice);
+    const agentRows = await Promise.all([...new Set(rows.map((r) => r.agentId))].map((id) => findAgentRow(id)));
+    const agents = new Map((await mapAgents(agentRows)).map((a) => [a.id, a]));
+    const out = [];
+    for (const r of rows) {
+      const agent = agents.get(r.agentId);
+      if (!agent || r.resalePrice == null) continue;
+      const hist = await db
+        .select()
+        .from(schema.resalePrices)
+        .where(eq(schema.resalePrices.agentId, r.agentId))
+        .orderBy(desc(schema.resalePrices.at))
+        .limit(10);
+      const last = hist[0] ? unitsToUsdc(hist[0].price) : null;
+      const prev = hist[hist.length - 1] ? unitsToUsdc(hist[hist.length - 1]!.price) : null;
+      out.push({
+        license: toLicense(r),
+        agent,
+        priceUsdc: unitsToUsdc(r.resalePrice),
+        priceTrendPct: last && prev ? Math.round(((last - prev) / prev) * 1000) / 10 : 0,
+        simulated: true,
+      });
+    }
+    return out;
+  }),
+);
 
 // ---------- Autenticado ----------
 
@@ -181,6 +213,45 @@ storeRouter.get(
   h(async (req) => {
     const wallet = address(requireWallet(req));
     return { usdc: unitsToUsdc(await chain().usdcBalance(wallet)) };
+  }),
+);
+
+/** Uso de cada especialista pela carteira (biblioteca). */
+storeRouter.get(
+  "/me/usage",
+  requireAuth,
+  h(async (req) => {
+    const wallet = requireWallet(req);
+    const rows = await db
+      .select({
+        agentId: schema.usageEvents.agentId,
+        activations: sql<number>`count(*) filter (where ${schema.usageEvents.tool} = 'activate_solver')`.mapWith(Number),
+        calls: sql<number>`count(*)`.mapWith(Number),
+        lastUsedAt: sql<string>`max(${schema.usageEvents.createdAt})`,
+      })
+      .from(schema.usageEvents)
+      .where(eq(schema.usageEvents.wallet, wallet))
+      .groupBy(schema.usageEvents.agentId);
+    return rows.filter((r) => r.agentId).map((r) => ({ ...r, lastUsedAt: new Date(r.lastUsedAt).toISOString() }));
+  }),
+);
+
+/** Como a carteira acessa um especialista agora (licença, créditos ou teste grátis restante). */
+storeRouter.get(
+  "/me/access/:idOrSlug",
+  requireAuth,
+  h(async (req) => {
+    const wallet = requireWallet(req);
+    const row = await findAgentRow(String(req.params.idOrSlug));
+    const [lic] = await db.select().from(schema.licenses).where(and(eq(schema.licenses.ownerWallet, wallet), eq(schema.licenses.agentId, row.id)));
+    const [cred] = await db.select().from(schema.credits).where(and(eq(schema.credits.ownerWallet, wallet), eq(schema.credits.agentId, row.id)));
+    const [trial] = await db.select().from(schema.trials).where(and(eq(schema.trials.wallet, wallet), eq(schema.trials.agentId, row.id)));
+    return {
+      agentId: row.id,
+      license: lic ? lic.id : null,
+      creditsLeft: cred?.remaining ?? null,
+      trialUsesLeft: Math.max(0, FREE_TRIAL_USES - (trial?.used ?? 0)),
+    };
   }),
 );
 

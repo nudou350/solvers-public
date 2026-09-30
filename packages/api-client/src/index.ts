@@ -5,7 +5,9 @@ import {
   CreatorDashboard,
   CreatorProfile,
   Escrow,
+  EscrowDetail,
   License,
+  ResaleListing,
   Memory,
   Profile,
   Review,
@@ -88,6 +90,7 @@ export function createApi(opts: ApiOptions = {}) {
           faucetEnabled: z.boolean(),
           faucetAmountUsdc: z.number(),
           connectorUrl: z.string(),
+          brlPerUsd: z.number(),
         }).passthrough(),
         "/api/config",
       ),
@@ -113,7 +116,20 @@ export function createApi(opts: ApiOptions = {}) {
     // ----- Minha conta -----
     getMyLicenses: () => req(z.array(License), "/api/me/licenses"),
     getMyEscrows: () => req(z.array(Escrow), "/api/me/escrows"),
-    getMyEscrow: (id: string) => req(z.object({ escrow: Escrow }).passthrough(), `/api/me/escrows/${id}`),
+    getMyEscrow: (id: string) => req(EscrowDetail, `/api/me/escrows/${id}`),
+    downloadDeliverable: (escrowId: string, index: number) =>
+      req(z.object({ files: z.record(z.string()) }), `/api/me/escrows/${escrowId}/milestones/${index}/download`),
+    getMyUsage: () =>
+      req(z.array(z.object({ agentId: z.string(), activations: z.number(), calls: z.number(), lastUsedAt: z.string() })), "/api/me/usage"),
+    getMyAccess: (idOrSlug: string) =>
+      req(
+        z.object({ agentId: z.string(), license: z.string().nullable(), creditsLeft: z.number().nullable(), trialUsesLeft: z.number() }),
+        `/api/me/access/${encodeURIComponent(idOrSlug)}`,
+      ),
+    refreshLicenses: () => post(z.object({ ok: z.boolean() }), "/api/me/licenses/refresh"),
+    getMemoriesCount: () =>
+      req(z.object({ count: z.number(), agents: z.array(z.object({ agentId: z.string(), updatedAt: z.string() })) }), "/api/me/memories/count"),
+    getResaleListings: () => req(z.array(ResaleListing), "/api/market/listings"),
     getReputation: () => req(UserReputation, "/api/me/reputation"),
     getProfile: () => req(Profile, "/api/me/profile"),
     getBalance: () => req(z.object({ usdc: z.number() }), "/api/me/balance"),
@@ -136,12 +152,24 @@ export function createApi(opts: ApiOptions = {}) {
     buildPurchase: (agentId: string, type: "permanent" | "credits" = "permanent", amount?: number) =>
       post(TxResponse, "/api/tx/purchase", { agentId, type, amount }),
     buildReview: (agentId: string, rating: number, text: string) => post(TxResponse, "/api/tx/review", { agentId, rating, text }),
-    buildEscrow: (agentId: string, milestones: { title: string; criteria: string; amountUsdc: number }[]) =>
+    buildEscrow: (
+      agentId: string,
+      milestones: { title: string; criteria: string; amountUsdc: number; acceptanceTests?: Record<string, string> }[],
+    ) =>
       post(TxResponse, "/api/tx/escrow", { agentId, milestones }),
     buildRelease: (escrowId: string, index: number) => post(TxResponse, `/api/tx/escrow/${escrowId}/release`, { index }),
     buildDispute: (escrowId: string, index: number, criterion: string, reason: string) =>
       post(TxResponse, `/api/tx/escrow/${escrowId}/dispute`, { index, criterion, reason }),
     submit: (transaction: string) => post(SubmitResponse.passthrough(), "/api/tx/submit", { transaction }),
+    /** Para quem envia pela carteira (signAndSendTransaction): confirma e indexa na hora. */
+    confirm: (signature: string) => post(SubmitResponse.passthrough(), "/api/tx/confirm", { signature }),
+
+    // ----- Admin (só funciona no servidor com ADMIN_KEYPAIR) -----
+    adminDisputes: () =>
+      req(z.array(z.object({ escrowId: z.string(), index: z.number(), title: z.string(), criteria: z.string(), criterion: z.string().nullable(), reason: z.string().nullable() })), "/api/admin/disputes"),
+    adminResolve: (escrowId: string, index: number, refund: boolean) =>
+      post(z.object({ signature: z.string() }).passthrough(), `/api/admin/escrow/${escrowId}/resolve`, { index, refund }),
+    adminApprove: (agentId: string) => post(z.object({ signature: z.string() }), `/api/admin/agents/${agentId}/approve`),
 
     /** Fluxo completo: monta no servidor -> carteira assina -> servidor envia e indexa. */
     async signAndSubmit(wallet: WalletLike, built: TxResponse) {

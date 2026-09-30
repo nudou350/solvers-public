@@ -195,12 +195,13 @@ escrowRouter.post(
 
 // ---------- Consultas ----------
 
-function milestoneExtras(m: MilestoneRow) {
+function milestoneExtras(m: MilestoneRow, reviewWindowSecs: number) {
   const report = (m.verifierReport ?? null) as { numPassed?: number; numTests?: number; mode?: string } | null;
   return {
     index: m.idx,
     amountUsdc: unitsToUsdc(m.amount),
     passedAt: m.passedAt?.toISOString() ?? null,
+    autoReleaseAt: m.passedAt && m.status === "passed" ? new Date(m.passedAt.getTime() + reviewWindowSecs * 1000).toISOString() : null,
     previewUrl: m.status === "passed" || m.status === "approved" ? m.previewUrl : null,
     tests: report ? { passed: report.numPassed ?? 0, total: report.numTests ?? 0, mode: report.mode ?? "docker" } : null,
     criteria: splitCriteria(m.criteria),
@@ -235,7 +236,7 @@ escrowRouter.get(
     return {
       escrow: toEscrow(row, ms),
       agent: { id: agent.id, slug: agent.slug, name: agent.name },
-      milestones: ms.sort((a, b) => a.idx - b.idx).map(milestoneExtras),
+      milestones: ms.sort((a, b) => a.idx - b.idx).map((m) => milestoneExtras(m, row.reviewWindowSecs)),
       explorerUrl: explorerUrl("address", row.id),
     };
   }),

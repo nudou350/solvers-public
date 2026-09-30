@@ -26,9 +26,10 @@ async function licenseOf(wallet: string, agent: AgentRow): Promise<string | null
   }
   // Fallback on-chain: comprou e o indexador ainda não gravou (INSTRUCTIONS.md 5.11).
   if (agent.collectionAddress) {
-    const found = await chain()
-      .findLicenses(address(wallet), address(agent.collectionAddress))
-      .catch(() => []);
+    const found = await Promise.race([
+      chain().findLicenses(address(wallet), address(agent.collectionAddress)),
+      new Promise<never[]>((r) => setTimeout(() => r([]), 3000)),
+    ]).catch(() => []);
     for (const asset of found) {
       await syncLicense(asset, agent.id);
       return asset;

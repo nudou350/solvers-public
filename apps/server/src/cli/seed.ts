@@ -255,7 +255,7 @@ async function main() {
   console.log("\nSeed concluído.");
 }
 
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("cli/seed.ts")) {
+if (/cli\/seed\.(ts|js)$/.test(process.argv[1]?.replace(/\\/g, "/") ?? "")) {
   try {
     await main();
   } finally {

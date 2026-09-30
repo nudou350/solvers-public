@@ -13,6 +13,7 @@ module.exports = {
       out_file: "/var/www/solvers/logs/backend-out.log",
       log_file: "/var/www/solvers/logs/backend-combined.log",
       time: true,
+      merge_logs: true,
       // Embeddings locais (transformers.js) usam ~300 MB.
       max_memory_restart: "900M",
       autorestart: true,
