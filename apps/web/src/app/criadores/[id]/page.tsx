@@ -128,7 +128,7 @@ export default async function CreatorPage({ params }: Props) {
                 <b className="trunc" style={{ display: "block" }}>
                   {a.name}
                 </b>
-                <div className="small muted">
+                <div className="small muted trunc">
                   Versão {a.version}
                   {a.trialAvailable ? " · teste grátis" : ""}
                 </div>

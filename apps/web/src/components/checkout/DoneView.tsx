@@ -125,7 +125,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
           </div>
           <div className="row" style={{ ...gap(16), margin: "18px 0" }}>
             <Tile category={agent.category} size="l" />
-            <div>
+            <div className="grow">
               <div className="display" style={{ fontSize: 30, lineHeight: 1.05 }}>
                 {agent.name}
               </div>

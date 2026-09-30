@@ -82,11 +82,11 @@ export default async function Home() {
                     <b className="trunc" style={{ display: "block" }}>
                       {a.name}
                     </b>
-                    <div className="small muted">
+                    <div className="small muted trunc">
                       publicado {ago(a.publishedAt)} · {a.evalScore}% nos testes{a.trialAvailable ? " · teste grátis" : ""}
                     </div>
                   </div>
-                  <span className="chip chip-brand">Novo</span>
+                  <span className="chip chip-brand flex-none">Novo</span>
                 </Link>
               ))}
             </div>

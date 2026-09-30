@@ -180,7 +180,7 @@ export function BeforeAfterBlock({ items, name }: { items: BeforeAfter[]; name: 
       ) : null}
       <div className="card pad-s row start" style={gap("12px", { margin: items.length > 1 ? "18px 0 22px" : "0 0 22px" })} role="tabpanel">
         <span className="av av-s">Eu</span>
-        <p className="bubble me" style={{ borderRadius: 16 }}>
+        <p className="bubble me grow" style={{ borderRadius: 16 }}>
           {cur.prompt}
         </p>
       </div>

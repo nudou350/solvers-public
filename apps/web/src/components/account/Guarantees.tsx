@@ -23,7 +23,7 @@ function LevelCard({ g }: { g: GuaranteeStatus | null }) {
       <span className="ok">
         <Icon name="shield-check" size="l" />
       </span>
-      <div className="col" style={{ "--gap": "2px" } as React.CSSProperties}>
+      <div className="col grow" style={{ "--gap": "2px" } as React.CSSProperties}>
         <div className="small muted">Seu nível de garantia</div>
         <b>
           {GUARANTEE_LEVEL_LABEL[g.level]} · até {usdc(g.limitUsdc)} em aberto

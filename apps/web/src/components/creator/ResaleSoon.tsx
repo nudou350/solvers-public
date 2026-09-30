@@ -42,7 +42,7 @@ export function ResaleSoon() {
             <span className={v.tone}>
               <Icon name={v.icon} />
             </span>
-            <span className="small">
+            <span className="small grow">
               <b>{v.title}</b> {v.text}
             </span>
           </div>
@@ -58,7 +58,7 @@ export function ResaleSoon() {
                 <span className="dot dot-now" aria-hidden>
                   {i + 1}
                 </span>
-                <div className="col" style={gap(4)}>
+                <div className="col grow" style={gap(4)}>
                   <b>{s.title}</b>
                   <span className="small muted">{s.text}</span>
                 </div>

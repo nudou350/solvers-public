@@ -166,7 +166,7 @@ export function PixPanel({
             Pix copia e cola
           </label>
           <div className="row m-col" style={gap(10)}>
-            <input id="pix-copia-cola" className="input mono" readOnly value={charge.qrCode} style={{ flex: 1 }} onFocus={(e) => e.currentTarget.select()} />
+            <input id="pix-copia-cola" className="input mono" readOnly value={charge.qrCode} style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
             <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>
               {copied ? "Copiado" : "Copiar código"}
             </Button>

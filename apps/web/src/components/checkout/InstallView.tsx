@@ -223,7 +223,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               É um endereço só para todos os especialistas. Quando a sua IA se conectar, você entra com a sua conta do Solver e ela passa a usar o que você comprou.
             </p>
             <div className="row m-col" style={gap(10)}>
-              <input className="input mono" readOnly value={url} placeholder="Carregando…" aria-label="Endereço do conector" style={{ flex: 1 }} onFocus={(e) => e.currentTarget.select()} />
+              <input className="input mono" readOnly value={url} placeholder="Carregando…" aria-label="Endereço do conector" style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
               <Button size="lg" icon={copied ? "check" : "copy"} onClick={copy} disabled={!url}>
                 {copied ? "Copiado" : "Copiar endereço"}
               </Button>
@@ -301,7 +301,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
             </div>
             <p className="muted">Abra uma conversa nova e peça algo simples. Se a sua IA responder citando o especialista, deu certo.</p>
             <div className="card-flat pad-s row between" style={gap(12)}>
-              <span>{agent ? `“Use o ${agent.name} e me diga como ele pode me ajudar.”` : "“Quais especialistas do Solver eu tenho?”"}</span>
+              <span className="grow">{agent ? `“Use o ${agent.name} e me diga como ele pode me ajudar.”` : "“Quais especialistas do Solver eu tenho?”"}</span>
             </div>
           </div>
         </div>
@@ -335,7 +335,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               <span className="dot dot-ok">
                 <Icon name="check" />
               </span>
-              <div>
+              <div className="grow">
                 <b>Tudo pronto!</b>
                 <div className="small muted">{agent ? "Seu especialista já pode ser usado na sua IA." : "Seus especialistas já podem ser usados na sua IA."}</div>
               </div>
@@ -343,7 +343,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           ) : null}
           <div className="card-flat pad-s row start" style={gap(12)}>
             <Icon name="message" />
-            <span className="small">
+            <span className="small grow">
               {creator ? (
                 <>
                   Travou em algum passo? Confira o endereço do passo 1 ou{" "}

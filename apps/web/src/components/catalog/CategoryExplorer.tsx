@@ -66,7 +66,7 @@ export function CategoryExplorer({ categories, initialTop, creators, rate }: { c
         {categories.length === 0 ? (
           <div className="card-flat pad center muted">As categorias aparecem aqui assim que houver especialistas publicados.</div>
         ) : (
-          <div className="g4 m2" style={gap("14px")}>
+          <div className="g4 m1" style={gap("14px")}>
             {categories.map((c) => {
               const on = cat === c.category;
               return (

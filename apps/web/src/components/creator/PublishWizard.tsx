@@ -293,7 +293,7 @@ export function PublishWizard() {
             <div className="col" style={gap(18)}>
               <div className="card-flat pad-s row start" style={gap(12)}>
                 <Icon name="info" />
-                <span className="small">
+                <span className="small grow">
                   São necessários pelo menos {MIN_CASES} casos de teste, cada um com o que a resposta precisa conter. A nota que aparece para os compradores é a
                   porcentagem de casos resolvidos, e é preciso pelo menos {MIN_SCORE}% para publicar.
                 </span>
@@ -381,7 +381,7 @@ export function PublishWizard() {
                       <b className="num">{result.score}%</b>
                     </div>
                   </div>
-                  <div>
+                  <div className="grow">
                     <b>{result.score}% dos casos resolvidos</b>
                     <div className="small muted">
                       {result.passed} de {result.total} casos. {result.score >= MIN_SCORE ? `Acima do mínimo de ${MIN_SCORE}% para publicar.` : `Abaixo do mínimo de ${MIN_SCORE}%: ajuste o especialista e rode de novo.`}
@@ -399,7 +399,7 @@ export function PublishWizard() {
                   <span className="ok">
                     <Icon name="gift" />
                   </span>
-                  <span className="small">
+                  <span className="small grow">
                     <b>Publicar é grátis, sem depósito.</b>{" "}
                     {sharePct != null ? `Você recebe ${dec1(sharePct).replace(",0", "")}% de cada venda; a taxa da plataforma já sai daí.` : "Você recebe a maior parte de cada venda; a taxa da plataforma já sai daí."}
                   </span>
@@ -408,7 +408,7 @@ export function PublishWizard() {
                   <span className="brand">
                     <Icon name="users" />
                   </span>
-                  <span className="small">
+                  <span className="small grow">
                     <b>Revisão da equipe.</b> Os primeiros especialistas de cada criador passam por uma revisão antes de entrar na vitrine.
                   </span>
                 </div>
@@ -416,7 +416,7 @@ export function PublishWizard() {
                   <span className="warn">
                     <Icon name="shield-check" />
                   </span>
-                  <span className="small">
+                  <span className="small grow">
                     <b>Garantia.</b>{" "}
                     {config
                       ? config.guaranteeMinSales > 0
@@ -446,7 +446,7 @@ export function PublishWizard() {
                   <span className="dot dot-ok">
                     <Icon name="check" />
                   </span>
-                  <div>
+                  <div className="grow">
                     <b>Enviado para revisão</b>
                     <div className="small muted">Você será avisado quando o especialista estiver no ar.</div>
                   </div>
@@ -479,17 +479,17 @@ export function PublishWizard() {
                 <Icon name="pen" />
               </span>
               <div className="grow" style={{ minWidth: 0 }}>
-                <b className={["h4", form.name.trim() ? "" : "faint"].join(" ")} style={{ display: "block", overflowWrap: "anywhere" }}>
+                <b className={["h4 clamp2", form.name.trim() ? "" : "faint"].join(" ")} style={{ display: "-webkit-box" }}>
                   {form.name.trim() || "Nome do especialista"}
                 </b>
-                <div className="small muted">por {creatorName}</div>
+                <div className="small muted trunc">por {creatorName}</div>
               </div>
             </div>
             <p className={["small", form.tagline.trim() ? "muted" : "faint"].join(" ")} style={{ overflowWrap: "anywhere" }}>
               {form.tagline.trim() || "A frase curta aparece aqui."}
             </p>
             <div className="row between" style={{ paddingTop: 12, borderTop: "1px solid var(--line)", gap: 12 }}>
-              <div>
+              <div className="flex-none">
                 <b className="num" style={{ fontSize: 20 }}>
                   {Number.isFinite(price) && price > 0 ? money(price) : "—"}
                 </b>
@@ -530,7 +530,7 @@ function SummaryRow({ label, value, bad, good }: { label: string; value: string;
   return (
     <div className="row between small" style={gap(12)}>
       <span className="muted">{label}</span>
-      <b className={bad ? "warn" : good ? "ok" : undefined} style={{ textAlign: "right" }}>
+      <b className={bad ? "warn" : good ? "ok" : undefined} style={{ textAlign: "right", minWidth: 0, overflowWrap: "anywhere" }}>
         {value}
       </b>
     </div>

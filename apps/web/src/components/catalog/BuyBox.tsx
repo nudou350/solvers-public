@@ -111,7 +111,7 @@ function Check({ children }: { children: ReactNode }) {
       <span className="ok">
         <Icon name="check-circle" size="s" />
       </span>
-      <span>{children}</span>
+      <span className="grow">{children}</span>
     </li>
   );
 }

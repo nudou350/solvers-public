@@ -112,7 +112,7 @@ export default async function AgentPage({ params }: Props) {
               </span>
               <div className="grow" style={{ minWidth: 180 }}>
                 <div className="small faint">Criado por</div>
-                <Link className="bold" href={creatorHref(cr.id)}>
+                <Link className="bold trunc" style={{ display: "block" }} href={creatorHref(cr.id)}>
                   {cr.name}
                 </Link>
               </div>
@@ -210,13 +210,13 @@ export default async function AgentPage({ params }: Props) {
                 {g.milestones.map((m, i) => (
                   <li key={i} className="card-flat pad col" style={gap("14px")}>
                     <div className="row between start" style={gap("12px")}>
-                      <div className="row" style={gap("12px")}>
+                      <div className="row grow" style={gap("12px")}>
                         <span className="dot dot-now" style={{ width: 32, height: 32 } as CSSProperties}>
                           {i + 1}
                         </span>
                         <b style={{ fontSize: 17 }}>{m.title}</b>
                       </div>
-                      <span className="col" style={gap("0", { alignItems: "flex-end", textAlign: "right" })}>
+                      <span className="col flex-none" style={gap("0", { alignItems: "flex-end", textAlign: "right" })}>
                         <b className="num" style={{ whiteSpace: "nowrap" }}>{brl(m.amountUsdc, rate)}</b>
                         <span className="tiny faint" style={{ whiteSpace: "nowrap" }}>{usdc(m.amountUsdc)}</span>
                       </span>
@@ -280,7 +280,7 @@ export default async function AgentPage({ params }: Props) {
             {connectors.length ? (
               connectors.map((r) => (
                 <div key={r.label} className="row between" style={gap("12px")}>
-                  <b>{connectorName(r.label)}</b>
+                  <b className="grow">{connectorName(r.label)}</b>
                   {r.optional ? <span className="chip">Opcional</span> : <span className="chip chip-warn">Conecte na sua IA</span>}
                 </div>
               ))

@@ -196,7 +196,7 @@ export function Memories() {
               <div className="row" style={{ "--gap": "14px", padding: "20px 24px", borderBottom: "1px solid var(--line)" } as React.CSSProperties}>
                 {a ? <Tile category={a.category} size="s" /> : <span className="tile tile-s" aria-hidden />}
                 <div className="grow">
-                  <b>{a?.name ?? "Especialista"}</b>
+                  <b className="trunc" style={{ display: "block" }}>{a?.name ?? "Especialista"}</b>
                   <div className="small muted">{g.items.length === 1 ? "1 memória" : `${g.items.length} memórias`}</div>
                 </div>
                 {a ? (

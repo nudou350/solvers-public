@@ -15,11 +15,11 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
       <div className="row start" style={gap("14px")}>
         <Tile category={a.category} />
         <div className="grow" style={{ minWidth: 0 }}>
-          <h3 className="h4">{a.name}</h3>
+          <h3 className="h4 clamp2">{a.name}</h3>
           {creatorName ? <div className="small muted trunc">por {creatorName}</div> : null}
         </div>
       </div>
-      <p className="small muted" style={{ minHeight: 40 }}>
+      <p className="small muted clamp3" style={{ minHeight: 40 }}>
         {a.tagline}
       </p>
       <div className="row wrapx" style={gap("6px 14px")}>
@@ -30,7 +30,7 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
         </span>
         {a.trialAvailable ? <TrialTag /> : null}
       </div>
-      <div className="row between" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+      <div className="row between wrapx" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
         <div>
           <div className="bold num" style={{ fontSize: 20 }}>
             {brl0(a.priceUsdc, rate)}

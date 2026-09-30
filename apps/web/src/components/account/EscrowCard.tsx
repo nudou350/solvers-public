@@ -56,9 +56,9 @@ export function Deliverable({ escrowId, index, label = "Baixar arquivos" }: { es
     return (
       <div className="row wrapx" style={{ "--gap": "6px" } as React.CSSProperties} aria-label="Arquivos da entrega">
         {names.map((n) => (
-          <button key={n} type="button" className="chip" style={{ minHeight: 36 }} onClick={() => saveTextFile(n, files[n] ?? "")}>
+          <button key={n} type="button" className="chip" style={{ minHeight: 36, maxWidth: "100%" }} onClick={() => saveTextFile(n, files[n] ?? "")}>
             <Icon name="download" size="s" />
-            {n}
+            <span className="trunc">{n}</span>
           </button>
         ))}
         {!names.length ? <span className="small faint">A entrega não tem arquivos.</span> : null}
@@ -226,7 +226,7 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
               return (
                 <div className="step" key={i}>
                   <span className={`dot ${st.dot}`}>{mark(m.status, i)}</span>
-                  <div className="col" style={{ "--gap": "4px", minWidth: 0 } as React.CSSProperties}>
+                  <div className="col grow" style={{ "--gap": "4px" } as React.CSSProperties}>
                     <div className="row wrapx" style={{ "--gap": "6px 10px" } as React.CSSProperties}>
                       <b>{m.title}</b>
                       {x ? <span className="tiny faint num">{money(x.amountUsdc)}</span> : null}
@@ -371,14 +371,14 @@ export function EscrowCard({ escrow: e, detail, agent, onChanged }: { escrow: Es
               <span className={msg.tone}>
                 <Icon name="info" size="s" />
               </span>
-              <span className="small">{msg.text}</span>
+              <span className="small grow">{msg.text}</span>
             </div>
           ) : disputed ? (
             <div className="row card-flat pad-s" style={{ "--gap": "10px", background: "var(--surface)" } as React.CSSProperties} role="status">
               <span className="warn">
                 <Icon name="info" size="s" />
               </span>
-              <span className="small">Contestação em análise. O valor continua guardado e você será avisado do resultado.</span>
+              <span className="small grow">Contestação em análise. O valor continua guardado e você será avisado do resultado.</span>
             </div>
           ) : null}
           {detail ? (

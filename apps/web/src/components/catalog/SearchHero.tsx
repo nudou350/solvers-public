@@ -150,17 +150,17 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                     <div className="row" style={gap("14px")}>
                       <Tile category={a.category} />
                       <div className="grow" style={{ minWidth: 0 }}>
-                        <h3 className="h4">{a.name}</h3>
-                        {creators[a.creatorId] ? <div className="small muted">por {creators[a.creatorId]?.name}</div> : null}
+                        <h3 className="h4 clamp2">{a.name}</h3>
+                        {creators[a.creatorId] ? <div className="small muted trunc">por {creators[a.creatorId]?.name}</div> : null}
                       </div>
                     </div>
-                    <p className="small muted">{a.tagline}</p>
+                    <p className="small muted clamp3">{a.tagline}</p>
                     {a.trialAvailable ? (
                       <div>
                         <TrialTag />
                       </div>
                     ) : null}
-                    <div className="row between" style={{ marginTop: "auto" }}>
+                    <div className="row between wrapx" style={{ marginTop: "auto" }}>
                       {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue /> : <span className="tiny faint">Ainda sem avaliações</span>}
                       <b className="num">{brl0(a.priceUsdc, rate)}</b>
                     </div>

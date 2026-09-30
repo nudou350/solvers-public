@@ -109,7 +109,7 @@ function Item({ icon, children }: { icon: IconName; children: ReactNode }) {
       <span className="faint">
         <Icon name={icon} size="s" />
       </span>
-      <span>{children}</span>
+      <span className="grow">{children}</span>
     </li>
   );
 }

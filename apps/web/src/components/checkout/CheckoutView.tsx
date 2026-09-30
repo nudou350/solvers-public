@@ -492,7 +492,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     <span className={`check ${agree ? "on" : ""}`}>
                       <Icon name="check" size="s" />
                     </span>
-                    <span className="small">{agreeText}</span>
+                    <span className="small grow">{agreeText}</span>
                   </button>
                   {touched && isG && (!titleOk || !descOk) ? (
                     <p className="small warn" role="alert">
@@ -566,16 +566,16 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               ) : null}
               <div className="row" style={gap(14)}>
                 <Tile category={agent.category} />
-                <div>
+                <div className="grow">
                   <b style={{ fontSize: 17 }}>{agent.name}</b>
-                  <div className="small muted">por {creator.name}</div>
+                  <div className="small muted trunc">por {creator.name}</div>
                 </div>
               </div>
               <div className="divider" />
               <div className="col small" style={gap(10)}>
                 <div className="row between" style={gap(12)}>
-                  <span className="muted">{lineLabel}</span>
-                  <b className="num">{totalText}</b>
+                  <span className="muted grow">{lineLabel}</span>
+                  <b className="num flex-none">{totalText}</b>
                 </div>
                 <div className="row between">
                   <span className="muted">Taxa de rede</span>
@@ -640,7 +640,7 @@ function GuaranteeLevelInfo({ limits, logged, totalUsdc }: { limits: GuaranteeSt
     return (
       <div className="row card-flat pad-s" style={gap(12)}>
         <Icon name="info" />
-        <span className="small">
+        <span className="small grow">
           {L ? (
             <>
               Contas novas podem ter até <b>{usdc(L.limited)}</b> em garantias abertas. O nível completo vai até <b>{usdc(L.full)}</b> e sobe conforme você compra e conclui tarefas sem disputas.
@@ -665,7 +665,7 @@ function GuaranteeLevelInfo({ limits, logged, totalUsdc }: { limits: GuaranteeSt
   return (
     <div className="row card-flat pad-s" style={gap(12)}>
       <Icon name="info" />
-      <span className="small">
+      <span className="small grow">
         Seu nível de garantia é <b>{GUARANTEE_LEVEL_LABEL[limits.level].toLowerCase()}</b>: até <b>{usdc(limits.limitUsdc)}</b> em garantias abertas (cabem mais {usdc(limits.availableUsdc)}). Ele sobe conforme você compra e conclui tarefas sem disputas.
         {limits.purchasesToFull > 0 ? ` Faltam ${limits.purchasesToFull} ${limits.purchasesToFull === 1 ? "compra" : "compras"} para o nível completo.` : ""}
       </span>

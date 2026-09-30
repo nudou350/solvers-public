@@ -22,6 +22,8 @@ button.me-pill { font: inherit; font-weight: 600; color: var(--ink); cursor: poi
 .acct-menu a, .acct-menu button { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 12px; border-radius: 12px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 600; text-align: left; cursor: pointer; }
 .acct-menu a:hover, .acct-menu button:hover { background: var(--surface-2); }
 .acct-menu button[disabled] { opacity: .5; cursor: wait; }
+.acct-menu { max-width: calc(100vw - 32px); }
+.acct-who .tiny { display: block; overflow-wrap: anywhere; }
 .acct-who { padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
 .tabbar a { text-decoration: none; }
 .seg { align-self: flex-start; }

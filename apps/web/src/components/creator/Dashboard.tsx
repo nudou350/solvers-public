@@ -187,7 +187,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                 <span className="display num" style={{ fontSize: 36 }}>{Math.round(creator.reputationScore)}</span>
               </div>
             </div>
-            <div className="col" style={gap(4)}>
+            <div className="col grow" style={gap(4)}>
               <RepBadge score={creator.reputationScore} style={{ alignSelf: "flex-start" }} />
               <span className="small muted">{lostText}</span>
             </div>

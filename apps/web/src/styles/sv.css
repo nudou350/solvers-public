@@ -51,6 +51,10 @@
 .ok { color: var(--mint); } .warn { color: var(--amber); } .bad { color: var(--red); } .brand { color: var(--brand); }
 .center { text-align: center; }
 .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp2, .clamp3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.clamp2 { -webkit-line-clamp: 2; line-clamp: 2; }
+.clamp3 { -webkit-line-clamp: 3; line-clamp: 3; }
+.flex-none { flex: none; }
 
 /* layout */
 .wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 40px; }
@@ -71,7 +75,7 @@
 .wrapx { flex-wrap: wrap; }
 .col { display: flex; flex-direction: column; gap: var(--gap, 12px); }
 .between { justify-content: space-between; }
-.grow { flex: 1 1 0; min-width: 0; }
+.grow { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
 .start { align-items: flex-start; }
 .end { align-items: flex-end; }
 .sticky { position: sticky; top: 24px; }
@@ -274,6 +278,8 @@ a.card:hover { transform: translateY(-3px); border-color: var(--line-strong); bo
 .searchbar .input:focus { outline: none; }
 .searchbar:focus-within { border-color: var(--brand); }
 .cat { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-align: left; width: 100%; min-height: 72px; transition: border-color .15s, background .15s; }
+.cat > .col { flex: 1 1 0; min-width: 0; }
+.cat b, .cat .tiny { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat:hover { border-color: var(--line-strong); }
 .cat.on { border-color: var(--brand); background: var(--brand-soft); }
 .rank { font-family: var(--font-serif), Georgia, serif; font-size: 44px; line-height: 1; width: 44px; color: var(--ink-3); flex: none; text-align: center; }
