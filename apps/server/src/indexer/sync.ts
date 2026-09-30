@@ -7,11 +7,11 @@ import { db, schema } from "../db/index.js";
 import { bytesToHexStr } from "../lib/crypto.js";
 import { resolvePublishedText } from "../store/review-rules.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, type MilestoneStatusName } from "./escrow-status.js";
+import { agentMirrorValues } from "./mirror.js";
 
 // Sincronização "busca a conta on-chain e espelha no banco". Idempotente: pode rodar quantas
 // vezes quiser para o mesmo endereço (webhook, polling e a própria API chamam).
 
-const AGENT_STATUS = ["pending", "active", "suspended"] as const;
 const ESCROW_STATUS = { 0: "active", 1: "approved", 2: "disputed", 3: "refunded" } as const;
 const MILESTONE_STATUS = { 0: "pending", 1: "passed", 2: "approved", 3: "disputed", 4: "refunded" } as const;
 
@@ -20,25 +20,8 @@ export async function syncAgent(agentAddr: Address): Promise<string | null> {
   if (!acc.exists) return null;
   const a = acc.data;
   const id = bytesToHex(a.agentId);
-  const values = {
-    version: a.version,
-    versionHash: bytesToHexStr(a.versionHash),
-    price: a.price,
-    pricePerUse: a.pricePerUse,
-    royaltyBps: a.royaltyBps,
-    evalScoreBps: a.evalScoreBps,
-    evalHash: bytesToHexStr(a.evalHash),
-    status: AGENT_STATUS[a.status] ?? "pending",
-    totalSales: a.totalSales,
-    verifiedUses: a.verifiedUses,
-    ratingSum: a.ratingSum,
-    ratingCount: a.ratingCount,
-    disputesLost: a.disputesLost,
-    stake: a.stake,
-    onchainAddress: agentAddr,
-    collectionAddress: a.collection,
-    updatedAt: new Date(),
-  };
+  // Não inclui platformStatus (kill switch da plataforma): ver indexer/mirror.ts.
+  const values = agentMirrorValues(a, agentAddr);
   const updated = await db.update(schema.agents).set(values).where(eq(schema.agents.id, id)).returning({ id: schema.agents.id });
   if (updated.length === 0) {
     // Registrado fora do script de publicação: cria uma entrada mínima para não perder o espelho.

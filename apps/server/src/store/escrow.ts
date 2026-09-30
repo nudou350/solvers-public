@@ -29,6 +29,7 @@ import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, delive
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
 import { notifyCreator } from "../notify/telegram.js";
+import { agentIsAvailable } from "../runtime/availability.js";
 import { splitCriteria } from "../runtime/guarantee-text.js";
 
 export const escrowRouter = Router();
@@ -122,7 +123,7 @@ escrowRouter.post(
     const deliveryDays = resolveDeliveryDays(body.deliveryDays);
     const agent = await findAgentRow(body.agentId);
     // Garantia é uma venda nova: especialista fora da vitrine não abre tarefas.
-    if (agent.status !== "active" || !agent.listed) throw badRequest("Este especialista ainda não está disponível.");
+    if (!agentIsAvailable(agent) || !agent.listed) throw badRequest("Este especialista ainda não está disponível.");
     const offer = guaranteeOffer(agent, 1);
     if (!offer) throw badRequest("Este especialista não oferece tarefas com garantia.");
     if ((body.acceptanceTests?.length ?? 0) > offer.milestones.length) throw badRequest("Há mais baterias de aceite do que etapas.");

@@ -1,19 +1,28 @@
 import { z } from "zod";
 import { FREE_TRIAL_USES, Requirement } from "@solvers/shared";
+import { AGENT_ID_RE, slugProblem, versionProblem } from "./agent-ids.js";
 
 // Schema do manifest.json dos pacotes (INSTRUCTIONS.md 6). Sem env/banco: validado também nos testes.
 
 /** Um critério por item: ";" e quebra de linha separam critérios na contestação. */
 const Criterion = z.string().min(2).max(300).refine((c) => !/[;\n]/.test(c), "critério não pode conter ';' nem quebra de linha");
 
-export const Manifest = z.object({
-  id: z.string().regex(/^[0-9a-f]{32}$/),
-  slug: z.string(),
+/** Forma do manifest (sem as verificações cruzadas): o validador v1 estende esta base. */
+export const ManifestBase = z.object({
+  id: z.string().regex(AGENT_ID_RE),
+  /** Vira nome de pasta e chave de busca: formato fechado e nunca igual a um `id` (PACKAGE_SPEC.md 4.1). */
+  slug: z.string().superRefine((s, ctx) => {
+    const why = slugProblem(s);
+    if (why) ctx.addIssue({ code: "custom", message: why });
+  }),
   name: z.string(),
   tagline: z.string(),
   description: z.string(),
   category: z.string(),
-  version: z.string(),
+  version: z.string().superRefine((v, ctx) => {
+    const why = versionProblem(v);
+    if (why) ctx.addIssue({ code: "custom", message: why });
+  }),
   catalogOnly: z.boolean().optional(),
   /** Usa get_memory/save_memory (se ausente, deduz pelas etapas). */
   usesMemory: z.boolean().optional(),
@@ -76,7 +85,10 @@ export const Manifest = z.object({
   versions: z
     .array(z.object({ version: z.string(), releasedAt: z.string(), notes: z.string() }))
     .default([]),
-}).superRefine((m, ctx) => {
+});
+
+/** Verificações entre campos (teste grátis x etapas e ferramentas). */
+export function manifestCrossChecks(m: z.infer<typeof ManifestBase>, ctx: z.RefinementCtx): void {
   if (!m.trial) return;
   if (m.trial.steps > m.steps.length) {
     ctx.addIssue({ code: "custom", path: ["trial", "steps"], message: `trial.steps (${m.trial.steps}) maior que o número de etapas (${m.steps.length})` });
@@ -86,5 +98,7 @@ export const Manifest = z.object({
       ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: ferramenta "${name}" não existe em tools` });
     }
   }
-});
+}
+
+export const Manifest = ManifestBase.superRefine(manifestCrossChecks);
 export type Manifest = z.infer<typeof Manifest>;

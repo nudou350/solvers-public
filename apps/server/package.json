@@ -16,6 +16,8 @@
     "cli:seed": "tsx --env-file-if-exists=.env src/cli/seed.ts",
     "cli:retire-escrows": "tsx --env-file-if-exists=.env src/cli/retire-escrows.ts",
     "cli:reindex": "tsx --env-file-if-exists=.env src/cli/reindex.ts",
+    "cli:validate": "tsx src/cli/validate.ts",
+    "cli:schema": "tsx src/cli/schema.ts",
     "cli:publish:devnet": "tsx --env-file=.env.devnet src/cli/publish.ts"
   },
   "dependencies": {
@@ -33,7 +35,8 @@
     "jose": "^6.2.12",
     "pg": "^8.16.0",
     "tweetnacl": "^1.0.3",
-    "zod": "^3.25.0"
+    "zod": "^3.25.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",

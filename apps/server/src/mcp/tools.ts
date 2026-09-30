@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { unitsToUsdc } from "@solvers/shared";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
@@ -32,6 +32,8 @@ import {
   responseHash,
   watermark,
 } from "../runtime/engine.js";
+import { agentIsAvailable, assertAgentAvailable, UNAVAILABLE_TEXT } from "../runtime/availability.js";
+import { canUseMemory, MEMORY_NO_ACCESS_TEXT } from "../runtime/memory-access.js";
 import { getPackage, type SolverPackage } from "../runtime/packages.js";
 import { guaranteesText, milestoneDeliveryBlock, resolveEscrowId } from "../runtime/guarantee-text.js";
 import { openGuarantees } from "../runtime/guarantees.js";
@@ -74,12 +76,36 @@ async function logUsage(ctx: McpContext, tool: string, agentId: string | null, s
   });
 }
 
+let usageLogFailures = 0;
+
+/** Falha ao gravar em usage_events: registra no log do servidor (PM2) com um contador, sem derrubar a resposta. */
+function reportUsageLogFailure(tool: string, wallet: string, e: unknown): void {
+  usageLogFailures += 1;
+  console.error(`[mcp][ALERTA] falha ao gravar usage_events (tool=${tool}, wallet=${wallet.slice(0, 6)}…, falhas desde o boot=${usageLogFailures})`, e);
+}
+
+/**
+ * Memória só com licença ou sessão aberta (paga ou de teste) do especialista, e só se ele estiver no ar.
+ * Antes aceitava qualquer agent_id do catálogo.
+ */
+export async function assertMemoryAccess(wallet: string, row: typeof schema.agents.$inferSelect): Promise<void> {
+  assertAgentAvailable(row);
+  const [open] = await db
+    .select({ id: schema.sessions.id })
+    .from(schema.sessions)
+    .where(and(eq(schema.sessions.wallet, wallet), eq(schema.sessions.agentId, row.id), gt(schema.sessions.expiresAt, new Date())))
+    .limit(1);
+  const licensed = open ? false : (await ownedAgents(wallet)).has(row.id);
+  if (!canUseMemory({ licensed, openSession: !!open })) throw new HttpError(403, MEMORY_NO_ACCESS_TEXT, "memory_no_access");
+}
+
 /** Envolve o handler: log em usage_events, erros amigáveis e nunca vaza stack. */
 function tool<A>(ctx: McpContext, name: string, fn: (args: A) => Promise<{ text: string; agentId?: string | null; sessionId?: string | null }>) {
   return async (args: A) => {
     try {
       const r = await fn(args);
-      await logUsage(ctx, name, r.agentId ?? null, r.sessionId ?? null, r.text).catch(() => undefined);
+      // A resposta ao usuário não depende do log, mas a falha NUNCA é silenciosa: usage_events alimenta auditoria e lotes on-chain.
+      await logUsage(ctx, name, r.agentId ?? null, r.sessionId ?? null, r.text).catch((e) => reportUsageLogFailure(name, ctx.wallet, e));
       return text(r.text);
     } catch (e) {
       if (e instanceof HttpError) return errorText(e.message);
@@ -248,7 +274,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     tool(ctx, "activate_solver", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
       const pkg = requirePackage(row.id);
-      if (row.status !== "active") return { text: "Este especialista está temporariamente indisponível.", agentId: row.id };
+      if (!agentIsAvailable(row)) return { text: UNAVAILABLE_TEXT, agentId: row.id };
       let open = await findOpenSession(ctx.wallet, row.id, pkg.manifest.version, pkg.steps.length);
       // Licença revendida ou garantia encerrada: descarta a sessão e segue o fluxo normal.
       if (open && !(await sessionGrantValid(open))) {
@@ -452,6 +478,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "get_memory", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
+      await assertMemoryAccess(ctx.wallet, row);
       const key = await memoryKeyFor(ctx.tokenId, ctx.wallet);
       if (!key) {
         return { text: "Memória indisponível nesta conexão (a chave não foi autorizada). Siga sem memória.", agentId: row.id };
@@ -471,6 +498,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "save_memory", async ({ agent_id, content }: { agent_id: string; content: string }) => {
       const row = await findAgentRow(agent_id);
+      await assertMemoryAccess(ctx.wallet, row);
       const key = await memoryKeyFor(ctx.tokenId, ctx.wallet);
       if (!key) return { text: "Não foi possível salvar: memória não autorizada nesta conexão.", agentId: row.id };
       await saveMemory(ctx.wallet, row.id, key, content);

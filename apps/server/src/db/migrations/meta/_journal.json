@@ -71,6 +71,13 @@
       "when": 1790801633134,
       "tag": "0009_escrow_v2_deadline_fee",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790806387260,
+      "tag": "0010_platform_status",
+      "breakpoints": true
     }
   ]
 }

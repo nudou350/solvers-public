@@ -5,6 +5,7 @@ import { forbidden, notFound } from "../lib/http.js";
 import { randomId, sha256Hex } from "../lib/crypto.js";
 import type { SolverPackage } from "./packages.js";
 import { escrowIsOpen, paidAccessById, sessionGrantValid, type PaidAccess } from "./access.js";
+import { assertAgentAvailable } from "./availability.js";
 import { licenseRecheckDue, withSummary } from "./session-rules.js";
 
 // Motor de etapas (INSTRUCTIONS.md 5.4): sessão por ativação, uma etapa por vez, gates,
@@ -91,7 +92,7 @@ export async function expireSession(sessionId: string): Promise<void> {
 }
 
 /**
- * Carrega a sessão garantindo que pertence à carteira do token, que não expirou, que o teste
+ * Carrega a sessão garantindo que pertence à carteira do token, que o especialista não foi suspenso, que não expirou, que o teste
  * grátis não passou do teto e que a licença (se for o caso) continua com a mesma carteira.
  */
 export async function getSession(sessionId: string, wallet: string): Promise<Session> {
@@ -105,6 +106,12 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
     if (other) throw forbidden("Esta sessão pertence a outra carteira.");
     throw notFound("Sessão não encontrada. Ative o solver de novo com activate_solver.");
   }
+  // Kill switch (PACKAGE_SPEC.md 15.4): especialista suspenso (plataforma ou cadeia) derruba as sessões abertas na hora.
+  const [agent] = await db
+    .select({ status: schema.agents.status, platformStatus: schema.agents.platformStatus })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, s.agentId));
+  assertAgentAvailable(agent ?? { status: "missing", platformStatus: "suspended" });
   if (s.expiresAt < new Date()) throw forbidden("Sessão expirada. Ative o solver de novo com activate_solver.");
   if (s.access === "trial" && s.calls > TRIAL_MAX_CALLS) {
     // Só no momento de bloquear: quem comprou durante o teste segue na mesma sessão, sem limites.
