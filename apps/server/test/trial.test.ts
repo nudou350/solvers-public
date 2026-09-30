@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { FREE_TRIAL_USES } from "@solvers/shared";
 import { escrowGivesAccess, paidAccessLine } from "../src/runtime/access-rules.js";
 import { Manifest } from "../src/runtime/manifest.js";
-import { trialAccessLine, trialEndText, trialInfo, trialLeft, trialLimits, trialStepLocked } from "../src/runtime/trial.js";
+import { myTrial, trialAccessLine, trialEndText, trialInfo, trialLeft, trialLimits, trialStepLocked } from "../src/runtime/trial.js";
 
 // Teste grátis por especialista (manifest.trial): schema, limites e textos (sem env ou banco).
 
@@ -122,7 +122,7 @@ describe("textos do teste", () => {
     const line = trialAccessLine(t, { use: 1, totalSteps: 4, toolNames: ["run_tests", "a11y_check"] });
     assert.equal(
       line,
-      "Teste grátis (uso 1 de 3): libera as etapas 1 a 2 de 4, até 15 consultas à base e run_tests 1 vez no total. Só com a licença: a11y_check. Você recebe o plano e o componente. Avise o usuário desses limites antes de começar.",
+      "Teste grátis (uso 1 de 3): libera as etapas 1 a 2 de 4, até 15 consultas à base e run_tests 1 vez no total. Depois deste, restam 2 usos grátis. Só com a licença: a11y_check. Você recebe o plano e o componente. Avise o usuário desses limites antes de começar.",
     );
   });
 
@@ -132,6 +132,26 @@ describe("textos do teste", () => {
     assert.match(line, /^Teste grátis \(uso 2 de 3\): libera a etapa 1 de 4, nenhuma consulta à base e run_tests 2 vezes \(restam 1\) no total\./);
     const all = trialLimits(parse({ trial: { ...trial, steps: 4 } }))!;
     assert.match(trialAccessLine(all, { use: 1, totalSteps: 4, toolNames: [] }), /libera as 4 etapas, até 15 consultas/);
+  });
+
+  it("linha de acesso: usos que sobram e aviso do último uso", () => {
+    const at = (use: number) => trialAccessLine(t, { use, totalSteps: 4, toolNames: [] });
+    assert.match(at(2), /Depois deste, resta 1 uso grátis\./);
+    assert.match(at(3), /Este é o último uso grátis\./);
+  });
+
+  it("resumo para a biblioteca: usos, consultas e ferramentas que sobram", () => {
+    const at = new Date("2026-09-30T12:00:00Z");
+    assert.deepEqual(myTrial("a1", t, 2, { searchesUsed: 5, toolRuns: { run_tests: 1 } }, at), {
+      agentId: "a1",
+      uses: 3,
+      usesLeft: 1,
+      searches: 15,
+      searchesLeft: 10,
+      tools: [{ name: "run_tests", limit: 1, left: 0 }],
+      lastUsedAt: "2026-09-30T12:00:00.000Z",
+    });
+    assert.equal(myTrial("a1", t, 3, { searchesUsed: 0, toolRuns: {} }, at).usesLeft, 0);
   });
 });
 

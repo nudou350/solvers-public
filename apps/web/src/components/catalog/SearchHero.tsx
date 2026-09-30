@@ -157,7 +157,7 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                     <p className="small muted clamp3">{a.tagline}</p>
                     {a.trialAvailable ? (
                       <div>
-                        <TrialTag />
+                        <TrialTag agentId={a.id} />
                       </div>
                     ) : null}
                     <div className="row between wrapx" style={{ marginTop: "auto" }}>

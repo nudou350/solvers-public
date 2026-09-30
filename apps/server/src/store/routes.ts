@@ -10,6 +10,7 @@ import {
   usdcToUnits,
   type AgentAccess,
   type License,
+  type MyTrial,
   type Profile,
   type PublicConfig,
   type TxResponse,
@@ -40,7 +41,7 @@ import {
 import { toLicense, toReputation } from "./mappers.js";
 import { trialUsage } from "../runtime/access.js";
 import { getPackage } from "../runtime/packages.js";
-import { trialLeft, trialLimits } from "../runtime/trial.js";
+import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 
 export const storeRouter = Router();
@@ -332,6 +333,25 @@ storeRouter.get(
       trialUsesLeft: Math.max(0, limits.uses - used),
       trial: trialLeft(limits, usage),
     };
+  }),
+);
+
+/** Testes grátis em andamento da carteira (biblioteca): só especialistas já ativados e ainda sem licença. */
+storeRouter.get(
+  "/me/trials",
+  requireAuth,
+  h(async (req): Promise<MyTrial[]> => {
+    const wallet = requireWallet(req);
+    const rows = await db.select().from(schema.trials).where(eq(schema.trials.wallet, wallet)).orderBy(desc(schema.trials.updatedAt));
+    if (!rows.length) return [];
+    const owned = await db.select({ agentId: schema.licenses.agentId }).from(schema.licenses).where(eq(schema.licenses.ownerWallet, wallet));
+    const licensed = new Set(owned.map((l) => l.agentId));
+    return rows.flatMap((r) => {
+      const pkg = getPackage(r.agentId);
+      const limits = pkg ? trialLimits(pkg.manifest) : null;
+      if (!limits || licensed.has(r.agentId) || r.used <= 0) return [];
+      return [myTrial(r.agentId, limits, r.used, { searchesUsed: r.searchesUsed, toolRuns: r.toolRuns }, r.updatedAt)];
+    });
   }),
 );
 

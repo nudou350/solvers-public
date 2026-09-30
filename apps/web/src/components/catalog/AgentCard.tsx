@@ -28,7 +28,7 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
           <Icon name="shield-check" size="s" />
           {a.evalScore}% nos testes
         </span>
-        {a.trialAvailable ? <TrialTag /> : null}
+        {a.trialAvailable ? <TrialTag agentId={a.id} /> : null}
       </div>
       <div className="row between wrapx" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
         <div>

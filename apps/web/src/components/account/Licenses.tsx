@@ -1,6 +1,6 @@
 "use client";
 // Aba "Especialistas" da biblioteca: licenças permanentes, com o uso das últimas 8 semanas.
-import type { UsageSummary } from "@solvers/api-client";
+import type { MyTrial, UsageSummary } from "@solvers/api-client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -13,29 +13,35 @@ import { useSession } from "@/lib/session";
 import { useLibrary } from "./LibraryShell";
 import { useAgentsIndex } from "@/lib/hooks";
 import { LoadError } from "./shared";
+import { TrialsSection } from "./TrialsSection";
 
 export function Licenses() {
   const { licenses, reloadLicenses } = useLibrary();
   const { api } = useSession();
   const [usage, setUsage] = useState<Map<string, UsageSummary>>(new Map());
+  // Testes grátis em andamento; se a chamada falhar a lista de licenças continua valendo sozinha.
+  const [trials, setTrials] = useState<MyTrial[] | null>(null);
   const list = Array.isArray(licenses) ? licenses : [];
-  const agents = useAgentsIndex(list.map((l) => l.agentId));
+  const agents = useAgentsIndex([...list.map((l) => l.agentId), ...(trials ?? []).map((t) => t.agentId)]);
 
   useEffect(() => {
     api.getMyUsage().then((u) => setUsage(new Map(u.map((x) => [x.agentId, x]))), () => {});
+    api.getMyTrials().then(setTrials, () => setTrials([]));
   }, [api]);
 
   if (licenses === "error") return <LoadError onRetry={reloadLicenses} text="Não conseguimos carregar suas licenças agora." />;
-  if (licenses === null) return <Loading text="Carregando seus especialistas…" />;
-  if (!list.length)
+  if (licenses === null || trials === null) return <Loading text="Carregando seus especialistas…" />;
+  if (!list.length && !trials.length)
     return (
       <Empty icon="library" title="Nenhum especialista na sua biblioteca" action={<Button href="/">Explorar especialistas</Button>}>
-        Quando você comprar a licença de um especialista, ele aparece aqui com o uso de cada mês.
+        Quando você comprar a licença de um especialista, ele aparece aqui com o uso de cada mês. Os testes grátis que você começar também.
       </Empty>
     );
 
   return (
     <div className="col" style={{ "--gap": "18px" } as React.CSSProperties}>
+      {trials.length ? <TrialsSection trials={trials} agents={agents} /> : null}
+      {trials.length && list.length ? <h2 className="h4">Licenças</h2> : null}
       {list.map((l) => {
         const a = agents.get(l.agentId);
         const u = usage.get(l.agentId);

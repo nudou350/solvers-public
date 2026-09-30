@@ -12,6 +12,7 @@ import {
   License,
   ResaleListing,
   Memory,
+  MyTrial,
   PixCharge,
   Profile,
   PublicConfig,
@@ -116,6 +117,7 @@ export function createApi(opts: ApiOptions = {}) {
     /** Limite de garantias da carteira: quanto ainda pode abrir e quantas compras faltam para o nível completo. */
     getMyGuarantee: () => req(GuaranteeStatus, "/api/me/guarantee"),
     /** Licença ou saldo do teste grátis (usos, consultas e execuções de ferramenta restantes). */
+    getMyTrials: () => req(z.array(MyTrial), "/api/me/trials"),
     getMyAccess: (idOrSlug: string) => req(AgentAccess, `/api/me/access/${encodeURIComponent(idOrSlug)}`),
     refreshLicenses: () => post(z.object({ ok: z.boolean() }), "/api/me/licenses/refresh"),
     getMemoriesCount: () =>

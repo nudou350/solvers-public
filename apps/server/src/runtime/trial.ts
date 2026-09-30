@@ -1,4 +1,4 @@
-import type { TrialInfo } from "@solvers/shared";
+import type { MyTrial, TrialInfo } from "@solvers/shared";
 import type { Manifest } from "./manifest.js";
 import type { SolverPackage } from "./packages.js";
 
@@ -49,6 +49,20 @@ export function trialLeft(t: TrialLimits, usage: TrialUsage | null) {
   };
 }
 
+/** Teste em andamento da carteira para a biblioteca (GET /me/trials). */
+export function myTrial(agentId: string, t: TrialLimits, used: number, usage: TrialUsage, lastUsedAt: Date): MyTrial {
+  const left = trialLeft(t, usage);
+  return {
+    agentId,
+    uses: t.uses,
+    usesLeft: Math.max(0, t.uses - used),
+    searches: t.searches,
+    searchesLeft: left.searchesLeft,
+    tools: Object.entries(t.tools).map(([name, limit]) => ({ name, limit, left: left.toolsLeft[name] ?? 0 })),
+    lastUsedAt: lastUsedAt.toISOString(),
+  };
+}
+
 /** A etapa `index` (0-based) está fora do teste? O encerramento (index >= total) nunca fica bloqueado. */
 export function trialStepLocked(t: TrialLimits, index: number, totalSteps: number): boolean {
   return index < totalSteps && index >= t.steps;
@@ -68,6 +82,12 @@ function listPt(items: string[]): string {
  */
 export function trialEndText(name: string, t: Pick<TrialLimits, "summary" | "lockedSummary">, purchaseLink: string): string {
   return `O teste grátis de ${name} vai até aqui: ${clause(t.summary)}. Com a licença vitalícia você também tem: ${clause(t.lockedSummary)}. Comprar: ${purchaseLink}`;
+}
+
+/** Quantos usos grátis sobram depois deste; no último, avisa que o teste acaba aqui. */
+function usesLeftText(left: number): string {
+  if (left <= 0) return "Este é o último uso grátis.";
+  return left === 1 ? "Depois deste, resta 1 uso grátis." : `Depois deste, restam ${left} usos grátis.`;
 }
 
 function stepsText(steps: number, total: number): string {
@@ -91,6 +111,7 @@ export function trialAccessLine(
   const blocked = ctx.toolNames.filter((n) => !(n in t.tools));
   const lines = [
     `Teste grátis (uso ${ctx.use} de ${t.uses}): ${listPt(parts)} no total.`,
+    usesLeftText(t.uses - ctx.use),
     blocked.length ? `Só com a licença: ${listPt(blocked)}.` : "",
     `${clause(t.summary)}.`,
     "Avise o usuário desses limites antes de começar.",

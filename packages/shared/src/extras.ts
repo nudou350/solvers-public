@@ -205,6 +205,20 @@ export const AgentAccess = z.object({
   trial: z.object({ searchesLeft: z.number(), toolsLeft: z.record(z.number()) }).nullable(),
 });
 
+/**
+ * GET /api/me/trials: testes grátis em andamento da carteira (um por especialista já ativado,
+ * sem licença). `usesLeft` 0 = teste esgotado.
+ */
+export const MyTrial = z.object({
+  agentId: z.string(),
+  uses: z.number(),
+  usesLeft: z.number(),
+  searches: z.number(),
+  searchesLeft: z.number(),
+  tools: z.array(z.object({ name: z.string(), limit: z.number(), left: z.number() })),
+  lastUsedAt: z.string(),
+});
+
 /** GET /api/config */
 /** Pix na demo: o comprador paga em reais e recebe USDC de teste (sem dinheiro real na devnet). */
 export const PixConfig = z.object({
@@ -285,6 +299,7 @@ export type AgentVersion = z.infer<typeof AgentVersion>;
 export type AgentDetail = z.infer<typeof AgentDetail>;
 export type TrialInfo = z.infer<typeof TrialInfo>;
 export type AgentAccess = z.infer<typeof AgentAccess>;
+export type MyTrial = z.infer<typeof MyTrial>;
 export type CreatorProfile = z.infer<typeof CreatorProfile>;
 export type CreatorDashboard = z.infer<typeof CreatorDashboard>;
 export type ConnectorStatus = z.infer<typeof ConnectorStatus>;

@@ -58,6 +58,39 @@ function fetchAccess(api: SolversApi, slug: string): Promise<MyAccess> {
   return p;
 }
 
+export type MyTrials = Awaited<ReturnType<SolversApi["getMyTrials"]>>;
+
+// Vários selos da mesma tela (cartões do catálogo) dividem a mesma chamada, como no acesso acima.
+const trialsInflight = new WeakMap<SolversApi, Promise<MyTrials>>();
+
+function fetchTrials(api: SolversApi): Promise<MyTrials> {
+  let p = trialsInflight.get(api);
+  if (!p) {
+    p = api.getMyTrials().finally(() => trialsInflight.delete(api));
+    trialsInflight.set(api, p);
+  }
+  return p;
+}
+
+/** Testes grátis em andamento do usuário logado, por especialista. null = sem sessão, carregando ou erro. */
+export function useMyTrials(): Map<string, MyTrials[number]> | null {
+  const { api, status } = useSession();
+  const [trials, setTrials] = useState<Map<string, MyTrials[number]> | null>(null);
+  useEffect(() => {
+    setTrials(null);
+    if (status !== "authed") return;
+    let live = true;
+    fetchTrials(api).then(
+      (list) => live && setTrials(new Map(list.map((t) => [t.agentId, t]))),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, status]);
+  return trials;
+}
+
 /** Licença e teste grátis do usuário logado neste especialista. null = sem sessão, carregando ou erro. */
 export function useMyAccess(slug: string): MyAccess | null {
   const { api, status } = useSession();
