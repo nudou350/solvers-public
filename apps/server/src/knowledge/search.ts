@@ -15,7 +15,8 @@ export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow
   if (vec) {
     // Distância do solver = a do vetor que casar melhor (texto todo, tagline ou uma das searchPhrases).
     const q = sql`${toVectorLiteral(vec)}::vector`;
-    const dist = sql<number>`least(${schema.agents.embedding} <=> ${q}, (select min(v.embedding <=> ${q}) from ${schema.agentSearchVectors} v where v.agent_id = ${schema.agents.id}))`;
+    // Colunas qualificadas à mão: no select o drizzle escreve só "id", que na subconsulta seria o de v.
+    const dist = sql<number>`least(${schema.agents}.embedding <=> ${q}, (select min(v.embedding <=> ${q}) from ${schema.agentSearchVectors} v where v.agent_id = ${schema.agents}.id))`;
     const rows = await db
       .select({ agent: schema.agents, dist })
       .from(schema.agents)

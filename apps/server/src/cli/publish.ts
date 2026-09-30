@@ -46,7 +46,7 @@ function searchText(pkg: SolverPackage) {
   return [m.name, m.tagline, m.description, m.category, ...m.packageContents, ...m.requirements.map((r) => r.label)].join("\n");
 }
 
-export async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
+async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
   const m = pkg.manifest;
   await db
     .insert(schema.creators)
