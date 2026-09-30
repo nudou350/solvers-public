@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { repLevel } from "@/lib/format";
+import type { CSSProperties, ReactNode } from "react";
+import { repCls, repLevel } from "@/lib/format";
 import { Icon, type IconName } from "./Icon";
 
 export type ChipTone = "default" | "ok" | "brand" | "warn" | "red" | "plain";
@@ -14,13 +14,16 @@ export function Chip({ tone = "default", icon, children, className }: { tone?: C
   );
 }
 
-/** Selo de reputação (0..100) com o nível do design: Referência, Confiável, Em crescimento... */
-export function RepBadge({ score, showScore = false }: { score: number; showScore?: boolean }) {
+/**
+ * Selo de reputação (0..100) com o nível do design: Referência, Confiável, Em crescimento...
+ * `children` troca o texto (ex: "Criador confiável"); o tom e o ícone seguem o nível.
+ */
+export function RepBadge({ score, showScore = false, children, style }: { score: number; showScore?: boolean; children?: ReactNode; style?: CSSProperties }) {
   const lv = repLevel(score);
   return (
-    <span className={["rep", lv.tone === "ok" ? "" : lv.tone].filter(Boolean).join(" ")} title={`Reputação ${Math.round(score)}/100`}>
+    <span className={repCls(score)} title={`Reputação ${Math.round(score)}/100`} style={style}>
       <Icon name={lv.tone === "warn" ? "warning" : "shield-check"} size="s" />
-      {lv.label}
+      {children ?? <span>{lv.label}</span>}
       {showScore ? <span className="num">· {Math.round(score)}</span> : null}
     </span>
   );

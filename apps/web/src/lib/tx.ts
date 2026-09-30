@@ -19,15 +19,18 @@ export class TxFailedError extends Error {
  * Assina e envia uma transação montada pelo servidor (buildPurchase, buildEscrow, buildRelease...).
  * `built` pode ser a resposta ou uma função que a monta (assim erros do build caem no mesmo try).
  */
-export async function runTx(
-  apiClient: SolversApi,
-  wallet: WalletLike,
-  built: TxResponse | (() => Promise<TxResponse>),
-): Promise<SubmitResponse & { meta?: TxResponse["meta"] }> {
+export type TxResult = SubmitResponse & {
+  meta?: TxResponse["meta"];
+  /** Link do explorador para a transação, montado pelo servidor na rede certa (null se ele não mandar). */
+  explorerUrl: string | null;
+};
+
+export async function runTx(apiClient: SolversApi, wallet: WalletLike, built: TxResponse | (() => Promise<TxResponse>)): Promise<TxResult> {
   const tx = typeof built === "function" ? await built() : built;
   const res = await apiClient.signAndSubmit(wallet, tx);
   if (res.status !== "confirmed") throw new TxFailedError(res.error ?? "A transação falhou na rede.", res.signature);
-  return { ...res, meta: tx.meta };
+  const extra = res as SubmitResponse & { explorerUrl?: unknown };
+  return { ...res, meta: tx.meta, explorerUrl: typeof extra.explorerUrl === "string" ? extra.explorerUrl : null };
 }
 
 export type TxErrorInfo = {
@@ -42,6 +45,15 @@ export type TxErrorInfo = {
 export function txErrorMessage(err: unknown): TxErrorInfo {
   if (err instanceof ApiError) {
     const b = err.body;
+    // /api/tx/submit: a rede recusou a transação (HTTP 422, {status:"failed", error} sem código). O caso comum é
+    // o blockhash expirar enquanto a pessoa assina; tentar de novo monta uma transação nova.
+    if (err.status === 422 || b.status === "failed")
+      return {
+        code: "transaction_failed",
+        title: "A rede não confirmou a transação",
+        text: "Nada foi cobrado. Às vezes a transação expira enquanto você assina. Tente de novo: montamos uma nova.",
+        action: "retry",
+      };
     switch (err.code) {
       case "insufficient_funds": {
         const need = typeof b.neededUsdc === "number" ? b.neededUsdc : null;
@@ -65,6 +77,8 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
       case "faucet_cooldown":
       case "faucet_daily_cap":
         return { code: err.code, title: "USDC de teste indisponível agora", text: err.message, action: null };
+      case "invalid_criterion":
+        return { code: err.code, title: "Escolha um dos critérios combinados", text: "A contestação precisa apontar um dos critérios da etapa.", action: null };
       case "transaction_failed":
         return { code: err.code, title: "A transação falhou na rede", text: err.message, action: "retry" };
       case "validation":
@@ -75,7 +89,8 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
         return { code: err.code, title: "Não deu para concluir", text: err.message, action: null };
     }
   }
-  if (err instanceof TxFailedError) return { code: "transaction_failed", title: "A transação falhou na rede", text: err.message, action: "retry" };
+  if (err instanceof TxFailedError)
+    return { code: "transaction_failed", title: "A rede não confirmou a transação", text: "Nada foi cobrado. Tente de novo: montamos uma nova.", action: "retry" };
   const msg = err instanceof Error ? err.message : String(err);
   if (/cancel|rejected|denied|exited/i.test(msg)) return { code: "cancelled", title: "Assinatura cancelada", text: "Nada foi cobrado.", action: null };
   return { code: "unknown", title: "Algo deu errado", text: msg || "Tente de novo.", action: "retry" };
@@ -86,13 +101,13 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 
 /**
  * Hook para as telas: `const { run, pending, error } = useTx();`
  * `await run(() => api.buildPurchase(agent.id))` faz o login se preciso, assina, envia e devolve o resultado
- * (ou null em caso de erro, que fica em `error` já traduzido).
+ * (`signature`, `meta` e `explorerUrl`), ou null em caso de erro, que fica em `error` já traduzido.
  */
 export function useTx() {
   const { api, requireWallet } = useSession();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<TxErrorInfo | null>(null);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof runTx>> | null>(null);
+  const [result, setResult] = useState<TxResult | null>(null);
 
   const run = useCallback(
     async (build: () => Promise<TxResponse>) => {
@@ -113,7 +128,7 @@ export function useTx() {
     [api, requireWallet],
   );
 
-  return { run, pending, error, result, reset: () => setError(null) };
+  return { run, pending, error, result, explorerUrl: result?.explorerUrl ?? null, reset: () => setError(null) };
 }
 
 /**

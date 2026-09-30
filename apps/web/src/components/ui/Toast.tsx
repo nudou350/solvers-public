@@ -61,7 +61,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts" aria-live="polite" aria-relevant="additions">
         {items.map((t) => (
-          <div key={t.id} className={`toast toast-${t.tone ?? "info"}`} role={t.tone === "bad" ? "alert" : "status"}>
+          // Sem role nos itens: a região aria-live acima já anuncia cada aviso novo (role aqui anunciava duas vezes).
+          <div key={t.id} className={`toast toast-${t.tone ?? "info"}`}>
             <Icon name={TONE_ICON[t.tone ?? "info"]} />
             <div className="note-body">
               <span className="note-title">{t.title}</span>

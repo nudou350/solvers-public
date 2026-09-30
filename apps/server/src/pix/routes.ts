@@ -172,8 +172,9 @@ pixRouter.post(
       if (units === 0n) throw badRequest("Você já tem saldo suficiente para esta compra.", "balance_sufficient");
       purpose = { agentId: (await findAgentRow(body.agentId)).id, type: body.type };
     }
-    // Centavos arredondados para cima (units tem 6 casas: centavos = units * cotação / 10^4).
-    let cents = Math.ceil(Number(units) * rate / 10_000 - 1e-9);
+    // Centavo mais próximo, igual ao total que a vitrine mostra (units tem 6 casas: centavos = units * cotação / 10^4).
+    // O USDC creditado é sempre o valor exato; a diferença de meio centavo fica por conta da plataforma.
+    let cents = Math.round(Number(units) * rate / 10_000);
     if (cents < MIN_CENTS) {
       if ("usdc" in body) throw badRequest(`O valor mínimo do Pix é R$ ${(MIN_CENTS / 100).toFixed(2)}.`, "pix_min");
       // Falta pouco para a compra: cobra o mínimo e credita o equivalente (um pouco mais que o necessário).

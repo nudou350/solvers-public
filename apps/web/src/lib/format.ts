@@ -30,13 +30,20 @@ export function initials(name: string): string {
 /** Carteira encurtada: "AbCd…WxYz". */
 export const short = (w?: string | null) => (w ? `${w.slice(0, 4)}…${w.slice(-4)}` : "");
 
-/** "30 set 2026". */
+// Datas sempre no fuso de Brasília: o servidor (SSR) e o navegador formatam igual, sem erro de hidratação.
+const DATE_PARTS = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "numeric", month: "numeric", year: "numeric" });
+
+/** "30 set 2026" (fuso de Brasília). */
 export function date(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const p: Record<string, string> = {};
+  for (const x of DATE_PARTS.formatToParts(new Date(iso))) p[x.type] = x.value;
+  return `${Number(p.day)} ${MONTHS[Number(p.month) - 1] ?? ""} ${p.year}`;
 }
 
-/** "há 3 dias", "ontem", "há 2 h", "agora há pouco". */
+/**
+ * "há 3 dias", "ontem", "há 2 h", "agora há pouco". Depende do relógio: num componente renderizado no servidor,
+ * use <Ago iso /> (components/ui/Ago), que tolera a diferença de alguns segundos na hidratação.
+ */
 export function ago(iso: string, now = Date.now()): string {
   const s = Math.max(0, (now - new Date(iso).getTime()) / 1000);
   const d = Math.floor(s / 86400);
@@ -74,6 +81,38 @@ export function repLevel(score: number): RepLevel {
   if (score >= 80) return { key: "grow", label: "Em crescimento", tone: "brand" };
   if (score >= 60) return { key: "new", label: "Começando", tone: "soft" };
   return { key: "low", label: "Em observação", tone: "warn" };
+}
+
+/** Classe do selo .rep (o tom "ok" é o padrão, sem classe extra). */
+export const repCls = (score: number) => {
+  const t = repLevel(score).tone;
+  return t === "ok" ? "rep" : `rep ${t}`;
+};
+
+/** Faixas de reputação, iguais às de repLevel (tabela "Níveis de reputação"). */
+export const REP_LEVELS: { key: RepLevel["key"]; name: string; range: string; cls: string }[] = [
+  { key: "low", name: "Em observação", range: "abaixo de 60", cls: "warn" },
+  { key: "new", name: "Começando", range: "60 a 79", cls: "soft" },
+  { key: "grow", name: "Em crescimento", range: "80 a 89", cls: "brand" },
+  { key: "trust", name: "Confiável", range: "90 a 94", cls: "" },
+  { key: "ref", name: "Referência", range: "95 a 100", cls: "" },
+];
+
+/** Nível de garantia do comprador (getMyGuarantee().level). */
+export const GUARANTEE_LEVEL_LABEL: Record<"none" | "limited" | "full", string> = { full: "Completo", limited: "Limitado", none: "Sem garantia" };
+
+/** Duração legível: "2 minutos", "48 horas", "3 dias" (dias só a partir de 2, quando exatos). */
+export function durationText(secs: number): string {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (secs >= 172800 && secs % 86400 === 0) return plural(secs / 86400, "dia", "dias");
+  if (secs >= 3600) return plural(Math.round(secs / 3600), "hora", "horas");
+  return plural(Math.max(1, Math.round(secs / 60)), "minuto", "minutos");
+}
+
+/** Converte o texto de um campo numérico ("12,5") em número (NaN se vazio/inválido). */
+export function parseNum(v: string): number {
+  const t = v.trim().replace(",", ".");
+  return t === "" ? Number.NaN : Number(t);
 }
 
 /** Tendência de 7 dias → classe do design (.trend.up/.down/.flat). */
@@ -132,4 +171,16 @@ export async function copyText(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Salva um texto como arquivo (Blob) no navegador. */
+export function saveTextFile(name: string, content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name.split("/").pop() || "arquivo.txt";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

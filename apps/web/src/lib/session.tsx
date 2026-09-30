@@ -4,8 +4,8 @@
 import type { PublicConfig } from "@solvers/api-client";
 import dynamic from "next/dynamic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type SolversApi } from "./api";
-import { createDevAdapter, loadDevWallet, PRIVY_APP_ID, type WalletAdapter, type WalletLike } from "./wallet";
+import { api, ApiError, onUnauthorized, type SolversApi } from "./api";
+import { createDevAdapter, DEV_WALLET_ALLOWED, devWalletBlocked, forgetDevWallet, loadDevWallet, PRIVY_APP_ID, type WalletAdapter, type WalletLike } from "./wallet";
 
 const PrivyWallet = dynamic(() => import("./wallet/privy"), { ssr: false });
 
@@ -27,6 +27,11 @@ export type Session = {
   /** Abre o login (Privy) ou cria/usa a carteira de desenvolvimento e faz o SIWS. */
   login(): Promise<Me>;
   logout(): Promise<void>;
+  /**
+   * Só na carteira de desenvolvimento: sai, apaga a semente deste navegador e entra com uma carteira nova.
+   * (Com o Privy, trocar de conta é o logout normal.)
+   */
+  switchDevWallet(): Promise<Me>;
   /** Relê /api/auth/me e o perfil (ex: depois de mudar o nome). */
   refresh(): Promise<Me | null>;
   /** Carteira pronta para assinar: se preciso, faz o login antes. */
@@ -45,13 +50,44 @@ export function loadConfig(): Promise<PublicConfig> {
   return configPromise;
 }
 
+// Indício de sessão. O cookie é httpOnly (o JS não o vê), então sem indício o /api/auth/me só responderia 401.
+// - HINT (localStorage): esta vitrine abriu uma sessão e ainda não saiu dela.
+// - CHECKED (sessionStorage): esta aba já perguntou ao servidor uma vez. Sem HINT, pergunta só uma vez por aba,
+//   para ainda detectar uma sessão aberta fora da vitrine (ex: a página de autorização do conector).
+const HINT = "solvers.session.v1";
+const CHECKED = "solvers.sessionChecked.v1";
+
+function shouldAskServer(): boolean {
+  try {
+    if (localStorage.getItem(HINT)) return true;
+    if (sessionStorage.getItem(CHECKED)) return false;
+    sessionStorage.setItem(CHECKED, "1");
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function setHint(on: boolean) {
+  try {
+    if (on) localStorage.setItem(HINT, "1");
+    else localStorage.removeItem(HINT);
+  } catch {
+    /* sem storage: pergunta sempre */
+  }
+}
+
 async function fetchMe(): Promise<Me | null> {
   try {
     const { wallet } = await api.me();
     const profile = await api.getProfile().catch(() => null);
+    setHint(true);
     return { wallet, displayName: profile?.displayName ?? null, email: profile?.email ?? null };
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) return null;
+    if (e instanceof ApiError && e.status === 401) {
+      setHint(false);
+      return null;
+    }
     throw e;
   }
 }
@@ -77,10 +113,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadConfig().then(setConfig, () => setConfig(null));
-    if (!PRIVY_APP_ID) loadDevWallet(false)?.then(setDevWallet, () => {});
+    if (!PRIVY_APP_ID && DEV_WALLET_ALLOWED) loadDevWallet(false)?.then(setDevWallet, () => {});
   }, []);
 
-  const refresh = useCallback(async () => {
+  /** Relê a sessão. Sem `force`, pula a pergunta ao servidor quando não há indício de sessão (ver HINT). */
+  const refresh = useCallback(async (force = true) => {
+    if (!force && !shouldAskServer()) {
+      setMe(null);
+      setStatus("anon");
+      return null;
+    }
     try {
       const m = await fetchMe();
       setMe(m);
@@ -93,14 +135,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void refresh(false);
   }, [refresh]);
+
+  // 401 no meio da sessão (cookie expirou): relê a sessão; o status vira "anon" e as telas pedem o login.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const rechecking = useRef(false);
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        if (statusRef.current !== "authed" || rechecking.current) return;
+        rechecking.current = true;
+        void refresh().finally(() => {
+          rechecking.current = false;
+        });
+      }),
+    [refresh],
+  );
 
   const inflight = useRef<Promise<Me> | null>(null);
   const login = useCallback(() => {
     inflight.current ??= (async () => {
       setLoggingIn(true);
       try {
+        if (adapterRef.current.kind === "dev") {
+          const blocked = devWalletBlocked((await loadConfig().catch(() => null))?.cluster);
+          if (blocked) throw new Error(blocked);
+        }
         const w = await adapterRef.current.connect();
         await api.login(w);
         // Com o Privy, o e-mail verificado vai para o perfil (FRONT_PLAN, fase C).
@@ -120,11 +182,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    setHint(false);
     await api.logout().catch(() => {});
     await adapterRef.current.disconnect().catch(() => {});
     setMe(null);
     setStatus("anon");
   }, []);
+
+  const switchDevWallet = useCallback(async () => {
+    if (PRIVY_APP_ID) throw new Error("Com o login por e-mail, use Sair para trocar de conta.");
+    setHint(false);
+    await api.logout().catch(() => {});
+    forgetDevWallet();
+    setDevWallet(null);
+    setMe(null);
+    setStatus("anon");
+    return login();
+  }, [login]);
 
   const current = adapter.current;
   const wallet = me && current && current.address === me.wallet ? current : null;
@@ -139,13 +213,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [login]);
 
   const value = useMemo<Session>(
-    () => ({ api, config, status, me, wallet, walletKind: adapter.kind, loggingIn, login, logout, refresh, requireWallet }),
-    [config, status, me, wallet, adapter.kind, loggingIn, login, logout, refresh, requireWallet],
+    () => ({ api, config, status, me, wallet, walletKind: adapter.kind, loggingIn, login, logout, switchDevWallet, refresh, requireWallet }),
+    [config, status, me, wallet, adapter.kind, loggingIn, login, logout, switchDevWallet, refresh, requireWallet],
   );
 
   return (
     <Ctx.Provider value={value}>
-      {PRIVY_APP_ID ? <PrivyWallet appId={PRIVY_APP_ID} onAdapter={setPrivyAdapter} /> : null}
+      {PRIVY_APP_ID ? <PrivyWallet appId={PRIVY_APP_ID} cluster={config?.cluster ?? null} onAdapter={setPrivyAdapter} /> : null}
       {children}
     </Ctx.Provider>
   );

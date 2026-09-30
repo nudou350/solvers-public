@@ -10,3 +10,6 @@ export { Empty, type EmptyProps } from "./Empty";
 export { Spinner, Loading, type SpinnerProps } from "./Spinner";
 export { Notice, ToastProvider, useToast, type Tone, type ToastInput } from "./Toast";
 export { Tile, Avatar } from "./Tile";
+export { AuthGate, type AuthGateProps } from "./AuthGate";
+export { TechCard, type TechRow } from "./TechCard";
+export { Ago } from "./Ago";
