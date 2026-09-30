@@ -1,0 +1,275 @@
+import { Router } from "express";
+import { and, desc, eq, gt } from "drizzle-orm";
+import { z } from "zod";
+import { address, type Address } from "@solvers/chain";
+import { MIN_PERMANENT_PRICE_USDC, unitsToUsdc, usdcToUnits, type License, type Profile, type TxResponse } from "@solvers/shared";
+import { chain, explorerUrl } from "../chain/index.js";
+import { db, schema } from "../db/index.js";
+import { env } from "../env.js";
+import { processSignature } from "../indexer/processor.js";
+import { refreshLicenseOwner } from "../indexer/sync.js";
+import { searchAgentRows } from "../knowledge/search.js";
+import { badRequest, h, HttpError, parse } from "../lib/http.js";
+import { requireAuth, requireWallet } from "../auth/jwt.js";
+import {
+  findAgentRow,
+  getAgentDetail,
+  getCreator,
+  getCreatorProfile,
+  listAgents,
+  listCategories,
+  listReviews,
+  mapAgents,
+} from "./catalog.js";
+import { creditsToLicense, toLicense, toReputation } from "./mappers.js";
+
+export const storeRouter = Router();
+
+// ---------- Público ----------
+
+storeRouter.get(
+  "/config",
+  h(async () => {
+    const c = chain();
+    const config = await c.fetchConfig().catch(() => null);
+    return {
+      cluster: env.SOLANA_CLUSTER,
+      rpcUrl: env.SOLANA_CLUSTER === "localnet" ? env.SOLANA_RPC_URL : null,
+      programId: c.programId,
+      usdcMint: c.usdcMint,
+      feePayer: c.feePayer.address,
+      feeBps: config?.data.feeBps ?? null,
+      minPurchaseUsdc: config ? unitsToUsdc(config.data.minPrice) : MIN_PERMANENT_PRICE_USDC,
+      faucetEnabled: env.FAUCET_ENABLED,
+      faucetAmountUsdc: env.FAUCET_AMOUNT_USDC,
+      connectorUrl: `${env.PUBLIC_API_URL.replace(/\/$/, "")}/mcp`,
+    };
+  }),
+);
+
+storeRouter.get(
+  "/agents",
+  h(async (req) => {
+    const q = parse(
+      z.object({
+        q: z.string().max(200).optional(),
+        category: z.string().max(60).optional(),
+        sort: z.enum(["rating", "uses", "trend", "new"]).optional(),
+        limit: z.coerce.number().int().min(1).max(100).optional(),
+      }),
+      req.query,
+    );
+    return listAgents(q);
+  }),
+);
+
+storeRouter.get("/categories", h(async () => listCategories()));
+
+storeRouter.get(
+  "/agents/:idOrSlug/metadata.json",
+  h(async (req) => {
+    const row = await findAgentRow(String(req.params.idOrSlug));
+    // JSON público apontado por metadata_uri (padrão de metadados de NFT).
+    return {
+      name: row.name,
+      symbol: "SOLVER",
+      description: row.tagline,
+      external_url: `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/especialistas/${row.slug}`,
+      attributes: [
+        { trait_type: "agent_id", value: row.id },
+        { trait_type: "category", value: row.category },
+        { trait_type: "version", value: row.version },
+      ],
+    };
+  }),
+);
+
+storeRouter.get(
+  "/agents/:idOrSlug/reviews",
+  h(async (req) => {
+    const row = await findAgentRow(String(req.params.idOrSlug));
+    return listReviews(row.id, 200);
+  }),
+);
+
+storeRouter.get("/agents/:idOrSlug", h(async (req) => getAgentDetail(String(req.params.idOrSlug))));
+
+storeRouter.post(
+  "/search",
+  h(async (req) => {
+    const { need } = parse(z.object({ need: z.string().min(3).max(500) }), req.body);
+    return mapAgents(await searchAgentRows(need, 3));
+  }),
+);
+
+storeRouter.get("/creators/:id", h(async (req) => getCreatorProfile(String(req.params.id))));
+
+// ---------- Autenticado ----------
+
+storeRouter.get(
+  "/me/licenses",
+  requireAuth,
+  h(async (req): Promise<License[]> => {
+    const wallet = requireWallet(req);
+    const lic = await db.select().from(schema.licenses).where(eq(schema.licenses.ownerWallet, wallet)).orderBy(desc(schema.licenses.acquiredAt));
+    const cred = await db
+      .select()
+      .from(schema.credits)
+      .where(and(eq(schema.credits.ownerWallet, wallet), gt(schema.credits.purchased, 0)));
+    return [...lic.map(toLicense), ...cred.map(creditsToLicense)];
+  }),
+);
+
+storeRouter.post(
+  "/me/licenses/refresh",
+  requireAuth,
+  h(async (req) => {
+    const wallet = requireWallet(req);
+    const lic = await db.select().from(schema.licenses).where(eq(schema.licenses.ownerWallet, wallet));
+    for (const l of lic) await refreshLicenseOwner(l.id);
+    return { ok: true };
+  }),
+);
+
+storeRouter.get(
+  "/me/reputation",
+  requireAuth,
+  h(async (req) => {
+    const wallet = requireWallet(req);
+    const [row] = await db.select().from(schema.userReputation).where(eq(schema.userReputation.wallet, wallet));
+    return toReputation(wallet, row);
+  }),
+);
+
+const KIND_LABEL: Record<string, string> = {
+  purchase: "Compra de licença",
+  credits: "Compra de créditos",
+  review: "Avaliação publicada",
+  escrow: "Tarefa com garantia criada",
+  milestone: "Etapa de garantia atualizada",
+  dispute_resolved: "Contestação resolvida",
+};
+
+storeRouter.get(
+  "/me/profile",
+  requireAuth,
+  h(async (req): Promise<Profile> => {
+    const wallet = requireWallet(req);
+    const [rep] = await db.select().from(schema.userReputation).where(eq(schema.userReputation.wallet, wallet));
+    const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
+    const txs = await db.select().from(schema.chainTxs).where(eq(schema.chainTxs.wallet, wallet)).orderBy(desc(schema.chainTxs.createdAt)).limit(30);
+    return {
+      wallet,
+      reputation: toReputation(wallet, rep),
+      creator: creatorRow ? await getCreator(creatorRow.id) : null,
+      explorerUrl: explorerUrl("address", wallet),
+      history: txs.map((t) => ({
+        kind: t.kind,
+        label: KIND_LABEL[t.kind] ?? t.kind,
+        at: t.createdAt.toISOString(),
+        signature: t.signature,
+      })),
+    };
+  }),
+);
+
+storeRouter.get(
+  "/me/balance",
+  requireAuth,
+  h(async (req) => {
+    const wallet = address(requireWallet(req));
+    return { usdc: unitsToUsdc(await chain().usdcBalance(wallet)) };
+  }),
+);
+
+// ---------- Transações ----------
+
+async function assertBalance(wallet: Address, needed: bigint) {
+  const balance = await chain().usdcBalance(wallet);
+  if (balance < needed) {
+    throw new HttpError(400, "Saldo de USDC insuficiente", "insufficient_funds", {
+      balanceUsdc: unitsToUsdc(balance),
+      neededUsdc: unitsToUsdc(needed),
+      faucetEnabled: env.FAUCET_ENABLED,
+    });
+  }
+}
+
+storeRouter.post(
+  "/tx/purchase",
+  requireAuth,
+  h(async (req): Promise<TxResponse> => {
+    const wallet = address(requireWallet(req));
+    const body = parse(
+      z.object({
+        agentId: z.string(),
+        type: z.enum(["permanent", "credits"]).default("permanent"),
+        amount: z.number().int().min(1).max(10_000).optional(),
+      }),
+      req.body,
+    );
+    const row = await findAgentRow(body.agentId);
+    if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
+    const c = chain();
+    if (body.type === "permanent") {
+      await assertBalance(wallet, row.price);
+      const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
+      return c.buildForUser(instructions, { kind: "purchase", asset: asset.address, priceUsdc: unitsToUsdc(price), agentId: row.id });
+    }
+    if (row.pricePerUse <= 0n) throw badRequest("Este especialista não tem pagamento por uso.");
+    const config = await c.fetchConfig();
+    const minAmount = Number((config.data.minPrice + row.pricePerUse - 1n) / row.pricePerUse);
+    const amount = Math.max(body.amount ?? minAmount, minAmount);
+    const total = row.pricePerUse * BigInt(amount);
+    await assertBalance(wallet, total);
+    const instructions = await c.buyCreditsIxs(wallet, row.id, amount, total);
+    return c.buildForUser(instructions, { kind: "credits", amount, totalUsdc: unitsToUsdc(total), agentId: row.id });
+  }),
+);
+
+storeRouter.post(
+  "/tx/submit",
+  requireAuth,
+  h(async (req) => {
+    const { transaction } = parse(z.object({ transaction: z.string().min(100).max(2000) }), req.body);
+    const { signature } = await chain().submitSigned(transaction);
+    // Indexa na hora: a licença aparece para o conector sem esperar webhook/polling.
+    const events = await processSignature(signature).catch(() => []);
+    return { signature, status: "confirmed", events: events.map((e) => e.name), explorerUrl: explorerUrl("tx", signature) };
+  }),
+);
+
+/** Confirma uma transação enviada direto pela carteira (signAndSend) e indexa. */
+storeRouter.post(
+  "/tx/confirm",
+  requireAuth,
+  h(async (req) => {
+    const { signature } = parse(z.object({ signature: z.string().min(60).max(100) }), req.body);
+    const events = await processSignature(signature);
+    return { signature, status: events.length > 0 ? "confirmed" : "pending", events: events.map((e) => e.name) };
+  }),
+);
+
+// ---------- Faucet de USDC de teste ----------
+
+const FAUCET_COOLDOWN_MS = 3600_000;
+
+storeRouter.post(
+  "/faucet",
+  requireAuth,
+  h(async (req) => {
+    if (!env.FAUCET_ENABLED) throw badRequest("Faucet desativado nesta rede");
+    const wallet = address(requireWallet(req));
+    const key = `faucet:${wallet}`;
+    const [last] = await db.select().from(schema.kv).where(eq(schema.kv.key, key));
+    if (last && Date.now() - new Date(last.value as string).getTime() < FAUCET_COOLDOWN_MS) {
+      throw new HttpError(429, "Você já recebeu USDC de teste há pouco. Tente de novo em 1 hora.", "faucet_cooldown");
+    }
+    const signature = await chain().faucet(wallet, usdcToUnits(env.FAUCET_AMOUNT_USDC));
+    await db
+      .insert(schema.kv)
+      .values({ key, value: new Date().toISOString() })
+      .onConflictDoUpdate({ target: schema.kv.key, set: { value: new Date().toISOString(), updatedAt: new Date() } });
+    return { signature, amountUsdc: env.FAUCET_AMOUNT_USDC, explorerUrl: explorerUrl("tx", signature) };
+  }),
+);

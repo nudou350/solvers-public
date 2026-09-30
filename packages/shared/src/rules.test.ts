@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { usdcToUnits, unitsToUsdc, guaranteeLevel, reputationScore, averageRating, agentIdToBytes, bytesToHex } from "./rules.js";
+import { creatorReputationScore, usdcToUnits, unitsToUsdc, guaranteeLevel, reputationScore, averageRating, agentIdToBytes, bytesToHex } from "./rules.js";
 
 test("usdc conversions", () => {
   assert.equal(usdcToUnits(12), 12_000_000n);
@@ -23,4 +23,10 @@ test("rating and ids", () => {
   assert.equal(averageRating(0, 0), 0);
   const id = "3f9a1c2e7b8d4e6fa1b2c3d4e5f60718";
   assert.equal(bytesToHex(agentIdToBytes(id)), id);
+});
+
+test("creator reputation", () => {
+  assert.equal(creatorReputationScore(0, 0, 0), 50);
+  assert.equal(creatorReputationScore(40, 5, 0), 90);
+  assert.equal(creatorReputationScore(10, 4, 2), 40);
 });

@@ -44,6 +44,16 @@ export function guaranteeLevel(purchases: number, disputesLost: number): Guarant
   return "full";
 }
 
+/**
+ * Reputação do criador (0..100): cresce com vendas e boa nota, cai muito com disputas perdidas.
+ * Mesma ideia da reputação do usuário (5.9), usando os dados do agente on-chain.
+ */
+export function creatorReputationScore(totalSales: number, avgRating: number, disputesLost: number): number {
+  const ratingBonus = avgRating > 0 ? (avgRating - 3) * 5 : 0;
+  const raw = 50 + Math.min(totalSales, 20) * 1.5 + ratingBonus - disputesLost * 15;
+  return Math.round(Math.max(0, Math.min(100, raw)));
+}
+
 /** Valor máximo de garantia por nível, em USDC. */
 export const GUARANTEE_LIMITS_USDC: Record<GuaranteeLevel, number> = {
   none: 0,
@@ -60,6 +70,6 @@ export function agentIdToBytes(id: string): Uint8Array {
   return Uint8Array.from(id.match(/../g)!.map((h) => parseInt(h, 16)));
 }
 
-export function bytesToHex(bytes: Uint8Array | number[]): string {
+export function bytesToHex(bytes: ArrayLike<number>): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
