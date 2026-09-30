@@ -43,7 +43,7 @@ FEEPAYER_RESERVE=${FEEPAYER_RESERVE_LAMPORTS:-1000000000}  # o fee-payer também
 ADMIN_KEEP=${ADMIN_KEEP_LAMPORTS:-500000000}     # --return-excess: o admin fica com este saldo (0,5 SOL)
 ROUND=100000000                                  # transferência arredondada para cima em 0,1 SOL
 DEVNET_GENESIS=EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG
-EXTEND_CHUNK=10000                               # limite de crescimento de conta por instrução é 10240
+EXTEND_CHUNK=10240                               # o loader exige blocos de EXATAMENTE 10240 bytes (mínimo = máximo por instrução)
 SRC=${SRC:-$(cd "$(dirname "$0")/../.." && pwd)}
 
 # --- pré-requisitos (aborta antes de qualquer escrita) -------------------------------------------------
@@ -80,7 +80,9 @@ rent() { solana rent "$1" --lamports --url "$URL" | awk '/Rent-exempt minimum/ {
 sol() { awk -v l="$1" 'BEGIN { s = ""; if (l < 0) { s = "-"; l = -l } printf "%s%d.%09d", s, int(l/1000000000), l%1000000000 }'; }
 bal() { solana balance "$1" --lamports --url "$URL" | awk '{print $1}'; }
 
-if [ "$NEW_LEN" -gt "$CUR_LEN" ]; then EXTEND=$((NEW_LEN - CUR_LEN + MARGIN_BYTES)); else EXTEND=0; fi
+if [ "$NEW_LEN" -gt "$CUR_LEN" ]; then
+  EXTEND=$(( (NEW_LEN - CUR_LEN + MARGIN_BYTES + EXTEND_CHUNK - 1) / EXTEND_CHUNK * EXTEND_CHUNK ))  # múltiplo de 10240
+else EXTEND=0; fi
 BUFFER_RENT=$(rent $((37 + NEW_LEN)))            # buffer: 37 bytes de cabeçalho + .so (devolvido ao final)
 if [ "$EXTEND" -gt 0 ]; then
   # ProgramData: 45 bytes de cabeçalho + .so
@@ -110,7 +112,7 @@ echo "Fee-payer ........... $FEEPAYER   saldo $(sol "$FP_BAL") SOL"
 echo "ProgramData atual ... $CUR_LEN bytes (último deploy no slot $CUR_SLOT)"
 echo "Novo .so ............ $NEW_LEN bytes  ($SO, $(sha256sum "$SO" | cut -c1-16)…)"
 if [ "$EXTEND" -gt 0 ]; then
-  echo "Extensão ............ +$EXTEND bytes (= $((NEW_LEN - CUR_LEN)) de crescimento + $MARGIN_BYTES de margem) -> depósito $(sol "$EXTEND_RENT") SOL"
+  echo "Extensão ............ +$EXTEND bytes (= $((NEW_LEN - CUR_LEN)) de crescimento + $MARGIN_BYTES de margem, arredondado para blocos de $EXTEND_CHUNK) -> depósito $(sol "$EXTEND_RENT") SOL"
 else
   echo "Extensão ............ não precisa (o novo .so cabe: $NEW_LEN <= $CUR_LEN)"
 fi
@@ -173,7 +175,7 @@ echo "[3/6] extensão do ProgramData"
 if [ "$EXTEND" -gt 0 ]; then
   LEFT=$EXTEND
   while [ "$LEFT" -gt 0 ]; do
-    STEP=$(( LEFT > EXTEND_CHUNK ? EXTEND_CHUNK : LEFT ))
+    STEP=$EXTEND_CHUNK
     solana program extend "$PROGRAM" "$STEP" --keypair "$KEYS/admin.json" --url "$URL"
     LEFT=$((LEFT - STEP))
   done
