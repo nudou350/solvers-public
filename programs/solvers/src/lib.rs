@@ -1,0 +1,88 @@
+use anchor_lang::prelude::*;
+
+pub mod errors;
+pub mod events;
+pub mod instructions;
+pub mod state;
+
+use instructions::*;
+
+declare_id!("DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW");
+
+#[program]
+pub mod solvers {
+    use super::*;
+
+    // Administração
+    pub fn initialize_config(ctx: Context<InitializeConfig>, args: ConfigParams) -> Result<()> {
+        instructions::admin::initialize_config(ctx, args)
+    }
+    pub fn update_config(ctx: Context<UpdateConfig>, args: ConfigParams) -> Result<()> {
+        instructions::admin::update_config(ctx, args)
+    }
+    pub fn approve_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
+        instructions::admin::approve_agent(ctx)
+    }
+    pub fn suspend_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
+        instructions::admin::suspend_agent(ctx)
+    }
+    pub fn slash_stake(ctx: Context<SlashStake>, amount: u64) -> Result<()> {
+        instructions::admin::slash_stake(ctx, amount)
+    }
+
+    // Publicação
+    pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> Result<()> {
+        instructions::agent::register_agent(ctx, args)
+    }
+    pub fn update_version(ctx: Context<UpdateVersion>, version: String, version_hash: [u8; 32]) -> Result<()> {
+        instructions::agent::update_version(ctx, version, version_hash)
+    }
+    pub fn update_pricing(ctx: Context<UpdatePricing>, price: u64, price_per_use: u64) -> Result<()> {
+        instructions::agent::update_pricing(ctx, price, price_per_use)
+    }
+    pub fn set_eval(ctx: Context<SetEval>, eval_score_bps: u16, eval_hash: [u8; 32]) -> Result<()> {
+        instructions::agent::set_eval(ctx, eval_score_bps, eval_hash)
+    }
+
+    // Compra e uso
+    pub fn purchase_license(ctx: Context<PurchaseLicense>) -> Result<()> {
+        instructions::purchase::purchase_license(ctx)
+    }
+    pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32) -> Result<()> {
+        instructions::purchase::buy_credits(ctx, amount)
+    }
+    pub fn consume_credit(ctx: Context<ConsumeCredit>) -> Result<()> {
+        instructions::purchase::consume_credit(ctx)
+    }
+    pub fn record_usage_batch(ctx: Context<RecordUsageBatch>, count: u64, merkle_root: [u8; 32]) -> Result<()> {
+        instructions::purchase::record_usage_batch(ctx, count, merkle_root)
+    }
+    pub fn submit_review(ctx: Context<SubmitReview>, rating: u8, content_hash: [u8; 32]) -> Result<()> {
+        instructions::review::submit_review(ctx, rating, content_hash)
+    }
+
+    // Garantia
+    pub fn create_escrow(
+        ctx: Context<CreateEscrow>,
+        nonce: u64,
+        milestones: Vec<MilestoneInput>,
+        review_window_secs: i64,
+    ) -> Result<()> {
+        instructions::escrow::create_escrow(ctx, nonce, milestones, review_window_secs)
+    }
+    pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 32]) -> Result<()> {
+        instructions::escrow::mark_passed(ctx, index, deliverable_hash)
+    }
+    pub fn release_milestone(ctx: Context<PayoutMilestone>, index: u8) -> Result<()> {
+        instructions::escrow::release_milestone(ctx, index)
+    }
+    pub fn open_dispute(ctx: Context<OpenDispute>, index: u8, reason_hash: [u8; 32]) -> Result<()> {
+        instructions::escrow::open_dispute(ctx, index, reason_hash)
+    }
+    pub fn resolve_dispute(ctx: Context<PayoutMilestone>, index: u8, refund: bool) -> Result<()> {
+        instructions::escrow::resolve_dispute(ctx, index, refund)
+    }
+    pub fn close_escrow(ctx: Context<CloseEscrow>) -> Result<()> {
+        instructions::escrow::close_escrow(ctx)
+    }
+}

@@ -1,0 +1,114 @@
+import { z } from "zod";
+
+// Contrato de dados compartilhado com o frontend (INSTRUCTIONS.md seção 3).
+// Os nomes de campos destes schemas não podem mudar: o front usa os mesmos nos mocks.
+
+export const Requirement = z.object({
+  type: z.enum(["client", "connector", "plan"]),
+  label: z.string(),
+  key: z.string().optional(),
+});
+
+export const Agent = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  tagline: z.string(),
+  description: z.string(),
+  category: z.string(),
+  creatorId: z.string(),
+  version: z.string(),
+  versionHash: z.string(),
+  priceUsdc: z.number(),
+  pricePerUseUsdc: z.number().nullable(),
+  userRating: z.number(),
+  reviewsCount: z.number(),
+  verifiedUses: z.number(),
+  evalScore: z.number(),
+  requirements: z.array(Requirement),
+  packageContents: z.array(z.string()),
+  guaranteeAvailable: z.boolean(),
+  resaleFloorUsdc: z.number().nullable(),
+  trend7d: z.number(),
+});
+
+export const Creator = z.object({
+  id: z.string(),
+  name: z.string(),
+  avatarUrl: z.string().nullable(),
+  bio: z.string(),
+  reputationScore: z.number(),
+  disputesLost: z.number(),
+  agentsPublished: z.number(),
+});
+
+export const License = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  ownerWallet: z.string(),
+  acquiredAt: z.string(),
+  type: z.enum(["permanent", "credits"]),
+  creditsLeft: z.number().nullable(),
+  listedForResale: z.boolean(),
+  resalePriceUsdc: z.number().nullable(),
+});
+
+export const Review = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  authorWallet: z.string(),
+  rating: z.number().int().min(1).max(5),
+  text: z.string(),
+  createdAt: z.string(),
+  verifiedPurchase: z.literal(true),
+});
+
+export const MilestoneStatus = z.enum(["pending", "submitted", "passed", "approved", "disputed", "refunded"]);
+
+export const Milestone = z.object({
+  title: z.string(),
+  criteria: z.string(),
+  status: MilestoneStatus,
+});
+
+export const EscrowStatus = z.enum(["active", "approved", "disputed", "refunded"]);
+
+export const Escrow = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  buyerWallet: z.string(),
+  amountUsdc: z.number(),
+  status: EscrowStatus,
+  milestones: z.array(Milestone),
+  autoReleaseAt: z.string(),
+});
+
+export const Memory = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  summary: z.string(),
+  updatedAt: z.string(),
+});
+
+export const GuaranteeLevel = z.enum(["limited", "full", "none"]);
+
+export const UserReputation = z.object({
+  wallet: z.string(),
+  score: z.number(),
+  purchases: z.number(),
+  disputesLost: z.number(),
+  guaranteeLevel: GuaranteeLevel,
+});
+
+export type Requirement = z.infer<typeof Requirement>;
+export type Agent = z.infer<typeof Agent>;
+export type Creator = z.infer<typeof Creator>;
+export type License = z.infer<typeof License>;
+export type Review = z.infer<typeof Review>;
+export type MilestoneStatus = z.infer<typeof MilestoneStatus>;
+export type Milestone = z.infer<typeof Milestone>;
+export type EscrowStatus = z.infer<typeof EscrowStatus>;
+export type Escrow = z.infer<typeof Escrow>;
+export type Memory = z.infer<typeof Memory>;
+export type GuaranteeLevel = z.infer<typeof GuaranteeLevel>;
+export type UserReputation = z.infer<typeof UserReputation>;

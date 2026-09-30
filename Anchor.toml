@@ -1,0 +1,19 @@
+[toolchain]
+package_manager = "pnpm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solvers = "DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW"
+
+[programs.devnet]
+solvers = "DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/solvers-admin.json"
+
+[scripts]
+test = "true"
