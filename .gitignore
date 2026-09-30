@@ -19,3 +19,4 @@ design/Solver.bundle.html
 
 # worktrees temporários de agentes
 /.claude/worktrees/
+.pnpm-install-worktree.log
