@@ -59,10 +59,15 @@ async function main() {
   const bal = await api<{ usdc: number }>("/api/me/balance", { token });
   log("saldo", bal.usdc);
 
+  // Pagamento por uso acabou: compra de créditos é recusada.
+  const credits = await api("/api/tx/purchase", { method: "POST", token, body: JSON.stringify({ agentId: agent.id, type: "credits", amount: 10 }) }).catch((e) => e as Error);
+  if (!(credits instanceof Error) || !credits.message.includes("400")) throw new Error("compra de créditos deveria ser recusada (400)");
+  log("compra de créditos recusada", "400");
+
   const built = await api<{ transaction: string; meta: { asset: string } }>("/api/tx/purchase", {
     method: "POST",
     token,
-    body: JSON.stringify({ agentId: agent.id, type: "permanent" }),
+    body: JSON.stringify({ agentId: agent.id }),
   });
   const signed = await signAsWallet(buyer, built.transaction);
   const sub = await api<{ signature: string; events: string[] }>("/api/tx/submit", {

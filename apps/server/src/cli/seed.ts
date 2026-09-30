@@ -3,7 +3,7 @@
 //
 //   pnpm --filter @solvers/server cli:seed
 //
-// Cria compradores de teste (.keys/buyers), compras, avaliações, créditos, usos verificados,
+// Cria compradores de teste (.keys/buyers), compras de licença, avaliações, usos verificados,
 // uma garantia concluída e uma em andamento, e anúncios de revenda (off-chain, a revenda é P2).
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -130,16 +130,6 @@ async function main() {
       }
     }
     console.log(`  ${a.name}: ${count} compras`);
-  }
-
-  // Créditos (pagamento por uso) para quem tem preço por uso.
-  const payPerUse = agents.find((a) => a.pricePerUse > 0n);
-  if (payPerUse) {
-    const b = buyers.gabi!;
-    const config = await c.fetchConfig();
-    const amount = Number((config.data.minPrice + payPerUse.pricePerUse - 1n) / payPerUse.pricePerUse);
-    await asUser(b, await c.buyCreditsIxs(b.address, payPerUse.id, amount));
-    console.log(`  créditos: gabi comprou ${amount} usos de ${payPerUse.name}`);
   }
 
   // Usos verificados (lote on-chain) + histórico de 14 dias para a tendência da semana.

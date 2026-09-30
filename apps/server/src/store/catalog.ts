@@ -1,9 +1,11 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Agent, AgentDetail, Creator, CreatorProfile, GuaranteeOffer } from "@solvers/shared";
-import { FREE_TRIAL_USES, unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shared";
+import { unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shared";
 import { env } from "../env.js";
 import { db, schema } from "../db/index.js";
 import { notFound } from "../lib/http.js";
+import { getPackage } from "../runtime/packages.js";
+import { trialInfo } from "../runtime/trial.js";
 import { brlPerUsd } from "./fx.js";
 import { guaranteeOffered, toAgent, toCreator, toReview, type AgentExtras, type CreatorStats } from "./mappers.js";
 
@@ -199,9 +201,8 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     versions: row.details.versions ?? [
       { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Versão atual", evalScore: agent!.evalScore },
     ],
-    freeTrialUses: FREE_TRIAL_USES,
+    trial: agentTrial(row.id),
     priceBrl: Math.round(unitsToUsdc(row.price) * rate * 100) / 100,
-    pricePerUseBrl: row.pricePerUse > 0n ? Math.round(unitsToUsdc(row.pricePerUse) * rate * 100) / 100 : null,
     resalePriceHistory: resale.map((r) => ({ date: r.at.toISOString(), priceUsdc: unitsToUsdc(r.price) })),
     ratingDistribution: [5, 4, 3, 2, 1].map((star) => dist.find((d) => d.rating === star)?.n ?? 0),
     onchain: {
@@ -211,6 +212,12 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     },
     guarantee: guaranteeOffer(row, rate),
   };
+}
+
+/** Teste grátis do manifest em disco (o mesmo que o conector aplica); null se não houver. */
+function agentTrial(agentId: string) {
+  const pkg = getPackage(agentId);
+  return pkg ? trialInfo(pkg) : null;
 }
 
 /** Modelo de tarefa com garantia do criador, com o valor de cada etapa já calculado. */

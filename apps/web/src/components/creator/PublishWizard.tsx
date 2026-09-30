@@ -64,7 +64,7 @@ export function PublishWizard() {
   const { config, me } = useSession();
   const rate = useRate();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ name: "", tagline: "", description: "", price: "", perUse: "" });
+  const [form, setForm] = useState({ name: "", tagline: "", description: "", price: "" });
   const [touched, setTouched] = useState(false);
   const [clients, setClients] = useState<string[]>(["Claude", "ChatGPT"]);
   const [conns, setConns] = useState<string[]>([]);
@@ -79,7 +79,6 @@ export function PublishWizard() {
 
   const minPrice = config?.minPurchaseUsdc ?? null;
   const price = parseNum(form.price);
-  const perUse = parseNum(form.perUse);
   const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
   const sharePct = config?.feeBps != null ? 100 - config.feeBps / 100 : null;
 
@@ -88,9 +87,8 @@ export function PublishWizard() {
     name: form.name.trim().length < 3 ? "Dê um nome com pelo menos 3 letras." : null,
     tagline: form.tagline.trim().length < 10 ? "Escreva uma frase curta (pelo menos 10 caracteres)." : null,
     price: !Number.isFinite(price) || price <= 0 ? "Informe o preço em USDC." : minPrice != null && price < minPrice ? `O preço mínimo é ${usdc(minPrice)}.` : null,
-    perUse: form.perUse.trim() !== "" && (!Number.isFinite(perUse) || perUse <= 0) ? "Informe um valor maior que zero, ou deixe em branco." : null,
   };
-  const step1Ok = !errors.name && !errors.tagline && !errors.price && !errors.perUse;
+  const step1Ok = !errors.name && !errors.tagline && !errors.price;
   const testsOk = result != null && result.score >= MIN_SCORE && result.total >= MIN_CASES;
   const canPublish = step1Ok && clients.length > 0 && testsOk;
 
@@ -185,19 +183,14 @@ export function PublishWizard() {
               <Field id="f-desc" label="Descrição">
                 <textarea id="f-desc" className="textarea" value={form.description} onChange={set("description")} placeholder="O que ele faz, para quem é e o que entrega." maxLength={2000} />
               </Field>
-              <div className="g2" style={gap(16)}>
-                <Field
-                  id="f-p1"
-                  label="Preço da licença permanente (USDC)"
-                  hint={`${Number.isFinite(price) && price > 0 ? `Equivale a ${money(price)}. ` : ""}${minPrice != null ? `Mínimo: ${usdc(minPrice)}${rate != null ? ` (${brl(minPrice, rate)})` : ""}.` : ""}`}
-                  error={touched ? errors.price : null}
-                >
-                  <input id="f-p1" className="input" value={form.price} onChange={set("price")} inputMode="decimal" placeholder={minPrice != null ? String(Math.max(minPrice, 1)) : ""} aria-invalid={touched && !!errors.price} />
-                </Field>
-                <Field id="f-p2" label="Preço por uso (USDC, opcional)" hint={Number.isFinite(perUse) && perUse > 0 ? `Equivale a ${money(perUse)}` : "Deixe em branco se só vender a licença."} error={touched ? errors.perUse : null}>
-                  <input id="f-p2" className="input" value={form.perUse} onChange={set("perUse")} inputMode="decimal" aria-invalid={touched && !!errors.perUse} />
-                </Field>
-              </div>
+              <Field
+                id="f-p1"
+                label="Preço da licença permanente (USDC)"
+                hint={`${Number.isFinite(price) && price > 0 ? `Equivale a ${money(price)}. ` : ""}${minPrice != null ? `Mínimo: ${usdc(minPrice)}${rate != null ? ` (${brl(minPrice, rate)})` : ""}.` : ""}`}
+                error={touched ? errors.price : null}
+              >
+                <input id="f-p1" className="input" value={form.price} onChange={set("price")} inputMode="decimal" placeholder={minPrice != null ? String(Math.max(minPrice, 1)) : ""} aria-invalid={touched && !!errors.price} />
+              </Field>
             </div>
           ) : null}
 
@@ -437,7 +430,6 @@ export function PublishWizard() {
                 <b>Resumo da publicação</b>
                 <SummaryRow label="Especialista" value={form.name.trim() || "Sem nome"} bad={!!errors.name} />
                 <SummaryRow label="Licença permanente" value={Number.isFinite(price) && price > 0 ? `${money(price)} · ${usdc(price)}` : "Sem preço"} bad={!!errors.price} />
-                <SummaryRow label="Por uso" value={Number.isFinite(perUse) && perUse > 0 ? money(perUse) : "Não vende por uso"} />
                 <SummaryRow label="IAs" value={clients.join(" e ") || "Nenhuma"} bad={clients.length === 0} />
                 <SummaryRow label="Arquivos" value={files.length ? `${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}` : "Nenhum"} />
                 <SummaryRow label="Nota de desempenho" value={result ? `${result.score}% em ${result.total} casos` : "Bateria não rodada"} bad={!testsOk} good={testsOk} />
@@ -501,7 +493,7 @@ export function PublishWizard() {
                 <b className="num" style={{ fontSize: 20 }}>
                   {Number.isFinite(price) && price > 0 ? money(price) : "—"}
                 </b>
-                <div className="tiny faint">{Number.isFinite(perUse) && perUse > 0 ? `ou ${money(perUse)} por uso` : Number.isFinite(price) && price > 0 ? usdc(price) : "defina o preço"}</div>
+                <div className="tiny faint">{Number.isFinite(price) && price > 0 ? usdc(price) : "defina o preço"}</div>
               </div>
               <span className={result ? "verified" : "chip"}>
                 <Icon name="shield-check" size="s" />

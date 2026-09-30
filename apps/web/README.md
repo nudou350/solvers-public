@@ -44,7 +44,7 @@ As `NEXT_PUBLIC_*` entram no bundle na hora do build: mudou, rode o build de nov
 | `/` | Home: busca por necessidade, categorias, mais bem avaliados, em alta e novidades |
 | `/especialistas/[slug]` | Especialista: notas, garantia, antes e depois, requisitos, versões, avaliações e detalhes técnicos |
 | `/criadores/[id]` | Perfil público do criador |
-| `/checkout?agent=<slug>&type=permanent\|credits\|guarantee` | Checkout (saldo em USDC ou Pix; garantia com título e descrição) |
+| `/checkout?agent=<slug>&type=permanent\|guarantee` | Checkout (saldo em USDC ou Pix; garantia com título e descrição) |
 | `/checkout/concluido?agent=<slug>&sig=...` | Compra concluída (confere a compra na conta) |
 | `/instalar?agent=<slug>` | Instalação guiada do conector (o "Testar grátis" leva para cá) |
 | `/biblioteca`, `/biblioteca/memorias` | Licenças, uso e memórias |

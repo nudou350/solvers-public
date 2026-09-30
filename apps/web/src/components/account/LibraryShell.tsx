@@ -54,7 +54,6 @@ function Inner({ tab, children }: { tab: "lic" | "mem"; children: ReactNode }) {
           Array.isArray(licenses) ? (
             <div className="row wrapx" style={{ "--gap": "10px" } as React.CSSProperties}>
               <Chip>{list.length === 1 ? "1 especialista" : `${list.length} especialistas`}</Chip>
-              <Chip>{list.filter((l) => l.type === "credits").length} com créditos</Chip>
             </div>
           ) : null
         }
@@ -84,7 +83,7 @@ export function LibraryShell({ children }: { children: ReactNode }) {
         title="Entre para ver sua biblioteca"
         text={
           tab === "lic"
-            ? "Seus especialistas, quanto você usou cada um e os créditos que restam ficam aqui."
+            ? "Seus especialistas e quanto você usou cada um ficam aqui."
             : "As memórias que os especialistas guardam sobre você ficam aqui, criptografadas."
         }
       >

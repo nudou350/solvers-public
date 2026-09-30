@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { brl0 } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref, type CreatorMap } from "./data";
+import { TrialTag } from "./TrialTag";
 
 const EXAMPLES = ["Criar as telas do meu app no Figma", "Revisar um contrato de prestação de serviço", "Planejar 10 dias na Itália", "Organizar as minhas finanças do mês"];
 const MIN_CHARS = 3;
@@ -154,6 +155,11 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                       </div>
                     </div>
                     <p className="small muted">{a.tagline}</p>
+                    {a.trialAvailable ? (
+                      <div>
+                        <TrialTag />
+                      </div>
+                    ) : null}
                     <div className="row between" style={{ marginTop: "auto" }}>
                       {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue /> : <span className="tiny faint">Ainda sem avaliações</span>}
                       <b className="num">{brl0(a.priceUsdc, rate)}</b>

@@ -6,6 +6,7 @@ import { Tile } from "@/components/ui/Tile";
 import { brl0, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref } from "./data";
+import { TrialTag } from "./TrialTag";
 
 /** Cartão de especialista da home ("Mais bem avaliados"). */
 export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creatorName?: string; rate: number }) {
@@ -27,6 +28,7 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
           <Icon name="shield-check" size="s" />
           {a.evalScore}% nos testes
         </span>
+        {a.trialAvailable ? <TrialTag /> : null}
       </div>
       <div className="row between" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
         <div>

@@ -7,6 +7,7 @@ const USDC_UNIT = 1_000_000n;
 
 /** Preço mínimo de licença permanente, para cobrir o rent da licença pago pelo servidor. */
 export const MIN_PERMANENT_PRICE_USDC = 5;
+/** Usos do teste grátis quando o manifest do especialista não define trial.uses. */
 export const FREE_TRIAL_USES = 3;
 
 export function usdcToUnits(usdc: number): bigint {

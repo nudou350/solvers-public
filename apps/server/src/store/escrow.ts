@@ -363,7 +363,8 @@ escrowRouter.post(
       .from(schema.credits)
       .where(and(eq(schema.credits.ownerWallet, wallet), eq(schema.credits.agentId, agent.id)));
     if (!licenseAsset && !(cred && cred.purchased > 0)) {
-      throw forbidden("Só quem tem a licença ou comprou créditos deste especialista pode avaliar.");
+      // Quem comprou créditos no modelo antigo (pagamento por uso) ainda pode avaliar.
+      throw forbidden("Só quem tem a licença deste especialista pode avaliar.");
     }
     const contentHash = sha256(body.text);
     const c = chain();

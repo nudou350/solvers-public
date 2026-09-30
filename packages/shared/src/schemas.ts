@@ -22,7 +22,8 @@ export const Agent = z.object({
   version: z.string(),
   versionHash: z.string(),
   priceUsdc: z.number(),
-  pricePerUseUsdc: z.number().nullable(),
+  /** Tem teste grátis (limites em AgentDetail.trial). */
+  trialAvailable: z.boolean(),
   userRating: z.number(),
   reviewsCount: z.number(),
   verifiedUses: z.number(),
@@ -51,8 +52,8 @@ export const License = z.object({
   agentId: z.string(),
   ownerWallet: z.string(),
   acquiredAt: z.string(),
-  type: z.enum(["permanent", "credits"]),
-  creditsLeft: z.number().nullable(),
+  /** Só existe licença vitalícia (o pagamento por uso acabou). */
+  type: z.literal("permanent"),
   listedForResale: z.boolean(),
   resalePriceUsdc: z.number().nullable(),
 });

@@ -84,7 +84,7 @@ export function merkleRoot(leaves: Buffer[]): Buffer {
   return level[0]!;
 }
 
-/** Usos por licença/teste (créditos já contam on-chain no consume_credit). */
+/** Usos por licença, garantia ou teste grátis, em lote on-chain (record_usage_batch). */
 export async function recordUsageBatchOnce(): Promise<number> {
   const rows = await db
     .select({ id: schema.usageEvents.id, agentId: schema.usageEvents.agentId, hash: schema.usageEvents.responseHash, sessionId: schema.usageEvents.sessionId })
@@ -95,7 +95,7 @@ export async function recordUsageBatchOnce(): Promise<number> {
         eq(schema.usageEvents.tool, "activate_solver"),
         eq(schema.usageEvents.batched, false),
         isNull(schema.usageEvents.batchId),
-        inArray(schema.sessions.access, ["license", "trial"]),
+        inArray(schema.sessions.access, ["license", "guarantee", "trial"]),
         lt(schema.usageEvents.createdAt, sql`now() - interval '10 seconds'`),
       ),
     )

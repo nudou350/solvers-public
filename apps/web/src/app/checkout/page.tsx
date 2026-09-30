@@ -11,8 +11,7 @@ export default async function CheckoutPage({ searchParams }: PageProps<"/checkou
   const { detail, error } = await loadAgent(param(sp.agent));
   if (!detail) return <AgentMissing error={error} />;
   let type = parseType(sp.type);
-  // Tipo indisponível para este especialista: cai na licença permanente.
-  if (type === "credits" && !detail.agent.pricePerUseUsdc) type = "permanent";
+  // Especialista sem garantia (ou tipo desconhecido, como o antigo "credits"): cai na licença permanente.
   if (type === "guarantee" && !detail.guarantee) type = "permanent";
   return <CheckoutView key={detail.agent.id} detail={detail} type={type} />;
 }

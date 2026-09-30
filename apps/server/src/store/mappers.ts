@@ -9,6 +9,8 @@ import {
 } from "@solvers/shared";
 import type { schema } from "../db/index.js";
 import { env } from "../env.js";
+import { getPackage } from "../runtime/packages.js";
+import { trialLimits } from "../runtime/trial.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 type CreatorRow = typeof schema.creators.$inferSelect;
@@ -35,6 +37,11 @@ export function publishedAt(row: AgentRow): string {
   return new Date(dates.length ? Math.min(...dates) : row.createdAt.getTime()).toISOString();
 }
 
+export function hasTrial(agentId: string): boolean {
+  const pkg = getPackage(agentId);
+  return !!pkg && trialLimits(pkg.manifest) !== null;
+}
+
 export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
   return {
     id: row.id,
@@ -47,7 +54,8 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     version: row.version,
     versionHash: row.versionHash,
     priceUsdc: unitsToUsdc(row.price),
-    pricePerUseUsdc: row.pricePerUse > 0n ? unitsToUsdc(row.pricePerUse) : null,
+    // Teste grátis vem do manifest em disco, a mesma fonte que o conector usa para aplicar os limites.
+    trialAvailable: hasTrial(row.id),
     userRating: averageRating(row.ratingSum, row.ratingCount),
     reviewsCount: row.ratingCount,
     verifiedUses: Number(row.verifiedUses),
@@ -82,23 +90,8 @@ export function toLicense(row: LicenseRow): License {
     ownerWallet: row.ownerWallet,
     acquiredAt: row.acquiredAt.toISOString(),
     type: "permanent",
-    creditsLeft: null,
     listedForResale: row.listedForResale,
     resalePriceUsdc: row.resalePrice == null ? null : unitsToUsdc(row.resalePrice),
-  };
-}
-
-/** Créditos aparecem como uma "licença" do tipo credits (id estável por solver + carteira). */
-export function creditsToLicense(row: typeof schema.credits.$inferSelect): License {
-  return {
-    id: `credits:${row.agentId}:${row.ownerWallet}`,
-    agentId: row.agentId,
-    ownerWallet: row.ownerWallet,
-    acquiredAt: row.createdAt.toISOString(),
-    type: "credits",
-    creditsLeft: row.remaining,
-    listedForResale: false,
-    resalePriceUsdc: null,
   };
 }
 

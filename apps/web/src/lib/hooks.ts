@@ -1,6 +1,6 @@
 "use client";
 // Hooks de apresentação compartilhados pelas telas.
-import type { Agent } from "@solvers/api-client";
+import type { Agent, SolversApi } from "@solvers/api-client";
 import { useEffect, useState } from "react";
 import { useSession } from "./session";
 
@@ -38,4 +38,41 @@ export function useAgentsIndex(ids: string[]): Map<string, Agent> {
     };
   }, [api, key]);
   return index;
+}
+
+export type MyAccess = Awaited<ReturnType<SolversApi["getMyAccess"]>>;
+
+// Pedidos de acesso em andamento, por sessão (api) e especialista: a caixa de compra e o bloco do teste
+// montam juntos e dividem a mesma chamada. Sai do mapa ao terminar, então a próxima visita busca de novo.
+const accessInflight = new WeakMap<SolversApi, Map<string, Promise<MyAccess>>>();
+
+function fetchAccess(api: SolversApi, slug: string): Promise<MyAccess> {
+  let m = accessInflight.get(api);
+  if (!m) accessInflight.set(api, (m = new Map()));
+  let p = m.get(slug);
+  if (!p) {
+    const map = m;
+    p = api.getMyAccess(slug).finally(() => map.delete(slug));
+    m.set(slug, p);
+  }
+  return p;
+}
+
+/** Licença e teste grátis do usuário logado neste especialista. null = sem sessão, carregando ou erro. */
+export function useMyAccess(slug: string): MyAccess | null {
+  const { api, status } = useSession();
+  const [access, setAccess] = useState<MyAccess | null>(null);
+  useEffect(() => {
+    setAccess(null);
+    if (status !== "authed") return;
+    let live = true;
+    fetchAccess(api, slug).then(
+      (a) => live && setAccess(a),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, status, slug]);
+  return access;
 }

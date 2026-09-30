@@ -23,7 +23,7 @@ const reg = await c.registerAgentIxs({
   version: "1.0.0",
   versionHash: createHash("sha256").update("pacote").digest(),
   price: usdcToUnits(12),
-  pricePerUse: usdcToUnits(0.5),
+  pricePerUse: 0n, // só licença vitalícia (pagamento por uso acabou)
   royaltyBps: 500,
 });
 const r1 = await c.sendAsServer(reg.instructions);

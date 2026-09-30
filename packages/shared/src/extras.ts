@@ -36,6 +36,21 @@ export const GuaranteeOffer = z.object({
   ),
 });
 
+/** Teste grátis do especialista: o que libera, com limites aplicados pelo servidor. */
+export const TrialInfo = z.object({
+  /** Ativações grátis por carteira. */
+  uses: z.number(),
+  /** Etapas iniciais liberadas (1..steps). */
+  steps: z.number(),
+  totalSteps: z.number(),
+  /** Consultas à base (search_knowledge) no teste inteiro. */
+  searches: z.number(),
+  /** Execuções por ferramenta no teste inteiro; ferramenta fora da lista fica bloqueada. */
+  tools: z.array(z.object({ name: z.string(), limit: z.number() })),
+  summary: z.string(),
+  lockedSummary: z.string(),
+});
+
 /** GET /api/agents/:slug */
 export const AgentDetail = z.object({
   agent: Agent,
@@ -43,9 +58,9 @@ export const AgentDetail = z.object({
   reviews: z.array(Review),
   beforeAfter: z.array(BeforeAfter),
   versions: z.array(AgentVersion),
-  freeTrialUses: z.number(),
+  /** null: especialista sem teste grátis. */
+  trial: TrialInfo.nullable(),
   priceBrl: z.number().nullable(),
-  pricePerUseBrl: z.number().nullable(),
   resalePriceHistory: z.array(z.object({ date: z.string(), priceUsdc: z.number() })),
   /** Quantidade de avaliações por nota, de 5 a 1 estrela. */
   ratingDistribution: z.array(z.number()).length(5),
@@ -177,8 +192,17 @@ export const UsageSummary = z.object({
   usesThisMonth: z.number(),
   /** Ativações por semana, das 8 últimas (a última é a semana atual). */
   weekly: z.array(z.number()).length(8),
-  creditsLeft: z.number().nullable(),
-  creditsTotal: z.number().nullable(),
+});
+
+/** GET /api/me/access/:idOrSlug: como a carteira acessa o especialista agora. */
+export const AgentAccess = z.object({
+  agentId: z.string(),
+  /** Id da licença (asset) ou null. */
+  license: z.string().nullable(),
+  /** 0 quando o especialista não tem teste grátis. */
+  trialUsesLeft: z.number(),
+  /** Saldo do teste inteiro (null: sem teste grátis). */
+  trial: z.object({ searchesLeft: z.number(), toolsLeft: z.record(z.number()) }).nullable(),
 });
 
 /** GET /api/config */
@@ -211,7 +235,7 @@ export const PixCharge = z.object({
   expiresAt: z.string(),
   creditSignature: z.string().nullable(),
   explorerUrl: z.string().nullable(),
-  purpose: z.object({ agentId: z.string(), type: z.enum(["permanent", "credits", "guarantee"]) }).nullable(),
+  purpose: z.object({ agentId: z.string(), type: z.enum(["permanent", "guarantee"]) }).nullable(),
   simulated: z.boolean(),
   createdAt: z.string(),
 });
@@ -259,6 +283,8 @@ export const SubmitResponse = z.object({ signature: z.string(), status: z.enum([
 export type BeforeAfter = z.infer<typeof BeforeAfter>;
 export type AgentVersion = z.infer<typeof AgentVersion>;
 export type AgentDetail = z.infer<typeof AgentDetail>;
+export type TrialInfo = z.infer<typeof TrialInfo>;
+export type AgentAccess = z.infer<typeof AgentAccess>;
 export type CreatorProfile = z.infer<typeof CreatorProfile>;
 export type CreatorDashboard = z.infer<typeof CreatorDashboard>;
 export type ConnectorStatus = z.infer<typeof ConnectorStatus>;

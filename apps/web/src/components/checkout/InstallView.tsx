@@ -9,7 +9,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/Toast";
-import { ago, copyText } from "@/lib/format";
+import { ago, connectorName, copyText } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import s from "./checkout.module.css";
@@ -26,7 +26,16 @@ type Check = {
   actLabel?: string;
   act?: () => void;
   acting?: boolean;
+  /** Requisito opcional: não bloqueia nem conta no progresso. */
+  optional?: boolean;
 };
+
+
+/** O que muda sem um conector opcional. Figma tem texto próprio; os demais, um genérico. */
+function optionalHint(key: string | undefined, name: string) {
+  if ((key ?? name).toLowerCase() === "figma") return "Opcional: conecte o Figma para ler o arquivo direto; sem ele, dá para colar prints e valores.";
+  return `Opcional: conecte o ${name} para o especialista ler os dados direto; sem ele, dá para colar as informações na conversa.`;
+}
 
 function Ill({ children }: { children: ReactNode }) {
   return (
@@ -95,7 +104,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
     void test(true);
     if (agent)
       api.getMyAccess(agent.slug).then(
-        (a) => setTrial({ trialUsesLeft: a.trialUsesLeft, owned: !!a.license || (a.creditsLeft ?? 0) > 0 }),
+        (a) => setTrial({ trialUsesLeft: a.trialUsesLeft, owned: !!a.license }),
         () => {},
       );
   }, [me, agent, api, test]);
@@ -124,15 +133,19 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
       actLabel: "Tenho um plano compatível",
       act: () => setPlan(true),
     },
-    ...connectorReqs.map<Check>((r) => ({
-      key: `conn-${r.key ?? r.label}`,
-      label: `${r.label} conectado?`,
-      ok: !!conns[r.label],
-      statusOk: "Conectado",
-      statusNo: `Este especialista usa o ${r.label}. Conecte-o na sua IA também.`,
-      actLabel: "Já conectei",
-      act: () => setConns((c) => ({ ...c, [r.label]: true })),
-    })),
+    ...connectorReqs.map<Check>((r) => {
+      const n = connectorName(r.label);
+      return {
+        key: `conn-${r.key ?? r.label}`,
+        label: r.optional ? `${n} (opcional)` : `${n} conectado?`,
+        ok: !!conns[r.label],
+        statusOk: "Conectado",
+        statusNo: r.optional ? optionalHint(r.key, n) : `Este especialista usa o ${n}. Conecte-o na sua IA também.`,
+        actLabel: "Já conectei",
+        act: () => setConns((c) => ({ ...c, [r.label]: true })),
+        optional: r.optional,
+      };
+    }),
     {
       key: "added",
       label: "Conector do Solver adicionado",
@@ -159,8 +172,9 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
       acting: !logged ? loggingIn : testing,
     },
   ];
-  const doneCount = checks.filter((k) => k.ok).length;
-  const allDone = doneCount === checks.length;
+  const required = checks.filter((k) => !k.optional);
+  const doneCount = required.filter((k) => k.ok).length;
+  const allDone = doneCount === required.length;
   const name = agent?.name ?? "Solver";
 
   return (
@@ -179,11 +193,11 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           </div>
         ) : null}
         <div className="row" style={{ ...gap(14), marginTop: 6, maxWidth: 460 }}>
-          <div className="bar mint grow" role="progressbar" aria-valuemin={0} aria-valuemax={checks.length} aria-valuenow={doneCount} aria-label="Progresso da instalação">
-            <i style={{ width: `${(doneCount / checks.length) * 100}%` }} />
+          <div className="bar mint grow" role="progressbar" aria-valuemin={0} aria-valuemax={required.length} aria-valuenow={doneCount} aria-label="Progresso da instalação">
+            <i style={{ width: `${(doneCount / required.length) * 100}%` }} />
           </div>
           <b className="small num">
-            {doneCount} de {checks.length}
+            {doneCount} de {required.length}
           </b>
         </div>
       </div>
@@ -297,13 +311,13 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
             <h2 className="h3">Checklist de requisitos</h2>
             {checks.map((k) => (
               <div key={k.key} className="row start" style={gap(12)}>
-                <span className={`dot ${k.ok ? "dot-ok" : "dot-now"}`} aria-hidden>
+                <span className={`dot ${k.ok ? "dot-ok" : k.optional ? "" : "dot-now"}`} aria-hidden>
                   {k.ok ? "✓" : "•"}
                 </span>
                 <div className="grow col" style={{ ...gap(8), minWidth: 0, alignItems: "flex-start" }}>
                   <div>
                     <b>{k.label}</b>
-                    <div className={`small ${k.ok ? "ok" : "warn"}`} aria-live={k.key === "test" ? "polite" : undefined}>
+                    <div className={`small ${k.ok ? "ok" : k.optional ? "muted" : "warn"}`} aria-live={k.key === "test" ? "polite" : undefined}>
                       {k.ok ? k.statusOk : k.statusNo}
                     </div>
                   </div>

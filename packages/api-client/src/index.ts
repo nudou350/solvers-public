@@ -1,5 +1,6 @@
 import {
   Agent,
+  AgentAccess,
   AgentDetail,
   ConnectorStatus,
   Creator,
@@ -114,11 +115,8 @@ export function createApi(opts: ApiOptions = {}) {
     getMyUsage: () => req(z.array(UsageSummary), "/api/me/usage"),
     /** Limite de garantias da carteira: quanto ainda pode abrir e quantas compras faltam para o nível completo. */
     getMyGuarantee: () => req(GuaranteeStatus, "/api/me/guarantee"),
-    getMyAccess: (idOrSlug: string) =>
-      req(
-        z.object({ agentId: z.string(), license: z.string().nullable(), creditsLeft: z.number().nullable(), trialUsesLeft: z.number() }),
-        `/api/me/access/${encodeURIComponent(idOrSlug)}`,
-      ),
+    /** Licença ou saldo do teste grátis (usos, consultas e execuções de ferramenta restantes). */
+    getMyAccess: (idOrSlug: string) => req(AgentAccess, `/api/me/access/${encodeURIComponent(idOrSlug)}`),
     refreshLicenses: () => post(z.object({ ok: z.boolean() }), "/api/me/licenses/refresh"),
     getMemoriesCount: () =>
       req(z.object({ count: z.number(), agents: z.array(z.object({ agentId: z.string(), updatedAt: z.string() })) }), "/api/me/memories/count"),
@@ -130,10 +128,10 @@ export function createApi(opts: ApiOptions = {}) {
     getBalance: () => req(z.object({ usdc: z.number() }), "/api/me/balance"),
     /**
      * Pix na demo: cria a cobrança (QR / copia e cola). Com agentId, o servidor calcula quanto falta
-     * (preço, pacote mínimo de créditos ou garantia, menos o saldo). Consulte com getPixCharge até
+     * (preço da licença ou da garantia, menos o saldo). Consulte com getPixCharge até
      * status "credited"; depois siga para a compra normal.
      */
-    createPixCharge: (body: { usdc: number } | { agentId: string; type: "permanent" | "credits" | "guarantee" }) =>
+    createPixCharge: (body: { usdc: number } | { agentId: string; type: "permanent" | "guarantee" }) =>
       post(PixCharge, "/api/pix/charges", body),
     getPixCharge: (id: string) => req(PixCharge, `/api/pix/charges/${encodeURIComponent(id)}`),
     /** Só quando getConfig().pix.simulate: aprova a cobrança sem pagar e credita o USDC de teste. */
@@ -154,8 +152,8 @@ export function createApi(opts: ApiOptions = {}) {
     getCreatorDashboard: () => req(CreatorDashboard, "/api/creator/dashboard"),
 
     // ----- Transações: o servidor monta e paga a taxa; a carteira só assina -----
-    buildPurchase: (agentId: string, type: "permanent" | "credits" = "permanent", amount?: number) =>
-      post(TxResponse, "/api/tx/purchase", { agentId, type, amount }),
+    /** Compra da licença vitalícia (único tipo de compra). */
+    buildPurchase: (agentId: string) => post(TxResponse, "/api/tx/purchase", { agentId }),
     buildReview: (agentId: string, rating: number, text: string) => post(TxResponse, "/api/tx/review", { agentId, rating, text }),
     /**
      * Tarefa com garantia: as etapas e os critérios vêm do modelo do criador (getAgent().guarantee);

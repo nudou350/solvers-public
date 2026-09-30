@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { cache, type CSSProperties } from "react";
 import { BeforeAfterBlock, Reviews, Scores, Versions } from "@/components/catalog/AgentSections";
 import { BuyBox } from "@/components/catalog/BuyBox";
+import { TrialBlock } from "@/components/catalog/TrialBlock";
 import { creatorHref, disputesText } from "@/components/catalog/data";
 import { Button } from "@/components/ui/Button";
 import { RepBadge } from "@/components/ui/Chip";
@@ -13,7 +14,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
 import { ApiError, serverApi } from "@/lib/api";
 import { clusterName, explorerLink } from "@/lib/explorer";
-import { brl, brlValue, categoryLabel, durationText, initials, repLevel, usdc } from "@/lib/format";
+import { brl, brlValue, categoryLabel, connectorName, durationText, initials, repLevel, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 
 export const dynamic = "force-dynamic";
@@ -71,10 +72,10 @@ export default async function AgentPage({ params }: Props) {
   const cr = d.creator;
   const lv = repLevel(cr.reputationScore);
   const rate = config.brlPerUsd;
-  const req = (t: "client" | "connector" | "plan") => a.requirements.filter((r) => r.type === t).map((r) => r.label);
-  const clients = req("client");
+  const req = (t: "client" | "connector" | "plan") => a.requirements.filter((r) => r.type === t);
+  const clients = req("client").map((r) => r.label);
   const connectors = req("connector");
-  const plan = req("plan")[0] ?? null;
+  const plan = req("plan")[0]?.label ?? null;
   const g = d.guarantee;
 
   return (
@@ -130,10 +131,10 @@ export default async function AgentPage({ params }: Props) {
                   Funciona no {clients.join(" e ")}
                 </span>
               ) : null}
-              {connectors.map((k) => (
-                <span key={k} className="chip chip-plain">
+              {connectors.map((r) => (
+                <span key={r.label} className="chip chip-plain">
                   <Icon name="plug" size="s" />
-                  Conector: {k}
+                  {r.optional ? `Conector opcional: ${connectorName(r.label)}` : `Conector: ${r.label}`}
                 </span>
               ))}
               {plan ? (
@@ -151,15 +152,15 @@ export default async function AgentPage({ params }: Props) {
               name={a.name}
               priceUsdc={a.priceUsdc}
               priceBrl={d.priceBrl}
-              pricePerUseUsdc={a.pricePerUseUsdc}
-              pricePerUseBrl={d.pricePerUseBrl}
-              freeTrialUses={d.freeTrialUses}
+              trial={d.trial}
               hasGuarantee={!!g}
               rate={rate}
             />
           </aside>
         </div>
       </section>
+
+      {d.trial ? <TrialBlock slug={a.slug} trial={d.trial} /> : null}
 
       <Scores
         rating={a.userRating}
@@ -277,10 +278,10 @@ export default async function AgentPage({ params }: Props) {
               <h3 className="h4">Conectores necessários</h3>
             </div>
             {connectors.length ? (
-              connectors.map((k) => (
-                <div key={k} className="row between">
-                  <b>{k}</b>
-                  <span className="chip chip-warn">Conecte na sua IA</span>
+              connectors.map((r) => (
+                <div key={r.label} className="row between" style={gap("12px")}>
+                  <b>{connectorName(r.label)}</b>
+                  {r.optional ? <span className="chip">Opcional</span> : <span className="chip chip-warn">Conecte na sua IA</span>}
                 </div>
               ))
             ) : (

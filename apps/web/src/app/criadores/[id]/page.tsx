@@ -128,7 +128,10 @@ export default async function CreatorPage({ params }: Props) {
                 <b className="trunc" style={{ display: "block" }}>
                   {a.name}
                 </b>
-                <div className="small muted">Versão {a.version}</div>
+                <div className="small muted">
+                  Versão {a.version}
+                  {a.trialAvailable ? " · teste grátis" : ""}
+                </div>
               </div>
               {a.reviewsCount > 0 ? (
                 <span className="row hide-m" style={gap("7px")}>

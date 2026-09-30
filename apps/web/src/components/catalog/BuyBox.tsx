@@ -1,56 +1,32 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import type { TrialInfo } from "@solvers/api-client";
+import { type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { brlValue, usdc } from "@/lib/format";
-import { useSession } from "@/lib/session";
+import { useMyAccess } from "@/lib/hooks";
 import { gap } from "@/lib/style";
-
-type Access = { license: string | null; creditsLeft: number | null; trialUsesLeft: number };
+import { usesText } from "./TrialBlock";
 
 export type BuyBoxProps = {
   slug: string;
   name: string;
   priceUsdc: number;
   priceBrl: number | null;
-  pricePerUseUsdc: number | null;
-  pricePerUseBrl: number | null;
-  freeTrialUses: number;
+  /** Teste grátis configurado pelo especialista; null = não tem teste. */
+  trial: TrialInfo | null;
   hasGuarantee: boolean;
   rate: number;
 };
 
-/** Caixa de compra da página do especialista: licença permanente ou por uso, teste grátis e acesso do usuário logado. */
+/** Caixa de compra da página do especialista: licença permanente, teste grátis (se houver) e acesso do usuário logado. */
 export function BuyBox(p: BuyBoxProps) {
-  const { api, status } = useSession();
-  const perUse = p.pricePerUseUsdc != null;
-  const [type, setType] = useState<"permanent" | "credits">("permanent");
-  const [access, setAccess] = useState<Access | null>(null);
-
-  useEffect(() => {
-    if (status !== "authed") {
-      setAccess(null);
-      return;
-    }
-    let live = true;
-    api.getMyAccess(p.slug).then(
-      (a) => live && setAccess(a),
-      () => live && setAccess(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [api, status, p.slug]);
-
-  const perm = type === "permanent" || !perUse;
-  const reais = (u: number, b: number | null) => (b != null ? brlValue(b) : brlValue(u * p.rate));
-  const buy = perm
-    ? { label: "Licença permanente", main: reais(p.priceUsdc, p.priceBrl), unit: "pagamento único", usdc: usdc(p.priceUsdc), cta: "Comprar licença" }
-    : { label: "Pagamento por uso", main: reais(p.pricePerUseUsdc ?? 0, p.pricePerUseBrl), unit: "por uso", usdc: usdc(p.pricePerUseUsdc ?? 0), cta: "Pagar por uso" };
-  const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=${perm ? "permanent" : "credits"}`;
+  const access = useMyAccess(p.slug);
+  const price = p.priceBrl != null ? brlValue(p.priceBrl) : brlValue(p.priceUsdc * p.rate);
+  const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=permanent`;
   const install = `/instalar?agent=${encodeURIComponent(p.slug)}`;
   const owned = !!access?.license;
-  const trialLeft = access?.trialUsesLeft ?? null;
+  const trialLeft = p.trial && access ? access.trialUsesLeft : null;
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>
@@ -75,55 +51,41 @@ export function BuyBox(p: BuyBoxProps) {
         ) : null}
         {owned ? null : (
           <>
-        <div className="col" style={gap("2px")}>
-          <span className="eyebrow">{buy.label}</span>
-          <div className="row price-row" style={gap("10px", { alignItems: "baseline" })}>
-            <span className="display big num price-big" style={{ fontSize: 60, whiteSpace: "nowrap" }}>
-              {buy.main}
-            </span>
-            <span className="muted">{buy.unit}</span>
-          </div>
-          <span className="small faint">{buy.usdc} · cotação de hoje</span>
-        </div>
-        {perUse ? (
-          <div className="col" style={gap("10px")} role="radiogroup" aria-label="Forma de pagamento">
-            <button type="button" role="radio" className={`opt${perm ? " on" : ""}`} aria-checked={perm} onClick={() => setType("permanent")}>
-              <span className="dot-r" />
-              <span className="col" style={gap("2px")}>
-                <b>Licença permanente</b>
-                <span className="small muted">Pague uma vez e use para sempre.</span>
-              </span>
-            </button>
-            <button type="button" role="radio" className={`opt${perm ? "" : " on"}`} aria-checked={!perm} onClick={() => setType("credits")}>
-              <span className="dot-r" />
-              <span className="col" style={gap("2px")}>
-                <b>Pagamento por uso</b>
-                <span className="small muted">{reais(p.pricePerUseUsdc ?? 0, p.pricePerUseBrl)} por uso, sem compromisso.</span>
-              </span>
-            </button>
-          </div>
-        ) : null}
-        <Button href={checkout} size="lg" block iconRight="arrow-right">
-          {buy.cta}
-        </Button>
-        <Button href={install} variant="secondary" block icon="play">
-          Testar grátis ({p.freeTrialUses} usos)
-        </Button>
+            <div className="col" style={gap("2px")}>
+              <span className="eyebrow">Licença permanente</span>
+              <div className="row price-row" style={gap("10px", { alignItems: "baseline" })}>
+                <span className="display big num price-big" style={{ fontSize: 60, whiteSpace: "nowrap" }}>
+                  {price}
+                </span>
+                <span className="muted">pagamento único</span>
+              </div>
+              <span className="small faint">{usdc(p.priceUsdc)} · cotação de hoje</span>
+            </div>
+            <Button href={checkout} size="lg" block iconRight="arrow-right">
+              Comprar licença
+            </Button>
+            {p.trial ? (
+              <div className="col" style={gap("8px")}>
+                <Button href={install} variant="secondary" block icon="play">
+                  Testar grátis
+                </Button>
+                <p className="small muted center" role="status">
+                  {trialLeft == null
+                    ? `${usesText(p.trial.uses)} para experimentar. `
+                    : trialLeft > 0
+                      ? `Restam ${trialLeft} de ${usesText(p.trial.uses)}. `
+                      : "Seu teste grátis acabou. "}
+                  <a className="link" href="#teste-gratis">
+                    Ver o que o teste inclui
+                  </a>
+                </p>
+              </div>
+            ) : null}
           </>
         )}
-        {!owned && trialLeft != null ? (
-          <p className="small muted center" role="status">
-            {trialLeft > 0 ? `${trialLeft} de ${p.freeTrialUses} usos grátis restantes` : `Seus ${p.freeTrialUses} usos grátis acabaram`}
-          </p>
-        ) : null}
-        {(access?.creditsLeft ?? 0) > 0 && access ? (
-          <p className="small muted center">
-            Você tem {access.creditsLeft} {access.creditsLeft === 1 ? "uso pago restante" : "usos pagos restantes"}.
-          </p>
-        ) : null}
         <ul className="col small" style={gap("10px")}>
           <Check>Licença registrada na rede Solana, em seu nome.</Check>
-          <Check>O teste grátis acontece na sua IA, pelo conector.</Check>
+          {p.trial ? <Check>O teste grátis acontece na sua IA, pelo conector.</Check> : null}
           <Check>{p.hasGuarantee ? "Garantia de resultado disponível para tarefas." : "Sem garantia de resultado para este especialista."}</Check>
         </ul>
         {p.hasGuarantee ? (

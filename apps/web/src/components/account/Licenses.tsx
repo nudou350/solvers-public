@@ -1,5 +1,5 @@
 "use client";
-// Aba "Especialistas" da biblioteca: licenças permanentes e pacotes de créditos, com o uso das últimas 8 semanas.
+// Aba "Especialistas" da biblioteca: licenças permanentes, com o uso das últimas 8 semanas.
 import type { UsageSummary } from "@solvers/api-client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -30,7 +30,7 @@ export function Licenses() {
   if (!list.length)
     return (
       <Empty icon="library" title="Nenhum especialista na sua biblioteca" action={<Button href="/">Explorar especialistas</Button>}>
-        Quando você comprar uma licença ou um pacote de créditos, ele aparece aqui com o uso de cada mês.
+        Quando você comprar a licença de um especialista, ele aparece aqui com o uso de cada mês.
       </Empty>
     );
 
@@ -39,10 +39,6 @@ export function Licenses() {
       {list.map((l) => {
         const a = agents.get(l.agentId);
         const u = usage.get(l.agentId);
-        const perm = l.type === "permanent";
-        const left = l.creditsLeft ?? u?.creditsLeft ?? 0;
-        const total = u?.creditsTotal ?? null;
-        const pct = total ? Math.max(0, Math.min(100, Math.round((100 * left) / total))) : 0;
         const weekly = u?.weekly ?? [0, 0, 0, 0, 0, 0, 0, 0];
         const uses = u?.usesThisMonth ?? 0;
         return (
@@ -53,7 +49,7 @@ export function Licenses() {
                 <div className="grow">
                   <h2 className="h4 trunc">{a?.name ?? "Especialista"}</h2>
                   <div className="row wrapx" style={{ "--gap": "6px 8px", marginTop: 4 } as React.CSSProperties}>
-                    <Chip tone={perm ? "brand" : "default"}>{perm ? "Licença permanente" : "Pacote de créditos"}</Chip>
+                    <Chip tone="brand">Licença permanente</Chip>
                     <span className="tiny faint">desde {date(l.acquiredAt)}</span>
                   </div>
                 </div>
@@ -76,22 +72,11 @@ export function Licenses() {
                 </div>
               </div>
               <div className="col" style={{ "--gap": "6px" } as React.CSSProperties}>
-                <span className="small muted">{perm ? "Uso" : "Créditos restantes"}</span>
-                {perm ? (
-                  <b className="ok row" style={{ "--gap": "6px" } as React.CSSProperties}>
-                    <Icon name="check-circle" size="s" />
-                    Uso ilimitado
-                  </b>
-                ) : (
-                  <div className="col" style={{ "--gap": "6px" } as React.CSSProperties}>
-                    {total ? (
-                      <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={left} aria-label="Créditos restantes">
-                        <i style={{ width: `${pct}%` }} />
-                      </div>
-                    ) : null}
-                    <b className="num small">{total ? `${int(left)} de ${int(total)}` : `${int(left)} ${left === 1 ? "crédito" : "créditos"}`}</b>
-                  </div>
-                )}
+                <span className="small muted">Uso</span>
+                <b className="ok row" style={{ "--gap": "6px" } as React.CSSProperties}>
+                  <Icon name="check-circle" size="s" />
+                  Uso ilimitado
+                </b>
               </div>
               <div className="row wrapx" style={{ "--gap": "8px", justifyContent: "flex-end" } as React.CSSProperties}>
                 {a ? (

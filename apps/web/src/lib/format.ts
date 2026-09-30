@@ -184,3 +184,6 @@ export function saveTextFile(name: string, content: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Nome do conector sem o "(opcional)" que alguns manifests trazem no rótulo. */
+export const connectorName = (label: string) => label.replace(/\s*\(opcional\)\s*$/i, "").trim() || label;

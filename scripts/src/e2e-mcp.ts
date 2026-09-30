@@ -2,9 +2,10 @@
 // 1. Descobre o authorization server pelo 401 do /mcp.  2. Registro dinâmico de cliente.
 // 3. /oauth/authorize + assinatura SIWS e da chave de memória (carteira simulada).
 // 4. Troca o código por token (PKCE S256).  5. Usa as ferramentas: lista, busca, ativa (teste grátis),
-//    preflight, etapas, conhecimento, run_tool e memória.
+//    preflight, etapas, conhecimento, run_tool e memória, conferindo os limites do teste grátis
+//    (etapa, consulta ou ferramenta fora do teste devolvem o texto de fim do teste, sem erro).
 import { createHash, randomBytes } from "node:crypto";
-import { getBase58Decoder, signBytes, type KeyPairSigner } from "@solana/kit";
+import { generateKeyPairSigner, getBase58Decoder, signBytes, type KeyPairSigner } from "@solana/kit";
 import { key, log } from "./env.js";
 
 const API = process.env.API_URL ?? "http://localhost:3017";
@@ -114,7 +115,8 @@ export async function call(token: string, name: string, args: Record<string, unk
 }
 
 async function main() {
-  const user = await key(process.env.E2E_WALLET ?? "buyer1");
+  // Carteira nova a cada execução: o teste grátis começa do zero (3 usos por carteira).
+  const user = process.env.E2E_WALLET ? await key(process.env.E2E_WALLET) : await generateKeyPairSigner();
   const token = await connect(user);
   log("OAuth completo (DCR + SIWS + PKCE)", user.address);
 
@@ -128,28 +130,51 @@ async function main() {
   if (!agentId) throw new Error(`find_solver sem resultado:\n${found}`);
   log("find_solver", found.split("\n")[1]);
 
+  type Trial = { uses: number; steps: number; totalSteps: number; searches: number; tools: { name: string; limit: number }[] };
+  const { trial } = (await (await fetch(`${API}/api/agents/${agentId}`)).json()) as { trial: Trial | null };
+  if (!trial) throw new Error("o especialista de front-end deveria ter teste grátis (manifest.trial)");
+
   const act = await call(token, "activate_solver", { agent_id: agentId });
   const sessionId = /session_id: (ses_[0-9a-f]+)/.exec(act)?.[1];
   if (!sessionId) throw new Error(`activate_solver não abriu sessão:\n${act}`);
+  if (!act.includes(`Teste grátis (uso 1 de ${trial.uses})`) || !act.includes("Avise o usuário desses limites")) {
+    throw new Error(`activate_solver deveria dizer os limites do teste:\n${act}`);
+  }
   log("activate_solver", act.split("\n")[1]);
 
   const pre = await call(token, "preflight_check", { session_id: sessionId, available_tools: ["solvers:next_step", "web_search"] });
   log("preflight_check", pre.split("\n")[0]);
 
-  const s1 = await call(token, "next_step", { session_id: sessionId });
-  log("next_step (etapa 1)", s1.split("\n")[0]);
-  const s2 = await call(token, "next_step", { session_id: sessionId, result_summary: "Requisitos: login com e-mail e senha, React 19, Vitest." });
-  log("next_step (etapa 2)", s2.split("\n")[0]);
+  // Etapas liberadas no teste; a seguinte devolve o texto de fim do teste (não é erro) e não avança.
+  for (let i = 1; i <= trial.steps; i++) {
+    const st = await call(token, "next_step", { session_id: sessionId, result_summary: i > 1 ? `Resumo da etapa ${i - 1}.` : undefined });
+    if (!st.startsWith(`# Etapa ${i} de ${trial.totalSteps}`)) throw new Error(`esperava a etapa ${i}:\n${st.slice(0, 300)}`);
+    log(`next_step (etapa ${i})`, st.split("\n")[0]);
+  }
+  if (trial.steps < trial.totalSteps) {
+    for (let k = 0; k < 2; k++) {
+      const locked = await call(token, "next_step", { session_id: sessionId, result_summary: "Resumo." });
+      if (!locked.startsWith("O teste grátis de") || !locked.includes("/checkout?agent=")) throw new Error(`esperava o fim do teste:\n${locked}`);
+    }
+    log("next_step além do teste", "texto de fim do teste com link de compra");
+  }
 
-  const kb = await call(token, "search_knowledge", { session_id: sessionId, query: "como associar mensagens de erro ao campo" });
-  log("search_knowledge", `${kb.length} caracteres`);
+  if (trial.searches > 0) {
+    const kb = await call(token, "search_knowledge", { session_id: sessionId, query: "como associar mensagens de erro ao campo" });
+    if (kb.startsWith("As consultas à base do teste grátis acabaram")) throw new Error("a primeira consulta deveria passar");
+    log("search_knowledge", `${kb.length} caracteres`);
+  }
 
-  const a11y = await call(token, "run_tool", {
-    session_id: sessionId,
-    tool: "a11y_check",
-    input: { files: { "Bad.tsx": '<div onClick={x}><img src="a.png"/><input id="e"/></div>' } },
-  });
-  log("run_tool a11y_check", `${JSON.parse(a11y).issues.length} problemas encontrados (esperado > 0)`);
+  // Ferramenta do teste: conta no total do teste inteiro; passou do limite, texto de fim do teste.
+  const a11yLimit = trial.tools.find((t) => t.name === "a11y_check")?.limit ?? 0;
+  const a11yInput = { files: { "Bad.tsx": '<div onClick={x}><img src="a.png"/><input id="e"/></div>' } };
+  for (let i = 0; i < a11yLimit; i++) {
+    const a11y = await call(token, "run_tool", { session_id: sessionId, tool: "a11y_check", input: a11yInput });
+    if (i === 0) log("run_tool a11y_check", `${JSON.parse(a11y).issues.length} problemas encontrados (esperado > 0)`);
+  }
+  const over = await call(token, "run_tool", { session_id: sessionId, tool: "a11y_check", input: a11yInput });
+  if (!over.includes("O teste grátis de")) throw new Error(`a11y_check além do limite deveria encerrar o teste:\n${over}`);
+  log(`run_tool a11y_check além do limite (${a11yLimit})`, "texto de fim do teste");
 
   await call(token, "save_memory", { agent_id: agentId, content: "Prefere TypeScript estrito e Vitest." });
   const mem = await call(token, "get_memory", { agent_id: agentId });

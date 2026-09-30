@@ -13,7 +13,7 @@ export default async function DonePage({ searchParams }: PageProps<"/checkout/co
   const { detail, error } = await loadAgent(param(sp.agent));
   if (!detail) return <AgentMissing error={error} />;
   const k = param(sp.kind);
-  const kind: DoneKind = k === "escrow" || k === "credits" ? k : "purchase";
+  const kind: DoneKind = k === "escrow" ? k : "purchase";
   return (
     <DoneView
       detail={detail}
@@ -22,7 +22,6 @@ export default async function DonePage({ searchParams }: PageProps<"/checkout/co
       escrow={param(sp.escrow)}
       asset={param(sp.asset)}
       paidUsdc={num(param(sp.usdc))}
-      credits={num(param(sp.n))}
       explorer={param(sp.explorer)}
     />
   );

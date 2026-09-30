@@ -34,7 +34,7 @@ async function main() {
   // 1. Compra da licença
   const mine = await api<{ agentId: string }[]>("/api/me/licenses", { token });
   if (!mine.some((l) => l.agentId === fe.id)) {
-    const r = await tx(token, buyer, "/api/tx/purchase", { agentId: fe.id, type: "permanent" });
+    const r = await tx(token, buyer, "/api/tx/purchase", { agentId: fe.id });
     log("licença comprada", r.events.join(","));
   }
 
@@ -66,6 +66,20 @@ async function main() {
   const preOk = await call(mcp, "preflight_check", { session_id: uiSession, available_tools: ["figma:get_file", "web_search"] });
   if (!preOk.startsWith("Tudo pronto")) throw new Error(`preflight com Figma deveria passar:\n${preOk}`);
   log("preflight detecta falta do Figma e libera quando conectado", "ok");
+
+  // UI Design sem licença: teste grátis com limites (a etapa depois do teste devolve o texto de fim)
+  const uiDetail = await api<{ trial: { uses: number; steps: number; totalSteps: number } | null }>(`/api/agents/${ui.id}`);
+  if (uiDetail.trial) {
+    if (!actUi.includes("Teste grátis (uso")) throw new Error(`UI Design deveria abrir em teste grátis:\n${actUi}`);
+    for (let i = 0; i < uiDetail.trial.steps; i++) await call(mcp, "next_step", { session_id: uiSession, result_summary: "Resumo." });
+    if (uiDetail.trial.steps < uiDetail.trial.totalSteps) {
+      const end = await call(mcp, "next_step", { session_id: uiSession, result_summary: "Resumo." });
+      if (!end.startsWith("O teste grátis de ")) throw new Error(`esperava o fim do teste:\n${end}`);
+    }
+    const access = await api<{ license: string | null; trialUsesLeft: number; trial: unknown }>(`/api/me/access/${ui.id}`, { token });
+    if (access.license || access.trialUsesLeft !== uiDetail.trial.uses - 1 || !access.trial) throw new Error(`acesso ao teste errado: ${JSON.stringify(access)}`);
+    log("teste grátis com limites: etapa fora do teste devolve o texto de fim", `restam ${access.trialUsesLeft} usos`);
+  }
 
   // Sessão de outra carteira é recusada
   const other = await connect(stranger);

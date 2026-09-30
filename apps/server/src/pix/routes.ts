@@ -50,7 +50,8 @@ function toPixCharge(r: Row): PixCharge {
     expiresAt: r.expiresAt.toISOString(),
     creditSignature: r.creditSignature,
     explorerUrl: r.creditSignature ? explorerUrl("tx", r.creditSignature) : null,
-    purpose: r.purpose ?? null,
+    // Cobranças antigas de créditos (pagamento por uso acabou) saem sem purpose.
+    purpose: r.purpose && (r.purpose.type as string) !== "credits" ? r.purpose : null,
     simulated: r.provider === "simulated",
     createdAt: r.createdAt.toISOString(),
   };
@@ -123,17 +124,12 @@ async function sync(row: Row): Promise<Row> {
 }
 
 /** Quanto falta (em unidades de USDC) para a compra pretendida, descontando o saldo da carteira. */
-async function neededUnits(wallet: string, agentId: string, type: "permanent" | "credits" | "guarantee"): Promise<bigint> {
+async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
   const row = await findAgentRow(agentId);
   if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
   if (type === "permanent") total = row.price;
-  else if (type === "credits") {
-    if (row.pricePerUse <= 0n) throw badRequest("Este especialista não tem pagamento por uso.");
-    const config = await chain().fetchConfig();
-    const minAmount = (config.data.minPrice + row.pricePerUse - 1n) / row.pricePerUse;
-    total = row.pricePerUse * minAmount;
-  } else {
+  else {
     const offer = guaranteeOffer(row, 1);
     if (!offer) throw badRequest("Este especialista não oferece tarefa com garantia.");
     total = usdcToUnits(offer.priceUsdc);
@@ -157,7 +153,7 @@ pixRouter.post(
     const body = parse(
       z.union([
         z.object({ usdc: z.number().positive().max(1_000) }).strict(),
-        z.object({ agentId: z.string().min(1).max(100), type: z.enum(["permanent", "credits", "guarantee"]) }).strict(),
+        z.object({ agentId: z.string().min(1).max(100), type: z.enum(["permanent", "guarantee"]) }).strict(),
       ]),
       req.body,
     );

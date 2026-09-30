@@ -4,6 +4,7 @@ import { db, schema } from "../db/index.js";
 import { forbidden, notFound } from "../lib/http.js";
 import { randomId, sha256Hex } from "../lib/crypto.js";
 import type { SolverPackage } from "./packages.js";
+import { escrowIsOpen, paidAccessById, type PaidAccess } from "./access.js";
 
 // Motor de etapas (INSTRUCTIONS.md 5.4): sessão por ativação, uma etapa por vez, gates,
 // e marca d'água simples por carteira.
@@ -15,8 +16,11 @@ const TRIAL_TTL_MS = 2 * 3600_000;
 const PAID_TTL_MS = 24 * 3600_000;
 export const TRIAL_MAX_CALLS = 60;
 
-export async function createSession(wallet: string, pkg: SolverPackage, access: string, licenseId?: string): Promise<Session> {
-  const ttl = access === "trial" ? TRIAL_TTL_MS : PAID_TTL_MS;
+/** Acesso da sessão: teste grátis ou pago (licença / tarefa com garantia, cujo escrowId fica no context). */
+export type SessionGrant = { kind: "trial" } | PaidAccess;
+
+export async function createSession(wallet: string, pkg: SolverPackage, grant: SessionGrant): Promise<Session> {
+  const ttl = grant.kind === "trial" ? TRIAL_TTL_MS : PAID_TTL_MS;
   const [s] = await db
     .insert(schema.sessions)
     .values({
@@ -25,9 +29,9 @@ export async function createSession(wallet: string, pkg: SolverPackage, access: 
       agentId: pkg.manifest.id,
       version: pkg.manifest.version,
       stepIndex: 0,
-      access,
-      licenseId: licenseId ?? null,
-      context: { summaries: [] },
+      access: grant.kind,
+      licenseId: grant.kind === "license" ? grant.licenseId : null,
+      context: grant.kind === "guarantee" ? { summaries: [], escrowId: grant.escrowId } : { summaries: [] },
       expiresAt: new Date(Date.now() + ttl),
     })
     .returning();
@@ -54,6 +58,35 @@ export async function findOpenSession(wallet: string, agentId: string, version: 
 }
 
 /**
+ * Sessão de teste de quem passou a ter acesso pago (comprou a licença ou abriu uma garantia):
+ * vira sessão paga, sem limites e com o TTL pago, mantendo a etapa em que o usuário parou.
+ */
+export async function promoteSession(session: Session, paid: PaidAccess): Promise<Session> {
+  const context = { ...(session.context as Record<string, unknown>) };
+  if (paid.kind === "guarantee") context.escrowId = paid.escrowId;
+  const [s] = await db
+    .update(schema.sessions)
+    .set({
+      access: paid.kind,
+      licenseId: paid.kind === "license" ? paid.licenseId : null,
+      context,
+      expiresAt: new Date(Date.now() + PAID_TTL_MS),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(schema.sessions.id, session.id), eq(schema.sessions.access, "trial")))
+    .returning();
+  if (s) return s;
+  // Outra chamada promoveu antes: devolve o estado atual.
+  const [cur] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, session.id));
+  return cur ?? session;
+}
+
+/** Encerra a sessão (licença revendida, garantia encerrada): a próxima ativação abre outra. */
+export async function expireSession(sessionId: string): Promise<void> {
+  await db.update(schema.sessions).set({ expiresAt: new Date(), updatedAt: new Date() }).where(eq(schema.sessions.id, sessionId));
+}
+
+/**
  * Carrega a sessão garantindo que pertence à carteira do token, que não expirou, que o teste
  * grátis não passou do teto e que a licença (se for o caso) continua com a mesma carteira.
  */
@@ -70,7 +103,16 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
   }
   if (s.expiresAt < new Date()) throw forbidden("Sessão expirada. Ative o solver de novo com activate_solver.");
   if (s.access === "trial" && s.calls > TRIAL_MAX_CALLS) {
+    // Só no momento de bloquear: quem comprou durante o teste segue na mesma sessão, sem limites.
+    const paid = await paidAccessById(wallet, s.agentId);
+    if (paid) return promoteSession(s, paid);
     throw forbidden("Limite do teste grátis atingido nesta sessão. Para continuar, o usuário pode comprar o especialista.");
+  }
+  if (s.access === "guarantee") {
+    const escrowId = (s.context as { escrowId?: unknown }).escrowId;
+    if (typeof escrowId !== "string" || !(await escrowIsOpen(escrowId))) {
+      throw forbidden("A tarefa com garantia deste especialista foi encerrada. Ative o solver de novo com activate_solver.");
+    }
   }
   if (s.access === "license" && s.licenseId) {
     const [lic] = await db

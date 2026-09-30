@@ -118,13 +118,17 @@ export const credits = pgTable(
   (t) => [primaryKey({ columns: [t.agentId, t.ownerWallet] })],
 );
 
-/** Teste grátis (off-chain): 3 usos por carteira por solver. */
+/** Teste grátis (off-chain) por carteira e solver: usos, consultas e execuções de ferramenta (manifest.trial). */
 export const trials = pgTable(
   "trials",
   {
     agentId: text("agent_id").notNull(),
     wallet: text("wallet").notNull(),
     used: integer("used").notNull().default(0),
+    /** search_knowledge no teste inteiro. */
+    searchesUsed: integer("searches_used").notNull().default(0),
+    /** run_tool por ferramenta no teste inteiro: { nome: execuções }. */
+    toolRuns: jsonb("tool_runs").$type<Record<string, number>>().notNull().default({}),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.agentId, t.wallet] })],
@@ -232,7 +236,7 @@ export const sessions = pgTable("sessions", {
   agentId: text("agent_id").notNull(),
   version: text("version").notNull(),
   stepIndex: integer("step_index").notNull().default(0),
-  access: text("access").notNull(), // license | credits | trial
+  access: text("access").notNull(), // license | guarantee (context.escrowId) | trial (credits: sessões antigas)
   context: jsonb("context").$type<Record<string, unknown>>().notNull().default({}),
   licenseId: text("license_id"),
   calls: integer("calls").notNull().default(0),
@@ -394,7 +398,8 @@ export const pixCharges = pgTable(
     ticketUrl: text("ticket_url"),
     expiresAt: ts("expires_at").notNull(),
     creditSignature: text("credit_signature"),
-    purpose: jsonb("purpose").$type<{ agentId: string; type: "permanent" | "credits" | "guarantee" }>(),
+    // Cobranças antigas podem ter type "credits" (pagamento por uso acabou): a API as mostra sem purpose.
+    purpose: jsonb("purpose").$type<{ agentId: string; type: "permanent" | "guarantee" }>(),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

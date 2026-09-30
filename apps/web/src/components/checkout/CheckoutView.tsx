@@ -1,5 +1,5 @@
 "use client";
-// Checkout: licença permanente, créditos ou tarefa com garantia (design: checkout-licenca e checkout-com-garantia).
+// Checkout: licença permanente ou tarefa com garantia (design: checkout-licenca e checkout-com-garantia).
 // Entrar → (garantia: descrever a tarefa) → forma de pagamento (saldo em USDC ou Pix) → revisar e pagar.
 import type { AgentDetail, GuaranteeStatus, PixCharge } from "@solvers/api-client";
 import Link from "next/link";
@@ -18,7 +18,7 @@ import { gap } from "@/lib/style";
 import { txErrorMessage, useFaucet, useTx, type TxErrorInfo } from "@/lib/tx";
 import { PixPanel } from "./PixPanel";
 import s from "./checkout.module.css";
-import { minCredits, type CheckoutType } from "./util";
+import type { CheckoutType } from "./util";
 
 type PayMethod = "wallet" | "pix";
 
@@ -41,12 +41,9 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   const faucet = useFaucet();
 
   const isG = type === "guarantee";
-  // Créditos: o pacote mínimo depende da config (compra mínima). Até ela chegar, o total fica em aberto.
-  const credits = type === "credits" && agent.pricePerUseUsdc && config ? minCredits(config.minPurchaseUsdc, agent.pricePerUseUsdc) : null;
-  const total: number | null = isG ? (guarantee?.priceUsdc ?? agent.priceUsdc) : type === "credits" ? (credits?.totalUsdc ?? null) : agent.priceUsdc;
-  const totalUsdc = total ?? 0;
+  const total = isG ? (guarantee?.priceUsdc ?? agent.priceUsdc) : agent.priceUsdc;
   const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
-  const totalText = total == null ? "…" : money(total);
+  const totalText = money(total);
 
   // ----- dados da conta -----
   const [balance, setBalance] = useState<number | null>(null);
@@ -77,7 +74,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   // ----- forma de pagamento -----
   const pixOn = !!config?.pix.enabled;
   const [method, setMethod] = useState<PayMethod | null>(null);
-  const enough = balance != null && balance + 1e-9 >= totalUsdc;
+  const enough = balance != null && balance + 1e-9 >= total;
   const effMethod: PayMethod = method ?? (pixOn && balance != null && !enough ? "pix" : "wallet");
 
   // ----- tarefa (garantia) -----
@@ -86,10 +83,10 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   const [touched, setTouched] = useState(false);
   const titleOk = title.trim().length >= TITLE_MIN && title.trim().length <= TITLE_MAX;
   const descOk = desc.trim().length >= DESC_MIN && desc.trim().length <= DESC_MAX;
-  const overLimit = isG && limits != null && limits.availableUsdc + 1e-9 < totalUsdc;
+  const overLimit = isG && limits != null && limits.availableUsdc + 1e-9 < total;
   // Mesma regra do servidor: no nível limitado, garantias acima de singleMilestoneMaxUsdc precisam de 2 etapas ou mais.
   const singleTooBig =
-    isG && limits != null && limits.level === "limited" && (guarantee?.milestones.length ?? 0) < 2 && totalUsdc > limits.singleMilestoneMaxUsdc;
+    isG && limits != null && limits.level === "limited" && (guarantee?.milestones.length ?? 0) < 2 && total > limits.singleMilestoneMaxUsdc;
   // Garantia: só paga (inclusive por Pix) depois de conferir o limite; assim o Pix não cobra uma garantia que seria recusada.
   const limitsOk = !isG || (limits != null && !overLimit && !singleTooBig);
 
@@ -112,23 +109,22 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
 
   const purchase = useCallback(async () => {
     const r = await tx.run(() =>
-      isG ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim() }) : api.buildPurchase(agent.id, type === "credits" ? "credits" : "permanent"),
+      isG ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim() }) : api.buildPurchase(agent.id),
     );
     if (!r) {
       void loadAccount();
       return;
     }
     const meta = (r.meta ?? {}) as Record<string, unknown>;
-    const kind = isG ? "escrow" : type === "credits" ? "credits" : "purchase";
+    const kind = isG ? "escrow" : "purchase";
     const q = new URLSearchParams({ agent: agent.slug, sig: r.signature, kind });
     if (typeof meta.escrowId === "string") q.set("escrow", meta.escrowId);
     if (typeof meta.asset === "string") q.set("asset", meta.asset);
-    const paid = typeof meta.priceUsdc === "number" ? meta.priceUsdc : typeof meta.totalUsdc === "number" ? meta.totalUsdc : totalUsdc;
+    const paid = typeof meta.priceUsdc === "number" ? meta.priceUsdc : typeof meta.totalUsdc === "number" ? meta.totalUsdc : total;
     q.set("usdc", String(paid));
     if (r.explorerUrl) q.set("explorer", r.explorerUrl);
-    if (typeof meta.amount === "number") q.set("n", String(meta.amount));
     router.push(`/checkout/concluido?${q}`);
-  }, [tx, isG, api, agent.id, agent.slug, title, desc, type, totalUsdc, router, loadAccount]);
+  }, [tx, isG, api, agent.id, agent.slug, title, desc, total, router, loadAccount]);
 
   const onCredited = useCallback(
     (c: PixCharge) => {
@@ -169,7 +165,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   }
 
   const alreadyOwned = owned && type === "permanent";
-  const canPay = !!config && total != null && agree && !alreadyOwned && limitsOk && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
+  const canPay = !!config && agree && !alreadyOwned && limitsOk && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
   function pay() {
     setTouched(true);
     if (!canPay) return;
@@ -182,17 +178,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
 
   const modes: { id: CheckoutType; label: string }[] = [
     { id: "permanent", label: "Licença" },
-    ...(agent.pricePerUseUsdc ? [{ id: "credits" as const, label: "Créditos" }] : []),
     ...(guarantee ? [{ id: "guarantee" as const, label: "Com garantia" }] : []),
   ];
 
   const reviewWin = guarantee ? durationText(guarantee.reviewWindowSecs) : "";
-  const lineLabel = isG ? "Tarefa com garantia" : credits ? `${credits.amount} usos · ${usdc(agent.pricePerUseUsdc ?? 0)} cada` : "Licença permanente";
+  const lineLabel = isG ? "Tarefa com garantia" : "Licença permanente";
   const agreeText = isG
     ? `Li e concordo com os critérios combinados e com a liberação automática em ${reviewWin}.`
-    : credits
-      ? `Concordo com os termos de uso e com a compra de ${credits.amount} usos em meu nome.`
-      : "Concordo com os termos de uso e com a emissão da licença em meu nome.";
+    : "Concordo com os termos de uso e com a emissão da licença em meu nome.";
 
   let n = 1;
   const stepLogin = n++;
@@ -375,10 +368,10 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                       Ao contestar, você aponta qual critério falhou. Se a contestação for procedente, o valor volta para você. Sem resposta em {reviewWin}, a aprovação é automática.
                     </GStep>
                   </div>
-                  <GuaranteeLevelInfo limits={limits} logged={logged} totalUsdc={totalUsdc} />
+                  <GuaranteeLevelInfo limits={limits} logged={logged} totalUsdc={total} />
                   {singleTooBig && limits ? (
                     <Notice tone="warn" title="Esta garantia precisa de pelo menos 2 etapas">
-                      Contas no nível limitado só abrem garantias de uma etapa até {usdc(limits.singleMilestoneMaxUsdc)}, e esta custa {usdc(totalUsdc)}. Faça mais compras para chegar ao nível completo.
+                      Contas no nível limitado só abrem garantias de uma etapa até {usdc(limits.singleMilestoneMaxUsdc)}, e esta custa {usdc(total)}. Faça mais compras para chegar ao nível completo.
                     </Notice>
                   ) : null}
                   {logged && limitsFailed ? (
@@ -457,7 +450,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     </>
                   }
                 >
-                  Você tem {usdc(balance)} e esta compra custa {total == null ? "…" : usdc(total)}.
+                  Você tem {usdc(balance)} e esta compra custa {usdc(total)}.
                 </Notice>
               ) : null}
               {faucet.error ? (
@@ -476,7 +469,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               {showPix && charge ? (
                 <PixPanel
                   charge={charge}
-                  totalUsdc={totalUsdc}
+                  totalUsdc={total}
                   onUpdate={setCharge}
                   onCredited={onCredited}
                   onRestart={() => {
@@ -511,7 +504,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   </Button>
                   <p className="tiny faint center">
                     <Icon name="lock" size="s" /> Pagamento protegido.{" "}
-                    {isG ? "O valor fica guardado até você aprovar cada etapa." : credits ? "Os créditos entram na sua conta assim que ele for confirmado." : "Você recebe a licença assim que ele for confirmado."}
+                    {isG ? "O valor fica guardado até você aprovar cada etapa." : "Você recebe a licença assim que ele for confirmado."}
                   </p>
                 </>
               )}
@@ -599,7 +592,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                 </div>
                 <div className="row between small">
                   <span className="muted">Preço em USDC</span>
-                  <b className="num">{total == null ? "…" : usdc(total)}</b>
+                  <b className="num">{usdc(total)}</b>
                 </div>
                 {rate != null ? (
                   <div className="tiny faint" style={{ marginTop: 6 }}>
@@ -611,10 +604,6 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               {isG ? (
                 <Chip tone="ok" icon="lock">
                   O valor fica guardado até você aprovar
-                </Chip>
-              ) : credits ? (
-                <Chip tone="ok" icon="bolt">
-                  {money(agent.pricePerUseUsdc ?? 0)} por uso
                 </Chip>
               ) : (
                 <Chip tone="ok" icon="shield-check">

@@ -18,7 +18,6 @@ import { LoadError } from "./shared";
 
 const HISTORY_MARK: Record<string, { dot: string; mark: string }> = {
   purchase: { dot: "dot-ok", mark: "✓" },
-  credits: { dot: "dot-ok", mark: "✓" },
   review: { dot: "dot-now", mark: "★" },
   escrow: { dot: "dot-now", mark: "⛨" },
   milestone: { dot: "dot-ok", mark: "✓" },

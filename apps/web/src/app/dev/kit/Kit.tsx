@@ -73,7 +73,7 @@ function SessionPanel() {
 
   const buy = async () => {
     if (!agent) return;
-    const r = await tx.run(() => api.buildPurchase(agent.id, "permanent"));
+    const r = await tx.run(() => api.buildPurchase(agent.id));
     if (r) {
       setLastAsset(typeof r.meta?.asset === "string" ? r.meta.asset : null);
       toast({ tone: "ok", title: "Compra concluída", text: `${agent.name}: licença registrada.` });
@@ -285,7 +285,7 @@ export function Kit() {
           <Card flat>
             <div className="col">
               <span className="h4">Cartão plano</span>
-              <Price usdc={0.9} rate={rate} size="s" suffix="por uso" inline />
+              <Price usdc={4} rate={rate} size="s" suffix="por tarefa" inline />
               <Price usdc={24} rate={rate} size="xl" />
             </div>
           </Card>

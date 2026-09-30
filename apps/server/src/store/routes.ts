@@ -8,6 +8,7 @@ import {
   MIN_PERMANENT_PRICE_USDC,
   unitsToUsdc,
   usdcToUnits,
+  type AgentAccess,
   type License,
   type Profile,
   type PublicConfig,
@@ -36,7 +37,10 @@ import {
   listReviews,
   mapAgents,
 } from "./catalog.js";
-import { creditsToLicense, toLicense, toReputation } from "./mappers.js";
+import { toLicense, toReputation } from "./mappers.js";
+import { trialUsage } from "../runtime/access.js";
+import { getPackage } from "../runtime/packages.js";
+import { trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 
 export const storeRouter = Router();
@@ -168,11 +172,7 @@ storeRouter.get(
   h(async (req): Promise<License[]> => {
     const wallet = requireWallet(req);
     const lic = await db.select().from(schema.licenses).where(eq(schema.licenses.ownerWallet, wallet)).orderBy(desc(schema.licenses.acquiredAt));
-    const cred = await db
-      .select()
-      .from(schema.credits)
-      .where(and(eq(schema.credits.ownerWallet, wallet), gt(schema.credits.purchased, 0)));
-    return [...lic.map(toLicense), ...cred.map(creditsToLicense)];
+    return lic.map(toLicense);
   }),
 );
 
@@ -264,7 +264,7 @@ storeRouter.get(
   }),
 );
 
-/** Uso de cada especialista pela carteira (biblioteca): totais, mês atual, 8 semanas e créditos. */
+/** Uso de cada especialista pela carteira (biblioteca): totais, mês atual e 8 semanas. */
 storeRouter.get(
   "/me/usage",
   requireAuth,
@@ -297,53 +297,40 @@ storeRouter.get(
       for (const w of weeks) if (w.agentId === agentId && w.ago >= 0 && w.ago < 8) out[7 - w.ago] = w.n;
       return out;
     };
-    const cred = await db.select().from(schema.credits).where(and(eq(schema.credits.ownerWallet, wallet), gt(schema.credits.purchased, 0)));
-    const byAgent = new Map<string, UsageSummary>();
-    for (const r of rows) {
-      if (!r.agentId) continue;
-      byAgent.set(r.agentId, {
-        agentId: r.agentId,
-        activations: r.activations,
-        calls: r.calls,
-        lastUsedAt: new Date(r.lastUsedAt).toISOString(),
-        usesThisMonth: r.usesThisMonth,
-        weekly: weekly(r.agentId),
-        creditsLeft: null,
-        creditsTotal: null,
-      });
-    }
-    for (const c of cred) {
-      const u = byAgent.get(c.agentId) ?? {
-        agentId: c.agentId,
-        activations: 0,
-        calls: 0,
-        lastUsedAt: null,
-        usesThisMonth: 0,
-        weekly: weekly(c.agentId),
-        creditsLeft: null,
-        creditsTotal: null,
-      };
-      byAgent.set(c.agentId, { ...u, creditsLeft: c.remaining, creditsTotal: c.purchased });
-    }
-    return [...byAgent.values()];
+    return rows.flatMap((r) =>
+      r.agentId
+        ? [
+            {
+              agentId: r.agentId,
+              activations: r.activations,
+              calls: r.calls,
+              lastUsedAt: new Date(r.lastUsedAt).toISOString(),
+              usesThisMonth: r.usesThisMonth,
+              weekly: weekly(r.agentId),
+            },
+          ]
+        : [],
+    );
   }),
 );
 
-/** Como a carteira acessa um especialista agora (licença, créditos ou teste grátis restante). */
+/** Como a carteira acessa um especialista agora (licença ou saldo do teste grátis). */
 storeRouter.get(
   "/me/access/:idOrSlug",
   requireAuth,
-  h(async (req) => {
+  h(async (req): Promise<AgentAccess> => {
     const wallet = requireWallet(req);
     const row = await findAgentRow(String(req.params.idOrSlug));
     const [lic] = await db.select().from(schema.licenses).where(and(eq(schema.licenses.ownerWallet, wallet), eq(schema.licenses.agentId, row.id)));
-    const [cred] = await db.select().from(schema.credits).where(and(eq(schema.credits.ownerWallet, wallet), eq(schema.credits.agentId, row.id)));
-    const [trial] = await db.select().from(schema.trials).where(and(eq(schema.trials.wallet, wallet), eq(schema.trials.agentId, row.id)));
+    const pkg = getPackage(row.id);
+    const limits = pkg ? trialLimits(pkg.manifest) : null;
+    if (!limits) return { agentId: row.id, license: lic ? lic.id : null, trialUsesLeft: 0, trial: null };
+    const { used, usage } = await trialUsage(wallet, row.id);
     return {
       agentId: row.id,
       license: lic ? lic.id : null,
-      creditsLeft: cred?.remaining ?? null,
-      trialUsesLeft: Math.max(0, FREE_TRIAL_USES - (trial?.used ?? 0)),
+      trialUsesLeft: Math.max(0, limits.uses - used),
+      trial: trialLeft(limits, usage),
     };
   }),
 );
@@ -366,30 +353,14 @@ storeRouter.post(
   requireAuth,
   h(async (req): Promise<TxResponse> => {
     const wallet = address(requireWallet(req));
-    const body = parse(
-      z.object({
-        agentId: z.string(),
-        type: z.enum(["permanent", "credits"]).default("permanent"),
-        amount: z.number().int().min(1).max(10_000).optional(),
-      }),
-      req.body,
-    );
+    // Só licença vitalícia: o pagamento por uso (type "credits") acabou e é recusado com 400.
+    const body = parse(z.object({ agentId: z.string(), type: z.literal("permanent").default("permanent") }), req.body);
     const row = await findAgentRow(body.agentId);
     if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
     const c = chain();
-    if (body.type === "permanent") {
-      await assertBalance(wallet, row.price);
-      const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
-      return c.buildForUser(instructions, { kind: "purchase", asset: asset.address, priceUsdc: unitsToUsdc(price), agentId: row.id });
-    }
-    if (row.pricePerUse <= 0n) throw badRequest("Este especialista não tem pagamento por uso.");
-    const config = await c.fetchConfig();
-    const minAmount = Number((config.data.minPrice + row.pricePerUse - 1n) / row.pricePerUse);
-    const amount = Math.max(body.amount ?? minAmount, minAmount);
-    const total = row.pricePerUse * BigInt(amount);
-    await assertBalance(wallet, total);
-    const instructions = await c.buyCreditsIxs(wallet, row.id, amount, total);
-    return c.buildForUser(instructions, { kind: "credits", amount, totalUsdc: unitsToUsdc(total), agentId: row.id });
+    await assertBalance(wallet, row.price);
+    const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
+    return c.buildForUser(instructions, { kind: "purchase", asset: asset.address, priceUsdc: unitsToUsdc(price), agentId: row.id });
   }),
 );
 

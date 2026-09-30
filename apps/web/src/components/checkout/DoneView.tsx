@@ -1,5 +1,5 @@
 "use client";
-// Compra concluída (design: compra-concluida): licença, créditos ou tarefa com garantia.
+// Compra concluída (design: compra-concluida): licença ou tarefa com garantia.
 import type { AgentDetail } from "@solvers/api-client";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
@@ -24,7 +24,6 @@ export type DoneProps = {
   escrow: string | null;
   asset: string | null;
   paidUsdc: number | null;
-  credits: number | null;
   /** explorerUrl que o servidor devolveu no submit (validado aqui); sem ele, o link é montado pela config. */
   explorer: string | null;
 };
@@ -32,7 +31,7 @@ export type DoneProps = {
 /** A URL diz o que foi comprado; a conta confirma. "unknown" = sem sessão para conferir (não bloqueia nada). */
 type Check = "checking" | "ok" | "missing" | "unknown";
 
-export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, explorer }: DoneProps) {
+export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer }: DoneProps) {
   const { api, config, status } = useSession();
   const [check, setCheck] = useState<Check>("checking");
   useEffect(() => {
@@ -44,7 +43,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, 
         ? escrow
           ? api.getMyEscrow(escrow).then(() => true)
           : Promise.resolve(false)
-        : api.getMyAccess(detail.agent.slug).then((a) => (kind === "credits" ? (a.creditsLeft ?? 0) > 0 : !!a.license));
+        : api.getMyAccess(detail.agent.slug).then((a) => !!a.license);
     confirm.then(
       (ok) => alive && setCheck(ok ? "ok" : "missing"),
       () => alive && setCheck("missing"),
@@ -65,12 +64,10 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, 
   const account = isEscrow ? escrow : asset;
   const txLink = sig ? (trustedExplorerUrl(explorer) ?? (config ? explorerLink(config, "tx", sig) : null)) : null;
 
-  const heading = isEscrow ? `Pronto! Sua tarefa com o ${agent.name} começou.` : kind === "credits" ? `Pronto! Seus créditos do ${agent.name} chegaram.` : `Pronto! O ${agent.name} é seu.`;
+  const heading = isEscrow ? `Pronto! Sua tarefa com o ${agent.name} começou.` : `Pronto! O ${agent.name} é seu.`;
   const lead = isEscrow
     ? "O pagamento está guardado e só vai para o criador quando você aprovar cada etapa. Conecte o especialista à sua IA para ele começar a trabalhar na tarefa."
-    : kind === "credits"
-      ? "Os créditos já estão na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo."
-      : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
+    : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
 
   return (
     <section className="wrap" style={{ position: "relative", paddingTop: 56, paddingBottom: 72 }}>
@@ -120,7 +117,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, 
         <div className="ticket" style={{ width: "100%", maxWidth: 520, textAlign: "left", padding: 26 }}>
           <div className="sol-line" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 4, borderRadius: 0 }} />
           <div className="row between">
-            <span className="eyebrow">{isEscrow ? "Sua tarefa" : kind === "credits" ? "Seus créditos" : "Sua licença"}</span>
+            <span className="eyebrow">{isEscrow ? "Sua tarefa" : "Sua licença"}</span>
             <span className={`chip ${isEscrow ? "chip-brand" : "chip-ok"}`}>
               <Icon name={isEscrow ? "shield-check" : "check"} size="s" />
               {isEscrow ? "Em andamento" : "Ativa"}
@@ -135,9 +132,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, 
               <div className="small muted" style={{ marginTop: 6 }}>
                 {isEscrow
                   ? `Tarefa com garantia · ${detail.guarantee?.milestones.length ?? 0} etapas`
-                  : kind === "credits"
-                    ? `${credits != null ? `${credits} usos` : "Créditos de uso"} · versão ${agent.version}`
-                    : `Licença permanente · versão ${agent.version}`}
+                  : `Licença permanente · versão ${agent.version}`}
               </div>
             </div>
           </div>
@@ -171,7 +166,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, credits, 
         {sig ? (
           <>
             <button type="button" className="link-btn small" onClick={() => setTech((v) => !v)} aria-expanded={tech} aria-controls="detalhes-tecnicos">
-              {tech ? "Ocultar detalhes técnicos" : isEscrow ? "Ver detalhes técnicos da tarefa" : kind === "credits" ? "Ver detalhes técnicos da compra" : "Ver detalhes técnicos da licença"}
+              {tech ? "Ocultar detalhes técnicos" : isEscrow ? "Ver detalhes técnicos da tarefa" : "Ver detalhes técnicos da licença"}
             </button>
             {tech ? (
               <dl id="detalhes-tecnicos" className="tech" style={{ marginTop: 14, textAlign: "left", width: "100%", maxWidth: 520 }}>

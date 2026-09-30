@@ -12,7 +12,7 @@ export type PriceProps = {
   round?: boolean;
   /** R$ e USDC na mesma linha. */
   inline?: boolean;
-  /** Texto depois do USDC, ex: "por uso". */
+  /** Texto depois do USDC, ex: "por tarefa". */
   suffix?: string;
   className?: string;
 };

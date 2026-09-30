@@ -83,7 +83,7 @@ export default async function Home() {
                       {a.name}
                     </b>
                     <div className="small muted">
-                      publicado {ago(a.publishedAt)} · {a.evalScore}% nos testes
+                      publicado {ago(a.publishedAt)} · {a.evalScore}% nos testes{a.trialAvailable ? " · teste grátis" : ""}
                     </div>
                   </div>
                   <span className="chip chip-brand">Novo</span>
@@ -102,7 +102,7 @@ export default async function Home() {
           </div>
           <div className="g3" style={gap("40px")}>
             <Step n={1} title="Escolha um especialista">
-              Compare notas de usuários, desempenho comprovado e o antes e depois. Teste grátis {config.freeTrialUses} vezes antes de decidir.
+              Compare notas de usuários, desempenho comprovado e o antes e depois. Muitos têm teste grátis para você experimentar antes de decidir.
             </Step>
             <Step n={2} title="Pague uma vez">
               Você recebe uma licença só sua. Se a tarefa tiver garantia, o pagamento fica guardado e só é liberado quando o resultado passa nos critérios.
@@ -158,7 +158,7 @@ function TrendRow({ agent: a, rank }: { agent: Agent; rank: number }) {
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="bold trunc">{a.name}</div>
         <div className="small muted trunc">
-          {categoryLabel(a.category)} · {int(a.verifiedUses)} usos verificados
+          {categoryLabel(a.category)} · {int(a.verifiedUses)} usos verificados{a.trialAvailable ? " · teste grátis" : ""}
         </div>
       </div>
       <span className={`trend ${cls}`} style={{ minWidth: 64, justifyContent: "flex-end" }}>

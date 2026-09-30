@@ -1,6 +1,6 @@
 // Publica solvers (INSTRUCTIONS.md 6): calcula o versionHash, ingere o conhecimento, espelha o
-// catálogo no banco, registra no programa (register_agent), aprova (admin) e grava a nota de
-// desempenho (set_eval). Idempotente: rodar de novo só atualiza o que mudou.
+// catálogo no banco, registra no programa (register_agent), acerta o preço (update_pricing, sem
+// pagamento por uso), aprova (admin) e grava a nota de desempenho (set_eval). Idempotente: rodar de novo só atualiza o que mudou.
 //
 //   pnpm --filter @solvers/server cli:publish            # todos os pacotes em agents/
 //   pnpm --filter @solvers/server cli:publish frontend-react ui-design
@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { loadSigner, type KeyPairSigner } from "@solvers/chain";
+import * as gen from "@solvers/client";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
 import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS, usdcToUnits } from "@solvers/shared";
 import { authorities, chain, initChain } from "../chain/index.js";
@@ -83,7 +84,8 @@ async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
     version: m.version,
     versionHash: pkg.versionHash,
     price: usdcToUnits(m.pricing.priceUsdc),
-    pricePerUse: m.pricing.pricePerUseUsdc ? usdcToUnits(m.pricing.pricePerUseUsdc) : 0n,
+    // Só licença vitalícia: o pagamento por uso acabou (o programa mantém o campo, sempre 0).
+    pricePerUse: 0n,
     royaltyBps: m.pricing.royaltyBps,
     requirements: m.requirements,
     packageContents: m.packageContents,
@@ -118,7 +120,7 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
       version: m.version,
       versionHash: hexToBytes(pkg.versionHash),
       price: usdcToUnits(m.pricing.priceUsdc),
-      pricePerUse: m.pricing.pricePerUseUsdc ? usdcToUnits(m.pricing.pricePerUseUsdc) : 0n,
+      pricePerUse: 0n,
       royaltyBps: m.pricing.royaltyBps,
     });
     await c.sendAsServer(reg.instructions);
@@ -126,6 +128,15 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
   } else if (Buffer.from(existing.data.versionHash).toString("hex") !== pkg.versionHash) {
     await c.sendAsServer([await c.updateVersionIx(creator, m.id, m.version, hexToBytes(pkg.versionHash))]);
     console.log(`  nova versão on-chain: ${m.version}`);
+  }
+
+  // Preço on-chain igual ao manifest e sem pagamento por uso (agentes antigos tinham price_per_use > 0).
+  const price = usdcToUnits(m.pricing.priceUsdc);
+  const current = await c.fetchAgent(m.id);
+  if (current.data.price !== price || current.data.pricePerUse !== 0n) {
+    const ix = await gen.getUpdatePricingInstructionAsync({ creator, agent: await c.agentPda(m.id), price, pricePerUse: 0n });
+    await c.sendAsServer([ix]);
+    console.log(`  preço on-chain: ${m.pricing.priceUsdc} USDC, sem pagamento por uso`);
   }
 
   const agent = await c.fetchAgent(m.id);
