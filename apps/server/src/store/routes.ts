@@ -19,6 +19,7 @@ import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { processSignature } from "../indexer/processor.js";
 import { brlPerUsd } from "./fx.js";
+import { pixConfig } from "../pix/routes.js";
 import type { Signature } from "@solvers/chain";
 import { refreshLicenseOwner } from "../indexer/sync.js";
 import { searchAgentRows } from "../knowledge/search.js";
@@ -64,6 +65,7 @@ storeRouter.get(
       guaranteeLimitsUsdc: GUARANTEE_LIMITS_USDC,
       guaranteeMinSales: env.GUARANTEE_MIN_SALES,
       guaranteeMinRating: env.GUARANTEE_MIN_RATING,
+      pix: pixConfig(),
     };
   }),
 );

@@ -5,7 +5,13 @@ const bool = z
   .optional()
   .transform((v) => v === "true" || v === "1");
 
-const schema = z.object({
+/** Booleano sem padrão fixo: undefined quando a variável não foi definida (o padrão depende da rede). */
+const optBool = z
+  .enum(["true", "false", "1", "0"])
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v === "true" || v === "1"));
+
+const base = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(3017),
   /** URL pública da API (mesmo domínio da vitrine, rotas /api /mcp /oauth). */
@@ -61,6 +67,24 @@ const schema = z.object({
   /** ...e com nota média igual ou acima desta (0 desliga a exigência de nota). */
   GUARANTEE_MIN_RATING: z.coerce.number().min(0).max(5).default(4),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(60),
+
+  /** Pix na demo (Mercado Pago, API Orders). Sem token, só o modo simulado funciona. */
+  MP_ACCESS_TOKEN: z.string().min(10).optional(),
+  /** Secret da assinatura dos webhooks (painel do Mercado Pago > Webhooks). */
+  MP_WEBHOOK_SECRET: z.string().min(8).optional(),
+  /** Credenciais de teste: o pagador vai como "APRO" (aprovação automática). Padrão: true fora da mainnet. */
+  MP_TEST_MODE: optBool,
+  /** Permite simular a aprovação do Pix sem o Mercado Pago. Padrão: true fora da mainnet; nunca na mainnet. */
+  PIX_SIMULATE: optBool,
+});
+
+const schema = base.transform((e) => {
+  const mainnet = e.SOLANA_CLUSTER === "mainnet-beta";
+  return {
+    ...e,
+    MP_TEST_MODE: e.MP_TEST_MODE ?? !mainnet,
+    PIX_SIMULATE: !mainnet && (e.PIX_SIMULATE ?? true),
+  };
 });
 
 export type Env = z.infer<typeof schema>;

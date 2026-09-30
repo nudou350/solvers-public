@@ -179,6 +179,40 @@ export const UsageSummary = z.object({
 });
 
 /** GET /api/config */
+/** Pix na demo: o comprador paga em reais e recebe USDC de teste (sem dinheiro real na devnet). */
+export const PixConfig = z.object({
+  /** false na mainnet (lá o Pix virá de um on-ramp licenciado) ou sem provedor configurado. */
+  enabled: z.boolean(),
+  /** Mostra o botão "simular pagamento" (só fora da mainnet). */
+  simulate: z.boolean(),
+  provider: z.enum(["mercadopago", "simulated"]).nullable(),
+  minBrl: z.number(),
+  maxBrl: z.number(),
+});
+
+export const PixChargeStatus = z.enum(["pending", "approved", "credited", "expired", "failed"]);
+
+/** POST /api/pix/charges e GET /api/pix/charges/:id */
+export const PixCharge = z.object({
+  id: z.string(),
+  provider: z.enum(["mercadopago", "simulated"]),
+  /** pending: aguardando o Pix; approved: pago, creditando; credited: USDC na carteira. */
+  status: PixChargeStatus,
+  amountBrl: z.number(),
+  amountUsdc: z.number(),
+  /** Pix copia e cola. No modo simulado é um texto fictício que não pode ser pago. */
+  qrCode: z.string().nullable(),
+  /** PNG em base64 (sem o prefixo data:). null no modo simulado. */
+  qrCodeBase64: z.string().nullable(),
+  ticketUrl: z.string().nullable(),
+  expiresAt: z.string(),
+  creditSignature: z.string().nullable(),
+  explorerUrl: z.string().nullable(),
+  purpose: z.object({ agentId: z.string(), type: z.enum(["permanent", "credits", "guarantee"]) }).nullable(),
+  simulated: z.boolean(),
+  createdAt: z.string(),
+});
+
 export const PublicConfig = z.object({
   cluster: z.string(),
   rpcUrl: z.string().nullable(),
@@ -196,6 +230,7 @@ export const PublicConfig = z.object({
   guaranteeLimitsUsdc: z.object({ none: z.number(), limited: z.number(), full: z.number() }),
   guaranteeMinSales: z.number(),
   guaranteeMinRating: z.number(),
+  pix: PixConfig,
 });
 
 /** GET /api/market/listings (revenda é P2: dados simulados na demo) */
@@ -232,5 +267,8 @@ export type MilestoneVerify = z.infer<typeof MilestoneVerify>;
 export type GuaranteeStatus = z.infer<typeof GuaranteeStatus>;
 export type UsageSummary = z.infer<typeof UsageSummary>;
 export type PublicConfig = z.infer<typeof PublicConfig>;
+export type PixConfig = z.infer<typeof PixConfig>;
+export type PixCharge = z.infer<typeof PixCharge>;
+export type PixChargeStatus = z.infer<typeof PixChargeStatus>;
 export type ResaleListing = z.infer<typeof ResaleListing>;
 export type SubmitResponse = z.infer<typeof SubmitResponse>;

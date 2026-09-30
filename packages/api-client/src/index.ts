@@ -11,6 +11,7 @@ import {
   License,
   ResaleListing,
   Memory,
+  PixCharge,
   Profile,
   PublicConfig,
   Review,
@@ -127,6 +128,16 @@ export function createApi(opts: ApiOptions = {}) {
     updateProfile: (data: { displayName?: string | null; email?: string | null }) =>
       req(z.object({ ok: z.boolean() }), "/api/me/profile", { method: "PATCH", body: JSON.stringify(data) }),
     getBalance: () => req(z.object({ usdc: z.number() }), "/api/me/balance"),
+    /**
+     * Pix na demo: cria a cobrança (QR / copia e cola). Com agentId, o servidor calcula quanto falta
+     * (preço, pacote mínimo de créditos ou garantia, menos o saldo). Consulte com getPixCharge até
+     * status "credited"; depois siga para a compra normal.
+     */
+    createPixCharge: (body: { usdc: number } | { agentId: string; type: "permanent" | "credits" | "guarantee" }) =>
+      post(PixCharge, "/api/pix/charges", body),
+    getPixCharge: (id: string) => req(PixCharge, `/api/pix/charges/${encodeURIComponent(id)}`),
+    /** Só quando getConfig().pix.simulate: aprova a cobrança sem pagar e credita o USDC de teste. */
+    simulatePixPayment: (id: string) => post(PixCharge, `/api/pix/charges/${encodeURIComponent(id)}/simulate`),
     faucet: () => post(z.object({ signature: z.string(), amountUsdc: z.number() }).passthrough(), "/api/faucet"),
 
     /** Memórias: se a API responder 409 memory_key_required, chame unlockMemories e tente de novo. */

@@ -36,6 +36,13 @@
       "when": 1790777937586,
       "tag": "0004_milestone_verify",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790779321356,
+      "tag": "0005_pix_charges",
+      "breakpoints": true
     }
   ]
 }

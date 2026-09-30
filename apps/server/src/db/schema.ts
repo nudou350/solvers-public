@@ -376,3 +376,27 @@ export const resalePrices = pgTable("resale_prices", {
   at: ts("at").notNull().defaultNow(),
 });
 
+
+/** Cobranças Pix da demo: o comprador paga em reais e recebe USDC de teste (sem conversão real). */
+export const pixCharges = pgTable(
+  "pix_charges",
+  {
+    id: text("id").primaryKey(),
+    wallet: text("wallet").notNull(),
+    provider: text("provider").notNull(), // mercadopago | simulated
+    providerOrderId: text("provider_order_id"),
+    externalReference: text("external_reference").notNull().unique(),
+    amountBrl: integer("amount_brl").notNull(), // centavos
+    amountUsdc: u64("amount_usdc").notNull(), // unidades de 6 casas
+    status: text("status").notNull().default("pending"), // pending | approved | credited | expired | failed
+    qrCode: text("qr_code"),
+    qrBase64: text("qr_base64"),
+    ticketUrl: text("ticket_url"),
+    expiresAt: ts("expires_at").notNull(),
+    creditSignature: text("credit_signature"),
+    purpose: jsonb("purpose").$type<{ agentId: string; type: "permanent" | "credits" | "guarantee" }>(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("pix_charges_wallet_idx").on(t.wallet, t.status), uniqueIndex("pix_charges_order_idx").on(t.providerOrderId)],
+);
