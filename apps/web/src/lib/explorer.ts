@@ -15,6 +15,14 @@ export function explorerLink(config: ClusterInfo, kind: "tx" | "address", value:
   return `https://explorer.solana.com/${kind}/${value}${q}`;
 }
 
+/**
+ * Link de uma carteira de pessoa, na aba de tokens. A carteira não guarda SOL (o servidor paga as taxas),
+ * então a página principal do explorador diz "Account does not exist"; o saldo em USDC está na aba de tokens.
+ */
+export function explorerWallet(config: ClusterInfo, wallet: string): string {
+  return explorerLink(config, "address", wallet).replace(/\/address\/([^?]+)/, "/address/$1/tokens");
+}
+
 /** Link de uma transação a partir de um explorerUrl de conta que a API devolveu (mantém a rede). */
 export function explorerTx(addressUrl: string, signature: string): string {
   return addressUrl.replace(/\/address\/[^?]+/, `/tx/${signature}`);

@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { TechCard } from "@/components/ui/TechCard";
 import { useToast } from "@/components/ui/Toast";
-import { clusterName, explorerTx } from "@/lib/explorer";
+import { clusterName, explorerTx, explorerWallet } from "@/lib/explorer";
 import { ago, date, GUARANTEE_LEVEL_LABEL, initials, REP_LEVELS, repLevel, short, usdc } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { txErrorMessage } from "@/lib/tx";
@@ -307,7 +307,7 @@ function Inner() {
           { label: "Carteira", value: p.wallet, mono: true },
           { label: "Rede", value: config ? clusterName(config.cluster) : "Solana" },
         ]}
-        explorer={p.explorerUrl}
+        explorer={config ? explorerWallet(config, p.wallet) : p.explorerUrl}
       />
     </>
   );

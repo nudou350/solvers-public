@@ -11,7 +11,7 @@ import { Icon } from "@/components/ui/Icon";
 import { TechCard } from "@/components/ui/TechCard";
 import { Tile } from "@/components/ui/Tile";
 import { ApiError, serverApi } from "@/lib/api";
-import { clusterName, explorerLink } from "@/lib/explorer";
+import { clusterName, explorerWallet } from "@/lib/explorer";
 import { dec1, initials, int, REP_LEVELS, repLevel, starPct } from "@/lib/format";
 import { gap } from "@/lib/style";
 
@@ -183,7 +183,7 @@ export default async function CreatorPage({ params }: Props) {
             { label: "Carteira", value: tech.wallet, mono: true },
             { label: "Rede", value: clusterName(tech.config.cluster) },
           ]}
-          explorer={explorerLink(tech.config, "address", tech.wallet)}
+          explorer={explorerWallet(tech.config, tech.wallet)}
         />
       ) : null}
     </section>
