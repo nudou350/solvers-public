@@ -19,11 +19,12 @@ export type SolverPackage = {
 function listFiles(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name.startsWith(".")) continue;
     const full = join(dir, name);
     const st = lstatSync(full);
     // Link simbólico entraria no hash (e numa leitura futura) apontando para fora da pasta.
+    // Confere antes de ignorar arquivos ocultos: `knowledge/.x.md` também pode ser um link.
     if (st.isSymbolicLink()) throw new Error(`link simbólico não é permitido no pacote: ${relative(dir, full)}`);
+    if (name === "node_modules" || name.startsWith(".")) continue;
     if (st.isDirectory()) out.push(...listFiles(full));
     else out.push(full);
   }

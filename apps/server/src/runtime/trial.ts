@@ -5,12 +5,19 @@ import type { SolverPackage } from "./packages.js";
 // Teste grátis por especialista (manifest.trial): limites e textos. Funções puras (sem env/banco),
 // testadas em test/trial.test.ts. Quem aplica os contadores é runtime/access.ts.
 
+/** Teto da entrada de uma ferramenta no teste: arquivos e bytes por execução. */
+export type ToolCap = { maxFiles?: number; maxBytes?: number };
+
 export type TrialLimits = {
   uses: number;
   steps: number;
   searches: number;
   /** Execuções por ferramenta no teste inteiro (só as liberadas, limite > 0). */
   tools: Record<string, number>;
+  /** Teto da entrada por execução, só das ferramentas liberadas. */
+  toolCaps: Record<string, ToolCap>;
+  /** Combinado do tamanho do pedido no teste, repassado à IA. */
+  scope: string | null;
   summary: string;
   lockedSummary: string;
 };
@@ -23,7 +30,8 @@ export function trialLimits(m: Pick<Manifest, "trial">): TrialLimits | null {
   const t = m.trial;
   if (!t || !t.available) return null;
   const tools = Object.fromEntries(Object.entries(t.tools).filter(([, n]) => n > 0));
-  return { uses: t.uses, steps: t.steps, searches: t.searches, tools, summary: t.summary, lockedSummary: t.lockedSummary };
+  const toolCaps = Object.fromEntries(Object.entries(t.toolLimits).filter(([name, cap]) => name in tools && (cap.maxFiles || cap.maxBytes)));
+  return { uses: t.uses, steps: t.steps, searches: t.searches, tools, toolCaps, scope: t.scope ?? null, summary: t.summary, lockedSummary: t.lockedSummary };
 }
 
 /** Teste do especialista para a vitrine (AgentDetail.trial). */
@@ -36,6 +44,7 @@ export function trialInfo(pkg: Pick<SolverPackage, "manifest" | "steps">): Trial
     totalSteps: pkg.steps.length,
     searches: t.searches,
     tools: Object.entries(t.tools).map(([name, limit]) => ({ name, limit })),
+    scope: t.scope,
     summary: t.summary,
     lockedSummary: t.lockedSummary,
   };
@@ -66,6 +75,39 @@ export function myTrial(agentId: string, t: TrialLimits, used: number, usage: Tr
 /** A etapa `index` (0-based) está fora do teste? O encerramento (index >= total) nunca fica bloqueado. */
 export function trialStepLocked(t: TrialLimits, index: number, totalSteps: number): boolean {
   return index < totalSteps && index >= t.steps;
+}
+
+/** Tamanho da entrada de uma ferramenta: arquivos (quando vem { files }, em array ou objeto) e bytes. */
+export function toolInputSize(input: unknown): { files: number | null; bytes: number } {
+  const files = input && typeof input === "object" ? (input as { files?: unknown }).files : undefined;
+  const entries: [string, string][] | null = Array.isArray(files)
+    ? files.map((f) => [String(f?.path ?? ""), String(f?.content ?? "")])
+    : files && typeof files === "object"
+      ? Object.entries(files).map(([path, content]) => [path, String(content)])
+      : null;
+  if (!entries) return { files: null, bytes: Buffer.byteLength(JSON.stringify(input ?? null)) };
+  return { files: entries.length, bytes: entries.reduce((a, [path, content]) => a + Buffer.byteLength(path) + Buffer.byteLength(content), 0) };
+}
+
+const kb = (bytes: number) => `${Math.round(bytes / 1000)} KB`;
+
+function capText(cap: ToolCap): string {
+  const parts = [cap.maxFiles ? `${cap.maxFiles} ${cap.maxFiles === 1 ? "arquivo" : "arquivos"}` : "", cap.maxBytes ? kb(cap.maxBytes) : ""].filter(Boolean);
+  return listPt(parts);
+}
+
+/**
+ * A entrada passa do teto da ferramenta no teste? Devolve o texto para a IA repassar (não é erro e
+ * não gasta saldo), ou null quando cabe. Quem chama só aplica em sessão de teste.
+ */
+export function trialToolCapError(tool: string, cap: ToolCap | undefined, input: unknown, purchaseLink: string): string | null {
+  if (!cap) return null;
+  const size = toolInputSize(input);
+  const tooMany = cap.maxFiles != null && size.files != null && size.files > cap.maxFiles;
+  const tooBig = cap.maxBytes != null && size.bytes > cap.maxBytes;
+  if (!tooMany && !tooBig) return null;
+  const sent = [size.files != null ? `${size.files} ${size.files === 1 ? "arquivo" : "arquivos"}` : "", kb(size.bytes)].filter(Boolean).join(", ");
+  return `Nada foi executado e o saldo do teste não foi gasto. No teste grátis, ${tool} aceita até ${capText(cap)} por execução (você enviou ${sent}). Envie só o componente principal e o teste dele e rode de novo. A licença vitalícia remove esse limite. Comprar: ${purchaseLink}`;
 }
 
 const clause = (s: string) => s.trim().replace(/[\s.;!]+$/, "");
@@ -109,11 +151,14 @@ export function trialAccessLine(
   parts.push(t.searches > 0 ? `até ${t.searches} ${t.searches === 1 ? "consulta" : "consultas"} à base${rest(t.searches, left.searchesLeft)}` : "nenhuma consulta à base");
   for (const [name, limit] of Object.entries(t.tools)) parts.push(`${name} ${times(limit)}${rest(limit, left.toolsLeft[name] ?? 0)}`);
   const blocked = ctx.toolNames.filter((n) => !(n in t.tools));
+  const capped = Object.entries(t.toolCaps).map(([name, cap]) => `${name} aceita até ${capText(cap)}`);
   const lines = [
     `Teste grátis (uso ${ctx.use} de ${t.uses}): ${listPt(parts)} no total.`,
     usesLeftText(t.uses - ctx.use),
     blocked.length ? `Só com a licença: ${listPt(blocked)}.` : "",
+    capped.length ? `Limite de tamanho por execução no teste: ${listPt(capped)}.` : "",
     `${clause(t.summary)}.`,
+    t.scope ? `Escopo do teste: ${clause(t.scope)}.` : "",
     "Avise o usuário desses limites antes de começar.",
   ];
   return lines.filter(Boolean).join(" ");

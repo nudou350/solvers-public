@@ -92,6 +92,11 @@ export function manifestV1CrossChecks(m: ManifestV1, ctx: z.RefinementCtx): void
       ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: ferramenta "${name}" não existe em tools` });
     }
   }
+  for (const name of Object.keys(m.trial.toolLimits)) {
+    if (!m.tools.some((t) => t.name === name)) {
+      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: ferramenta "${name}" não existe em tools` });
+    }
+  }
   for (const name of m.trial.templates) {
     if (!m.templates.some((t) => t.name === name)) {
       ctx.addIssue({ code: "custom", path: ["trial", "templates", name], message: `trial.templates: template "${name}" não existe em templates` });

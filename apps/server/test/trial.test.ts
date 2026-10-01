@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { FREE_TRIAL_USES } from "@solvers/shared";
 import { escrowGivesAccess, paidAccessLine } from "../src/runtime/access-rules.js";
 import { Manifest } from "../src/runtime/manifest.js";
-import { myTrial, trialAccessLine, trialEndText, trialInfo, trialLeft, trialLimits, trialStepLocked } from "../src/runtime/trial.js";
+import { myTrial, toolInputSize, trialAccessLine, trialEndText, trialInfo, trialLeft, trialLimits, trialStepLocked, trialToolCapError } from "../src/runtime/trial.js";
 
 // Teste grátis por especialista (manifest.trial): schema, limites e textos (sem env ou banco).
 
@@ -73,9 +73,20 @@ describe("manifest.trial", () => {
       totalSteps: 4,
       searches: 15,
       tools: [{ name: "run_tests", limit: 1 }],
+      scope: null,
       summary: trial.summary,
       lockedSummary: trial.lockedSummary,
     });
+  });
+
+  it("toolLimits e scope: opcionais, só valem para ferramenta liberada e ferramenta existente", () => {
+    const t = trialLimits(parse({ trial: { ...trial, tools: { run_tests: 1 }, toolLimits: { run_tests: { maxFiles: 3, maxBytes: 30000 }, a11y_check: { maxFiles: 1 } }, scope: "1 componente por uso" } }))!;
+    assert.deepEqual(t.toolCaps, { run_tests: { maxFiles: 3, maxBytes: 30000 } });
+    assert.equal(t.scope, "1 componente por uso");
+    assert.deepEqual(trialLimits(parse({ trial }))!.toolCaps, {});
+    assert.equal(trialLimits(parse({ trial }))!.scope, null);
+    assert.throws(() => parse({ trial: { ...trial, toolLimits: { deploy: { maxFiles: 1 } } } }), /toolLimits/);
+    assert.throws(() => parse({ trial: { ...trial, toolLimits: { run_tests: { maxFiles: 0 } } } }));
   });
 
   it("os manifests publicados em agents/ são válidos", () => {
@@ -108,6 +119,43 @@ describe("limites do teste", () => {
   });
 });
 
+describe("teto da entrada das ferramentas no teste", () => {
+  const cap = { maxFiles: 3, maxBytes: 30_000 };
+  const link = "https://x/compra";
+  const arr = (n: number, content = "x") => ({ files: Array.from({ length: n }, (_, i) => ({ path: `F${i}.tsx`, content })) });
+
+  it("mede arquivos e bytes nos dois formatos de files", () => {
+    assert.deepEqual(toolInputSize(arr(2, "abc")), { files: 2, bytes: 2 * (6 + 3) });
+    assert.deepEqual(toolInputSize({ files: { "A.tsx": "abc", "B.tsx": "é" } }), { files: 2, bytes: 5 + 3 + 5 + 2 });
+  });
+
+  it("entrada sem files: só bytes do JSON", () => {
+    assert.deepEqual(toolInputSize({ colors: ["#fff"] }), { files: null, bytes: Buffer.byteLength('{"colors":["#fff"]}') });
+    assert.deepEqual(toolInputSize(null), { files: null, bytes: 4 });
+  });
+
+  it("cabe no teto: null", () => {
+    assert.equal(trialToolCapError("run_tests", cap, arr(3), link), null);
+    assert.equal(trialToolCapError("run_tests", undefined, arr(40), link), null);
+    assert.equal(trialToolCapError("run_tests", { maxFiles: 1 }, { files: { "A.tsx": "x".repeat(100_000) } }, link), null);
+  });
+
+  it("passa do teto: texto em português sem gastar saldo, com o que foi enviado e o link", () => {
+    const many = trialToolCapError("run_tests", cap, arr(5), link)!;
+    assert.match(many, /^Nada foi executado e o saldo do teste não foi gasto\./);
+    assert.match(many, /run_tests aceita até 3 arquivos e 30 KB por execução \(você enviou 5 arquivos, 0 KB\)/);
+    assert.match(many, /Comprar: https:\/\/x\/compra$/);
+    const big = trialToolCapError("a11y_check", cap, arr(1, "x".repeat(31_000)), link)!;
+    assert.match(big, /você enviou 1 arquivo, 31 KB/);
+    assert.ok(trialToolCapError("run_tests", { maxBytes: 10 }, { anything: "x".repeat(50) }, link));
+  });
+
+  it("limite só de arquivos ou só de bytes aparece sem o outro", () => {
+    assert.match(trialToolCapError("run_tests", { maxFiles: 1 }, arr(2), link)!, /aceita até 1 arquivo por execução/);
+    assert.match(trialToolCapError("run_tests", { maxBytes: 1000 }, arr(1, "x".repeat(2000)), link)!, /aceita até 1 KB por execução/);
+  });
+});
+
 describe("textos do teste", () => {
   const t = trialLimits(parse({ trial }))!;
 
@@ -124,6 +172,12 @@ describe("textos do teste", () => {
       line,
       "Teste grátis (uso 1 de 3): libera as etapas 1 a 2 de 4, até 15 consultas à base e run_tests 1 vez no total. Depois deste, restam 2 usos grátis. Só com a licença: a11y_check. Você recebe o plano e o componente. Avise o usuário desses limites antes de começar.",
     );
+  });
+
+  it("linha de acesso: teto das ferramentas e escopo quando o manifest define", () => {
+    const capped = trialLimits(parse({ trial: { ...trial, tools: { run_tests: 1, a11y_check: 3 }, toolLimits: { run_tests: { maxFiles: 3, maxBytes: 30000 }, a11y_check: { maxFiles: 3 } }, scope: "1 componente por uso." } }))!;
+    const line = trialAccessLine(capped, { use: 1, totalSteps: 4, toolNames: ["run_tests", "a11y_check"] });
+    assert.match(line, /Limite de tamanho por execução no teste: run_tests aceita até 3 arquivos e 30 KB e a11y_check aceita até 3 arquivos\. Você recebe o plano e o componente\. Escopo do teste: 1 componente por uso\. Avise o usuário/);
   });
 
   it("linha de acesso: saldo restante, etapa única e sem consultas", () => {

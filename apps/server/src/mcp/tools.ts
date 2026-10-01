@@ -39,7 +39,7 @@ import { guaranteesText, milestoneDeliveryBlock, resolveEscrowId } from "../runt
 import { openGuarantees } from "../runtime/guarantees.js";
 import { assertSessionCurrent, planNextStep } from "../runtime/session-rules.js";
 import { runServerTool } from "../runtime/tools.js";
-import { times, trialAccessLine, trialEndText, trialLimits, trialStepLocked, type TrialLimits } from "../runtime/trial.js";
+import { times, trialAccessLine, trialEndText, trialLimits, trialStepLocked, trialToolCapError, type TrialLimits } from "../runtime/trial.js";
 import { memoryKeyFor, readMemories, saveMemory } from "../memory/crypto.js";
 import { escalate } from "../notify/telegram.js";
 import { submitDeliverable } from "../verifier/deliverables.js";
@@ -446,6 +446,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       // No teste, só as ferramentas liberadas, contando no total. Nome inexistente cai no erro normal do runServerTool.
       if (trial && pkg.manifest.tools.some((t) => t.name === name)) {
         const limit = trial.tools[name] ?? 0;
+        // Teto de tamanho da entrada no teste: confere antes de gastar saldo (a licença não tem teto).
+        const capped = limit > 0 ? trialToolCapError(name, trial.toolCaps[name], input, purchaseLink(pkg.manifest.slug)) : null;
+        if (capped && !(await upgraded(session))) return { text: capped, agentId: session.agentId, sessionId: session.id };
         if (limit > 0 && (await consumeTrialTool(ctx.wallet, session.agentId, name, limit))) {
           try {
             const result = await runServerTool(pkg, name, input);

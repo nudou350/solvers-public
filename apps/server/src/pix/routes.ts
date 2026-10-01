@@ -9,6 +9,7 @@ import { chain, explorerUrl } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { badRequest, h, HttpError, notFound, parse, unauthorized } from "../lib/http.js";
+import { agentIsAvailable } from "../runtime/availability.js";
 import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { brlPerUsd } from "../store/fx.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
@@ -107,7 +108,7 @@ async function sync(row: Row): Promise<Row> {
 /** Quanto falta (em unidades de USDC) para a compra pretendida, descontando o saldo da carteira. */
 async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
   const row = await findAgentRow(agentId);
-  if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
+  if (!agentIsAvailable(row)) throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
   if (type === "permanent") {
     // O preço pode ter mudado on-chain sem evento: confere antes de cobrar o Pix do valor antigo.
