@@ -91,6 +91,7 @@ pub struct PurchaseLicense<'info> {
 /// `expected_price` é o preço mostrado ao comprador: se o criador mudar o preço entre a montagem
 /// e a execução da transação, a compra falha em vez de cobrar outro valor.
 pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     let price = agent.price;
@@ -187,6 +188,7 @@ pub struct BuyCredits<'info> {
 
 /// `max_total` protege o comprador de mudança de preço entre a montagem e a execução.
 pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32, max_total: u64) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     require!(agent.price_per_use > 0, SolversError::PayPerUseDisabled);

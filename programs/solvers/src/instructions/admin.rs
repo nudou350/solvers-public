@@ -44,6 +44,62 @@ pub fn initialize_config(ctx: Context<InitializeConfig>, args: ConfigParams) -> 
     config.min_stake = args.min_stake;
     config.min_price = args.min_price;
     config.bump = ctx.bumps.config;
+    // Config v2 desde o nascimento (mainnet): sem guardian e sem pausa.
+    config.layout_version = CONFIG_LAYOUT_VERSION;
+    config.pause_flags = 0;
+    config.guardian = Pubkey::default();
+    config._reserved = [0; 64];
+    Ok(())
+}
+
+/// Migra o Config v1 (187 bytes, devnet) para o v2. Só a upgrade authority assina (mesma regra de
+/// `initialize_config`) e `config` é `UncheckedAccount`: `Account<Config>` falharia aqui, porque a
+/// conta v1 é curta demais para o struct v2 (`AccountDidNotDeserialize`). Os bytes v1 não são
+/// tocados; o resize acrescenta os campos novos zerados e só `layout_version` recebe valor.
+/// Instrução de transição: depois que a devnet migrar, ela pode ser removida num upgrade.
+#[derive(Accounts)]
+pub struct MigrateConfig<'info> {
+    /// Paga o rent adicional (a plataforma patrocina as taxas).
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// Precisa ser a upgrade authority do programa.
+    pub authority: Signer<'info>,
+    /// CHECK: PDA do Config validada por seeds e dono; discriminador e tamanho v1 conferidos no handler.
+    #[account(mut, seeds = [CONFIG_SEED], bump, owner = crate::ID)]
+    pub config: UncheckedAccount<'info>,
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ SolversError::NotAdmin)]
+    pub program: Program<'info, crate::program::Solvers>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ SolversError::NotAdmin)]
+    pub program_data: Account<'info, ProgramData>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn migrate_config(ctx: Context<MigrateConfig>) -> Result<()> {
+    let config = ctx.accounts.config.to_account_info();
+    // Só o tamanho v1 migra: outro tamanho (v2 inclusive) nunca é redimensionado.
+    require!(config.data_len() == CONFIG_V1_LEN, SolversError::ConfigAlreadyMigrated);
+    require!(
+        config.try_borrow_data()?[..8] == *Config::DISCRIMINATOR,
+        anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+    );
+
+    let new_len = 8 + Config::INIT_SPACE;
+    let missing = Rent::get()?.minimum_balance(new_len).saturating_sub(config.lamports());
+    if missing > 0 {
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.key(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: config.clone(),
+                },
+            ),
+            missing,
+        )?;
+    }
+    // `resize` estende com zeros (sol_memset em solana-account-info 3.1.1): flags 0, sem guardian, reservado zerado.
+    config.resize(new_len)?;
+    config.try_borrow_mut_data()?[CONFIG_V1_LEN] = CONFIG_LAYOUT_VERSION;
     Ok(())
 }
 
@@ -70,6 +126,46 @@ pub fn update_config(ctx: Context<UpdateConfig>, args: ConfigParams) -> Result<(
         min_stake: config.min_stake,
         min_price: config.min_price,
     });
+    Ok(())
+}
+
+/// Pausa de emergência. O admin define qualquer combinação de bits válidos (liga e desliga); o guardian
+/// só acrescenta bits (nunca remove). Saídas do comprador e instruções de admin nunca pausam.
+#[derive(Accounts)]
+pub struct SetPause<'info> {
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+}
+
+pub fn set_pause(ctx: Context<SetPause>, flags: u8) -> Result<()> {
+    let signer = ctx.accounts.signer.key();
+    let config = &mut ctx.accounts.config;
+    let is_admin = signer == config.admin;
+    let is_guardian = !is_admin && config.guardian != Pubkey::default() && signer == config.guardian;
+    require!(is_admin || is_guardian, SolversError::NotPauseAuthority);
+    require!(flags & !PAUSE_MASK == 0, SolversError::InvalidPauseFlags);
+    // O guardian só acrescenta bits: o valor novo precisa conter todos os bits já ligados.
+    require!(!is_guardian || flags & config.pause_flags == config.pause_flags, SolversError::GuardianCannotUnpause);
+    let old_flags = config.pause_flags;
+    config.pause_flags = flags;
+    emit!(PauseChanged { by: signer, old_flags, new_flags: flags });
+    Ok(())
+}
+
+/// Define o guardian da pausa; `Pubkey::default()` remove o guardian.
+#[derive(Accounts)]
+pub struct SetGuardian<'info> {
+    pub admin: Signer<'info>,
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ SolversError::NotAdmin)]
+    pub config: Account<'info, Config>,
+}
+
+pub fn set_guardian(ctx: Context<SetGuardian>, new_guardian: Pubkey) -> Result<()> {
+    let config = &mut ctx.accounts.config;
+    let old_guardian = config.guardian;
+    config.guardian = new_guardian;
+    emit!(GuardianChanged { admin: ctx.accounts.admin.key(), old_guardian, new_guardian });
     Ok(())
 }
 

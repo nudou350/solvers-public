@@ -43,7 +43,37 @@ pub struct Config {
     /// das contas que a plataforma paga como fee payer.
     pub min_price: u64,
     pub bump: u8,
+    // ---- Config v2: campos novos só no FIM (layout v1 intacto; `migrate_config` faz o resize) ----
+    /// 2 desde a v2; a conta v1 (187 bytes) não tem este campo.
+    pub layout_version: u8,
+    /// Bits de pausa (`PAUSE_*`). Saídas do comprador e instruções de admin nunca pausam.
+    pub pause_flags: u8,
+    /// Só pode LIGAR bits da pausa (nunca desligar). `Pubkey::default()` = sem guardian.
+    pub guardian: Pubkey,
+    /// Espaço para campos futuros (sempre zerado até alguém consumi-lo).
+    pub _reserved: [u8; 64],
 }
+
+impl Config {
+    /// Recusa a operação se o bit de pausa estiver ligado.
+    pub fn require_not_paused(&self, bit: u8) -> Result<()> {
+        require!(self.pause_flags & bit == 0, crate::errors::SolversError::Paused);
+        Ok(())
+    }
+}
+
+/// Config v1 (devnet): 179 bytes de dados + 8 do discriminador.
+pub const CONFIG_V1_LEN: usize = 8 + 179;
+/// Valor de `Config.layout_version` do layout atual.
+pub const CONFIG_LAYOUT_VERSION: u8 = 2;
+/// Bit 0: entradas (`register_agent`, `purchase_license`, `buy_credits`, `create_escrow`).
+pub const PAUSE_ENTRIES: u8 = 1 << 0;
+/// Bit 1: pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`).
+pub const PAUSE_PAYMENTS: u8 = 1 << 1;
+pub const PAUSE_MASK: u8 = PAUSE_ENTRIES | PAUSE_PAYMENTS;
+
+// O v2 é o v1 mais 98 bytes no fim: `migrate_config` depende disso.
+const _: () = assert!(Config::INIT_SPACE == (CONFIG_V1_LEN - 8) + 1 + 1 + 32 + 64);
 
 /// Transferência de admin em andamento (PDA por config, só existe entre `propose_admin` e
 /// `accept_admin`/`cancel_admin_transfer`). Conta à parte para não mudar o layout de `Config`.

@@ -1,7 +1,7 @@
 //! Testes do programa com LiteSVM (INSTRUCTIONS.md 4.7).
 //! Requer `tests/fixtures/mpl_core.so` (dump da devnet) e o build em `target/deploy/solvers.so`.
 
-use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, Space, ToAccountMetas};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::spl_token;
 use litesvm::LiteSVM;
@@ -72,6 +72,9 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("AcceptAdmin", 9_000),
     ("CancelAdminTransfer", 8_000),
     ("SetTreasury", 7_000),
+    ("MigrateConfig", 10_000),
+    ("SetPause", 6_000),
+    ("SetGuardian", 6_000),
     ("RegisterAgent", 77_500),
     ("TopUpStake", 20_000),
     ("UpdateVersion", 8_000),
@@ -3445,6 +3448,9 @@ fn every_authority_must_sign_not_just_be_named() {
             data: solvers::instruction::ResolveStaleDispute { index: 1 }.data(),
         }, buyer.pubkey()),
         ("set_treasury", set_treasury_ix(&env, &admin, env.treasury), admin),
+        ("set_pause", set_pause_ix(&admin, PAUSE_ENTRIES), admin),
+        ("set_guardian", set_guardian_ix(&admin, Pubkey::default()), admin),
+        ("migrate_config", migrate_ix(&env.payer.pubkey(), &admin, config_pda()), admin),
     ];
     for (name, ix, key) in cases.iter_mut() {
         unsign(ix, key);
@@ -3456,6 +3462,493 @@ fn every_authority_must_sign_not_just_be_named() {
     assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
     assert_eq!(env.account::<Credits>(&credits_pda(&agent, &buyer.pubkey())).remaining, 10);
     assert_eq!(env.account::<Agent>(&pending.key).status, AgentStatus::Pending);
+}
+
+// ------------------------------------------------------------------------ governança v2 ----
+// Config v2 (migração do v1 da devnet) e pausa de emergência.
+
+/// Config v1 como está na devnet: 179 bytes de dados (ordem dos campos do v1) + discriminador de `Config`.
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, Debug, PartialEq)]
+struct ConfigV1 {
+    admin: Pubkey,
+    verifier: Pubkey,
+    usage_authority: Pubkey,
+    treasury: Pubkey,
+    usdc_mint: Pubkey,
+    fee_bps: u16,
+    min_stake: u64,
+    min_price: u64,
+    bump: u8,
+}
+
+impl ConfigV1 {
+    fn of(env: &Env) -> Self {
+        ConfigV1 {
+            admin: env.admin.pubkey(),
+            verifier: env.verifier.pubkey(),
+            usage_authority: env.usage.pubkey(),
+            treasury: env.treasury,
+            usdc_mint: env.mint,
+            fee_bps: FEE_BPS,
+            min_stake: 0,
+            min_price: MIN_PRICE,
+            bump: Pubkey::find_program_address(&[CONFIG_SEED], &solvers::ID).1,
+        }
+    }
+
+    fn bytes(&self) -> Vec<u8> {
+        let mut data = Config::DISCRIMINATOR.to_vec();
+        anchor_lang::AnchorSerialize::serialize(self, &mut data).unwrap();
+        assert_eq!(data.len(), CONFIG_V1_LEN);
+        data
+    }
+}
+
+/// Grava `data` em `key` como conta do programa, com rent para o tamanho dos próprios dados.
+fn put_program_account(env: &mut Env, key: Pubkey, owner: Pubkey, data: Vec<u8>) {
+    let lamports = env.svm.minimum_balance_for_rent_exemption(data.len());
+    env.svm
+        .set_account(key, solana_account::Account { lamports, data, owner, executable: false, rent_epoch: 0 })
+        .unwrap();
+}
+
+/// Env sem `initialize_config`, com o Config v1 sintético da devnet no endereço do PDA.
+fn env_with_config_v1() -> (Env, ConfigV1) {
+    let mut env = Env::build(false);
+    let v1 = ConfigV1::of(&env);
+    put_program_account(&mut env, config_pda(), solvers::ID, v1.bytes());
+    (env, v1)
+}
+
+fn migrate_ix(payer: &Pubkey, authority: &Pubkey, config: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::MigrateConfig {
+            payer: *payer,
+            authority: *authority,
+            config,
+            program: solvers::ID,
+            program_data: program_data(),
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::MigrateConfig {}.data(),
+    }
+}
+
+fn migrate(env: &mut Env, payer: &Keypair, authority: &Keypair, config: Pubkey) -> Result<Vec<String>, String> {
+    env.send_logs(migrate_ix(&payer.pubkey(), &authority.pubkey(), config), &[payer, authority])
+}
+
+fn rent_for(env: &Env, len: usize) -> u64 {
+    env.svm.minimum_balance_for_rent_exemption(len)
+}
+
+fn set_pause_ix(signer: &Pubkey, flags: u8) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::SetPause { signer: *signer, config: config_pda() }.to_account_metas(None),
+        data: solvers::instruction::SetPause { flags }.data(),
+    }
+}
+
+fn set_pause(env: &mut Env, signer: &Keypair, flags: u8) -> Result<Vec<String>, String> {
+    env.send_logs(set_pause_ix(&signer.pubkey(), flags), &[signer])
+}
+
+fn set_guardian_ix(admin: &Pubkey, new_guardian: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::SetGuardian { admin: *admin, config: config_pda() }.to_account_metas(None),
+        data: solvers::instruction::SetGuardian { new_guardian }.data(),
+    }
+}
+
+fn set_guardian(env: &mut Env, signer: &Keypair, new_guardian: Pubkey) -> Result<Vec<String>, String> {
+    env.send_logs(set_guardian_ix(&signer.pubkey(), new_guardian), &[signer])
+}
+
+fn config_of(env: &Env) -> Config {
+    env.account::<Config>(&config_pda())
+}
+
+#[test]
+fn migrate_config_before_migration_readers_fail_and_non_authority_is_refused() {
+    let (mut env, _) = env_with_config_v1();
+    let admin = admin_kp(&env);
+    let payer = funded(&mut env);
+
+    // (a) Antes de migrar, toda instrução que lê `Account<Config>` falha: a conta v1 é curta demais.
+    let params = env.params(0);
+    let err = update_config_as(&mut env, &admin, params).unwrap_err();
+    assert!(err.contains("AccountDidNotDeserialize"), "{err}");
+    let err = set_pause(&mut env, &admin, 1).unwrap_err();
+    assert!(err.contains("AccountDidNotDeserialize"), "{err}");
+
+    // (b) Só a upgrade authority migra: admin do Config que não é a authority, verificador e estranhos não.
+    env.set_upgrade_authority(unique_key());
+    for signer in [admin.insecure_clone(), verifier_kp(&env), funded(&mut env)] {
+        let err = migrate(&mut env, &payer, &signer, config_pda()).unwrap_err();
+        assert!(err.contains("NotAdmin"), "{err}");
+    }
+    // Quem paga o rent não vira autoridade.
+    let err = migrate(&mut env, &payer, &payer, config_pda()).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    assert_eq!(env.svm.get_account(&config_pda()).unwrap().data.len(), CONFIG_V1_LEN);
+}
+
+#[test]
+fn migrate_config_preserves_v1_bytes_zeroes_the_rest_and_runs_once() {
+    let (mut env, v1) = env_with_config_v1();
+    let before = env.svm.get_account(&config_pda()).unwrap();
+    assert_eq!(before.data.len(), 187);
+    assert_eq!(before.lamports, rent_for(&env, 187));
+    let (admin, payer) = (admin_kp(&env), funded(&mut env));
+    let payer_before = lamports(&env, &payer.pubkey());
+
+    // (c) Migra: os 187 bytes v1 ficam idênticos, `layout_version` = 2 e o resto zerado.
+    migrate(&mut env, &payer, &admin, config_pda()).unwrap();
+    let after = env.svm.get_account(&config_pda()).unwrap();
+    assert_eq!(after.data.len(), 8 + Config::INIT_SPACE);
+    assert_eq!(after.data.len(), 285);
+    assert_eq!(after.data[..CONFIG_V1_LEN], before.data[..]);
+    assert_eq!(after.data[CONFIG_V1_LEN], CONFIG_LAYOUT_VERSION);
+    assert!(after.data[CONFIG_V1_LEN + 1..].iter().all(|b| *b == 0));
+    assert_eq!(after.owner, solvers::ID);
+    // O pagador do rent cobriu só a diferença e a conta ficou isenta de rent.
+    assert_eq!(after.lamports, rent_for(&env, 285));
+    assert_eq!(payer_before - lamports(&env, &payer.pubkey()), rent_for(&env, 285) - rent_for(&env, 187));
+    let cfg = config_of(&env);
+    assert_eq!((cfg.admin, cfg.verifier, cfg.usage_authority, cfg.treasury, cfg.usdc_mint), (v1.admin, v1.verifier, v1.usage_authority, v1.treasury, v1.usdc_mint));
+    assert_eq!((cfg.fee_bps, cfg.min_stake, cfg.min_price, cfg.bump), (v1.fee_bps, v1.min_stake, v1.min_price, v1.bump));
+    assert_eq!((cfg.layout_version, cfg.pause_flags, cfg.guardian, cfg._reserved), (2, 0, Pubkey::default(), [0u8; 64]));
+
+    // (d) Segunda chamada: o tamanho já é o v2 e nada muda (nem o rent).
+    let err = migrate(&mut env, &payer, &admin, config_pda()).unwrap_err();
+    assert!(err.contains("ConfigAlreadyMigrated"), "{err}");
+    assert_eq!(env.svm.get_account(&config_pda()).unwrap().data, after.data);
+    assert_eq!(lamports(&env, &config_pda()), rent_for(&env, 285));
+}
+
+#[test]
+fn migrate_config_then_normal_flow_works_and_keeps_new_fields() {
+    let (mut env, _) = env_with_config_v1();
+    // Pagador = authority (caso do Squads, em que o cofre assina e paga): o mesmo signer nas duas contas.
+    let admin = admin_kp(&env);
+    migrate(&mut env, &admin, &admin, config_pda()).unwrap();
+
+    // (e) Compra, créditos e garantia passam sobre o Config migrado.
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (buyer, _) = new_buyer(&mut env, 100 * USDC);
+    purchase(&mut env, &agent, &buyer).unwrap();
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[5 * USDC, 5 * USDC]).unwrap();
+    mark_passed(&mut env, &escrow, 0).unwrap();
+    release(&mut env, &agent, &escrow, &buyer, 0).unwrap();
+
+    // Pausa e guardian funcionam, e `update_config` (que regrava o Config) não toca nos campos novos.
+    let guardian = new_keypair().pubkey();
+    set_guardian(&mut env, &admin, guardian).unwrap();
+    set_pause(&mut env, &admin, PAUSE_ENTRIES).unwrap();
+    let params = ConfigParams { fee_bps: 500, ..env.params(0) };
+    env.update_config_with(params).unwrap();
+    let cfg = config_of(&env);
+    assert_eq!((cfg.fee_bps, cfg.layout_version, cfg.pause_flags, cfg.guardian), (500, 2, PAUSE_ENTRIES, guardian));
+    assert_eq!(env.svm.get_account(&config_pda()).unwrap().data.len(), 285);
+}
+
+#[test]
+fn migrate_config_refuses_accounts_that_are_not_the_v1_config() {
+    let (mut env, v1) = env_with_config_v1();
+    let (admin, payer) = (admin_kp(&env), funded(&mut env));
+    let v1_bytes = v1.bytes();
+
+    // (f) Endereço que não é o PDA do Config (mesmo dono, mesmo tamanho, mesmo discriminador).
+    let impostor = unique_key();
+    put_program_account(&mut env, impostor, solvers::ID, v1_bytes.clone());
+    let err = migrate(&mut env, &payer, &admin, impostor).unwrap_err();
+    assert!(err.contains("ConstraintSeeds"), "{err}");
+    let err = migrate(&mut env, &payer, &admin, unique_key()).unwrap_err();
+    assert!(err.contains("ConstraintSeeds"), "{err}");
+
+    // PDA certo, dono errado (outro programa ou o sistema).
+    for owner in [system_program::ID, spl_token::ID] {
+        put_program_account(&mut env, config_pda(), owner, v1_bytes.clone());
+        let err = migrate(&mut env, &payer, &admin, config_pda()).unwrap_err();
+        assert!(err.contains("ConstraintOwner"), "{err}");
+    }
+
+    // PDA e dono certos, mas outro discriminador (um Agent não vira Config).
+    let mut cosplay = v1_bytes.clone();
+    cosplay[..8].copy_from_slice(Agent::DISCRIMINATOR);
+    put_program_account(&mut env, config_pda(), solvers::ID, cosplay.clone());
+    let err = migrate(&mut env, &payer, &admin, config_pda()).unwrap_err();
+    assert!(err.contains("AccountDiscriminatorMismatch"), "{err}");
+    assert_eq!(env.svm.get_account(&config_pda()).unwrap().data, cosplay);
+
+    // Tamanho que não é o v1 (nem o v2): nunca é redimensionado.
+    for len in [CONFIG_V1_LEN + 1, CONFIG_V1_LEN + 98, CONFIG_V1_LEN - 1] {
+        let mut data = v1_bytes.clone();
+        data.resize(len, 0);
+        put_program_account(&mut env, config_pda(), solvers::ID, data);
+        let err = migrate(&mut env, &payer, &admin, config_pda()).unwrap_err();
+        assert!(err.contains("ConfigAlreadyMigrated"), "{err}");
+        assert_eq!(env.svm.get_account(&config_pda()).unwrap().data.len(), len);
+    }
+}
+
+#[test]
+fn config_v2_is_the_v1_prefix_and_v1_readers_still_decode_it() {
+    // `initialize_config` já cria o v2.
+    let mut env = Env::new();
+    let acc = env.svm.get_account(&config_pda()).unwrap();
+    assert_eq!(acc.data.len(), 285);
+    let cfg = config_of(&env);
+    assert_eq!((cfg.layout_version, cfg.pause_flags, cfg.guardian, cfg._reserved), (2, 0, Pubkey::default(), [0u8; 64]));
+
+    // Leitor v1 (mesma ordem de campos, borsh que não exige consumir o buffer inteiro, como o
+    // `try_deserialize_unchecked` do binário antigo) lê o v2 e vê os mesmos valores.
+    let mut rest = &acc.data[8..];
+    assert_eq!(&acc.data[..8], Config::DISCRIMINATOR);
+    let v1 = ConfigV1::deserialize(&mut rest).unwrap();
+    assert_eq!(v1, ConfigV1::of(&env));
+    assert_eq!(rest.len(), 98);
+    assert_eq!(rest[0], 2);
+
+    // O código atual relê o v2 e o regrava por inteiro (só o prefixo v1 muda, a cauda fica).
+    let guardian = unique_key();
+    let admin = admin_kp(&env);
+    set_guardian(&mut env, &admin, guardian).unwrap();
+    set_pause(&mut env, &admin, PAUSE_PAYMENTS).unwrap();
+    let before = env.svm.get_account(&config_pda()).unwrap().data;
+    env.update_fee(500).unwrap();
+    let after = env.svm.get_account(&config_pda()).unwrap().data;
+    assert_eq!(after.len(), 285);
+    assert_eq!(after[CONFIG_V1_LEN..], before[CONFIG_V1_LEN..]);
+    assert_ne!(after[..CONFIG_V1_LEN], before[..CONFIG_V1_LEN]);
+}
+
+/// Binário ANTIGO (programa de antes da governança v2) sobre um Config v2: ele precisa ler e regravar
+/// sem perder a cauda. Exige o `.so` do commit anterior em `SOLVERS_V1_SO` (sem a variável, o teste só avisa).
+#[test]
+fn previous_binary_reads_and_rewrites_a_v2_config_without_losing_the_tail() {
+    let Some(old_so) = std::env::var_os("SOLVERS_V1_SO") else {
+        eprintln!("SOLVERS_V1_SO não definido: teste com o binário anterior pulado");
+        return;
+    };
+    let mut svm = LiteSVM::new();
+    svm.add_program_from_file(solvers::ID, old_so).expect("SOLVERS_V1_SO inválido");
+    let admin = new_keypair();
+    svm.airdrop(&admin.pubkey(), 10_000_000_000).unwrap();
+    let config = Config {
+        admin: admin.pubkey(),
+        verifier: unique_key(),
+        usage_authority: unique_key(),
+        treasury: unique_key(),
+        usdc_mint: unique_key(),
+        fee_bps: FEE_BPS,
+        min_stake: 7,
+        min_price: MIN_PRICE,
+        bump: Pubkey::find_program_address(&[CONFIG_SEED], &solvers::ID).1,
+        layout_version: 2,
+        pause_flags: PAUSE_MASK,
+        guardian: unique_key(),
+        _reserved: [0; 64],
+    };
+    let mut data = Vec::new();
+    anchor_lang::AccountSerialize::try_serialize(&config, &mut data).unwrap();
+    assert_eq!(data.len(), 285);
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(config_pda(), solana_account::Account { lamports, data, owner: solvers::ID, executable: false, rent_epoch: 0 })
+        .unwrap();
+
+    let params = ConfigParams { verifier: config.verifier, usage_authority: config.usage_authority, fee_bps: 500, min_stake: 7, min_price: MIN_PRICE };
+    let ix = Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::UpdateConfig { admin: admin.pubkey(), config: config_pda() }.to_account_metas(None),
+        data: solvers::instruction::UpdateConfig { args: params }.data(),
+    };
+    let tx = Transaction::new_signed_with_payer(&[ix], Some(&admin.pubkey()), &[&admin], svm.latest_blockhash());
+    svm.send_transaction(tx).unwrap_or_else(|e| panic!("binário anterior recusou o Config v2: {:?}", e.meta.logs));
+
+    let mut expected = Vec::new();
+    anchor_lang::AccountSerialize::try_serialize(&Config { fee_bps: 500, ..config }, &mut expected).unwrap();
+    assert_eq!(svm.get_account(&config_pda()).unwrap().data, expected);
+}
+
+#[test]
+fn set_pause_and_guardian_permissions_and_events() {
+    let mut env = Env::new();
+    let (admin, guardian, stranger) = (admin_kp(&env), new_keypair(), new_keypair());
+
+    // Sem guardian configurado, ninguém além do admin mexe na pausa.
+    let err = set_pause(&mut env, &guardian, PAUSE_ENTRIES).unwrap_err();
+    assert!(err.contains("NotPauseAuthority"), "{err}");
+
+    // Só o admin define o guardian (nem o próprio guardian, nem estranhos).
+    for signer in [&guardian, &stranger] {
+        let err = set_guardian(&mut env, signer, guardian.pubkey()).unwrap_err();
+        assert!(err.contains("NotAdmin"), "{err}");
+    }
+    let logs = set_guardian(&mut env, &admin, guardian.pubkey()).unwrap();
+    let ev = events::<solvers::events::GuardianChanged>(&logs);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].admin, ev[0].old_guardian, ev[0].new_guardian), (admin.pubkey(), Pubkey::default(), guardian.pubkey()));
+    assert_eq!(config_of(&env).guardian, guardian.pubkey());
+
+    // Estranho não pausa.
+    let err = set_pause(&mut env, &stranger, PAUSE_ENTRIES).unwrap_err();
+    assert!(err.contains("NotPauseAuthority"), "{err}");
+    assert_eq!(config_of(&env).pause_flags, 0);
+
+    // O guardian liga bits, inclusive acrescentando outros, e repetir o mesmo valor é aceito.
+    let logs = set_pause(&mut env, &guardian, PAUSE_ENTRIES).unwrap();
+    let ev = events::<solvers::events::PauseChanged>(&logs);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].by, ev[0].old_flags, ev[0].new_flags), (guardian.pubkey(), 0, PAUSE_ENTRIES));
+    set_pause(&mut env, &guardian, PAUSE_MASK).unwrap();
+    set_pause(&mut env, &guardian, PAUSE_MASK).unwrap();
+    assert_eq!(config_of(&env).pause_flags, PAUSE_MASK);
+
+    // ...mas nunca desliga: nem tudo, nem um bit só.
+    for flags in [0, PAUSE_ENTRIES, PAUSE_PAYMENTS] {
+        let err = set_pause(&mut env, &guardian, flags).unwrap_err();
+        assert!(err.contains("GuardianCannotUnpause"), "{err}");
+    }
+    assert_eq!(config_of(&env).pause_flags, PAUSE_MASK);
+
+    // Bits fora de 0 e 1 são recusados para o guardian e para o admin.
+    for flags in [0b100, 0xFF, PAUSE_MASK | 0b1000_0000] {
+        for signer in [&guardian, &admin] {
+            let err = set_pause(&mut env, signer, flags).unwrap_err();
+            assert!(err.contains("InvalidPauseFlags"), "{err}");
+        }
+    }
+    assert_eq!(config_of(&env).pause_flags, PAUSE_MASK);
+
+    // O admin liga e desliga, em qualquer combinação.
+    let logs = set_pause(&mut env, &admin, 0).unwrap();
+    let ev = events::<solvers::events::PauseChanged>(&logs);
+    assert_eq!((ev[0].by, ev[0].old_flags, ev[0].new_flags), (admin.pubkey(), PAUSE_MASK, 0));
+    for flags in [PAUSE_PAYMENTS, PAUSE_ENTRIES, PAUSE_MASK, 0] {
+        set_pause(&mut env, &admin, flags).unwrap();
+        assert_eq!(config_of(&env).pause_flags, flags);
+    }
+
+    // Com só o bit 1 ligado, o guardian não pode trocá-lo pelo bit 0 (isso removeria o bit 1).
+    set_pause(&mut env, &admin, PAUSE_PAYMENTS).unwrap();
+    let err = set_pause(&mut env, &guardian, PAUSE_ENTRIES).unwrap_err();
+    assert!(err.contains("GuardianCannotUnpause"), "{err}");
+
+    // Guardian removido (Pubkey::default()) perde o poder; o admin segue com ele.
+    let logs = set_guardian(&mut env, &admin, Pubkey::default()).unwrap();
+    let ev = events::<solvers::events::GuardianChanged>(&logs);
+    assert_eq!((ev[0].old_guardian, ev[0].new_guardian), (guardian.pubkey(), Pubkey::default()));
+    let err = set_pause(&mut env, &guardian, PAUSE_MASK).unwrap_err();
+    assert!(err.contains("NotPauseAuthority"), "{err}");
+    assert_eq!(config_of(&env).pause_flags, PAUSE_PAYMENTS);
+    set_pause(&mut env, &admin, PAUSE_MASK).unwrap();
+    assert_eq!(config_of(&env).pause_flags, PAUSE_MASK);
+}
+
+#[test]
+fn pause_blocks_entries_and_payments_each_by_its_own_bit() {
+    let mut env = Env::new();
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (buyer, _) = new_buyer(&mut env, 300 * USDC);
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[5 * USDC, 5 * USDC, 5 * USDC]).unwrap();
+    dispute(&mut env, &escrow, &buyer, 2).unwrap();
+    let admin = admin_kp(&env);
+
+    // Bit 0 (entradas): as quatro entradas param; os pagamentos seguem.
+    set_pause(&mut env, &admin, PAUSE_ENTRIES).unwrap();
+    let err = register(&mut env, 12 * USDC, 0).err().unwrap();
+    assert!(err.contains("Error Code: Paused."), "register_agent: {err}");
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("Error Code: Paused."), "purchase_license: {err}");
+    let err = buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap_err();
+    assert!(err.contains("Error Code: Paused."), "buy_credits: {err}");
+    let err = create_escrow_full(&mut env, &agent, &buyer, 2, &[5 * USDC], REVIEW_WINDOW, 0).err().unwrap();
+    assert!(err.contains("Error Code: Paused."), "create_escrow: {err}");
+    assert!(env.svm.get_account(&pda(&[ESCROW_SEED, buyer.pubkey().as_ref(), agent.key.as_ref(), &2u64.to_le_bytes()])).is_none());
+    mark_passed(&mut env, &escrow, 0).unwrap();
+
+    // Bit 1 (pagamentos): as três instruções de pagamento param; as entradas voltam.
+    set_pause(&mut env, &admin, PAUSE_PAYMENTS).unwrap();
+    let err = mark_passed(&mut env, &escrow, 1).unwrap_err();
+    assert!(err.contains("Error Code: Paused."), "mark_passed: {err}");
+    let err = release(&mut env, &agent, &escrow, &buyer, 1).unwrap_err();
+    assert!(err.contains("Error Code: Paused."), "release_milestone: {err}");
+    let err = resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 2, true).unwrap_err();
+    assert!(err.contains("Error Code: Paused."), "resolve_dispute: {err}");
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(
+        e.milestones.iter().map(|m| m.status).collect::<Vec<_>>(),
+        [MilestoneStatus::Passed, MilestoneStatus::Pending, MilestoneStatus::Disputed]
+    );
+    assert_eq!(env.balance(&escrow.vault), 15 * USDC);
+    register(&mut env, 12 * USDC, 0).unwrap();
+    purchase(&mut env, &agent, &buyer).unwrap();
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    create_escrow_full(&mut env, &agent, &buyer, 2, &[5 * USDC], REVIEW_WINDOW, 0).unwrap();
+
+    // Pausa desligada: as mesmas instruções passam.
+    set_pause(&mut env, &admin, 0).unwrap();
+    mark_passed(&mut env, &escrow, 1).unwrap();
+    release(&mut env, &agent, &escrow, &buyer, 1).unwrap();
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 2, true).unwrap();
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(
+        e.milestones.iter().map(|m| m.status).collect::<Vec<_>>(),
+        [MilestoneStatus::Passed, MilestoneStatus::Approved, MilestoneStatus::Refunded]
+    );
+}
+
+#[test]
+fn buyer_exits_and_admin_instructions_never_pause() {
+    let mut env = Env::new();
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (buyer, buyer_usdc) = new_buyer(&mut env, 100 * USDC);
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    // Prazo de entrega de 1 dia: vence antes do SLA de 7 dias da disputa.
+    let escrow = create_escrow_days(&mut env, &agent, &buyer, &[5 * USDC, 5 * USDC], 1).unwrap();
+    let admin = admin_kp(&env);
+    set_pause(&mut env, &admin, PAUSE_MASK).unwrap();
+
+    // Tudo pausado: o comprador ainda abre disputa...
+    dispute(&mut env, &escrow, &buyer, 0).unwrap();
+    // ...e, vencidos os prazos, recupera o dinheiro (cancelamento por atraso e disputa parada).
+    warp(&mut env, DISPUTE_SLA_SECS + 1);
+    cancel(&mut env, &escrow, &buyer, 1).unwrap();
+    let keeper = new_keypair();
+    stale(&mut env, &escrow, &keeper, &buyer.pubkey(), 0).unwrap();
+    assert_eq!(env.balance(&buyer_usdc), 100 * USDC - 5 * USDC);
+    assert_eq!(env.balance(&escrow.vault), 0);
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.status, EscrowStatus::Refunded);
+    // ...e a plataforma ainda fecha o escrow encerrado.
+    let payer = env.payer.insecure_clone();
+    close(&mut env, &escrow, &buyer.pubkey(), &payer).unwrap();
+    assert!(env.svm.get_account(&escrow.key).is_none_or(|a| a.lamports == 0));
+    assert_eq!(config_of(&env).pause_flags, PAUSE_MASK);
+
+    // Administração e operações que não são entrada nem pagamento seguem funcionando.
+    env.send(status_ix(&admin.pubkey(), &agent, false), &[&admin]).unwrap();
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Suspended);
+    env.send(status_ix(&admin.pubkey(), &agent, true), &[&admin]).unwrap();
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+    let params = ConfigParams { fee_bps: 700, ..env.params(0) };
+    update_config_as(&mut env, &admin, params).unwrap();
+    assert_eq!(config_of(&env).fee_bps, 700);
+    let creator = agent.creator.insecure_clone();
+    env.send(update_pricing_ix(&creator.pubkey(), &agent, 13 * USDC, USDC / 2), &[&creator]).unwrap();
+    let usage = usage_kp(&env);
+    env.send(record_usage_ix(&usage.pubkey(), &agent, 3, [1; 32]), &[&usage]).unwrap();
+    env.send(consume_ix(&usage.pubkey(), &agent, credits_pda(&agent, &buyer.pubkey())), &[&usage]).unwrap();
+    set_guardian(&mut env, &admin, unique_key()).unwrap();
+    set_pause(&mut env, &admin, 0).unwrap();
 }
 
 // ------------------------------------------------------------------------ meta: cobertura ----
@@ -3494,7 +3987,7 @@ fn program_errors() -> Vec<String> {
 #[test]
 fn cu_ceilings_cover_every_instruction() {
     let instructions = program_instructions();
-    assert!(instructions.len() >= 28, "lib.rs mudou de forma: {instructions:?}");
+    assert!(instructions.len() >= 31, "lib.rs mudou de forma: {instructions:?}");
     for name in &instructions {
         let row = CU_CEILINGS.iter().find(|(n, _)| n == name);
         let (_, ceiling) = row.unwrap_or_else(|| panic!("{name} sem teto em CU_CEILINGS"));

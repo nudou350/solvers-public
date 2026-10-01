@@ -21,7 +21,15 @@ minStake: bigint;
  * Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
  * das contas que a plataforma paga como fee payer.
  */
-minPrice: bigint; bump: number;  };
+minPrice: bigint; bump: number; 
+/** 2 desde a v2; a conta v1 (187 bytes) não tem este campo. */
+layoutVersion: number; 
+/** Bits de pausa (`PAUSE_*`). Saídas do comprador e instruções de admin nunca pausam. */
+pauseFlags: number; 
+/** Só pode LIGAR bits da pausa (nunca desligar). `Pubkey::default()` = sem guardian. */
+guardian: Address; 
+/** Espaço para campos futuros (sempre zerado até alguém consumi-lo). */
+reserved: ReadonlyUint8Array;  };
 
 export type ConfigArgs = { admin: Address; verifier: Address; usageAuthority: Address; 
 /** Token account USDC da plataforma. */
@@ -32,16 +40,24 @@ minStake: number | bigint;
  * Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
  * das contas que a plataforma paga como fee payer.
  */
-minPrice: number | bigint; bump: number;  };
+minPrice: number | bigint; bump: number; 
+/** 2 desde a v2; a conta v1 (187 bytes) não tem este campo. */
+layoutVersion: number; 
+/** Bits de pausa (`PAUSE_*`). Saídas do comprador e instruções de admin nunca pausam. */
+pauseFlags: number; 
+/** Só pode LIGAR bits da pausa (nunca desligar). `Pubkey::default()` = sem guardian. */
+guardian: Address; 
+/** Espaço para campos futuros (sempre zerado até alguém consumi-lo). */
+reserved: ReadonlyUint8Array;  };
 
 /** Gets the encoder for {@link ConfigArgs} account data. */
 export function getConfigEncoder(): FixedSizeEncoder<ConfigArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)], ['admin', getAddressEncoder()], ['verifier', getAddressEncoder()], ['usageAuthority', getAddressEncoder()], ['treasury', getAddressEncoder()], ['usdcMint', getAddressEncoder()], ['feeBps', getU16Encoder()], ['minStake', getU64Encoder()], ['minPrice', getU64Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: CONFIG_DISCRIMINATOR }));
+    return transformEncoder(getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)], ['admin', getAddressEncoder()], ['verifier', getAddressEncoder()], ['usageAuthority', getAddressEncoder()], ['treasury', getAddressEncoder()], ['usdcMint', getAddressEncoder()], ['feeBps', getU16Encoder()], ['minStake', getU64Encoder()], ['minPrice', getU64Encoder()], ['bump', getU8Encoder()], ['layoutVersion', getU8Encoder()], ['pauseFlags', getU8Encoder()], ['guardian', getAddressEncoder()], ['reserved', fixEncoderSize(getBytesEncoder(), 64)]]), (value) => ({ ...value, discriminator: CONFIG_DISCRIMINATOR }));
 }
 
 /** Gets the decoder for {@link Config} account data. */
 export function getConfigDecoder(): FixedSizeDecoder<Config> {
-    return getStructDecoder([['discriminator', fixDecoderSize(getBytesDecoder(), 8)], ['admin', getAddressDecoder()], ['verifier', getAddressDecoder()], ['usageAuthority', getAddressDecoder()], ['treasury', getAddressDecoder()], ['usdcMint', getAddressDecoder()], ['feeBps', getU16Decoder()], ['minStake', getU64Decoder()], ['minPrice', getU64Decoder()], ['bump', getU8Decoder()]]);
+    return getStructDecoder([['discriminator', fixDecoderSize(getBytesDecoder(), 8)], ['admin', getAddressDecoder()], ['verifier', getAddressDecoder()], ['usageAuthority', getAddressDecoder()], ['treasury', getAddressDecoder()], ['usdcMint', getAddressDecoder()], ['feeBps', getU16Decoder()], ['minStake', getU64Decoder()], ['minPrice', getU64Decoder()], ['bump', getU8Decoder()], ['layoutVersion', getU8Decoder()], ['pauseFlags', getU8Decoder()], ['guardian', getAddressDecoder()], ['reserved', fixDecoderSize(getBytesDecoder(), 64)]]);
 }
 
 /** Gets the codec for {@link Config} account data. */
@@ -94,5 +110,5 @@ export async function fetchAllMaybeConfig(
 }
 
 export function getConfigSize(): number {
-  return 187;
+  return 285;
 }

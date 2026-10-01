@@ -74,4 +74,14 @@ pub enum SolversError {
     NotPendingAdmin,
     #[msg("Novo admin inválido")]
     InvalidNewAdmin,
+    #[msg("Operação pausada")]
+    Paused,
+    #[msg("A configuração já está no layout atual")]
+    ConfigAlreadyMigrated,
+    #[msg("Bits de pausa inválidos")]
+    InvalidPauseFlags,
+    #[msg("Somente o admin ou o guardian pode alterar a pausa")]
+    NotPauseAuthority,
+    #[msg("O guardian só pode ligar a pausa; desligar é do admin")]
+    GuardianCannotUnpause,
 }

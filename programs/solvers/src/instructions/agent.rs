@@ -65,6 +65,7 @@ pub struct RegisterAgent<'info> {
 }
 
 pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     require!(args.metadata_uri.len() <= MAX_URI_LEN, SolversError::StringTooLong);
     require!(args.version.len() <= MAX_VERSION_LEN, SolversError::StringTooLong);
     require!(args.name.len() <= MAX_NAME_LEN, SolversError::StringTooLong);

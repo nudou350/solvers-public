@@ -65,6 +65,7 @@ pub fn create_escrow(
     review_window_secs: i64,
     delivery_days: u16,
 ) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     require!(ctx.accounts.agent.status == AgentStatus::Active, SolversError::AgentNotActive);
     require!(!milestones.is_empty() && milestones.len() <= MAX_MILESTONES, SolversError::InvalidMilestones);
     require!(
@@ -153,6 +154,7 @@ pub struct MarkPassed<'info> {
 }
 
 pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 32]) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_PAYMENTS)?;
     let escrow = &mut ctx.accounts.escrow;
     let now = Clock::get()?.unix_timestamp;
     let window = escrow.review_window_secs;
@@ -244,6 +246,7 @@ pub struct ReleaseMilestone<'info> {
 }
 
 pub fn release_milestone(ctx: Context<ReleaseMilestone>, index: u8) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_PAYMENTS)?;
     let now = Clock::get()?.unix_timestamp;
     let caller = ctx.accounts.caller.key();
     let escrow = &ctx.accounts.escrow;
@@ -350,6 +353,7 @@ pub struct ResolveDispute<'info> {
 }
 
 pub fn resolve_dispute(ctx: Context<ResolveDispute>, index: u8, refund: bool) -> Result<()> {
+    ctx.accounts.config.require_not_paused(PAUSE_PAYMENTS)?;
     let m = ctx
         .accounts
         .escrow

@@ -42,6 +42,15 @@ pub mod solvers {
     pub fn set_treasury(ctx: Context<SetTreasury>) -> Result<()> {
         instructions::admin::set_treasury(ctx)
     }
+    pub fn migrate_config(ctx: Context<MigrateConfig>) -> Result<()> {
+        instructions::admin::migrate_config(ctx)
+    }
+    pub fn set_pause(ctx: Context<SetPause>, flags: u8) -> Result<()> {
+        instructions::admin::set_pause(ctx, flags)
+    }
+    pub fn set_guardian(ctx: Context<SetGuardian>, new_guardian: Pubkey) -> Result<()> {
+        instructions::admin::set_guardian(ctx, new_guardian)
+    }
 
     // Publicação
     pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> Result<()> {

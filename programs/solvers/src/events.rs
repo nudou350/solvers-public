@@ -147,3 +147,18 @@ pub struct PricingUpdated {
     pub price: u64,
     pub price_per_use: u64,
 }
+
+#[event]
+pub struct PauseChanged {
+    /// Quem mudou (admin ou guardian).
+    pub by: Pubkey,
+    pub old_flags: u8,
+    pub new_flags: u8,
+}
+
+#[event]
+pub struct GuardianChanged {
+    pub admin: Pubkey,
+    pub old_guardian: Pubkey,
+    pub new_guardian: Pubkey,
+}

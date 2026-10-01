@@ -999,6 +999,67 @@
       ]
     },
     {
+      "name": "migrate_config",
+      "discriminator": [
+        92,
+        131,
+        58,
+        105,
+        210,
+        154,
+        224,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Paga o rent adicional (a plataforma patrocina as taxas)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Precisa ser a upgrade authority do programa."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program",
+          "address": "DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "open_dispute",
       "discriminator": [
         137,
@@ -2178,6 +2239,97 @@
       ]
     },
     {
+      "name": "set_guardian",
+      "discriminator": [
+        147,
+        243,
+        50,
+        121,
+        154,
+        164,
+        50,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_guardian",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_pause",
+      "discriminator": [
+        63,
+        32,
+        154,
+        2,
+        56,
+        103,
+        79,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "flags",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "set_treasury",
       "discriminator": [
         57,
@@ -3223,6 +3375,19 @@
       ]
     },
     {
+      "name": "GuardianChanged",
+      "discriminator": [
+        152,
+        239,
+        217,
+        24,
+        162,
+        189,
+        236,
+        143
+      ]
+    },
+    {
       "name": "LicensePurchased",
       "discriminator": [
         42,
@@ -3246,6 +3411,19 @@
         231,
         73,
         147
+      ]
+    },
+    {
+      "name": "PauseChanged",
+      "discriminator": [
+        238,
+        188,
+        213,
+        78,
+        134,
+        209,
+        178,
+        218
       ]
     },
     {
@@ -3507,6 +3685,31 @@
       "code": 6035,
       "name": "InvalidNewAdmin",
       "msg": "Novo admin inválido"
+    },
+    {
+      "code": 6036,
+      "name": "Paused",
+      "msg": "Operação pausada"
+    },
+    {
+      "code": 6037,
+      "name": "ConfigAlreadyMigrated",
+      "msg": "A configuração já está no layout atual"
+    },
+    {
+      "code": 6038,
+      "name": "InvalidPauseFlags",
+      "msg": "Bits de pausa inválidos"
+    },
+    {
+      "code": 6039,
+      "name": "NotPauseAuthority",
+      "msg": "Somente o admin ou o guardian pode alterar a pausa"
+    },
+    {
+      "code": 6040,
+      "name": "GuardianCannotUnpause",
+      "msg": "O guardian só pode ligar a pausa; desligar é do admin"
     }
   ],
   "types": [
@@ -3807,6 +4010,39 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "layout_version",
+            "docs": [
+              "2 desde a v2; a conta v1 (187 bytes) não tem este campo."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "pause_flags",
+            "docs": [
+              "Bits de pausa (`PAUSE_*`). Saídas do comprador e instruções de admin nunca pausam."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "guardian",
+            "docs": [
+              "Só pode LIGAR bits da pausa (nunca desligar). `Pubkey::default()` = sem guardian."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Espaço para campos futuros (sempre zerado até alguém consumi-lo)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -4137,6 +4373,26 @@
       }
     },
     {
+      "name": "GuardianChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_guardian",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "LicensePurchased",
       "type": {
         "kind": "struct",
@@ -4307,6 +4563,29 @@
           },
           {
             "name": "status",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PauseChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "by",
+            "docs": [
+              "Quem mudou (admin ou guardian)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_flags",
+            "type": "u8"
+          },
+          {
+            "name": "new_flags",
             "type": "u8"
           }
         ]
