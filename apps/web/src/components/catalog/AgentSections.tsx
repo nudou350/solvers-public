@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { useMyAccess } from "@/lib/hooks";
 import { date, dec1, initials, int, short, starPct } from "@/lib/format";
 import { gap } from "@/lib/style";
+import { ReviewPhotos } from "./Gallery";
 import { ReviewBox } from "./ReviewBox";
 
 /** Detalhes técnicos da versão: impressão digital, conta do especialista na rede (AgentDetail.onchain.agent) e rede. */
@@ -317,6 +318,7 @@ export function Reviews({ slug, initial, total }: { slug: string; initial: Revie
               </div>
               <span className="stars" style={{ "--p": `${starPct(r.rating)}%` } as CSSProperties} role="img" aria-label={`${r.rating} de 5`} />
               <p className="muted">{r.text}</p>
+              <ReviewPhotos images={r.images} who={who} />
             </article>
           );
         })}

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { cache, type CSSProperties } from "react";
 import { BeforeAfterBlock, Reviews, Scores, Versions } from "@/components/catalog/AgentSections";
 import { BuyBox } from "@/components/catalog/BuyBox";
+import { Gallery } from "@/components/catalog/Gallery";
 import { TrialBlock } from "@/components/catalog/TrialBlock";
 import { creatorHref, disputesText } from "@/components/catalog/data";
 import { Button } from "@/components/ui/Button";
@@ -144,6 +145,7 @@ export default async function AgentPage({ params }: Props) {
                 </span>
               ) : null}
             </div>
+            <Gallery images={d.images} name={a.name} />
           </div>
 
           <aside className="sticky" aria-label="Comprar">
