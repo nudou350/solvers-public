@@ -153,6 +153,10 @@ a.card:hover { transform: translateY(-3px); border-color: var(--line-strong); bo
 /* notas */
 .score-card { border-radius: 22px; padding: 28px; border: 1px solid var(--line); background: var(--surface); }
 .score-verified { background: linear-gradient(180deg, var(--mint-soft), var(--surface) 82%); border-color: color-mix(in oklab, var(--mint) 30%, var(--line)); }
+a.score-users { color: inherit; text-decoration: none; cursor: pointer; transition: border-color .15s, transform .15s; }
+a.score-users:hover { border-color: var(--amber); transform: translateY(-2px); }
+a.score-users:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.score-more { font-size: 14px; font-weight: 600; color: var(--amber); }
 .score-users { background: linear-gradient(180deg, var(--amber-soft), var(--surface) 82%); border-color: color-mix(in oklab, var(--amber) 25%, var(--line)); }
 .ring { --p: 90; width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; flex: none; background: conic-gradient(var(--mint) calc(var(--p) * 1%), color-mix(in oklab, var(--mint) 18%, var(--surface)) 0); }
 .ring > div { width: 84px; height: 84px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }

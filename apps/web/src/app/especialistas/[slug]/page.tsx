@@ -6,6 +6,7 @@ import { cache, type CSSProperties } from "react";
 import { BeforeAfterBlock, Reviews, Scores, Versions } from "@/components/catalog/AgentSections";
 import { BuyBox } from "@/components/catalog/BuyBox";
 import { Gallery } from "@/components/catalog/Gallery";
+import { ClampedText } from "@/components/ui/ClampedText";
 import { TrialBlock } from "@/components/catalog/TrialBlock";
 import { creatorHref, disputesText } from "@/components/catalog/data";
 import { Button } from "@/components/ui/Button";
@@ -124,7 +125,8 @@ export default async function AgentPage({ params }: Props) {
               </RepBadge>
               <span className="small muted">{disputesText(cr.disputesLost)}</span>
             </div>
-            <p style={{ fontSize: 17, lineHeight: 1.65, maxWidth: 720 }}>{a.description}</p>
+            <Gallery images={d.images} name={a.name} />
+            <ClampedText text={a.description} style={{ fontSize: 17, lineHeight: 1.65 }} />
             <div className="row wrapx" style={gap("10px")}>
               {clients.length ? (
                 <span className="chip chip-plain">
@@ -145,7 +147,6 @@ export default async function AgentPage({ params }: Props) {
                 </span>
               ) : null}
             </div>
-            <Gallery images={d.images} name={a.name} />
           </div>
 
           <aside className="sticky" aria-label="Comprar">
@@ -347,7 +348,7 @@ export default async function AgentPage({ params }: Props) {
         </section>
       ) : null}
 
-      <section id="avaliar" className="wrap" style={{ paddingBottom: 24 }}>
+      <section id="avaliar" className="wrap" style={{ paddingBottom: 24, scrollMarginTop: 24 }}>
         <div className="row between end wrapx" style={gap("12px", { marginBottom: 26 })}>
           <h2 className="display h2s">Avaliações</h2>
           <span className="verified">

@@ -1,7 +1,7 @@
 "use client";
 // Partes interativas da página do especialista: notas + detalhes técnicos, antes e depois, versões e avaliações.
 import type { AgentVersion, BeforeAfter, Review } from "@solvers/api-client";
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type MouseEvent } from "react";
 import { Ago } from "@/components/ui/Ago";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -36,10 +36,24 @@ export function Scores({
 }) {
   const [open, setOpen] = useState(false);
   const total = distribution.reduce((s, n) => s + n, 0);
+  // Com avaliações, o cartão inteiro leva à lista (#avaliar, no fim da página).
+  const toReviews = (e: MouseEvent<HTMLElement>) => {
+    const target = document.getElementById("avaliar");
+    if (!target) return;
+    e.preventDefault();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    history.replaceState(null, "", "#avaliar");
+  };
+  const UsersCard = reviewsCount > 0 ? "a" : "div";
   return (
     <section className="wrap" style={{ paddingBottom: 64 }}>
       <div className="g3 gn3" style={gap("22px")}>
-        <div className="score-card score-users col" style={gap("16px")}>
+        <UsersCard
+          className="score-card score-users col"
+          style={gap("16px")}
+          {...(reviewsCount > 0 ? { href: "#avaliar", onClick: toReviews, "aria-label": `O que as pessoas acharam: nota ${dec1(rating)} de 5, ${int(reviewsCount)} ${reviewsCount === 1 ? "avaliação" : "avaliações"}. Ir para as avaliações` } : {})}
+        >
           <div className="row" style={gap("8px")}>
             <span className="warn">
               <Icon name="users" />
@@ -82,7 +96,8 @@ export function Scores({
             <p className="muted">Ainda sem avaliações. As primeiras chegam depois das primeiras compras.</p>
           )}
           <p className="tiny faint">Só quem comprou pode avaliar.</p>
-        </div>
+          {reviewsCount > 0 ? <span className="score-more">Ver as avaliações ↓</span> : null}
+        </UsersCard>
 
         <div className="score-card score-verified col" style={gap("16px")}>
           <div className="row" style={gap("8px")}>
