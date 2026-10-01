@@ -39,6 +39,8 @@ export type TxErrorInfo = {
   text: string;
   /** Ação sugerida na tela: receber USDC de teste, entrar de novo ou só tentar outra vez. */
   action: "faucet" | "login" | "retry" | null;
+  /** Só em `listing_changed` (revenda): preço atual do anúncio, em USDC (a tela mostra o valor novo e pede a confirmação de novo). */
+  listingPriceUsdc?: number;
   /** Só em `price_changed`: o preço on-chain mudou desde o que a tela mostrava (valores em USDC). */
   priceChange?: { previousUsdc: number; usdc: number };
 };
@@ -93,6 +95,82 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
           priceChange: now != null && before != null ? { previousUsdc: before, usdc: now } : undefined,
         };
       }
+      // ----- Revenda de licenças (códigos em RESALE_ERROR_CODES, @solvers/shared) -----
+      case "resale_disabled":
+        return { code: err.code, title: "A revenda não está aberta agora", text: "O mercado de revenda está fechado por enquanto. Tente de novo mais tarde.", action: null };
+      case "listing_not_found":
+        return {
+          code: err.code,
+          title: "Esse anúncio não está mais disponível",
+          text: "Ele foi vendido, cancelado ou mudou. Veja os outros anúncios do mercado de revenda.",
+          action: null,
+        };
+      case "listing_changed": {
+        const now = typeof b.priceUsdc === "number" ? b.priceUsdc : null;
+        return {
+          code: err.code,
+          title: "O preço do anúncio mudou",
+          text:
+            now != null
+              ? `O vendedor mudou o preço para ${fmt(now)} USDC. Confira o novo valor e confirme de novo.`
+              : "O vendedor mudou o preço. Confira o novo valor e confirme de novo.",
+          action: null,
+          listingPriceUsdc: now ?? undefined,
+        };
+      }
+      case "not_owner":
+        return {
+          code: err.code,
+          title: "Esta licença não é da sua conta",
+          text: "Só quem tem a licença pode anunciar ou cancelar o anúncio. Atualize a página e confira sua biblioteca.",
+          action: null,
+        };
+      case "own_listing":
+        return {
+          code: err.code,
+          title: "Esse anúncio é seu",
+          text: "Você não pode comprar a própria licença. Para tirá-la do mercado, cancele o anúncio na sua biblioteca.",
+          action: null,
+        };
+      case "price_too_low":
+        return { code: err.code, title: "O preço está baixo demais", text: "Escolha um valor igual ou maior que o mínimo e tente de novo.", action: null };
+      case "already_listed":
+        return {
+          code: err.code,
+          title: "Esta licença já está à venda",
+          text: "Atualize a página. Para mudar o preço, cancele o anúncio e anuncie de novo.",
+          action: null,
+        };
+      case "cut_too_high":
+        return {
+          code: err.code,
+          title: "Este especialista não pode ser revendido agora",
+          text: "A soma do royalty do criador com a taxa do Solvers passa do limite permitido numa revenda.",
+          action: null,
+        };
+      case "creator_cannot_resell":
+        return {
+          code: err.code,
+          title: "Criadores não revendem os próprios especialistas",
+          text: "Você criou este especialista, então não pode anunciar licenças dele no mercado.",
+          action: null,
+        };
+      case "cancel_via_wallet":
+        return {
+          code: err.code,
+          title: "Cancele o anúncio pela sua carteira",
+          text: "Não dá para cancelar este anúncio por aqui. Na sua carteira, retire a permissão de venda da licença e depois atualize a página. Enquanto isso a licença continua sendo sua.",
+          action: null,
+        };
+      case "license_invalid":
+        return { code: err.code, title: "Não reconhecemos esta licença", text: "Atualize a página e tente de novo. Se continuar, fale com o suporte.", action: null };
+      case "license_already_reviewed":
+        return {
+          code: err.code,
+          title: "Esta licença já foi usada numa avaliação",
+          text: "Quem vendeu a licença usada já avaliou o especialista com ela, e cada licença serve para uma avaliação só. A nota do especialista segue valendo para você.",
+          action: null,
+        };
       case "guarantee_limit":
         return { code: err.code, title: "Limite de garantias atingido", text: err.message, action: null };
       case "rate_limited":

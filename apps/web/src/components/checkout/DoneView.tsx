@@ -22,6 +22,8 @@ const CONFETTI: [number, number, number][] = [
 export type DoneProps = {
   detail: AgentDetail;
   kind: DoneKind;
+  /** Licença usada, comprada no mercado de revenda (?resale=1): muda os textos, o resto é igual a uma compra. */
+  resale?: boolean;
   sig: string | null;
   escrow: string | null;
   asset: string | null;
@@ -36,7 +38,7 @@ type Check = "checking" | "ok" | "missing" | "unknown";
 /** Esperas entre as conferências (~30 s no total): a compra pode demorar um pouco para aparecer na conta. */
 const RETRY_DELAYS_MS = [0, 2000, 3000, 5000, 5000, 5000, 10_000];
 
-export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer }: DoneProps) {
+export function DoneView({ detail, kind, resale = false, sig, escrow, asset, paidUsdc, explorer }: DoneProps) {
   const { api, config, status, login, loggingIn } = useSession();
   const toast = useToast();
   const [check, setCheck] = useState<Check>("checking");
@@ -100,7 +102,9 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
         ? "Só um instante, estamos conferindo na sua conta."
         : isEscrow
     ? "O pagamento está guardado e só vai para o criador quando você aprovar cada etapa. Conecte o especialista à sua IA para ele começar a trabalhar na tarefa."
-    : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
+    : resale
+      ? "Sua licença usada já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo. As memórias de quem vendeu ficaram com ele, então o especialista começa a conhecer você do zero."
+      : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
 
   return (
     <section className="wrap" style={{ position: "relative", paddingTop: 56, paddingBottom: 72 }}>
@@ -189,7 +193,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
               <div className="small muted" style={{ marginTop: 6 }}>
                 {isEscrow
                   ? `Tarefa com garantia · ${detail.guarantee?.milestones.length ?? 0} etapas`
-                  : `Licença permanente · versão ${agent.version}`}
+                  : `${resale ? "Licença permanente usada" : "Licença permanente"} · versão ${agent.version}`}
               </div>
             </div>
           </div>
@@ -230,6 +234,7 @@ export function DoneView({ detail, kind, sig, escrow, asset, paidUsdc, explorer 
               avaliar o {agent.name}
             </Link>
             .
+            {resale ? " Se quem vendeu já avaliou com esta licença, talvez você não consiga avaliar com ela." : ""}
           </p>
         ) : null}
 

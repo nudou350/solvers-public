@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Chip,
+  Dialog,
   Empty,
   Icon,
   ICONS,
@@ -203,6 +204,8 @@ export function Kit() {
   const rate = useRate();
   const toast = useToast();
   const [tab, setTab] = useState<"lic" | "mem" | "hist">("lic");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogLocked, setDialogLocked] = useState(false);
   const soon = new Date(Date.now() + 5 * 3600_000 + 12 * 60_000).toISOString();
 
   return (
@@ -360,6 +363,31 @@ export function Kit() {
             </Card>
           </div>
         </div>
+      </Section>
+
+      <Section title="Janela (Dialog)">
+        <div className="row wrapx">
+          <Button variant="secondary" icon="tag" onClick={() => setDialogOpen(true)}>
+            Abrir janela
+          </Button>
+        </div>
+        {dialogOpen ? (
+          <Dialog title="Título da janela" onClose={() => setDialogOpen(false)} locked={dialogLocked}>
+            <p className="muted">
+              Esc, o X e o clique fora fecham. O foco fica preso na janela e volta para o botão ao fechar. Marque um campo com data-autofocus para o foco começar nele.
+            </p>
+            <label className="field">
+              <span className="label">Campo com foco inicial</span>
+              <input className="input" data-autofocus placeholder="Digite aqui" />
+            </label>
+            <div className="row end wrapx">
+              <Button variant="secondary" onClick={() => setDialogLocked((v) => !v)}>
+                {dialogLocked ? "Destravar" : "Travar (como ao assinar)"}
+              </Button>
+              <Button onClick={() => setDialogOpen(false)} disabled={dialogLocked}>Fechar</Button>
+            </div>
+          </Dialog>
+        ) : null}
       </Section>
 
       <Section title="Formatação (lib/format)">

@@ -25,6 +25,8 @@ export function cryptoAmount(n: number, symbol: string): string {
   const up = Math.ceil(n * 10 ** d - 1e-9) / 10 ** d;
   return `${fixed(up, d)} ${symbol}`;
 }
+/** Pontos-base em porcentagem: 500 -> "5%", 750 -> "7,5%". */
+export const bpsPct = (bps: number) => `${(bps / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 export const int = (n: number) => Number(n).toLocaleString("pt-BR");
 export const dec1 = (n: number) => fixed(n, 1);
 /** Variação com sinal: "+3,2%", "−1,0%". */

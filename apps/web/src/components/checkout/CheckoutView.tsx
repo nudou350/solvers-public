@@ -1,7 +1,8 @@
 "use client";
 // Checkout: licença permanente ou tarefa com garantia (design: checkout-licenca e checkout-com-garantia).
 // Entrar → (garantia: descrever a tarefa) → forma de pagamento (saldo em USDC ou Pix) → revisar e pagar.
-import type { AgentDetail, GuaranteeStatus, PixCharge, SodaxQuote } from "@solvers/api-client";
+// Com `listing` é a compra de uma licença usada do mercado de revenda (/checkout?listing=<licença>): só saldo em USDC.
+import type { AgentDetail, GuaranteeStatus, PixCharge, ResaleListing, SodaxQuote } from "@solvers/api-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -35,7 +36,7 @@ function StepDot({ n, done }: { n: number; done?: boolean }) {
   return <span className={`dot ${done ? "dot-ok" : "dot-now"}`}>{done ? "✓" : n}</span>;
 }
 
-export function CheckoutView({ detail, type }: { detail: AgentDetail; type: CheckoutType }) {
+export function CheckoutView({ detail, type, listing = null }: { detail: AgentDetail; type: CheckoutType; listing?: ResaleListing | null }) {
   const router = useRouter();
   const toast = useToast();
   const { api, config, status, me, walletKind, loggingIn, login, requireWallet } = useSession();
@@ -48,7 +49,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   const faucet = useFaucet();
 
   const isG = type === "guarantee";
-  const total = isG ? (guarantee?.priceUsdc ?? agent.priceUsdc) : agent.priceUsdc;
+  // Licença usada: o preço é o do anúncio (muda com 409 listing_changed) e o anúncio pode sumir (listing_not_found).
+  const isR = !!listing;
+  const [listingPrice, setListingPrice] = useState(listing?.priceUsdc ?? 0);
+  const [listingGone, setListingGone] = useState(false);
+  const total = isR ? listingPrice : isG ? (guarantee?.priceUsdc ?? agent.priceUsdc) : agent.priceUsdc;
   const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
   const totalText = money(total);
 
@@ -79,9 +84,9 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   }, [loadAccount]);
 
   // ----- forma de pagamento -----
-  const pixOn = !!config?.pix.enabled;
+  const pixOn = !isR && !!config?.pix.enabled;
   // SODAX (demo): opção para quem já tem cripto em outra rede; só aparece quando o servidor liga. Fica fora do padrão.
-  const sodaxCfg = config?.sodax?.enabled ? config.sodax : null;
+  const sodaxCfg = !isR && config?.sodax?.enabled ? config.sodax : null;
   const [sodaxPick, setSodaxPick] = useState<string | null>(null);
   const sodaxSource = sodaxPick ?? sodaxCfg?.sources[0]?.key ?? "";
   const [sodaxQuote, setSodaxQuote] = useState<SodaxQuote | null>(null);
@@ -143,7 +148,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
 
   const purchase = useCallback(async () => {
     const r = await tx.run(() =>
-      isG ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim(), deliveryDays }) : api.buildPurchase(agent.id),
+      listing
+        ? api.buildBuyListing(listing.id, listingPrice)
+        : isG
+          ? api.buildEscrow(agent.id, { title: title.trim(), description: desc.trim(), deliveryDays })
+          : api.buildPurchase(agent.id),
     );
     if (!r) {
       void loadAccount();
@@ -153,12 +162,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     const kind = isG ? "escrow" : "purchase";
     const q = new URLSearchParams({ agent: agent.slug, sig: r.signature, kind });
     if (typeof meta.escrowId === "string") q.set("escrow", meta.escrowId);
+    if (listing) q.set("resale", "1");
     if (typeof meta.asset === "string") q.set("asset", meta.asset);
+    else if (listing) q.set("asset", listing.id);
     const paid = typeof meta.priceUsdc === "number" ? meta.priceUsdc : typeof meta.totalUsdc === "number" ? meta.totalUsdc : total;
     q.set("usdc", String(paid));
     if (r.explorerUrl) q.set("explorer", r.explorerUrl);
     router.push(`/checkout/concluido?${q}`);
-  }, [tx, isG, api, agent.id, agent.slug, title, desc, deliveryDays, total, router, loadAccount]);
+  }, [tx, isG, listing, listingPrice, api, agent.id, agent.slug, title, desc, deliveryDays, total, router, loadAccount]);
 
   const chargeWalletRef = useRef(chargeWallet);
   chargeWalletRef.current = chargeWallet;
@@ -178,6 +189,36 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx.error, pixError]);
+
+  // Licença usada: o preço do anúncio mudou ou ele sumiu. Mostra o valor novo, zera o aceite e pede a confirmação de novo.
+  useEffect(() => {
+    if (!listing) return;
+    const code = tx.error?.code;
+    if (code === "listing_not_found") {
+      setListingGone(true);
+      return;
+    }
+    if (code !== "listing_changed") return;
+    setAgree(false);
+    // O 409 já traz o preço atual do anúncio; sem ele, relê a lista.
+    if (tx.error?.listingPriceUsdc != null) {
+      setListingPrice(tx.error.listingPriceUsdc);
+      return;
+    }
+    let alive = true;
+    api.getResaleListing(listing.id).then(
+      (now) => {
+        if (!alive) return;
+        if (now) setListingPrice(now.priceUsdc);
+        else setListingGone(true);
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx.error]);
 
   const onCredited = useCallback(
     (c: PixCharge) => {
@@ -224,9 +265,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   }
 
   const alreadyOwned = owned && type === "permanent";
+  const myListing = isR && !!meWallet && listing?.sellerWallet === meWallet;
+  const listingBlocked = listingGone || myListing;
   // SODAX só segue com uma cotação ao vivo na tela: é ela que a pessoa está aceitando.
   const sodaxReady = effMethod !== "sodax" || (!!sodaxCfg && sodaxQuote != null);
-  const canPay = !!config && agree && !alreadyOwned && limitsOk && sodaxReady && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
+  const canPay = !!config && agree && !alreadyOwned && !listingBlocked && limitsOk && sodaxReady && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
   function pay() {
     setTouched(true);
     if (!canPay) return;
@@ -244,10 +287,12 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   ];
 
   const reviewWin = guarantee ? durationText(guarantee.reviewWindowSecs) : "";
-  const lineLabel = isG ? "Tarefa com garantia" : "Licença permanente";
+  const lineLabel = isR ? "Licença usada" : isG ? "Tarefa com garantia" : "Licença permanente";
   const agreeText = isG
     ? `Li e concordo com os critérios combinados e com a liberação automática em ${reviewWin}.`
-    : "Concordo com os termos de uso e com a emissão da licença em meu nome.";
+    : isR
+      ? "Concordo com os termos de uso e entendo que é uma licença usada: as memórias de quem vende não vêm junto, e a nota do especialista é a mesma."
+      : "Concordo com os termos de uso e com a emissão da licença em meu nome.";
 
   let n = 1;
   const stepLogin = n++;
@@ -268,14 +313,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   return (
     <>
       <div className="wrap" style={{ paddingTop: 28 }}>
-        <Link className="link-btn" href={`/especialistas/${agent.slug}`}>
+        <Link className="link-btn" href={isR ? "/revenda" : `/especialistas/${agent.slug}`}>
           <Icon name="arrow-left" size="s" />
-          Voltar para o especialista
+          {isR ? "Voltar para o mercado de revenda" : "Voltar para o especialista"}
         </Link>
       </div>
       <section className="wrap" style={{ paddingTop: 8, paddingBottom: 56 }}>
         <h1 className="display h2" style={{ marginBottom: 28 }}>
-          Finalizar compra
+          {isR ? "Comprar licença usada" : "Finalizar compra"}
         </h1>
         <div className="split">
           <div className="col" style={gap(22)}>
@@ -329,6 +374,34 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                 }
               >
                 A licença permanente já está na sua conta. Não é preciso comprar de novo.
+              </Notice>
+            ) : null}
+
+            {listingGone && tx.error?.code !== "listing_not_found" ? (
+              <Notice
+                tone="warn"
+                role="alert"
+                title="Esse anúncio não está mais disponível"
+                actions={
+                  <Button size="sm" href="/revenda">
+                    Ver outros anúncios
+                  </Button>
+                }
+              >
+                Ele foi vendido, cancelado ou mudou. Nada foi cobrado.
+              </Notice>
+            ) : null}
+            {myListing ? (
+              <Notice
+                tone="info"
+                title="Este anúncio é seu"
+                actions={
+                  <Button size="sm" variant="secondary" href="/biblioteca">
+                    Ver minha biblioteca
+                  </Button>
+                }
+              >
+                Você não pode comprar a própria licença. Para tirá-la do mercado, cancele o anúncio na sua biblioteca.
               </Notice>
             ) : null}
 
@@ -493,7 +566,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                 <StepDot n={stepPay} done={showCharge && charge?.status === "credited"} />
                 <h2 className="h3">Como você quer pagar</h2>
               </div>
-              {pixOn ? (
+              {isR ? null : pixOn ? (
                 <button type="button" className={`opt ${effMethod === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")} aria-pressed={effMethod === "pix"} disabled={busy || showCharge}>
                   <span className="dot-r" />
                   <span className="col grow" style={gap(2)}>
@@ -526,6 +599,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   ) : null}
                 </span>
               </button>
+              {isR ? <p className="tiny faint">Na compra de licença usada, o pagamento é só com saldo em USDC.</p> : null}
               {sodaxCfg ? (
                 <>
                   <button type="button" className={`opt ${effMethod === "sodax" ? "on" : ""}`} onClick={() => setMethod("sodax")} aria-pressed={effMethod === "sodax"} disabled={busy || showCharge}>
@@ -614,7 +688,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     </p>
                   ) : null}
                   <Button size="lg" block iconRight="arrow-right" loading={busy} disabled={!canPay} className={canPay ? "" : "off"} onClick={pay}>
-                    Pagar {totalText}
+                    {isR ? `Comprar licença usada por ${totalText}` : `Pagar ${totalText}`}
                   </Button>
                   <p className="tiny faint center">
                     <Icon name="lock" size="s" /> Pagamento protegido.{" "}
@@ -641,6 +715,13 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     : "O preço do especialista mudou. Confira o novo valor e confirme de novo."}
                 </Notice>
               ) : null}
+              {tx.error?.code === "listing_changed" ? (
+                <Notice tone="warn" role="alert" title={tx.error.title}>
+                  {tx.error.listingPriceUsdc != null
+                    ? `O vendedor mudou o preço para ${money(tx.error.listingPriceUsdc)} (${usdc(tx.error.listingPriceUsdc)}). Confira o novo valor e confirme de novo.`
+                    : tx.error.text}
+                </Notice>
+              ) : null}
               {pixError && pixError.code !== "price_changed" ? (
                 <Notice tone="bad" role="alert" title={pixError.title}>
                   {pixError.text}
@@ -649,13 +730,17 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
               <p className={tx.pending ? "small muted center" : "sr-only"} role="status" aria-live="polite">
                 {tx.pending ? "Assinando e registrando a compra na rede…" : ""}
               </p>
-              {tx.error && tx.error.code !== "price_changed" ? (
+              {tx.error && tx.error.code !== "price_changed" && tx.error.code !== "listing_changed" ? (
                 <Notice
                   tone="bad"
                   role="alert"
                   title={tx.error.title}
                   actions={
-                    tx.error.action === "faucet" && faucet.enabled ? (
+                    tx.error.code === "listing_not_found" ? (
+                      <Button size="sm" href="/revenda">
+                        Ver outros anúncios
+                      </Button>
+                    ) : tx.error.action === "faucet" && faucet.enabled ? (
                       <Button size="sm" icon="coin" loading={faucet.pending} onClick={getFaucet}>
                         Receber USDC de teste
                       </Button>
@@ -679,7 +764,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
           {/* Resumo */}
           <aside className="sticky">
             <div className="card pad col" style={gap(18)}>
-              {modes.length > 1 ? (
+              {!isR && modes.length > 1 ? (
                 <div className="seg" role="tablist" aria-label="Tipo de compra" style={{ alignSelf: "stretch", display: "flex" }}>
                   {modes.map((m) => (
                     <button
@@ -710,6 +795,18 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   <span className="muted grow">{lineLabel}</span>
                   <b className="num flex-none">{totalText}</b>
                 </div>
+                {isR && listing ? (
+                  <>
+                    <div className="row between" style={gap(12)}>
+                      <span className="muted">Vendido por</span>
+                      <b className="num flex-none">{short(listing.sellerWallet)}</b>
+                    </div>
+                    <div className="row between" style={gap(12)}>
+                      <span className="muted">Preço de um novo</span>
+                      <span className="num flex-none">{money(agent.priceUsdc)}</span>
+                    </div>
+                  </>
+                ) : null}
                 <div className="row between">
                   <span className="muted">Taxa de rede</span>
                   <b className="num ok">Por conta do Solvers</b>
@@ -733,6 +830,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   </div>
                 ) : null}
               </div>
+              {isR ? (
+                <p className="small muted">
+                  Licença usada: a nota do especialista é a mesma, mas as memórias de quem vende não vêm junto. O criador recebe uma parte desta revenda.
+                </p>
+              ) : null}
               <div>
               {isG ? (
                 <Chip tone="ok" icon="lock">

@@ -28,11 +28,6 @@
   .pix > :last-child { justify-self: stretch; }
 }
 
-/* Pedido de ajuda ao criador (HelpDialog). */
-.helpDialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: inherit; overflow: auto; }
-.helpDialog::backdrop { background: rgba(10, 9, 14, .55); }
-.helpBody { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+/* Pedido de ajuda ao criador (HelpDialog; a janela em si é o ui/Dialog). */
 .helpForm { display: flex; flex-direction: column; gap: 16px; }
-.helpClose { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
-.helpClose:hover { background: var(--line); }
 .helpLink { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; }

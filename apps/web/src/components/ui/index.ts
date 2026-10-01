@@ -7,6 +7,7 @@ export { Stars, type StarsProps } from "./Stars";
 export { Price, type PriceProps } from "./Price";
 export { Tabs, type TabItem, type TabsProps } from "./Tabs";
 export { Empty, type EmptyProps } from "./Empty";
+export { Dialog, type DialogProps } from "./Dialog";
 export { Spinner, Loading, type SpinnerProps } from "./Spinner";
 export { Notice, ToastProvider, useToast, type Tone, type ToastInput } from "./Toast";
 export { Tile, Avatar } from "./Tile";

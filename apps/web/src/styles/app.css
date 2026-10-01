@@ -28,6 +28,14 @@ button.me-pill { font: inherit; font-weight: 600; color: var(--ink); cursor: poi
 .tabbar a { text-decoration: none; }
 .seg { align-self: flex-start; }
 
+/* janela modal (components/ui/Dialog) */
+.dlg { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: inherit; overflow: auto; }
+.dlg::backdrop { background: rgba(10, 9, 14, .55); }
+.dlg-body { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.dlg-x { width: 44px; height: 44px; margin: -6px -8px 0 0; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.dlg-x:hover { background: var(--line); }
+.dlg-x[disabled] { opacity: .4; cursor: not-allowed; }
+
 /* botão em carregamento */
 .btn { position: relative; }
 .btn.is-loading { color: transparent !important; pointer-events: none; }

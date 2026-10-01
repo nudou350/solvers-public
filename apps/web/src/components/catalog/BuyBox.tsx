@@ -1,5 +1,6 @@
 "use client";
 import type { TrialInfo } from "@solvers/api-client";
+import Link from "next/link";
 import { type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -17,6 +18,10 @@ export type BuyBoxProps = {
   trial: TrialInfo | null;
   hasGuarantee: boolean;
   rate: number;
+  /** Revenda ligada (config.resaleEnabled): liberam "Licença usada" e, para quem já tem a licença, "Anunciar minha licença". */
+  resaleOn?: boolean;
+  /** Anúncio de revenda mais barato deste especialista (null/ausente: nada à venda). */
+  resale?: { listingId: string; floorUsdc: number } | null;
 };
 
 /** Caixa de compra da página do especialista: licença permanente, teste grátis (se houver) e acesso do usuário logado. */
@@ -26,6 +31,7 @@ export function BuyBox(p: BuyBoxProps) {
   const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=permanent`;
   const install = `/instalar?agent=${encodeURIComponent(p.slug)}`;
   const owned = !!access?.license;
+  const usedHref = p.resale ? `/checkout?listing=${encodeURIComponent(p.resale.listingId)}` : null;
   const trialLeft = p.trial && access ? access.trialUsesLeft : null;
 
   return (
@@ -45,6 +51,11 @@ export function BuyBox(p: BuyBoxProps) {
                 <Button href="/biblioteca" size="sm" variant="secondary">
                   Minha biblioteca
                 </Button>
+                {p.resaleOn ? (
+                  <Button href="/biblioteca" size="sm" variant="ghost" icon="tag">
+                    Anunciar minha licença
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -64,6 +75,16 @@ export function BuyBox(p: BuyBoxProps) {
             <Button href={checkout} size="lg" block iconRight="arrow-right">
               Comprar licença
             </Button>
+            {p.resaleOn && usedHref && p.resale ? (
+              <Link className="row between card-flat pad-s" href={usedHref} style={gap("12px")}>
+                <span className="col" style={gap("2px")}>
+                  <span className="small faint">Prefere pagar menos?</span>
+                  <b>Licença usada a partir de {brlValue(p.resale.floorUsdc * p.rate)}</b>
+                  <span className="tiny faint">Mesma nota do especialista. As memórias de quem vende não vão junto.</span>
+                </span>
+                <Icon name="arrow-right" />
+              </Link>
+            ) : null}
             {p.trial ? (
               <div className="col" style={gap("8px")}>
                 <Button href={install} variant="secondary" block icon="play">

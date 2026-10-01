@@ -18,7 +18,7 @@ export function Footer() {
               Especialistas
             </Link>
             <Link href="/revenda" className="muted">
-              Mercado de revenda <span className="faint">(em breve)</span>
+              Mercado de revenda
             </Link>
             <Link href="/garantias" className="muted">
               Garantias

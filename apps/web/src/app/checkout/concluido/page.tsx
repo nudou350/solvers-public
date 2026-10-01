@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AgentMissing } from "@/components/checkout/AgentMissing";
 import { DoneView } from "@/components/checkout/DoneView";
 import { loadAgent } from "@/components/checkout/loadAgent";
-import { param, type DoneKind } from "@/components/checkout/util";
+import { isResale, param, type DoneKind } from "@/components/checkout/util";
 
 export const metadata: Metadata = { title: "Compra concluída", robots: { index: false } };
 
@@ -18,6 +18,7 @@ export default async function DonePage({ searchParams }: PageProps<"/checkout/co
     <DoneView
       detail={detail}
       kind={kind}
+      resale={kind === "purchase" && isResale(sp.resale)}
       sig={param(sp.sig)}
       escrow={param(sp.escrow)}
       asset={param(sp.asset)}

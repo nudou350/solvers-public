@@ -158,6 +158,8 @@ export default async function AgentPage({ params }: Props) {
               trial={d.trial}
               hasGuarantee={!!g}
               rate={rate}
+              resaleOn={config.resaleEnabled}
+              resale={config.resaleEnabled && d.resaleListingId && a.resaleFloorUsdc != null ? { listingId: d.resaleListingId, floorUsdc: a.resaleFloorUsdc } : null}
             />
           </aside>
         </div>

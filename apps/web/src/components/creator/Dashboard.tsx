@@ -132,6 +132,7 @@ function NotCreator({ sharePct }: { sharePct: number }) {
 
 function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["creator"]> }) {
   const rate = useRate();
+  const resaleOn = !!useSession().config?.resaleEnabled;
   const money0 = (v: number) => (rate != null ? brl0(v, rate) : usdc(v));
   const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
   const lost = data.totals.disputesLost;
@@ -165,8 +166,17 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
         </div>
         <div className="card pad-s col" style={gap(6)}>
           <span className="small muted">Royalties de revenda</span>
-          <span className="display kpi-n faint" style={kpiMoney}>Em breve</span>
-          <span className="tiny faint">quando o mercado de revenda abrir</span>
+          {resaleOn ? (
+            <>
+              <span className="display num kpi-n" style={kpiMoney}>{money0(data.totals.royaltiesUsdc)}</span>
+              <span className="tiny faint">{usdc(data.totals.royaltiesUsdc)} · em revendas feitas no mercado</span>
+            </>
+          ) : (
+            <>
+              <span className="display kpi-n faint" style={kpiMoney}>Em breve</span>
+              <span className="tiny faint">quando o mercado de revenda abrir</span>
+            </>
+          )}
         </div>
         <div className="card pad-s col" style={gap(6)}>
           <span className="small muted">Contestações</span>
