@@ -28,7 +28,7 @@ infra/                 PM2, nginx e scripts de deploy no padrão da VPS
 | Avaliação | Uma licença prova uma única avaliação (PDA `license_review`), preço fixado na compra (`expected_price`) | Correções da revisão de segurança |
 | Garantia | Prazo de liberação automática por etapa (`passed_at + review_window`) | Várias etapas com prazos independentes |
 | Teste grátis | 3 usos por carteira por solver, controlado off-chain | Não existia no programa |
-| Revenda | Tela alimentada por dados simulados (P2) | Fora do escopo P0/P1 |
+| Revenda | Licença revendida pelo mercado, sem custódia, com royalty ao criador (`docs/resale.md`) | Devnet; mainnet depende dos termos com o advogado |
 | SBPF | Build com `--arch v1` | Devnet/mainnet ainda aceitam deploy v0-v2; o validador de teste 3.x não roda v3 |
 
 ## Rodando localmente

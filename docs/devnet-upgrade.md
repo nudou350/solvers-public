@@ -20,6 +20,9 @@ Quem faz o trabalho é `scripts/chain/upgrade-devnet.sh` (dry-run por padrão; s
   o script transfere do fee-payer para o admin só o que faltar (arredondado a 0,1 SOL), sem faucet. O fee-payer
   também paga taxas/rent do servidor, então o script aborta se ele ficar com menos de 1 SOL
   (`FEEPAYER_RESERVE_LAMPORTS` muda isso). Hoje: admin ~1,51; fee-payer ~4,81; necessário ~3,83; transfere ~2,4.
+  **Esses números são do `.so` anterior à revenda.** Com ela (`.so` de 909.888 bytes) o buffer sobe para ~6,3 SOL
+  (devolvíveis) e a extensão custa mais (ver "O que muda neste upgrade"): confira o saldo do admin e do fee-payer
+  contra o dry-run, que imprime os valores reais, antes do `--yes`.
 - O ProgramData pode não ter folga sobre o `.so` implantado: qualquer crescimento além do `Data Length` atual
   (`solana program show <id> --url devnet`) exige extensão; o script estende o crescimento + 1 KB de margem.
 - **Config (fee_bps)**: o novo `update_config` recusa `fee_bps` > 2000. Confira antes (somente leitura, a partir
@@ -117,19 +120,42 @@ EOF
 ```
    Esperado após o upgrade: só `CY8GP4eM25jL7ofX4oEfedoCVh3BHtP4oHucmwWKvTzd` (o escrow antigo) pode falhar; se
    outra conta falhar, **não dê push**: investigue (ou faça rollback).
-6. **Servidor + web**: só agora (upgrade feito, Config com 285 bytes), `git push` na `master` (o CI faz o deploy na VPS). Acompanhe o Actions e
-   `pm2 logs solvers-api`. Veja a janela de incompatibilidade abaixo.
+6. **Servidor + web**: só agora (upgrade feito, Config com 285 bytes), `git push` na `master` (o CI faz o deploy na VPS: migration,
+   servidor e web juntos). A revenda sobe **desligada** (`resaleEnabled=false`; a tela `/revenda` fica "em breve" e o servidor não
+   deve montar transações de revenda; conferir no código que a flag cobre as rotas). Acompanhe o Actions e `pm2 logs solvers-api`. Veja a janela de incompatibilidade abaixo.
 7. **Retirar o escrow antigo no banco da VPS** (PG `solvers`, porta 5433). Faça `pg_dump` antes e rode, na VPS:
    `pnpm --filter @solvers/server cli:retire-escrows` (dry-run: só lista, lê o RPC, não altera nada) e, revisando a
    lista, `pnpm --filter @solvers/server cli:retire-escrows --yes`. Ele marca como `refunded`/`closed` os escrows
    ausentes ou ilegíveis na cadeia; não apaga linhas.
+7a. **Limpar os dados simulados da revenda** (anúncios inventados pelo `seed`: `licenses.listed_for_resale` e
+   `licenses.resale_price`, e o histórico da tabela `resale_prices`). Faça `pg_dump` antes e **confirme com o dono antes de
+   qualquer DELETE/UPDATE**; o anúncio real só existe a partir do `Listing` on-chain, então nada disso é recuperável nem
+   necessário depois. Detalhes em `docs/resale.md`.
 8. **Reindexar**: na VPS, `pnpm --filter @solvers/server cli:reindex --backfill` (idempotente; completa
-   `chain_txs` e reconstrói o espelho a partir do estado on-chain). Se sobrar pendência: `cli:reindex --dead`.
+   `chain_txs` e reconstrói o espelho a partir do estado on-chain, incluindo `Listing`). Se sobrar pendência: `cli:reindex --dead`.
+8a. **Ligar a revenda**: só com o programa novo conferido, o servidor no ar, os dados simulados limpos e o reindex feito, ligue
+   `resaleEnabled` (como, em `docs/resale.md`) e teste um ciclo anunciar -> comprar -> cancelar com carteiras de teste.
 9. **Republicar especialistas se o hash mudou**: `pnpm --filter @solvers/server cli:publish <slug...>` (ou sem
    argumentos, para todos os pacotes em `agents/`), só dos pacotes cujo conteúdo/hash mudou.
 
-## O que muda neste upgrade (governança do admin)
+## O que muda neste upgrade (governança do admin e revenda de licenças)
 
+- **Revenda de licenças: 3 instruções novas** (`programs/solvers/src/instructions/resale.rs`; visão geral em `docs/resale.md`):
+  `list_license(price)` (o dono aprova a PDA `market_authority`, seed `market_authority`, como `TransferDelegate` do asset e a
+  plataforma abre o `Listing`), `buy_listing(expected_price)` (paga royalty ao criador, taxa à tesouraria e o resto ao vendedor,
+  transfere o asset e fecha o `Listing`) e `cancel_listing` (o vendedor sempre; terceiros só anúncio velho; nunca pausa). Sem
+  custódia: a licença fica na carteira do vendedor, que mantém o acesso até a venda.
+- **PDA nova `Listing`** (seeds `["listing", asset]`, um por asset, 157 bytes, rent pago pela plataforma e devolvido ao fechar;
+  `fee_bps` e `royalty_bps` congelados no anúncio) e a PDA sem dados `market_authority`. Existe só entre o anúncio e a venda ou o
+  cancelamento. **Nenhuma conta existente muda de layout** (Config, Agent, License etc. ficam como estão).
+- **3 eventos e 9 erros novos da revenda**: `LicenseListed`, `LicenseResold`, `ListingCancelled`; `SelfPurchase` 6051,
+  `ListingMismatch` 6052, `ResaleCutTooHigh` 6053, `NotAssetOwner` 6054, `AssetNotInCollection` 6055, `ListingStillValid` 6056,
+  `CreatorCannotResell` 6057, `ListingNotAuthorized` 6058, `CancelPayerMismatch` 6059. Os eventos entram no indexador; o `Listing`
+  é espelhado numa tabela nova (migration aditiva, sobe com o deploy).
+- **Regras que importam na operação**: royalty por convenção (só a venda pelo mercado paga; transferência por fora segue livre,
+  sem royalty); teto royalty + taxa de 5000 bps; preço >= `config.min_price`; o criador não revende a própria licença (MVP); compra
+  bloqueada para solver suspenso, retirado ou com stake abaixo do mínimo (anunciar e cancelar não dependem do status); a pausa de
+  entradas bloqueia anunciar e comprar, nunca cancelar; revenda não incrementa `UserReputation` nem `Agent.total_sales`.
 - **16 instruções novas (e `slash_stake` removida)**: `propose_admin(new_admin)`, `accept_admin`, `cancel_admin_transfer` (rotação do admin em 2 etapas),
   `set_treasury` (troca a conta de USDC da tesouraria), `top_up_stake(amount)` (o criador repõe stake; reativar o
   solver ainda exige `approve_agent`), `migrate_config` (passo 4a, instrução de transição), `set_pause(flags)` e
@@ -152,7 +178,7 @@ EOF
   `guardian`, `_reserved[64]`. Exige o passo 4a. **PDA nova** `PendingAdmin` (seeds `["pending_admin", config]`,
   73 bytes): só existe entre a proposta e o aceite ou cancelamento; nenhuma outra conta existente muda.
 - **Pausa de emergência** (`Config.pause_flags`): bit 1 entradas (`register_agent`, `purchase_license`, `buy_credits`,
-  `create_escrow`), bit 2 pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`). Saídas do comprador nunca
+  `create_escrow`, `list_license`, `buy_listing`; `cancel_listing` nunca pausa), bit 2 pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`). Saídas do comprador nunca
   pausam. O admin liga e desliga; o `guardian` só liga. Nasce desligada (`0`) e sem guardian.
 - **15 eventos e 17 erros novos** (`NotPendingAdmin` 6034, `InvalidNewAdmin` 6035, `Paused` 6036, `ConfigAlreadyMigrated` 6037,
   `InvalidPauseFlags` 6038, `NotPauseAuthority` 6039, `GuardianCannotUnpause` 6040, `AgentRetired` 6041, `AgentNotRetired` 6042,
@@ -166,8 +192,17 @@ EOF
   "Compras pausadas temporariamente". Leitura que falha, Config v1 ou tamanho desconhecido **não bloqueiam**
   (fail-open): o programa recusa com `Paused` e a simulação antes da assinatura devolve a mensagem em português
   como 409. Pagamentos pausados (bit 2) só aparecem pela simulação (409), não por 503.
-- **O `.so` cresce de 715.664 para 797.496 bytes (+81.832)** (o `.so` final, com Config v2, pausa, guardian e stake com saída,
-  já com a otimização de tamanho abaixo; `ls -l target/deploy/solvers.so`). Em 2026-10-01 o `solana program show` da devnet
+- **Com a revenda o `.so` final mede 909.888 bytes** (antes dela, 797.496: +112.392 bytes; o teto da CI passou a 946.244; CU
+  máximos medidos: `list_license` 55.659 (teto de teste 70.000), `buy_listing` 51.611, `cancel_listing` 31.319; 115 testes). Para o
+  ProgramData da devnet, que em 2026-10-01 tinha `Data Length: 726216`, a extensão necessária vai a ~183.672 bytes de crescimento
+  (+ margem do script). **Custo em SOL: estimativa, confirmar no dry-run do `upgrade-devnet.sh`.** Só a parte da revenda
+  (~112 KB a mais) custa ~0,77 SOL de extensão (não volta) e o buffer do upgrade fica em ~6,3 SOL (devolvíveis ao admin). Há
+  divergência entre as taxas: o texto antigo usava 5,08e-6 SOL/byte e o LiteSVM mede 6.960 lamports/byte (~6,96e-6 SOL/byte); as
+  estimativas desta linha usam a do LiteSVM e, com a taxa antiga, saem ~27% menores. Vale o número que o dry-run imprimir, que lê o
+  `solana rent` da própria rede. Os cálculos do item seguinte são do `.so` de 797.496 bytes (sem a revenda) e ficam como histórico
+  da conta do script.
+- **Antes da revenda: o `.so` cresce de 715.664 para 797.496 bytes (+81.832)** (o `.so` com Config v2, pausa, guardian e stake com
+  saída, já com a otimização de tamanho abaixo; `ls -l target/deploy/solvers.so`). Em 2026-10-01 o `solana program show` da devnet
   mostrava `Data Length: 726216`, então o ProgramData **não** comporta o novo e a extensão é obrigatória. Conta (a regra do
   script: crescimento + 1.024 de margem, arredondado para cima a blocos de 10.240; 5,08e-6 SOL por byte):
   - crescimento = 797.496 - 726.216 = **71.280** bytes; + 1.024 = 72.304; / 10.240 = 7,06 -> **8 blocos = 81.920 bytes**;
@@ -182,16 +217,20 @@ EOF
   ligada por padrão em `programs/solvers/Cargo.toml` e `-C llvm-args=-inline-threshold=100` em `.cargo/config.toml`
   (`[target.sbpfv1-solana-solana]`, vale **só** para `anchor build --arch v1`, o que `build-program.sh` e `program.yml`
   usam; sem o arquivo o `.so` mede 880.912). O CU de cada instrução ficou entre -1,2% e +1,0% do anterior. O passo "Tamanho do
-  `.so` dentro do teto" do `program.yml` falha acima de 829.396 bytes. **Efeito visível:** o log `Program log: Instruction: X`
+  `.so` dentro do teto" do `program.yml` falha acima de 946.244 bytes (909.888 + 4%, com a revenda; era 829.396 sobre 797.496). **Efeito visível:** o log `Program log: Instruction: X`
   deixa de existir, então os explorers (Solscan, Solana Explorer) mostram a transação sem o nome da instrução (o IDL
   e os eventos seguem iguais). O build verificável (Docker, mainnet-runbook seção 3) precisa usar o mesmo `.cargo/config.toml`
   (copiado para dentro da imagem) para reproduzir o tamanho; **não verificado**.
 - **Sequência final (a ordem que vale)**: **build** (`build-program.sh`) -> **dry-run** (`upgrade-devnet.sh`) -> **upgrade**
   (`upgrade-devnet.sh --yes`) -> **`migrate-config`** (passo 4a, dry-run e `--yes`) -> **conferir** (Config com **285 bytes**,
-  `layoutVersion` 2, e as outras contas do passo 5) -> **push do servidor**.
-- **Ordem**: a sequência final acima, e o push do servidor só no fim. O servidor
+  `layoutVersion` 2, e as outras contas do passo 5) -> **push do servidor** (migration + servidor + web, com
+  `resaleEnabled=false`) -> **limpar os dados simulados da revenda** (passo 7a, com confirmação do dono) ->
+  **`cli:reindex --backfill`** (passo 8) -> **ligar `resaleEnabled`** (passo 8a).
+- **Ordem**: a sequência final acima, e o push do servidor só no fim do programa. O servidor
   novo conhece os eventos, mas não depende deles para funcionar; já o programa novo com servidor antigo só deixa os
-  eventos novos sem tratamento (o parser ignora discriminador desconhecido), sem derrubar o indexador.
+  eventos novos sem tratamento (o parser ignora discriminador desconhecido), sem derrubar o indexador. **Programa novo com
+  servidor antigo é seguro para a revenda**: o servidor antigo não monta `list_license`/`buy_listing`, então ninguém anuncia
+  e nada fica pendurado.
 
 ### Operar o admin: `cli:admin`
 
@@ -247,6 +286,8 @@ de teste da devnet). Não tente liberá-lo; basta retirá-lo do banco (passo 7).
   (decoder v2) não lê a Config. Só existe até o `migrate-config`; não dê push antes.
 - Programa novo + servidor antigo (entre os passos 4a e 6): só impede criar garantias; compras, licenças,
   leituras e o resto seguem funcionando. Se o indexador registrar falhas, o `cli:reindex --dead` do passo 8 recupera.
+- Programa novo + servidor antigo, no que toca à revenda: seguro. As instruções novas só existem se alguém as monta (o servidor
+  antigo não monta), e os eventos novos são ignorados pelo parser.
 - Servidor novo + programa antigo (push antes do upgrade): **o pior caso**. O servidor cria escrow no layout
   antigo sem aviso e ele fica irrecuperável depois do upgrade. Por isso o push só acontece no passo 6.
 
@@ -274,6 +315,15 @@ desmigrar. O que o rollback perde: a pausa e o guardian (o binário antigo ignor
 `Retired` (valor 3) no Agent, e o binário antigo **não decodifica** um Agent com esse valor (o enum dele só tem 0 a 2): o
 solver (e toda instrução que o lê) passa a falhar. Até o primeiro `request_stake_exit` o rollback é limpo; depois, só
 corrigindo para a frente (novo upgrade). Combine com os criadores antes de liberar o site para o pedido de saída.
+
+**NOTA DE ROLLBACK DA REVENDA: depois do primeiro anúncio, voltar ao `.so` antigo deixa assets com delegate pendurado.** Cada
+anúncio põe a PDA `market_authority` como `TransferDelegate` no asset da licença; o binário antigo não conhece essa PDA nem o
+`Listing`, então ninguém mais cancela ou compra, e o delegate continua no asset. Não é perda de fundos (a licença segue com o
+vendedor, a PDA só transfere com o programa novo e a authority volta a `Owner` após qualquer transferência), e o **vendedor
+revoga o delegate pela própria carteira** direto no mpl-core. O `Listing` fica preso como conta do programa (sem o
+`cancel_listing` para fechá-lo; o rent da plataforma só volta com um upgrade para a frente). Antes do primeiro anúncio o
+rollback é limpo; depois, prefira corrigir para a frente e, se for preciso voltar, desligue `resaleEnabled` primeiro. O contrário
+(programa novo com servidor antigo) é seguro. A migration da revenda é aditiva: com `resaleEnabled=false` as tabelas ficam, sem uso.
 
 ## Se algo falhar no meio
 

@@ -51,7 +51,7 @@ As `NEXT_PUBLIC_*` entram no bundle na hora do build: mudou, rode o build de nov
 | `/garantias` | Tarefas com garantia: etapas, prévia, aprovar e contestar |
 | `/perfil` | Perfil, reputação e histórico |
 | `/criador`, `/criador/publicar` | Painel do criador; formulário de publicação mockado (Fase D) |
-| `/revenda` | "Em breve" |
+| `/revenda` | Mercado de revenda de licenças (anúncios reais; "em breve" com `resaleEnabled` desligada). Regras em `docs/resale.md` |
 | `/dev/kit` | Kit de componentes (só em dev ou com `NEXT_PUBLIC_SHOW_DEV_KIT=1`) |
 
 ## Onde fica cada coisa

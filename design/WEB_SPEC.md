@@ -28,13 +28,13 @@ Vitrine do Solvers em Next.js, fiel ao design do Claude Design e ligada à API r
 | `/instalar?agent=<slug>` ★ | instalacao-guiada |
 | `/biblioteca` e `/biblioteca/memorias` | minha-biblioteca, minhas-memorias |
 | `/garantias` | garantias-em-andamento |
-| `/revenda` | mercado-de-revenda: **"em breve"** com a proposta e a lista de interesse. Sem anúncios simulados. |
+| `/revenda` | mercado-de-revenda: anúncios **reais** (licença anunciada por outros donos, com royalty ao criador). Com `resaleEnabled` desligada, mostra "em breve". Sem anúncios simulados. |
 | `/criador` e `/criador/publicar` | painel-do-criador, publicar-especialista (formulário **mockado**, sem API: fase D) |
 | `/perfil` | perfil-e-reputacao |
 | `/criadores/[id]` | perfil-de-criador |
 
 ## Regras de produto que mudam o design
-- Aluguel foi **removido** (botão "Alugar" e textos). Revenda é "em breve": nada de "Revender" na biblioteca, só um aviso discreto.
+- Aluguel foi **removido** (botão "Alugar" e textos). Revenda existe (devnet; mainnet depende dos termos com o advogado): a biblioteca tem "Anunciar" e "Cancelar anúncio" por licença e avisa que as memórias não acompanham a licença. Com `resaleEnabled` desligada, nada de "Anunciar": só um aviso discreto de "em breve".
 - Pix aparece como **"em breve"** no checkout até a fase B. O método ativo é "Saldo em USDC". Na devnet, mostrar o botão "Receber USDC de teste" (`faucet()`) quando `getConfig().faucetEnabled`.
 - A garantia usa as etapas do criador: `getAgent().guarantee`, só leitura. O comprador escreve título e descrição. O limite vem de `getMyGuarantee()`.
 - A contestação exige escolher um dos critérios **e** escrever o motivo (5 a 2000 caracteres). Não existe "Outro critério".

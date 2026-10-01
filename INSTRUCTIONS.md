@@ -41,7 +41,7 @@
 | Solver em etapas dentro do Claude | Humano de reserva (notificação por Telegram ou e-mail) |
 | Avaliação on-chain só com licença | Enclave seguro para memórias (fica no pitch) |
 | Escrow com liberação automática por testes | Construtor sem código (formulário simples ou P2) |
-| Memória criptografada no banco | Mercado de revenda completo (P2, ver seção 4.6) |
+| Memória criptografada no banco; revenda de licenças (devnet; mainnet depende dos termos com o advogado, ver seção 4.6) | — |
 
 ---
 
@@ -391,14 +391,23 @@ A criação do NFT dentro de `purchase_license` via CPI é o desenho correto (pa
 
 **Plano B:** `purchase_license` só faz o pagamento e emite o evento. O servidor escuta o evento e cria o asset com a `collection_authority` (keypair do servidor como update authority da coleção). Funciona na demo, mas é centralizado. Se usar o plano B, documentar no pitch como "migração para CPI" nos próximos passos.
 
-### 4.6 Revenda (P2)
+### 4.6 Revenda (implementada)
 
-Desenho para quando houver tempo:
+Implementada no programa (`programs/solvers/src/instructions/resale.rs`) e na devnet; **mainnet depende dos termos de revenda com o advogado** (`NEXT_STEPS.md`). Visão geral, regras e operação em `docs/resale.md`; o que muda no upgrade em `docs/devnet-upgrade.md`.
 
-* `list_license(price)`: o dono adiciona o plugin **TransferDelegate** do Metaplex Core apontando para uma PDA do programa e cria uma conta `Listing`.
-* `buy_listing`: comprador paga; o programa divide em royalty (criador), taxa (treasury) e vendedor; transfere o asset via CPI usando o delegate; fecha `Listing`.
-* Royalties: configurar o plugin Royalties da coleção. Como a revenda oficial passa pelo nosso programa, o royalty é garantido nela. Para bloquear revenda fora da plataforma, usar a regra de allowlist de programas do plugin (avaliar se vale a complexidade).
-* Memórias **não** acompanham a licença na revenda (são da carteira, não do NFT).
+**Sem custódia.** A licença não sai da carteira do vendedor até a venda. Ao anunciar, o dono aprova a PDA `market_authority` (seed `market_authority`, sem dados) como `TransferDelegate` do asset e a plataforma abre a conta `Listing`.
+
+* `list_license(price)`: vendedor assina, a plataforma paga o rent. Cria o `Listing` (PDA `["listing", asset]`, um por asset, 157 bytes) com `seller`, `asset`, `agent`, `price`, `fee_bps` (de `Config.fee_bps`), `royalty_bps` (de `Agent.royalty_bps`), `listed_at`, `rent_payer` e `bump`; taxa e royalty ficam **congelados** no anúncio. Adiciona o plugin `TransferDelegate` ao asset (ou troca a authority de um plugin que já existe). Exige `price >= config.min_price` e que `royalty_bps + fee_bps` não passe de 5000 (50%). O criador do solver não pode revender a própria licença (MVP).
+* `buy_listing(expected_price)`: comprador assina. Confere preço esperado, asset ainda do vendedor, na coleção e delegado à PDA; transfere o asset com a PDA e paga, do saldo do comprador, o **royalty** (`agent.royalty_bps` → ATA do criador), a **taxa da plataforma** (`config.fee_bps` → tesouraria) e **o resto à ATA do vendedor** (endereço derivado, não o dono atual da conta). Fecha o `Listing` e devolve o rent a quem o pagou. Bloqueada para solver suspenso, retirado ou com stake abaixo do mínimo.
+* `cancel_listing`: o vendedor cancela sempre (revoga o delegate e fecha o `Listing`). Qualquer outra carteira só fecha anúncio **velho** (dono mudou, delegate revogado ou asset queimado), para o endereço não ficar preso. Nunca pausa.
+* Eventos: `LicenseListed`, `LicenseResold` (traz `royalty`, `fee` e `seller_amount`) e `ListingCancelled`.
+* Erros novos (6051 a 6059): `SelfPurchase`, `ListingMismatch`, `ResaleCutTooHigh`, `NotAssetOwner`, `AssetNotInCollection`, `ListingStillValid`, `CreatorCannotResell`, `ListingNotAuthorized`, `CancelPayerMismatch`. Mais os já existentes `PriceTooLow`, `PriceChanged`, `AgentNotActive`, `InsufficientStake` e `Paused`.
+* Pausa: o bit de entradas (`PAUSE_ENTRIES`) bloqueia `list_license` e `buy_listing`; `cancel_listing` nunca pausa. Listar e cancelar não dependem do status do solver.
+* Royalty **por convenção**: só a venda pelo mercado paga. Transferência por fora segue livre e sem royalty (as coleções existentes usam `RuleSet::None`); bloquear isso por allowlist de programas ficou de fora.
+* Revenda não é venda do criador: não incrementa `UserReputation` nem `Agent.total_sales`.
+* O vendedor mantém o acesso até a venda. Depois de qualquer transferência o mpl-core devolve a authority do `TransferDelegate` ao dono (`Owner`), então a PDA nunca transfere duas vezes.
+* Memórias **não** acompanham a licença (são da carteira, não do NFT). As avaliações pessoais ficam com quem as escreveu e a nota é a do solver. Limite aceito no MVP: a avaliação on-chain é uma por licença (`LicenseReview` por asset); se a dona anterior já avaliou com aquele asset, o novo dono não consegue avaliar com ele.
+* Taxa e royalty (exemplo): preço 100 USDC, royalty 5%, taxa 10% → criador 5, plataforma 10, vendedor 85. Royalty e taxa arredondam para baixo; a sobra fica com o vendedor (`resale_split` em `state.rs`).
 
 ### 4.7 Testes e deploy
 
@@ -875,7 +884,9 @@ Sem datas: ordem de dependência. Cada fase termina com algo demonstrável.
 * [ ] Seed completo, backup, vídeo plano B, ensaio cronometrado
 * [ ] Slides com arquitetura e próximos passos (P2)
 
-**P2 (pitch, não construir antes do resto):** revenda com royalty, construtor sem código, enclave para memórias, arbitragem descentralizada, solvers contratando solvers via x402, lotes de uso com raiz Merkle verificável.
+**Revenda com royalty:** feita (seção 4.6), na devnet; mainnet depende dos termos com o advogado.
+
+**P2 (pitch, não construir antes do resto):** construtor sem código, enclave para memórias, arbitragem descentralizada, solvers contratando solvers via x402, lotes de uso com raiz Merkle verificável.
 
 ---
 
