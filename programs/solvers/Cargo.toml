@@ -9,7 +9,9 @@ crate-type = ["cdylib", "lib"]
 name = "solvers"
 
 [features]
-default = []
+# no-log-ix-name: tira o log "Instruction: X" de cada instrução (menos bytes e CU). Os testes identificam a
+# instrução pelo discriminador, não pelo log.
+default = ["no-log-ix-name"]
 cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-idl = []

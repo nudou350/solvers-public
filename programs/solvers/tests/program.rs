@@ -103,13 +103,62 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("CloseEscrow", 20_500),
 ];
 
-/// Nome da instrução do programa (primeiro "Program log: Instruction: X" da transação).
-fn instruction_name(logs: &[String]) -> Option<&str> {
-    logs.iter().find_map(|l| l.strip_prefix("Program log: Instruction: "))
+/// Discriminadores das instruções do programa: o nome vem do dado enviado, não do log `Instruction: X`
+/// (que some com a feature `no-log-ix-name`; e o primeiro `Instruction:` do log pode ser de um CPI).
+/// Instrução nova precisa entrar aqui (`ix_discriminators_cover_every_instruction`).
+macro_rules! ix_discriminators {
+    ($($n:ident),* $(,)?) => {
+        &[$((stringify!($n), <solvers::instruction::$n as Discriminator>::DISCRIMINATOR)),*]
+    };
+}
+const IX_DISCRIMINATORS: &[(&str, &[u8])] = ix_discriminators![
+    InitializeConfig,
+    UpdateConfig,
+    ApproveAgent,
+    SuspendAgent,
+    ProposeAdmin,
+    AcceptAdmin,
+    CancelAdminTransfer,
+    SetTreasury,
+    MigrateConfig,
+    SetPause,
+    SetGuardian,
+    RequestStakeExit,
+    ExtendStakeExit,
+    CancelStakeExit,
+    WithdrawStake,
+    ProposeSlash,
+    ContestSlash,
+    CancelSlash,
+    ExecuteSlash,
+    RegisterAgent,
+    TopUpStake,
+    UpdateVersion,
+    UpdatePricing,
+    SetEval,
+    PurchaseLicense,
+    BuyCredits,
+    ConsumeCredit,
+    RecordUsageBatch,
+    SubmitReview,
+    SubmitReviewWithCredits,
+    CreateEscrow,
+    MarkPassed,
+    ReleaseMilestone,
+    OpenDispute,
+    ResolveDispute,
+    CancelUndelivered,
+    ResolveStaleDispute,
+    CloseEscrow,
+];
+
+/// Nome da instrução do programa a partir do `data` da instrução (discriminador de 8 bytes).
+fn instruction_name(data: &[u8]) -> Option<&'static str> {
+    IX_DISCRIMINATORS.iter().find(|(_, d)| data.starts_with(d)).map(|(n, _)| *n)
 }
 
-fn assert_cu_ceiling(logs: &[String], consumed: u64) {
-    let name = instruction_name(logs).expect("log de instrução ausente");
+fn assert_cu_ceiling(data: &[u8], consumed: u64) {
+    let name = instruction_name(data).expect("discriminador de instrução desconhecido");
     let ceiling = CU_CEILINGS
         .iter()
         .find(|(n, _)| *n == name)
@@ -257,6 +306,7 @@ impl Env {
         let mut all: Vec<&Keypair> = vec![&self.payer];
         all.extend(signers.iter().copied().filter(|k| k.pubkey() != self.payer.pubkey()));
         let program_id = ix.program_id;
+        let ix_data = ix.data.clone();
         let tx = Transaction::new_signed_with_payer(&[ix], Some(&self.payer.pubkey()), &all, self.svm.latest_blockhash());
         let res = self
             .svm
@@ -264,11 +314,11 @@ impl Env {
             .map(|m| {
                 // CU_REPORT=1 imprime o consumo de cada transação (checklist de CU do review).
                 if std::env::var_os("CU_REPORT").is_some() {
-                    eprintln!("CU {} {}", m.compute_units_consumed, m.logs.iter().find(|l| l.contains("Instruction:")).map_or("", |l| l.as_str()));
+                    eprintln!("CU {} {}", m.compute_units_consumed, if program_id == solvers::ID { instruction_name(&ix_data).unwrap_or("?") } else { "-" });
                 }
                 // Com CU_REPORT=1 só mede (recalibrar a tabela); sem ela, confere os tetos.
                 if program_id == solvers::ID && std::env::var_os("CU_REPORT").is_none() {
-                    assert_cu_ceiling(&m.logs, m.compute_units_consumed);
+                    assert_cu_ceiling(&ix_data, m.compute_units_consumed);
                 }
                 m.logs
             })
@@ -4732,6 +4782,15 @@ fn cu_ceilings_cover_every_instruction() {
     for (name, _) in CU_CEILINGS {
         assert!(instructions.contains(&name.to_string()), "{name} está na tabela mas não existe em lib.rs");
     }
+}
+
+#[test]
+fn ix_discriminators_cover_every_instruction() {
+    let instructions = program_instructions();
+    for name in &instructions {
+        assert!(IX_DISCRIMINATORS.iter().any(|(n, _)| n == name), "{name} sem discriminador em IX_DISCRIMINATORS");
+    }
+    assert_eq!(IX_DISCRIMINATORS.len(), instructions.len());
 }
 
 #[test]

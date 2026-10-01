@@ -6,6 +6,9 @@ resolver = "2"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+# Nível 2 em vez do 3 (padrão do release): parte da redução do .so medida junto com a flag de inline de
+# .cargo/config.toml e a feature no-log-ix-name; o CU de cada instrução ficou a +-1,2% do anterior.
+opt-level = 2
 
 [profile.release.build-override]
 opt-level = 3

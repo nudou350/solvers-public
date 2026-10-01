@@ -166,18 +166,26 @@ EOF
   "Compras pausadas temporariamente". Leitura que falha, Config v1 ou tamanho desconhecido **não bloqueiam**
   (fail-open): o programa recusa com `Paused` e a simulação antes da assinatura devolve a mensagem em português
   como 409. Pagamentos pausados (bit 2) só aparecem pela simulação (409), não por 503.
-- **O `.so` cresce de 715.664 para 904.576 bytes (+188.912)** (o `.so` final, com Config v2, pausa, guardian e stake com saída;
-  `ls -l target/deploy/solvers.so`). Em 2026-10-01 o `solana program show` da devnet mostrava `Data Length: 726216`, então o
-  ProgramData **não** comporta o novo e a extensão é obrigatória. Conta (a regra do script: crescimento + 1.024 de margem,
-  arredondado para cima a blocos de 10.240; 5,08e-6 SOL por byte):
-  - crescimento = 904.576 - 726.216 = **178.360** bytes; + 1.024 = 179.384; / 10.240 = 17,52 -> **18 blocos = 184.320 bytes**;
-  - extensão = 184.320 x 5,08e-6 = **~0,936 SOL** (não volta);
-  - buffer do upgrade = (904.576 + 37) x 5,08e-6 = **~4,595 SOL** (volta ao admin ao final);
-  - necessário no admin = 4,595 + 0,936 + 0,05 de margem = **~5,58 SOL** (a linha "Hoje" dos pré-requisitos, ~3,83, era para
-    o `.so` de 715.664 bytes). Com o admin em ~3,70 SOL faltam ~1,88 e o script transfere ~1,9 do fee-payer (arredondado a
-    0,1), que fica com ~2,3 se hoje tiver ~4,2, acima da reserva de 1 SOL. Some ~0,0007 SOL da migração da Config (pago pelo
+- **O `.so` cresce de 715.664 para 797.496 bytes (+81.832)** (o `.so` final, com Config v2, pausa, guardian e stake com saída,
+  já com a otimização de tamanho abaixo; `ls -l target/deploy/solvers.so`). Em 2026-10-01 o `solana program show` da devnet
+  mostrava `Data Length: 726216`, então o ProgramData **não** comporta o novo e a extensão é obrigatória. Conta (a regra do
+  script: crescimento + 1.024 de margem, arredondado para cima a blocos de 10.240; 5,08e-6 SOL por byte):
+  - crescimento = 797.496 - 726.216 = **71.280** bytes; + 1.024 = 72.304; / 10.240 = 7,06 -> **8 blocos = 81.920 bytes**;
+  - extensão = 81.920 x 5,08e-6 = **~0,416 SOL** (não volta);
+  - buffer do upgrade = (797.496 + 37) x 5,08e-6 = **~4,052 SOL** (volta ao admin ao final);
+  - necessário no admin = 4,052 + 0,416 + 0,05 de margem = **~4,52 SOL** (a linha "Hoje" dos pré-requisitos, ~3,83, era para
+    o `.so` de 715.664 bytes). Com o admin em ~3,70 SOL faltam ~0,82 e o script transfere ~0,9 do fee-payer (arredondado a
+    0,1), que fica com ~3,3 se hoje tiver ~4,2, acima da reserva de 1 SOL. Some ~0,0007 SOL da migração da Config (pago pelo
     fee-payer). Estimativa: o saldo do admin e o `Data Length` mudam, então confira antes e use o dry-run do passo 2, que
-    imprime os números reais.
+    imprime os números reais. (Sem a otimização o `.so` seria de 904.576 bytes e a extensão de ~0,94 SOL.)
+- **Tamanho do `.so` (otimização do build)**: `opt-level = 2` no `[profile.release]` do `Cargo.toml`, a feature `no-log-ix-name`
+  ligada por padrão em `programs/solvers/Cargo.toml` e `-C llvm-args=-inline-threshold=100` em `.cargo/config.toml`
+  (`[target.sbpfv1-solana-solana]`, vale **só** para `anchor build --arch v1`, o que `build-program.sh` e `program.yml`
+  usam; sem o arquivo o `.so` mede 880.912). O CU de cada instrução ficou entre -1,2% e +1,0% do anterior. O passo "Tamanho do
+  `.so` dentro do teto" do `program.yml` falha acima de 829.396 bytes. **Efeito visível:** o log `Program log: Instruction: X`
+  deixa de existir, então os explorers (Solscan, Solana Explorer) mostram a transação sem o nome da instrução (o IDL
+  e os eventos seguem iguais). O build verificável (Docker, mainnet-runbook seção 3) precisa usar o mesmo `.cargo/config.toml`
+  (copiado para dentro da imagem) para reproduzir o tamanho; **não verificado**.
 - **Sequência final (a ordem que vale)**: **build** (`build-program.sh`) -> **dry-run** (`upgrade-devnet.sh`) -> **upgrade**
   (`upgrade-devnet.sh --yes`) -> **`migrate-config`** (passo 4a, dry-run e `--yes`) -> **conferir** (Config com **285 bytes**,
   `layoutVersion` 2, e as outras contas do passo 5) -> **push do servidor**.

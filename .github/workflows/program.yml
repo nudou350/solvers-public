@@ -11,6 +11,7 @@ on:
     paths:
       - "programs/**"
       - "Cargo.toml"
+      - ".cargo/**"
       - "Cargo.lock"
       - "Anchor.toml"
       - "packages/solvers-client/**"
@@ -22,6 +23,7 @@ on:
     paths:
       - "programs/**"
       - "Cargo.toml"
+      - ".cargo/**"
       - "Cargo.lock"
       - "Anchor.toml"
       - "packages/solvers-client/**"
@@ -190,6 +192,20 @@ jobs:
           anchor build --arch v1 --ignore-keys
           test -s target/deploy/solvers.so
           test -s target/idl/solvers.json
+
+      # Teto de tamanho do .so: 797.496 bytes medidos em 2026-10-01 + 4% = 829.396. O -inline-threshold de
+      # .cargo/config.toml só vale para o alvo de `--arch v1` (`[target.sbpfv1-solana-solana]`): com outro --arch
+      # o alvo muda e a flag some em silêncio (sem a flag o .so mede ~880 KB). Este passo transforma isso em falha.
+      # Se o programa crescer de verdade, suba o teto aqui junto com docs/devnet-upgrade.md (conta de SOL).
+      - name: Tamanho do .so dentro do teto
+        run: |
+          max=829396
+          size=$(stat -c %s target/deploy/solvers.so)
+          echo "solvers.so: ${size} bytes (teto ${max})"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error title=.so acima do teto::${size} > ${max} bytes. Confira se .cargo/config.toml foi aplicado (anchor build --arch v1) e se o programa cresceu de propósito."
+            exit 1
+          fi
 
       - name: IDL com o mesmo endereço do declare_id! e do Anchor.toml
         run: |

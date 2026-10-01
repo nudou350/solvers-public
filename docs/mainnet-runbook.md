@@ -23,7 +23,7 @@ Trava no código: `apps/server/src/env.ts` recusa o boot com `SOLANA_CLUSTER=mai
 
 ### 1. Preparar (nada on-chain)
 1. **Keypair novo do programa**, em máquina offline: `solana-keygen new --outfile program-mainnet.json` (frase de passe se possível). Anote o endereço: é o novo `declare_id!`. Backup em 2 locais; sem esta chave não há deploy inicial (depois dele ela deixa de ser necessária).
-2. **Chave de deploy**: `solana-keygen new --outfile deploy-mainnet.json` (nome sem "admin"; o script recusa). Envie SOL de uma carteira sua: buffer (~3,9 SOL, volta ao reembolso) + rent do programa no deploy inicial + margem. O dry-run do script imprime o valor exato.
+2. **Chave de deploy**: `solana-keygen new --outfile deploy-mainnet.json` (nome sem "admin"; o script recusa). Envie SOL de uma carteira sua: buffer (~4,05 SOL para o `.so` de 797.496 bytes, volta ao reembolso) + rent do programa no deploy inicial + margem. O dry-run do script imprime o valor exato.
 3. **Squad**: criar o Squads v4 (2-de-3) e anotar o **endereço do vault 0** (é ele, não o endereço do Squad/multisig, a upgrade authority). Cada membro confere o endereço pelo próprio painel.
 4. **Carteira fria do admin** e **dispositivo do guardian**: só os endereços públicos entram nos comandos abaixo.
 5. **Mint de USDC da mainnet**: confira o endereço na documentação oficial da Circle antes de pôr em `USDC_MINT` (o endereço público conhecido é `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`; **[não verificado]** contra a fonte oficial nesta sessão).
@@ -44,6 +44,7 @@ Meta: o `.so` do deploy sai de build determinístico, e outra pessoa/máquina re
 - Existe `solanafoundation/solana-verifiable-build:3.0.0` (manifest ok), a imagem usada pelo `solana-verify build`. **`solana-verify` não está instalado** no WSL, e não conferi se instala (`cargo install solana-verify`) nem se aceita o nosso `--arch v1`.
 - **Decisão pendente do dono/devops:** (a) `anchor build --verifiable --docker-image solanafoundation/anchor:v1.0.2 --solana-version 3.0.0`, ou (b) `solana-verify build` com a imagem 3.0.0. Escolha uma, rode no ensaio, builde **duas vezes em máquinas diferentes** e compare o sha256. Se nenhuma reproduzir, a alternativa honesta é publicar o hash do `.so` e o commit, sem selo de "verificado".
 - O `.so` da devnet saiu de build **fora do Docker**: não serve de referência de hash.
+- O tamanho do `.so` depende de `.cargo/config.toml` (`-inline-threshold=100`, só para `--arch v1`), de `opt-level = 2` e da feature `no-log-ix-name` (sem o log `Instruction: X` nos explorers). Um build verificável em Docker precisa enxergar o mesmo `.cargo/config.toml`, senão o hash e o tamanho (hoje 797.496 bytes; o CI falha acima de 829.396) mudam. **[não verificado]** com `solana-verify`/`anchor build --verifiable`.
 - Por isso o job `verifiable-build` **não foi** adicionado ao `.github/workflows/program.yml` (não consegui justificar que a imagem para Anchor 1.2.0 existe). Quando a decisão acima for tomada, acrescentar o job `continue-on-error: true` com a imagem escolhida.
 
 ### 4. Deploy inicial

@@ -1,0 +1,6 @@
+# Só vale para o alvo SBF v1 (`anchor build --arch v1`, usado por scripts/chain/build-program.sh e pelo
+# .github/workflows/program.yml). Com outro --arch o nome do alvo muda e esta flag deixa de ser aplicada em
+# silêncio e o .so volta a crescer (o CI confere o tamanho máximo).
+# inline-threshold=100 + opt-level=2 (Cargo.toml) + feature no-log-ix-name: -11,9% no .so, CU +-1%.
+[target.sbpfv1-solana-solana]
+rustflags = ["-C", "llvm-args=-inline-threshold=100"]
