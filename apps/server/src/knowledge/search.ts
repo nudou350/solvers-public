@@ -9,7 +9,7 @@ const RELEVANCE_MARGIN = 0.01;
 
 /** Busca em linguagem natural na vitrine e no find_solver: top N solvers ativos para a necessidade. */
 export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow[]> {
-  const listed = and(eq(schema.agents.status, "active"), eq(schema.agents.listed, true));
+  const listed = and(eq(schema.agents.status, "active"), eq(schema.agents.platformStatus, "active"), eq(schema.agents.listed, true));
   // Enquanto o modelo carrega (primeiro boot), usa full text para não travar a requisição.
   const vec = embeddingsLoaded() ? (await embed([need], "query"))?.[0] : undefined;
   if (vec) {

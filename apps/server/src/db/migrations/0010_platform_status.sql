@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "platform_status" text DEFAULT 'active' NOT NULL;

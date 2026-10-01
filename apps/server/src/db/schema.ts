@@ -64,7 +64,9 @@ export const agents = pgTable(
     royaltyBps: integer("royalty_bps").notNull().default(0),
     evalScoreBps: integer("eval_score_bps").notNull().default(0),
     evalHash: text("eval_hash"),
-    status: text("status").notNull().default("pending"), // pending | active | suspended
+    status: text("status").notNull().default("pending"), // pending | active | suspended (espelho da conta on-chain: o indexador reescreve)
+    /** Kill switch da plataforma: active | suspended. NUNCA escrito pelo indexador (PACKAGE_SPEC.md 15.4). */
+    platformStatus: text("platform_status").notNull().default("active"),
     totalSales: u64("total_sales").notNull().default(sql`0`),
     verifiedUses: u64("verified_uses").notNull().default(sql`0`),
     ratingSum: u64("rating_sum").notNull().default(sql`0`),

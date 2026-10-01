@@ -41,6 +41,7 @@ import {
 } from "./catalog.js";
 import { toLicense, toReputation } from "./mappers.js";
 import { trialUsage } from "../runtime/access.js";
+import { agentIsAvailable } from "../runtime/availability.js";
 import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
@@ -378,7 +379,8 @@ storeRouter.post(
     // Só licença vitalícia: o pagamento por uso (type "credits") acabou e é recusado com 400.
     const body = parse(z.object({ agentId: z.string(), type: z.literal("permanent").default("permanent") }), req.body);
     const row = await findAgentRow(body.agentId);
-    if (row.status !== "active") throw badRequest("Este especialista ainda não está disponível para compra.");
+    // Suspenso pela plataforma (platformStatus) também não vende: a coluna `status` é só o espelho da cadeia.
+    if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
     // update_pricing não emite evento: confere o preço on-chain e, se mudou, espelha e responde 409 price_changed.
     await assertFreshPrice(row);
     const c = chain();

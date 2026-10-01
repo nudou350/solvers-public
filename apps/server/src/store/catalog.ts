@@ -4,6 +4,7 @@ import { unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shar
 import { env } from "../env.js";
 import { db, schema } from "../db/index.js";
 import { notFound } from "../lib/http.js";
+import { isAgentId } from "../runtime/agent-ids.js";
 import { getPackage } from "../runtime/packages.js";
 import { trialInfo } from "../runtime/trial.js";
 import { brlPerUsd } from "./fx.js";
@@ -65,7 +66,7 @@ const publishedAtSql = sql`coalesce(
 )`;
 
 export async function listAgents(query: ListQuery): Promise<Agent[]> {
-  const conds = [eq(schema.agents.status, "active"), eq(schema.agents.listed, true)];
+  const conds = [eq(schema.agents.status, "active"), eq(schema.agents.platformStatus, "active"), eq(schema.agents.listed, true)];
   if (query.category) conds.push(eq(schema.agents.category, query.category));
   if (query.q) {
     const like = `%${query.q}%`;
@@ -94,11 +95,15 @@ export async function listAgents(query: ListQuery): Promise<Agent[]> {
   return mapAgents(rows);
 }
 
+/**
+ * Busca por `id` (32 hex) ou `slug`, nunca pelos dois ao mesmo tempo: o formato decide a coluna.
+ * Um slug não pode ter formato de id (validado no manifest), então não há como um agente "roubar" a busca de outro.
+ */
 export async function findAgentRow(idOrSlug: string): Promise<AgentRow> {
   const [row] = await db
     .select()
     .from(schema.agents)
-    .where(or(eq(schema.agents.id, idOrSlug), eq(schema.agents.slug, idOrSlug)))
+    .where(isAgentId(idOrSlug) ? eq(schema.agents.id, idOrSlug) : eq(schema.agents.slug, idOrSlug))
     .limit(1);
   if (!row) throw notFound("Especialista não encontrado");
   return row;
@@ -111,7 +116,7 @@ export async function creatorStats(creatorId: string): Promise<CreatorStats> {
       ratingSum: sql<number>`coalesce(sum(${schema.agents.ratingSum}), 0)`.mapWith(Number),
       ratingCount: sql<number>`coalesce(sum(${schema.agents.ratingCount}), 0)`.mapWith(Number),
       disputesLost: sql<number>`coalesce(sum(${schema.agents.disputesLost}), 0)`.mapWith(Number),
-      agentsPublished: sql<number>`count(*) filter (where ${schema.agents.status} = 'active')`.mapWith(Number),
+      agentsPublished: sql<number>`count(*) filter (where ${schema.agents.status} = 'active' and ${schema.agents.platformStatus} = 'active')`.mapWith(Number),
     })
     .from(schema.agents)
     .where(eq(schema.agents.creatorId, creatorId));
@@ -147,7 +152,7 @@ export async function getCreatorProfile(creatorId: string): Promise<CreatorProfi
   const rows = await db
     .select()
     .from(schema.agents)
-    .where(and(eq(schema.agents.creatorId, creatorId), eq(schema.agents.status, "active"), eq(schema.agents.listed, true)));
+    .where(and(eq(schema.agents.creatorId, creatorId), eq(schema.agents.status, "active"), eq(schema.agents.platformStatus, "active"), eq(schema.agents.listed, true)));
   return { creator, agents: await mapAgents(rows) };
 }
 
@@ -239,7 +244,7 @@ export async function listCategories(): Promise<{ category: string; count: numbe
   return db
     .select({ category: schema.agents.category, count: sql<number>`count(*)`.mapWith(Number) })
     .from(schema.agents)
-    .where(and(eq(schema.agents.status, "active"), eq(schema.agents.listed, true)))
+    .where(and(eq(schema.agents.status, "active"), eq(schema.agents.platformStatus, "active"), eq(schema.agents.listed, true)))
     .groupBy(schema.agents.category)
     .orderBy(schema.agents.category);
 }
