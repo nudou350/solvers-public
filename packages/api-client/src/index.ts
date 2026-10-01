@@ -17,6 +17,7 @@ import {
   Profile,
   PublicConfig,
   Review,
+  SodaxQuote,
   SubmitResponse,
   TxResponse,
   UsageSummary,
@@ -138,6 +139,16 @@ export function createApi(opts: ApiOptions = {}) {
     getPixCharge: (id: string) => req(PixCharge, `/api/pix/charges/${encodeURIComponent(id)}`),
     /** Só quando getConfig().pix.simulate: aprova a cobrança sem pagar e credita o USDC de teste. */
     simulatePixPayment: (id: string) => post(PixCharge, `/api/pix/charges/${encodeURIComponent(id)}/simulate`),
+    /**
+     * SODAX na demo (só quando getConfig().sodax?.enabled): getSodaxQuote devolve a cotação REAL do que o
+     * comprador pagaria na outra rede para receber o USDC que falta. createSodaxCharge abre a cobrança e
+     * simulateSodaxPayment credita o USDC de teste (nenhum dinheiro real). Consulte a cobrança com getPixCharge.
+     */
+    getSodaxQuote: (q: { agentId: string; type: "permanent" | "guarantee"; source: string }) =>
+      req(SodaxQuote, `/api/sodax/quote?${new URLSearchParams(q)}`),
+    createSodaxCharge: (body: { agentId: string; type: "permanent" | "guarantee"; source: string }) =>
+      post(PixCharge, "/api/sodax/charges", body),
+    simulateSodaxPayment: (id: string) => post(PixCharge, `/api/sodax/charges/${encodeURIComponent(id)}/simulate`),
     faucet: () => post(z.object({ signature: z.string(), amountUsdc: z.number() }).passthrough(), "/api/faucet"),
 
     /** Memórias: se a API responder 409 memory_key_required, chame unlockMemories e tente de novo. */

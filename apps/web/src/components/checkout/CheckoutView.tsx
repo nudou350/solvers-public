@@ -1,7 +1,7 @@
 "use client";
 // Checkout: licença permanente ou tarefa com garantia (design: checkout-licenca e checkout-com-garantia).
 // Entrar → (garantia: descrever a tarefa) → forma de pagamento (saldo em USDC ou Pix) → revisar e pagar.
-import type { AgentDetail, GuaranteeStatus, PixCharge } from "@solvers/api-client";
+import type { AgentDetail, GuaranteeStatus, PixCharge, SodaxQuote } from "@solvers/api-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -17,10 +17,12 @@ import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { txErrorMessage, useFaucet, useTx, type TxErrorInfo } from "@/lib/tx";
 import { PixPanel } from "./PixPanel";
+import { SodaxPanel } from "./SodaxPanel";
+import { SodaxQuoteCard } from "./SodaxQuote";
 import s from "./checkout.module.css";
 import type { CheckoutType } from "./util";
 
-type PayMethod = "wallet" | "pix";
+type PayMethod = "wallet" | "pix" | "sodax";
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 120;
@@ -78,6 +80,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
 
   // ----- forma de pagamento -----
   const pixOn = !!config?.pix.enabled;
+  // SODAX (demo): opção para quem já tem cripto em outra rede; só aparece quando o servidor liga. Fica fora do padrão.
+  const sodaxCfg = config?.sodax?.enabled ? config.sodax : null;
+  const [sodaxPick, setSodaxPick] = useState<string | null>(null);
+  const sodaxSource = sodaxPick ?? sodaxCfg?.sources[0]?.key ?? "";
+  const [sodaxQuote, setSodaxQuote] = useState<SodaxQuote | null>(null);
   const [method, setMethod] = useState<PayMethod | null>(null);
   const enough = balance != null && balance + 1e-9 >= total;
   const effMethod: PayMethod = method ?? (pixOn && balance != null && !enough ? "pix" : "wallet");
@@ -126,7 +133,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     setChargeWallet(null);
     setPixError(null);
     creditedOnce.current = null;
-    toast({ tone: "info", title: "O Pix anterior foi fechado", text: "Ele era de outra conta. Gere um novo para esta." });
+    toast({ tone: "info", title: "A cobrança anterior foi fechada", text: "Ela era de outra conta. Gere uma nova para esta." });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meWallet, chargeWallet, charge]);
 
@@ -184,12 +191,13 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
     [loadAccount, purchase],
   );
 
-  async function startPix() {
+  /** Abre a cobrança (Pix ou SODAX) para a carteira atual; o painel de cada uma segue dali. */
+  async function startCharge(create: () => Promise<PixCharge>) {
     setPixPending(true);
     setPixError(null);
     try {
       const w = await requireWallet();
-      const c = await api.createPixCharge({ agentId: agent.id, type });
+      const c = await create();
       // A conta mudou enquanto a cobrança era criada: não mostra o QR de outra carteira.
       if (meWalletRef.current && meWalletRef.current !== w.address) return;
       setChargeWallet(w.address);
@@ -216,11 +224,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   }
 
   const alreadyOwned = owned && type === "permanent";
-  const canPay = !!config && agree && !alreadyOwned && limitsOk && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
+  // SODAX só segue com uma cotação ao vivo na tela: é ela que a pessoa está aceitando.
+  const sodaxReady = effMethod !== "sodax" || (!!sodaxCfg && sodaxQuote != null);
+  const canPay = !!config && agree && !alreadyOwned && limitsOk && sodaxReady && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
   function pay() {
     setTouched(true);
     if (!canPay) return;
-    if (effMethod === "pix") void startPix();
+    if (effMethod === "pix") void startCharge(() => api.createPixCharge({ agentId: agent.id, type }));
+    else if (effMethod === "sodax") void startCharge(() => api.createSodaxCharge({ agentId: agent.id, type, source: sodaxSource }));
     else void purchase();
   }
 
@@ -245,7 +256,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
   const stepReview = n++;
   const logged = status === "authed" && !!me;
   const busy = tx.pending || pixPending;
-  const showPix = !!charge;
+  const showCharge = !!charge;
+  const showSodax = charge?.provider === "sodax";
+  const restartCharge = () => {
+    setCharge(null);
+    setChargeWallet(null);
+    creditedOnce.current = null;
+    tx.reset();
+  };
 
   return (
     <>
@@ -277,8 +295,8 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                     <div className="small muted">{me.email ?? (me.displayName ? `Carteira ${short(me.wallet)}` : "Conectada")}</div>
                   </div>
                   <div className="col" style={gap(4, { alignItems: "flex-end" })}>
-                    <SwitchAccount disabled={busy || showPix} />
-                    {showPix ? <span className="tiny faint">Cancele o Pix para trocar de conta.</span> : null}
+                    <SwitchAccount disabled={busy || showCharge} />
+                    {showCharge ? <span className="tiny faint">Cancele o pagamento para trocar de conta.</span> : null}
                   </div>
                 </div>
               ) : walletKind === "privy" ? (
@@ -335,7 +353,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                       onChange={(e) => setTitle(e.target.value)}
                       aria-invalid={touched && !titleOk}
                       aria-describedby="tarefa-titulo-ajuda"
-                      disabled={busy || showPix}
+                      disabled={busy || showCharge}
                     />
                     <span id="tarefa-titulo-ajuda" className={`tiny ${touched && !titleOk ? "warn" : "faint"}`}>
                       De {TITLE_MIN} a {TITLE_MAX} caracteres.
@@ -354,7 +372,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                       onChange={(e) => setDesc(e.target.value)}
                       aria-invalid={touched && !descOk}
                       aria-describedby="tarefa-ajuda"
-                      disabled={busy || showPix}
+                      disabled={busy || showCharge}
                     />
                     <span id="tarefa-ajuda" className={`tiny num ${s.counter} ${touched && !descOk ? "warn" : "faint"}`}>
                       {desc.trim().length < DESC_MIN ? `Mínimo de ${DESC_MIN} caracteres · ` : ""}
@@ -374,7 +392,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                           aria-checked={deliveryDays === d}
                           className={deliveryDays === d ? "on" : undefined}
                           onClick={() => setDeliveryDays(d)}
-                          disabled={busy || showPix}
+                          disabled={busy || showCharge}
                         >
                           {d} dias
                         </button>
@@ -472,11 +490,11 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
             {/* Forma de pagamento */}
             <div className="card pad col" style={gap(18)}>
               <div className="row" style={gap(14)}>
-                <StepDot n={stepPay} done={showPix && charge?.status === "credited"} />
+                <StepDot n={stepPay} done={showCharge && charge?.status === "credited"} />
                 <h2 className="h3">Como você quer pagar</h2>
               </div>
               {pixOn ? (
-                <button type="button" className={`opt ${effMethod === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")} aria-pressed={effMethod === "pix"} disabled={busy || showPix}>
+                <button type="button" className={`opt ${effMethod === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")} aria-pressed={effMethod === "pix"} disabled={busy || showCharge}>
                   <span className="dot-r" />
                   <span className="col grow" style={gap(2)}>
                     <span className="row wrapx" style={gap(8)}>
@@ -495,7 +513,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   </span>
                 </div>
               )}
-              <button type="button" className={`opt ${effMethod === "wallet" ? "on" : ""}`} onClick={() => setMethod("wallet")} aria-pressed={effMethod === "wallet"} disabled={busy || showPix}>
+              <button type="button" className={`opt ${effMethod === "wallet" ? "on" : ""}`} onClick={() => setMethod("wallet")} aria-pressed={effMethod === "wallet"} disabled={busy || showCharge}>
                 <span className="dot-r" />
                 <span className="col grow" style={gap(2)}>
                   <b>Saldo em USDC</b>
@@ -508,6 +526,31 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   ) : null}
                 </span>
               </button>
+              {sodaxCfg ? (
+                <>
+                  <button type="button" className={`opt ${effMethod === "sodax" ? "on" : ""}`} onClick={() => setMethod("sodax")} aria-pressed={effMethod === "sodax"} disabled={busy || showCharge}>
+                    <span className="dot-r" />
+                    <span className="col grow" style={gap(2)}>
+                      <span className="row wrapx" style={gap(8)}>
+                        <b>SODAX</b>
+                        <Chip tone="warn">Teste</Chip>
+                      </span>
+                      <span className="small muted">Para quem já tem cripto em outra rede (como Ethereum, Base ou Arbitrum). Você vê a cotação e o valor chega aqui em USDC.</span>
+                    </span>
+                  </button>
+                  {effMethod === "sodax" && !showCharge ? (
+                    <SodaxQuoteCard
+                      agentId={agent.id}
+                      type={type}
+                      sources={sodaxCfg.sources}
+                      source={sodaxSource}
+                      onSource={setSodaxPick}
+                      onQuote={setSodaxQuote}
+                      disabled={busy}
+                    />
+                  ) : null}
+                </>
+              ) : null}
               {logged && effMethod === "wallet" && balance != null && !enough ? (
                 <Notice
                   tone="warn"
@@ -541,22 +584,14 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
             <div className="card pad col" style={gap(16)}>
               <div className="row" style={gap(14)}>
                 <StepDot n={stepReview} />
-                <h2 className="h3">{showPix ? "Pague com Pix" : "Revisar e pagar"}</h2>
+                <h2 className="h3">{showSodax ? "Pague com SODAX" : showCharge ? "Pague com Pix" : "Revisar e pagar"}</h2>
               </div>
-              {showPix && charge ? (
-                <PixPanel
-                  charge={charge}
-                  ownerWallet={chargeWallet ?? ""}
-                  totalUsdc={total}
-                  onUpdate={setCharge}
-                  onCredited={onCredited}
-                  onRestart={() => {
-                    setCharge(null);
-                    setChargeWallet(null);
-                    creditedOnce.current = null;
-                    tx.reset();
-                  }}
-                />
+              {showCharge && charge ? (
+                showSodax ? (
+                  <SodaxPanel charge={charge} quote={sodaxQuote} ownerWallet={chargeWallet ?? ""} onUpdate={setCharge} onCredited={onCredited} onRestart={restartCharge} />
+                ) : (
+                  <PixPanel charge={charge} ownerWallet={chargeWallet ?? ""} totalUsdc={total} onUpdate={setCharge} onCredited={onCredited} onRestart={restartCharge} />
+                )
               ) : (
                 <>
                   <button
@@ -594,7 +629,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                   title="O preço do especialista mudou"
                   actions={
                     // Pix já pago e creditado: a compra só segue quando a pessoa confirma o novo valor.
-                    showPix && charge?.status === "credited" ? (
+                    showCharge && charge?.status === "credited" ? (
                       <Button size="sm" loading={tx.pending} onClick={() => void purchase()}>
                         Confirmar e pagar {totalText}
                       </Button>
@@ -628,7 +663,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                       <Button size="sm" onClick={doLogin}>
                         Entrar de novo
                       </Button>
-                    ) : tx.error.action === "retry" || (showPix && charge?.status === "credited") ? (
+                    ) : tx.error.action === "retry" || (showCharge && charge?.status === "credited") ? (
                       <Button size="sm" icon="refresh" onClick={() => void purchase()}>
                         Tentar de novo
                       </Button>
@@ -655,7 +690,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                       className={m.id === type ? "on" : undefined}
                       style={{ flex: 1, justifyContent: "center", whiteSpace: "nowrap", paddingInline: 10 }}
                       onClick={() => switchType(m.id)}
-                      disabled={busy || showPix}
+                      disabled={busy || showCharge}
                     >
                       {m.label}
                     </button>

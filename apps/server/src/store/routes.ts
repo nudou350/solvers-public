@@ -23,6 +23,7 @@ import { processSignature } from "../indexer/processor.js";
 import { assertFreshPrice } from "./fresh-price.js";
 import { brlPerUsd } from "./fx.js";
 import { pixConfig } from "../pix/routes.js";
+import { sodaxConfig } from "../sodax/routes.js";
 import type { Signature } from "@solvers/chain";
 import { refreshLicenseOwner } from "../indexer/sync.js";
 import { searchAgentRows } from "../knowledge/search.js";
@@ -45,8 +46,8 @@ import { agentIsAvailable } from "../runtime/availability.js";
 import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
-
 import { buildForUserChecked } from "./tx-build.js";
+
 export const storeRouter = Router();
 
 // ---------- Público ----------
@@ -74,6 +75,7 @@ storeRouter.get(
       guaranteeMinSales: env.GUARANTEE_MIN_SALES,
       guaranteeMinRating: env.GUARANTEE_MIN_RATING,
       pix: pixConfig(),
+      sodax: sodaxConfig(),
     };
   }),
 );

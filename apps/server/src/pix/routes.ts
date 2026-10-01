@@ -22,10 +22,10 @@ import { createPixOrder, getOrder, orderPayment, verifyWebhookSignature } from "
 
 const MIN_CENTS = 100; // R$ 1
 const MAX_CENTS = 50_000; // R$ 500
-const MAX_PENDING = 3;
-const TTL_MS = 30 * 60_000; // PT30M, igual à expiração pedida ao Mercado Pago
+export const MAX_PENDING = 3;
+export const TTL_MS = 30 * 60_000; // PT30M, igual à expiração pedida ao Mercado Pago
 
-type Row = typeof schema.pixCharges.$inferSelect;
+export type Row = typeof schema.pixCharges.$inferSelect;
 
 const isMainnet = () => env.SOLANA_CLUSTER === "mainnet-beta";
 
@@ -40,7 +40,7 @@ export function pixConfig(): PixConfig {
   };
 }
 
-function toPixCharge(r: Row): PixCharge {
+export function toPixCharge(r: Row): PixCharge {
   return {
     id: r.id,
     provider: r.provider as PixCharge["provider"],
@@ -57,12 +57,12 @@ function toPixCharge(r: Row): PixCharge {
     explorerUrl: r.status === "credited" && r.creditSignature ? explorerUrl("tx", r.creditSignature) : null,
     // Cobranças antigas de créditos (pagamento por uso acabou) saem sem purpose.
     purpose: r.purpose && (r.purpose.type as string) !== "credits" ? r.purpose : null,
-    simulated: r.provider === "simulated",
+    simulated: r.provider !== "mercadopago",
     createdAt: r.createdAt.toISOString(),
   };
 }
 
-async function load(id: string): Promise<Row | undefined> {
+export async function load(id: string): Promise<Row | undefined> {
   const [row] = await db.select().from(schema.pixCharges).where(eq(schema.pixCharges.id, id));
   return row;
 }
@@ -106,7 +106,7 @@ async function sync(row: Row): Promise<Row> {
 }
 
 /** Quanto falta (em unidades de USDC) para a compra pretendida, descontando o saldo da carteira. */
-async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
+export async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
   const row = await findAgentRow(agentId);
   if (!agentIsAvailable(row)) throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
@@ -219,7 +219,7 @@ pixRouter.post(
   }),
 );
 
-async function ownCharge(wallet: string, id: string): Promise<Row> {
+export async function ownCharge(wallet: string, id: string): Promise<Row> {
   const row = await load(id);
   if (!row || row.wallet !== wallet) throw notFound("Cobrança Pix não encontrada");
   return row;

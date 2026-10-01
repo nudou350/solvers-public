@@ -76,6 +76,10 @@ const base = z.object({
   MP_TEST_MODE: optBool,
   /** Permite simular a aprovação do Pix sem o Mercado Pago. Padrão: true fora da mainnet; nunca na mainnet. */
   PIX_SIMULATE: optBool,
+  /** Opção de pagamento SODAX na demo (cotação real + pagamento de teste). Padrão: true fora da mainnet; nunca na mainnet. */
+  SODAX_SIMULATE: optBool,
+  /** API pública de swaps do SODAX (sem chave). Sobrescreva só para testes. */
+  SODAX_API_URL: z.string().url().default("https://api.sodax.com/v1/swaps"),
 });
 
 const schema = base.transform((e) => {
@@ -84,6 +88,7 @@ const schema = base.transform((e) => {
     ...e,
     MP_TEST_MODE: e.MP_TEST_MODE ?? !mainnet,
     PIX_SIMULATE: !mainnet && (e.PIX_SIMULATE ?? true),
+    SODAX_SIMULATE: !mainnet && (e.SODAX_SIMULATE ?? true),
   };
 });
 

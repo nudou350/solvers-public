@@ -8,6 +8,7 @@ import { optionalAuth } from "./auth/jwt.js";
 import { storeRouter } from "./store/routes.js";
 import { webhookRouter } from "./indexer/poller.js";
 import { pixRouter, pixWebhookRouter } from "./pix/routes.js";
+import { sodaxRouter } from "./sodax/routes.js";
 import { errorHandler } from "./lib/http.js";
 import { pool } from "./db/index.js";
 
@@ -71,10 +72,11 @@ export function createApp(mounts: Mount[] = []): Express {
   app.use("/api", webCors, express.json({ limit: "256kb" }), cookieParser(), byIp, optionalAuth, byWallet);
   app.use(["/api/search", "/api/tx", "/api/faucet"], costly);
   // Criar/simular Pix tem o mesmo limite do faucet; a consulta (polling do front) não.
-  app.use("/api/pix", (req, res, next) => (req.method === "POST" ? costly(req, res, next) : next()));
+  app.use(["/api/pix", "/api/sodax"], (req, res, next) => (req.method === "POST" ? costly(req, res, next) : next()));
   app.use("/api/auth", authRouter);
   app.use("/api", storeRouter);
   app.use("/api", pixRouter);
+  app.use("/api", sodaxRouter);
 
   for (const mount of mounts) mount(app);
 

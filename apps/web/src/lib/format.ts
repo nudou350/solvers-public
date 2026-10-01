@@ -16,6 +16,15 @@ export const brl0 = (usdc: number, rate: number) => `R$ ${fixed(Math.round(usdc 
 export const brlValue = (reais: number, digits = 2) => `R$ ${fixed(reais, digits)}`;
 /** "25 USDC" / "12,50 USDC". */
 export const usdc = (n: number) => `${fixed(n, n % 1 ? 2 : 0)} USDC`;
+/**
+ * Valor cripto de outra rede para mostrar na tela: "0,001858 ETH", "12,40 USDC". Arredonda para CIMA na casa
+ * mostrada, para a tela nunca prometer pagar menos do que a cotação pede.
+ */
+export function cryptoAmount(n: number, symbol: string): string {
+  const d = symbol === "USDC" ? 2 : n >= 1 ? 4 : n >= 0.01 ? 5 : 6;
+  const up = Math.ceil(n * 10 ** d - 1e-9) / 10 ** d;
+  return `${fixed(up, d)} ${symbol}`;
+}
 export const int = (n: number) => Number(n).toLocaleString("pt-BR");
 export const dec1 = (n: number) => fixed(n, 1);
 /** Variação com sinal: "+3,2%", "−1,0%". */

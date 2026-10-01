@@ -248,12 +248,48 @@ export const PixConfig = z.object({
   maxBrl: z.number(),
 });
 
+/**
+ * SODAX na demo: o comprador escolhe pagar com cripto de outra rede (Ethereum, Base, Arbitrum...). A cotação é
+ * real (API pública do SODAX); o pagamento é simulado e credita USDC de teste. A execução real do swap exige
+ * mainnet (o SODAX não tem testnet) e fica para a próxima fase.
+ */
+export const SodaxSource = z.object({
+  key: z.string(),
+  /** Texto curto para a opção, ex.: "ETH na Base". */
+  label: z.string(),
+  network: z.string(),
+  symbol: z.string(),
+});
+
+export const SodaxConfig = z.object({
+  /** false na mainnet (execução real ainda não existe) ou com SODAX_SIMULATE desligado. */
+  enabled: z.boolean(),
+  /** Mostra o botão de pagamento de teste (só fora da mainnet). */
+  simulate: z.boolean(),
+  sources: z.array(SodaxSource),
+});
+
+/** GET /api/sodax/quote: quanto o comprador pagaria na outra rede para receber o USDC que falta. */
+export const SodaxQuote = z.object({
+  source: SodaxSource,
+  /** Valor a pagar na origem, já com folga para a taxa (decimal, ex.: 0.00741). */
+  payAmount: z.number(),
+  /** USDC que chegariam na carteira (>= o necessário; maior quando o valor mínimo do SODAX foi aplicado). */
+  receiveUsdc: z.number(),
+  /** USDC que faltam para a compra (descontado o saldo). */
+  needUsdc: z.number(),
+  /** true quando o valor era menor que o mínimo do SODAX (~US$ 1) e a cotação usa o mínimo. */
+  minApplied: z.boolean(),
+  /** Quando o SODAX respondeu (ISO). A cotação vale por poucos segundos. */
+  quotedAt: z.string(),
+});
+
 export const PixChargeStatus = z.enum(["pending", "approved", "credited", "expired", "failed"]);
 
-/** POST /api/pix/charges e GET /api/pix/charges/:id */
+/** POST /api/pix/charges e GET /api/pix/charges/:id (também usado pelas cobranças SODAX da demo) */
 export const PixCharge = z.object({
   id: z.string(),
-  provider: z.enum(["mercadopago", "simulated"]),
+  provider: z.enum(["mercadopago", "simulated", "sodax"]),
   /** pending: aguardando o Pix; approved: pago, creditando; credited: USDC na carteira. */
   status: PixChargeStatus,
   amountBrl: z.number(),
@@ -289,6 +325,8 @@ export const PublicConfig = z.object({
   guaranteeMinSales: z.number(),
   guaranteeMinRating: z.number(),
   pix: PixConfig,
+  /** Ausente em servidores antigos: o front só mostra a opção SODAX quando vem enabled. */
+  sodax: SodaxConfig.optional(),
 });
 
 /** GET /api/market/listings (revenda é P2: dados simulados na demo) */
@@ -331,5 +369,8 @@ export type PublicConfig = z.infer<typeof PublicConfig>;
 export type PixConfig = z.infer<typeof PixConfig>;
 export type PixCharge = z.infer<typeof PixCharge>;
 export type PixChargeStatus = z.infer<typeof PixChargeStatus>;
+export type SodaxSource = z.infer<typeof SodaxSource>;
+export type SodaxConfig = z.infer<typeof SodaxConfig>;
+export type SodaxQuote = z.infer<typeof SodaxQuote>;
 export type ResaleListing = z.infer<typeof ResaleListing>;
 export type SubmitResponse = z.infer<typeof SubmitResponse>;
