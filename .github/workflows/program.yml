@@ -1,0 +1,228 @@
+name: Program (Anchor)
+
+# CI do programa on-chain (programs/solvers). Independente do deploy.yml: este workflow NÃO bloqueia o deploy.
+# Modelo: kit solanabr/ai-kit (/audit-solana passo 2, /setup-ci-cd), calibrado ao estado real do repositório:
+# o que já está limpo é bloqueante (-D); o que ainda tem violações roda como aviso (::warning::) e está
+# marcado abaixo com a contagem medida em 2026-10-01 para virar -D quando for corrigido.
+# A keypair real do programa NUNCA entra aqui: o build usa --ignore-keys e o declare_id! do código.
+
+on:
+  pull_request:
+    paths:
+      - "programs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "Anchor.toml"
+      - "packages/solvers-client/**"
+      - "scripts/chain/**"
+      - "pnpm-lock.yaml" # versões do codama mudam o cliente gerado
+      - ".github/workflows/program.yml"
+  push:
+    branches: [master]
+    paths:
+      - "programs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "Anchor.toml"
+      - "packages/solvers-client/**"
+      - "scripts/chain/**"
+      - "pnpm-lock.yaml" # versões do codama mudam o cliente gerado
+      - ".github/workflows/program.yml"
+
+concurrency:
+  group: program-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Toolchain pinada = a que roda e funciona no WSL do desenvolvedor (rustc/anchor/solana conferidos lá).
+  RUST_VERSION: "1.98.1"
+  ANCHOR_VERSION: "1.2.0"
+  # Binário oficial da release v1.2.0 (mesmo sha256 do ~/.avm/bin/anchor-1.2.0 instalado via avm no WSL).
+  ANCHOR_SHA256: "0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7"
+  SOLANA_VERSION: "3.0.0"
+  # sha256 do tarball https://release.anza.xyz/v3.0.0/... calculado ao criar este workflow (a Anza não publica
+  # checksum separado): protege contra troca posterior do arquivo, não contra comprometimento prévio.
+  SOLANA_SHA256: "912f3ce691f3f6d82c466b90574878312bbdcd455b5d2726795d2bc019b993b5"
+  CARGO_AUDIT_VERSION: "0.22.2"
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: fmt + clippy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt --component clippy
+          rustup default "$RUST_VERSION"
+          rustc --version && cargo --version
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      # TODO(fmt): hoje o código NÃO está formatado (107 trechos em 8 arquivos de programs/solvers, medido em
+      # 2026-10-01 no commit 207bd36). Rode `cargo fmt --all` num commit só de formatação e então troque o
+      # `if ! ...; then warning` abaixo por um `cargo fmt --all -- --check` simples (bloqueante).
+      - name: cargo fmt --check (aviso até o código ser formatado)
+        run: |
+          if ! cargo fmt --all -- --check > fmt.diff 2>&1; then
+            n=$(grep -c '^Diff in' fmt.diff || true)
+            echo "::warning title=cargo fmt::${n} trechos fora do rustfmt; rode 'cargo fmt --all' e torne este passo bloqueante"
+          fi
+
+      # Limpo hoje (0 avisos em lib + testes): bloqueante.
+      - name: clippy (todos os alvos, -D warnings)
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      # Flags do kit só na lib do programa (testes podem usar unwrap/expect). Hoje a lib tem 0 unwrap/expect/panic:
+      # esses três são bloqueantes. arithmetic_side_effects tem 7 ocorrências (admin.rs 1, escrow.rs 4,
+      # purchase.rs 1, state.rs 1; medido em 2026-10-01): fica -W e deve virar -D quando forem corrigidas.
+      - name: clippy lib (unwrap/expect/panic bloqueantes; aritmética em aviso)
+        run: |
+          cargo clippy --locked -p solvers --lib -- \
+            -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic \
+            -W clippy::arithmetic_side_effects 2>&1 | tee clippy-lib.log
+          n=$(grep -c 'arithmetic operation that can potentially' clippy-lib.log || true)
+          if [ "$n" -gt 0 ]; then
+            echo "::warning title=clippy::arithmetic_side_effects: ${n} ocorrências na lib; corrigir e trocar -W por -D"
+          fi
+
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+
+      - name: Cache do cargo-audit
+        id: audit-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ env.CARGO_AUDIT_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ runner.os }}
+
+      - name: Instalar cargo-audit ${{ env.CARGO_AUDIT_VERSION }}
+        if: steps.audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked --version "$CARGO_AUDIT_VERSION"
+
+      # Vulnerabilidades (RUSTSEC) reprovam. Hoje: 0 vulnerabilidades e 5 avisos "unmaintained" transitivos
+      # (ansi_term, bincode 1.x, derivative, libsecp256k1, paste), que vêm da árvore Solana/Anchor/litesvm e
+      # não reprovam. Não usar --deny warnings enquanto essas dependências não forem trocadas upstream.
+      # Atenção: o banco de advisories muda com o tempo; um PR pode ficar vermelho por advisory novo.
+      - name: cargo audit
+        run: cargo audit
+
+  build-test:
+    name: anchor build + testes + cliente em sincronia
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          rustc --version && cargo --version
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      # Solana CLI (traz o cargo-build-sbf) e as platform-tools que ele baixa na primeira compilação.
+      - name: Cache Solana CLI + platform-tools
+        id: solana-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/solana-release
+            ~/.cache/solana
+          key: solana-${{ env.SOLANA_VERSION }}-${{ runner.os }}-v1
+
+      - name: Instalar Solana CLI ${{ env.SOLANA_VERSION }}
+        if: steps.solana-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o /tmp/solana.tar.bz2 \
+            "https://release.anza.xyz/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${SOLANA_SHA256}  /tmp/solana.tar.bz2" | sha256sum -c -
+          tar -xjf /tmp/solana.tar.bz2 -C "$HOME"
+          rm /tmp/solana.tar.bz2
+
+      - name: Instalar Anchor ${{ env.ANCHOR_VERSION }} (binário oficial verificado)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o "$HOME/.local/bin/anchor" \
+            "https://github.com/solana-foundation/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          echo "${ANCHOR_SHA256}  $HOME/.local/bin/anchor" | sha256sum -c -
+          chmod +x "$HOME/.local/bin/anchor"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/solana-release/bin" >> "$GITHUB_PATH"
+
+      - name: Conferir versões
+        run: |
+          anchor --version | grep -F "$ANCHOR_VERSION"
+          solana --version | grep -F "solana-cli $SOLANA_VERSION"
+
+      # Sem a keypair do programa: --ignore-keys pula a checagem keypair x declare_id! (o cargo-build-sbf gera
+      # uma keypair descartável em target/deploy, que nunca é publicada). O IDL usa o declare_id! do código.
+      - name: anchor build
+        run: |
+          rm -f target/deploy/solvers.so target/idl/solvers.json
+          anchor build --arch v1 --ignore-keys
+          test -s target/deploy/solvers.so
+          test -s target/idl/solvers.json
+
+      - name: IDL com o mesmo endereço do declare_id! e do Anchor.toml
+        run: |
+          idl_addr=$(jq -r .address target/idl/solvers.json)
+          toml_addrs=$(sed -nE 's/^solvers = "(.*)"/\1/p' Anchor.toml | sort -u)
+          echo "IDL: $idl_addr | Anchor.toml: $toml_addrs"
+          [ "$idl_addr" = "$toml_addrs" ]
+
+      # Os testes carregam target/deploy/solvers.so (por isso vêm depois do build).
+      - name: cargo test (LiteSVM)
+        run: |
+          cargo test --locked -p solvers --test program 2>&1 | tee test.log
+          grep -E 'test result: ok\. [1-9][0-9]* passed' test.log
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Instalar dependências do cliente
+        run: |
+          corepack enable pnpm
+          pnpm install --frozen-lockfile --filter "@solvers/client..."
+
+      # O IDL versionado e o cliente Codama gerado têm que bater com o programa que acabou de ser compilado.
+      # `status --porcelain` (e não só `git diff`) também pega arquivos gerados novos/removidos.
+      - name: Cliente Codama em sincronia com o programa
+        run: |
+          cp target/idl/solvers.json packages/solvers-client/idl/solvers.json
+          pnpm --filter @solvers/client generate
+          pnpm --filter @solvers/client typecheck
+          if [ -n "$(git -c core.fileMode=false status --porcelain -- packages/solvers-client)" ]; then
+            echo "::error title=cliente fora de sincronia::IDL/cliente gerado difere do versionado. Rode scripts/chain/build-program.sh (ou 'pnpm --filter @solvers/client generate') e commite packages/solvers-client."
+            git -c core.fileMode=false status --short -- packages/solvers-client
+            git -c core.fileMode=false diff --stat -- packages/solvers-client
+            exit 1
+          fi

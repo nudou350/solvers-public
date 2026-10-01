@@ -1,0 +1,32 @@
+---
+name: solana-backend-ts
+description: Regras de indexador e de envio de transações do backend TypeScript (apps/server/src/indexer, packages/chain/src/chain.ts, @solana/kit 8.4). Use ao mexer em ingestão de eventos, commitment, reenvio, compute budget, RPC ou alertas on-chain.
+---
+
+# Indexador e envio de transações (TS)
+
+Só conceitos; o que o código já faz está indicado com arquivo. "Verificar" marca o que não foi confirmado.
+
+## Indexador (`apps/server/src/indexer`)
+
+- **Idempotência.** Evento marcado por `(signature, idx)` em `processed_events` (chave primária); `recordChainTx` faz upsert por `signature`. Os handlers só releem a conta e espelham, então rodam antes da marca (`processor.ts`, `processTransaction`). Efeito irreversível não entra nos handlers sem a mesma proteção.
+- **`meta.err`.** O poller descarta `s.err` e `processTransaction` devolve `[]` se `failed`. Todo caminho novo de ingestão repete a checagem: os logs de uma transação que falhou trazem eventos emitidos antes do erro.
+- **Mesmo commitment.** Assinaturas e `getTransaction` usam `confirmed` (`poller.ts`, `txLogs`), mas as leituras de conta (`fetchMaybe*` em `sync.ts`, `getAccountInfo` em `fetchEscrowLayout`, `fetchCoreAsset`, `resyncAccounts`) não passam commitment; o RPC usa `finalized` por padrão, então o espelho pode ler estado mais velho que a transação que o disparou. Verificar e alinhar, passando `minContextSlot` = slot da transação.
+- **Finalidade e slot.** Tudo é gravado a partir de `confirmed`, sem marca provisória e sem promoção; não achei uso de slot em `apps/server/src`. Efeito irreversível (pagamento, entrega paga, fechar escrow, notificação) só depois de `finalized`, ou grave o slot e promova `confirmed` para `finalized`. Conferir o gatilho dos jobs em `jobs.ts` (`closeFinishedOnce`, disputas paradas), que agem sobre o espelho.
+- **Logs truncados.** Eventos vêm de `emit!` (logs). `parseEventsDetailed` detecta "Log truncated" e `resyncAccounts` relê as contas do programa tocadas. Para evento crítico, `emit_cpi!` evita a dependência de logs (o programa hoje não o usa).
+- **Backfill pelo mesmo caminho.** `retryFailures`, `cli:reindex --recent|--backfill|--dead` e o polling passam por `processSignature`; `indexer_failures` guarda backoff e estado `dead`. O cursor (`indexer:last_signature` em `kv`) não trava com uma falha. Não crie um segundo caminho de ingestão com regras próprias.
+- **Evento novo do programa.** Entra em `DECODERS` e no tipo `SolversEvent` (`packages/chain/src/events.ts`) e ganha um `case` em `handle` (`processor.ts`; o `switch` não tem `default`, então esquecer o `case` ignora o evento em silêncio). Evento com discriminador desconhecido (programa mais novo que o servidor) é pulado pelo parser sem erro: o indexador não cai, mas também não espelha nada, então servidor e programa precisam andar juntos. Hoje: `StakeToppedUp` relê o solver (o stake é espelhado), `TreasuryUpdated` limpa o cache da tesouraria, `AdminTransfer*` não espelham nada.
+- **Alertas.** Hoje: log "DESISTIU" para assinatura `dead` e `/health` que só testa o banco. Não achei alerta de atraso (slot da ponta menos último processado) nem de troca da upgrade authority (`programDataAddress` só serve a `initialize_config`). Ambos faltam.
+
+## Envio (`packages/chain/src/chain.ts`)
+
+- **Simulação antes da assinatura.** `SolversChain.simulate` (`sigVerify: false`, blockhash novo, `confirmed`, timeout) devolve `ok`, `rejected` (regra do programa ou saldo; mensagem em português), `failed` ou `infra`; `store/tx-build.ts` (`buildForUserChecked`) a roda em toda transação do usuário e `store/simulation-gate.ts` só bloqueia `rejected` (409 `operation_rejected`); o resto segue (fail-open, preflight do envio é a barreira final) e vai para o log.
+- **Erros do programa.** `packages/chain/src/program-errors.ts` mapeia TODO código do cliente gerado para texto em português (`satisfies Record<SolversError, string>` e `program-errors.test.ts` quebram se um erro novo ficar sem texto). Erro novo no programa: regenere o cliente, escreva a mensagem e rode o teste. O código vem da linha de log do programa certo, não de qualquer `Custom(n)`.
+- **Mesmos bytes.** `sendWire` reenvia o `wire` já assinado (`skipPreflight`, `maxRetries: 0`) enquanto `waitConfirmed` consulta; `signServerTx` revela a assinatura antes do envio e `pix/credit.ts` grava assinatura, `wire` e `lastValidBlockHeight` antes de enviar. Reassine com blockhash novo só depois de `signatureOutcome` = `expired` (`isDefinitelyNotLanded`); antes disso as duas podem entrar.
+- **Expiração por block height**, não por tempo: `lastValidBlockHeight` mais `EXPIRY_MARGIN`. `submitSigned` não conhece o valor real da transação do usuário e usa altura atual + 150, o que adia o veredito `expired`.
+- **Commitment coerente no envio.** Blockhash e preflight usam `confirmed`; manter.
+- **CU e fee na mainnet.** `COMPUTE_UNITS = 400_000` é fixo e `PRIORITY_FEE_MICROLAMPORTS` é estático (padrão 0). A taxa v0 é limite × preço: simule, use consumido + 10 a 20% e derive o preço de `getRecentPrioritizationFees` nas contas graváveis (percentil com teto).
+- **`maxSupportedTransactionVersion`.** `txLogs` usa `1`; os tipos do `@solana/rpc-types` 8.4 listam `'legacy' | 0 | 1` e o ai-kit recomenda `1`. Verificar que o RPC de produção aceita `1`, e se `getBlock` (se for usado) segue a mesma regra.
+- **Failover de RPC.** Há um único `createSolanaRpc(SOLANA_RPC_URL)`. Na mainnet: dois provedores e troca quando o `getSlot` de um ficar atrás do outro além de um limite; leituras com `minContextSlot` para não aceitar nó atrasado.
+- **Chaves de RPC só no servidor.** `rpcUrl` só vai ao front no cluster `localnet` (`store/routes.ts`); o front envia a transação assinada via `/api/tx/submit`. Manter, e não colocar a URL do provedor em variável pública.
+- **Webhook.** O segredo da Helius é comparado em tempo constante (`poller.ts`) e o polling segue como fallback obrigatório.

@@ -20,8 +20,8 @@ Quem faz o trabalho é `scripts/chain/upgrade-devnet.sh` (dry-run por padrão; s
   o script transfere do fee-payer para o admin só o que faltar (arredondado a 0,1 SOL), sem faucet. O fee-payer
   também paga taxas/rent do servidor, então o script aborta se ele ficar com menos de 1 SOL
   (`FEEPAYER_RESERVE_LAMPORTS` muda isso). Hoje: admin ~1,51; fee-payer ~4,81; necessário ~3,83; transfere ~2,4.
-- O ProgramData tem exatamente o tamanho do `.so` antigo (685256 bytes, sem folga): qualquer crescimento exige
-  extensão; o script estende o crescimento + 1 KB de margem.
+- O ProgramData pode não ter folga sobre o `.so` implantado: qualquer crescimento além do `Data Length` atual
+  (`solana program show <id> --url devnet`) exige extensão; o script estende o crescimento + 1 KB de margem.
 - **Config (fee_bps)**: o novo `update_config` recusa `fee_bps` > 2000. Confira antes (somente leitura, a partir
   de `apps/server`; se passar de 2000, corrija a Config antes do upgrade):
 
@@ -83,6 +83,51 @@ EOF
    `chain_txs` e reconstrói o espelho a partir do estado on-chain). Se sobrar pendência: `cli:reindex --dead`.
 9. **Republicar especialistas se o hash mudou**: `pnpm --filter @solvers/server cli:publish <slug...>` (ou sem
    argumentos, para todos os pacotes em `agents/`), só dos pacotes cujo conteúdo/hash mudou.
+
+## O que muda neste upgrade (governança do admin)
+
+- **5 instruções novas**: `propose_admin(new_admin)`, `accept_admin`, `cancel_admin_transfer` (rotação do admin em 2 etapas),
+  `set_treasury` (troca a conta de USDC da tesouraria) e `top_up_stake(amount)` (o criador repõe stake; reativar o
+  solver ainda exige `approve_agent`). Retirada de stake e pausa continuam inexistentes (`docs/design-governance-v2.md`).
+- **PDA nova** `PendingAdmin` (seeds `["pending_admin", config]`, 73 bytes): só existe entre a proposta e o aceite ou
+  cancelamento. Não muda o layout de `Config` nem de nenhuma conta existente, então o passo 5 não muda.
+- **5 eventos e 2 erros novos** (`NotPendingAdmin` 6034, `InvalidNewAdmin` 6035). O indexador já os trata: `StakeToppedUp`
+  relê o solver (o stake é espelhado) e `TreasuryUpdated` limpa o cache da tesouraria; os de admin só ficam registrados.
+- **O `.so` cresce de 715.664 para 773.992 bytes (+58.328)**. Em 2026-10-01 o `solana program show` da devnet mostrava
+  `Data Length: 726216` (o ProgramData já tem folga sobre o `.so` anterior), então o crescimento a cobrir é de
+  47.776 bytes. Pelo cálculo do script (crescimento + 1.024 de margem, arredondado a blocos de 10.240): **extensão de
+  51.200 bytes (5 blocos), ~0,26 SOL (51.200 × 5,08e-6, não volta)**. O buffer do upgrade passa de ~3,5 para
+  **~3,9 SOL** (774.029 bytes; volta ao admin). Necessário no admin: ~3,9 + 0,26 + 0,05 de margem = **~4,2 SOL**
+  (a linha "Hoje" dos pré-requisitos, ~3,83, era para o `.so` de 715.664 bytes). Com o admin em ~3,70 SOL faltam ~0,5
+  e o script transfere ~0,6 do fee-payer (~2,40 SOL), que fica com ~1,8, acima da reserva de 1 SOL. Estimativa: o
+  `Data Length` muda a cada upgrade, então confira o valor atual antes e use o dry-run do passo 2, que imprime os
+  números reais.
+- **Ordem (a mesma de sempre)**: build, dry-run, `--yes`, conferência e **só então** `git push` do servidor. O servidor
+  novo conhece os eventos, mas não depende deles para funcionar; já o programa novo com servidor antigo só deixa os
+  eventos novos sem tratamento (o parser ignora discriminador desconhecido), sem derrubar o indexador.
+
+### Operar o admin: `cli:admin`
+
+Dry-run por padrão (imprime contas, quem assina, saldo do fee payer, taxa estimada e o resultado da simulação; nada é
+enviado); só envia com `--yes`. Nunca imprime chave. Use `cli:admin:devnet` para carregar o `.env.devnet`.
+O comando confere o genesis hash do RPC e **aborta se não for a devnet, até no dry-run** (um `.env` de mainnet não envia nada
+por engano). Só para outra rede, de propósito: `--allow-network <nome>`, em que `<nome>` é a rede detectada
+(`mainnet-beta` ou `desconhecida`, ex. localnet); nome que não bate com a rede detectada não libera. Erro ao ler arquivo de
+chave mostra só `arquivo de chave inválido: <caminho>`, nunca trecho do conteúdo.
+
+```bash
+# troca de admin (2 etapas). O fee payer da plataforma paga as taxas e o rent da proposta (volta ao fechar)
+pnpm --filter @solvers/server cli:admin:devnet propose <novo-admin> [--yes]        # assina ADMIN_KEYPAIR (ou --keypair)
+pnpm --filter @solvers/server cli:admin:devnet accept --keypair <chave-do-novo-admin.json> [--yes]
+pnpm --filter @solvers/server cli:admin:devnet cancel [--yes]                       # desiste da proposta pendente
+# tesouraria: informe a CONTA de token de USDC (não a carteira); precisa ser do USDC da plataforma e não congelada
+pnpm --filter @solvers/server cli:admin:devnet set-treasury <conta-usdc> [--yes]
+# stake: assinado pelo CRIADOR (chave em CREATOR_KEYS_DIR/<creator.id>.json ou --keypair); sem a chave só imprime o plano
+pnpm --filter @solvers/server cli:admin:devnet top-up-stake <slug> <usdc> [--yes]
+```
+
+Depois do `accept`, a chave antiga deixa de ser admin: troque `ADMIN_KEYPAIR` do servidor (se ele usa admin) pela nova.
+Se o criador reabastecer um solver suspenso, o admin ainda precisa aprovar de novo (`approve_agent`).
 
 ## O escrow de teste antigo
 
