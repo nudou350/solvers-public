@@ -173,6 +173,9 @@ export function createApi(opts: ApiOptions = {}) {
       req(z.array(ImageRef), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews/mine/images`, { method: "POST", headers: { "content-type": file.type }, body: file }),
     deleteReviewImage: (idOrSlug: string, imageId: string) =>
       req(z.array(ImageRef), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews/mine/images/${encodeURIComponent(imageId)}`, { method: "DELETE" }),
+    /** Pede ajuda ao criador deste especialista. Devolve o protocolo; o criador é avisado e o contato dele não aparece. */
+    requestHelp: (idOrSlug: string, message: string, contact?: string) =>
+      post(z.object({ protocol: z.string(), notified: z.boolean() }), `/api/agents/${encodeURIComponent(idOrSlug)}/help`, { message, contact: contact || undefined }),
     buildReview: (agentId: string, rating: number, text: string) => post(TxResponse, "/api/tx/review", { agentId, rating, text }),
     /**
      * Tarefa com garantia: as etapas e os critérios vêm do modelo do criador (getAgent().guarantee);

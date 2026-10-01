@@ -13,6 +13,7 @@ import { ago, connectorName, copyText } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import s from "./checkout.module.css";
+import { HelpDialog } from "./HelpDialog";
 import { txErrorMessage } from "@/lib/tx";
 
 type Client = "claude" | "gpt";
@@ -70,6 +71,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const [tab, setTab] = useState<Client>("claude");
   const [copied, setCopied] = useState(false);
   const [plan, setPlan] = useState(false);
+  const [helping, setHelping] = useState(false);
   const [conns, setConns] = useState<Record<string, boolean>>({});
   // "Já colei e confirmei" é por aba: o que foi feito no Claude não vale para o ChatGPT.
   const [addedBy, setAddedBy] = useState<Record<Client, boolean>>({ claude: false, gpt: false });
@@ -382,9 +384,15 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               {creator ? (
                 <>
                   Travou em algum passo? Confira o endereço do passo 1 ou{" "}
-                  <Link className="link" href={`/criadores/${creator.id}`}>
-                    fale com {creator.name}
-                  </Link>
+                  {logged && agent ? (
+                    <button type="button" className={`link ${s.helpLink}`} onClick={() => setHelping(true)}>
+                      peça ajuda a {creator.name}
+                    </button>
+                  ) : (
+                    <Link className="link" href={`/criadores/${creator.id}`}>
+                      veja quem é {creator.name}
+                    </Link>
+                  )}
                   .
                 </>
               ) : (
@@ -396,6 +404,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           </div>
         </aside>
       </div>
+      {helping && agent && creator ? <HelpDialog slug={agent.slug} creatorName={creator.name} onClose={() => setHelping(false)} /> : null}
     </section>
   );
 }
