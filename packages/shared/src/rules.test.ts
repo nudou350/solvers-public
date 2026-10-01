@@ -8,6 +8,18 @@ test("usdc conversions", () => {
   assert.equal(unitsToUsdc(12_500_000n), 12.5);
 });
 
+test("unitsToUsdc: divisão única, sem ruído de ponto flutuante", () => {
+  assert.equal(unitsToUsdc(1_140_000n), 1.14);
+  assert.equal(unitsToUsdc(5_560_000n), 5.56);
+  assert.equal(unitsToUsdc(1n), 0.000001);
+  assert.equal(unitsToUsdc(0n), 0);
+  assert.equal(unitsToUsdc(123), 0.000123); // aceita number
+  // todo preço em centavos de 0,00 a 1000,00 é o double mais próximo de c/100 (o que o cliente digita)
+  for (let c = 0; c <= 100_000; c++) assert.equal(unitsToUsdc(BigInt(c) * 10_000n), c / 100, `centavos ${c}`);
+  // valores acima de 2^53 unidades seguem pelo caminho BigInt (sem perder a parte inteira)
+  assert.equal(unitsToUsdc(18_446_744_073_709_551_615n), 18_446_744_073_709.55);
+});
+
 test("reputation", () => {
   assert.equal(reputationScore(0, 0), 50);
   assert.equal(reputationScore(30, 0), 80);

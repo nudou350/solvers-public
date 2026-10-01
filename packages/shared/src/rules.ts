@@ -23,6 +23,9 @@ export function usdcToUnits(usdc: number): bigint {
 
 export function unitsToUsdc(units: bigint | number): number {
   const u = BigInt(units);
+  // Divisão única: o double mais próximo do valor exato (1_140_000n -> 1.14). Somar inteiro + fração gerava ruído
+  // (1.1400000000000001) que quebrava o eco do preço pelo cliente.
+  if (u <= BigInt(Number.MAX_SAFE_INTEGER) && u >= -BigInt(Number.MAX_SAFE_INTEGER)) return Number(u) / 1_000_000;
   return Number(u / USDC_UNIT) + Number(u % USDC_UNIT) / 1_000_000;
 }
 

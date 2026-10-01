@@ -4,11 +4,11 @@
 //   pnpm --filter @solvers/server cli:seed
 //
 // Cria compradores de teste (.keys/buyers), compras de licença, avaliações, usos verificados,
-// uma garantia concluída e uma em andamento, e anúncios de revenda (off-chain, a revenda é P2).
+// uma garantia concluída e uma em andamento e, com RESALE_ENABLED, anúncios e uma venda REAIS de revenda (list_license/buy_listing).
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   createKeyPairSignerFromBytes,
   getBase64EncodedWireTransaction,
@@ -21,6 +21,7 @@ import { address, loadSigner } from "@solvers/chain";
 import { findReviewPda } from "@solvers/client";
 import { usdcToUnits } from "@solvers/shared";
 import { authorities, chain, initChain } from "../chain/index.js";
+import { env } from "../env.js";
 import { db, pool, schema } from "../db/index.js";
 import { runMigrations } from "../db/migrate.js";
 import { processSignature } from "../indexer/processor.js";
@@ -86,6 +87,52 @@ const REVIEWS: Record<string, Array<[number, string]>> = {
     [4, "Boas variações de título para testar."],
   ],
 };
+
+/**
+ * Anúncios reais: até 3 licenças de solvers diferentes são anunciadas pelos próprios donos; a primeira é vendida a outro
+ * comprador (histórico de preço e royalty reais) e este a anuncia de novo, então o solver fica com piso E histórico.
+ * Idempotente: licença que já tem anúncio ativo é pulada e, havendo alguma venda no banco, a venda não se repete.
+ */
+async function seedResale(all: KeyPairSigner[], veterans: KeyPairSigner[]) {
+  const c = chain();
+  const byAddress = new Map(all.map((k) => [k.address as string, k]));
+  const min = (await c.fetchConfig()).data.minPrice;
+  const max = (x: bigint, y: bigint) => (x > y ? x : y);
+  const owned = await db
+    .select()
+    .from(schema.licenses)
+    .where(inArray(schema.licenses.ownerWallet, veterans.map((v) => v.address as string)))
+    .orderBy(schema.licenses.agentId, schema.licenses.acquiredAt);
+  const firstPerAgent = new Map<string, (typeof owned)[number]>();
+  for (const l of owned) if (!firstPerAgent.has(l.agentId)) firstPerAgent.set(l.agentId, l);
+  const picks = [...firstPerAgent.values()].slice(0, 3);
+  const listed: Array<{ asset: string; seller: KeyPairSigner; agentId: string; price: bigint; agentPrice: bigint }> = [];
+  for (const [i, l] of picks.entries()) {
+    const seller = byAddress.get(l.ownerWallet);
+    const [a] = await db.select().from(schema.agents).where(eq(schema.agents.id, l.agentId));
+    if (!seller || !a) continue;
+    const price = max((a.price * BigInt(85 + i * 5)) / 100n, min);
+    const [active] = await db.select({ id: schema.listings.id }).from(schema.listings).where(and(eq(schema.listings.licenseId, l.id), eq(schema.listings.status, "active")));
+    if (active) {
+      console.log(`  revenda: ${a.name} já anunciado`);
+      continue;
+    }
+    const { instructions } = await c.listLicenseIxs(seller.address, address(l.id), price, { agentIdHex: a.id });
+    await asUser(seller, instructions);
+    listed.push({ asset: l.id, seller, agentId: a.id, price, agentPrice: a.price });
+    console.log(`  revenda: ${a.name} anunciado por ${Number(price) / 1e6} USDC`);
+  }
+  const [anySale] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(schema.listings).where(eq(schema.listings.status, "sold"));
+  const first = listed[0];
+  if (!first || (anySale?.n ?? 0) > 0) return;
+  const buyerSigner = veterans.find((v) => v.address !== first.seller.address);
+  if (!buyerSigner) return;
+  const bought = await c.buyListingIxs(buyerSigner.address, address(first.asset), first.price);
+  await asUser(buyerSigner, bought.instructions);
+  console.log(`  revenda: 1 venda real (${Number(first.price) / 1e6} USDC); o comprador anuncia a licença de novo`);
+  const relist = max((first.agentPrice * 95n) / 100n, min);
+  await asUser(buyerSigner, (await c.listLicenseIxs(buyerSigner.address, address(first.asset), relist, { agentIdHex: first.agentId })).instructions);
+}
 
 async function main() {
   await runMigrations();
@@ -229,25 +276,17 @@ async function main() {
     }
   }
 
-  // Revenda (P2): anúncios e histórico de preço simulados off-chain para a tela de mercado.
-  const listed = await db.select().from(schema.licenses).limit(4);
-  for (const [i, l] of listed.entries()) {
-    const [a] = await db.select().from(schema.agents).where(eq(schema.agents.id, l.agentId));
-    if (!a) continue;
-    const price = (a.price * BigInt(80 + i * 7)) / 100n;
-    await db.update(schema.licenses).set({ listedForResale: true, resalePrice: price }).where(eq(schema.licenses.id, l.id));
-    const [hist] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(schema.resalePrices).where(eq(schema.resalePrices.agentId, a.id));
-    if ((hist?.n ?? 0) === 0) {
-      await db.insert(schema.resalePrices).values(
-        Array.from({ length: 10 }, (_, d) => ({
-          agentId: a.id,
-          price: (a.price * BigInt(70 + ((d * 5 + i * 3) % 25))) / 100n,
-          at: new Date(Date.now() - (10 - d) * 3 * 86400_000),
-        })),
-      );
+  // Revenda REAL (list_license / buy_listing assinados pelos compradores de teste): nada é inventado no banco.
+  if (!env.RESALE_ENABLED) {
+    console.log("  revenda: pulada (RESALE_ENABLED desligada; ligue e rode de novo depois do upgrade do programa)");
+  } else {
+    try {
+      await seedResale(Object.values(buyers), veterans.map((n) => buyers[n]!));
+    } catch (e) {
+      // Programa na rede ainda sem as instruções de revenda (ou saldo/estado inesperado): o resto do seed já está pronto.
+      console.warn(`  revenda: NÃO foi semeada (${(e as Error).message}). O programa desta rede tem as instruções de revenda? Veja docs/devnet-upgrade.md.`);
     }
   }
-  console.log("  revenda simulada: 4 anúncios");
   console.log("\nSeed concluído.");
 }
 

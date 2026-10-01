@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { address, type Address } from "@solvers/chain";
+import { address, listingIsLive, type Address } from "@solvers/chain";
 import * as gen from "@solvers/client";
 import { bytesToHex } from "@solvers/shared";
 import { chain } from "../chain/index.js";
@@ -8,6 +8,7 @@ import { bytesToHexStr } from "../lib/crypto.js";
 import { resolvePublishedText } from "../store/review-rules.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, type MilestoneStatusName } from "./escrow-status.js";
 import { agentMirrorValues } from "./mirror.js";
+import { applyListed, closeListingsAt, removeLicenseRow, setLicenseOwner, upsertLicenseRow } from "./resale-mirror.js";
 
 // Sincronização "busca a conta on-chain e espelha no banco". Idempotente: pode rodar quantas
 // vezes quiser para o mesmo endereço (webhook, polling e a própria API chamam).
@@ -79,35 +80,86 @@ export async function agentIdByAddress(agentAddr: Address): Promise<string | nul
   return row?.id ?? (await syncAgent(agentAddr));
 }
 
-export async function syncLicense(asset: Address, agentId: string, signature?: string, blockTime?: number | null) {
+/**
+ * Espelha a licença no dono atual (on-chain) e devolve esse dono. Quando o dono muda (venda pelo mercado ou
+ * transferência), o novo dono recebe `acquired_at`/`signature` da aquisição e os sinais de anúncio são zerados
+ * (ver `upsertLicenseRow`).
+ */
+export async function syncLicense(
+  asset: Address,
+  agentId: string,
+  signature?: string,
+  blockTime?: number | null,
+  /** Troca o dono lido da cadeia (ex.: o comprador de uma revenda recente, quando a leitura ainda mostra o vendedor). */
+  pickOwner?: (coreOwner: string) => string,
+): Promise<string> {
   let core = await chain().fetchCoreAsset(asset);
   for (let i = 0; !core && i < 5; i++) {
     await new Promise((r) => setTimeout(r, 500));
     core = await chain().fetchCoreAsset(asset);
   }
   if (!core) throw new Error(`licença ${asset} ainda não visível no RPC`);
-  await db
-    .insert(schema.licenses)
-    .values({
-      id: asset,
-      agentId,
-      ownerWallet: core.owner,
-      acquiredAt: blockTime ? new Date(blockTime * 1000) : new Date(),
-      type: "permanent",
-      signature: signature ?? null,
-    })
-    .onConflictDoUpdate({ target: schema.licenses.id, set: { ownerWallet: core.owner } });
+  const owner = pickOwner ? pickOwner(core.owner) : core.owner;
+  await upsertLicenseRow({
+    asset,
+    agentId,
+    owner,
+    acquiredAt: blockTime ? new Date(blockTime * 1000) : new Date(),
+    signature: signature ?? null,
+  });
+  return owner;
 }
 
-/** Revalida a posse de uma licença on-chain (transferências fora da plataforma). */
+/**
+ * Revalida a posse de uma licença on-chain (transferências fora da plataforma). Dono diferente do vendedor de um anúncio
+ * ativo: o anúncio é fechado como 'invalid'. Asset que não existe mais: a licença some do espelho.
+ */
 export async function refreshLicenseOwner(asset: string): Promise<string | null> {
   const core = await chain().fetchCoreAsset(address(asset));
   if (!core) {
-    await db.delete(schema.licenses).where(eq(schema.licenses.id, asset));
+    await removeLicenseRow(asset);
     return null;
   }
-  await db.update(schema.licenses).set({ ownerWallet: core.owner }).where(eq(schema.licenses.id, asset));
+  await setLicenseOwner(asset, core.owner);
   return core.owner;
+}
+
+/**
+ * Espelha o anúncio de revenda de um endereço `Listing` (reconciliação: logs truncados, `cli:reindex --listings`).
+ * Conta ausente: anúncios ativos naquele endereço viram 'invalid'. Conta presente: garante o anúncio ativo, desde que o
+ * vendedor ainda seja o dono da licença.
+ */
+export async function syncListing(listingAddr: Address): Promise<void> {
+  const acc = await gen.fetchMaybeListing(chain().rpc, listingAddr, { commitment: "confirmed" });
+  if (!acc.exists) {
+    await closeListingsAt(listingAddr);
+    return;
+  }
+  const l = acc.data;
+  const agentId = await agentIdByAddress(l.agent);
+  if (!agentId) return;
+  const owner = await syncLicense(l.asset, agentId);
+  if (owner !== l.seller) return; // syncLicense já fechou o anúncio velho como 'invalid'
+  // A conta Listing existe, mas só vale (comprável) com o asset do vendedor, na coleção do solver e com o delegate na PDA do
+  // mercado. Sem isso (delegate revogado por fora, asset de outra coleção) o anúncio é 'invalid', nunca 'active'.
+  const c = chain();
+  const agent = await gen.fetchMaybeAgent(c.rpc, l.agent, { commitment: "confirmed" });
+  const core = await c.fetchCoreLicense(l.asset);
+  if (!agent.exists || !listingIsLive(l, core, agent.data.collection, await c.marketAuthorityPda())) {
+    await closeListingsAt(listingAddr);
+    return;
+  }
+  await applyListed({
+    licenseId: l.asset,
+    agentId,
+    listingAddress: listingAddr,
+    seller: l.seller,
+    price: l.price,
+    feeBps: l.feeBps,
+    royaltyBps: l.royaltyBps,
+    listedAt: l.listedAt > 0n ? new Date(Number(l.listedAt) * 1000) : new Date(),
+    signature: null,
+  });
 }
 
 export async function syncReview(agentAddr: Address, author: Address, agentId: string) {

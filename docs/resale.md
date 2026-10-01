@@ -47,12 +47,13 @@ Também valem os já existentes: `PriceTooLow`, `InvalidAmount`, `PriceChanged` 
 
 ## Flags
 
-`resaleEnabled` (em `PublicConfig`): desligada, a tela `/revenda` mostra "em breve", a biblioteca não oferece "Anunciar" e o servidor não deve montar transações de revenda. O deploy sobe com ela **desligada** e só se liga no fim do upgrade (`docs/devnet-upgrade.md`, passo 8a). O programa não conhece essa flag: ela só controla servidor e web. *Confirmar no código da Fase 3 o nome da variável de ambiente que a alimenta.*
+`resaleEnabled` (em `PublicConfig`): desligada, a tela `/revenda` mostra "em breve", a biblioteca não oferece "Anunciar" e o servidor não deve montar transações de revenda. O deploy sobe com ela **desligada** e só se liga no fim do upgrade (`docs/devnet-upgrade.md`, passo 8a). O programa não conhece essa flag: ela só controla servidor e web. Vem da variável de ambiente `RESALE_ENABLED` do servidor (`true` liga; o padrão é desligada). Desligada: `POST /api/tx/list` e `/api/tx/buy-listing` respondem 503 `resale_disabled`, `GET /api/market/listings` devolve `[]` e o catálogo não mostra piso de revenda; `POST /api/tx/cancel-listing` continua funcionando (o vendedor sempre pode sair).
 
 ## Operação
 
-- **Reindexar**: `pnpm --filter @solvers/server cli:reindex --backfill` (na VPS) reconstrói o espelho de anúncios e vendas a partir da cadeia. Rode depois do upgrade e antes de ligar a flag.
+- **Reindexar**: `pnpm --filter @solvers/server cli:reindex --backfill` completa `chain_txs` (inclui as vendas de revenda) e `--recent N` reprocessa as transações recentes do programa, que reconstroem anúncios e vendas a partir dos eventos. `--listings` reconcilia a tabela `listings` com as contas `Listing` on-chain: cria o anúncio ativo que faltava e fecha como `invalid` o que não existe mais ou não vale (dono diferente do vendedor, delegate revogado, outra coleção). Não recupera royalty/taxa de vendas passadas (isso vem dos eventos). Rode depois do upgrade e antes de ligar a flag.
 - **Dados simulados**: o `seed` antigo marcava anúncios inventados em `licenses.listed_for_resale`/`licenses.resale_price` e gravava histórico em `resale_prices`. Limpe antes de ligar a flag (`pg_dump` antes; **confirmar com o dono antes do DELETE/UPDATE**). Nunca mostrar dados simulados na tela.
+- **Pré-condição para ligar a flag**: rode `pnpm --filter @solvers/server cli:clean-simulated-resale --yes` (depois do dry-run e do `pg_dump`) ANTES de ligar `RESALE_ENABLED`. Sem isso a biblioteca mostra "À venda" em licenças sem anúncio real, porque o seed antigo deixou `listed_for_resale`/`resale_price` marcados. Anúncios reais da tabela `listings` não são tocados pela limpeza.
 - **Anúncio preso**: um anúncio velho qualquer carteira fecha com `cancel_listing`. Se o delegate ficou pendurado num asset (rollback do programa), o vendedor o revoga pela própria carteira.
 
 ## Pendências

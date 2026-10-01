@@ -1218,9 +1218,12 @@ export class SolversChain {
 
   // ---------- Licenças (Metaplex Core) ----------
 
-  /** Lê owner e coleção de um asset Metaplex Core (layout BaseAssetV1). */
+  /**
+   * Lê owner e coleção de um asset Metaplex Core (layout BaseAssetV1), em `confirmed`: com o padrão do RPC (`finalized`) o
+   * indexador e o refresh ainda viam o dono antigo por ~13 s depois de uma venda (mesmo commitment de `fetchCoreLicense`).
+   */
   async fetchCoreAsset(asset: Address): Promise<CoreAsset | null> {
-    const { value } = await this.rpc.getAccountInfo(asset, { encoding: "base64" }).send();
+    const { value } = await this.rpc.getAccountInfo(asset, { encoding: "base64", commitment: "confirmed" }).send();
     if (!value || value.owner !== MPL_CORE_PROGRAM_ADDRESS) return null;
     return decodeCoreAsset(Uint8Array.from(getBase64Encoder().encode(value.data[0])));
   }

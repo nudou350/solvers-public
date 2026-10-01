@@ -85,6 +85,20 @@
       "when": 1790864889512,
       "tag": "0011_agent_review_images",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790880954310,
+      "tag": "0012_resale_listings",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790883042748,
+      "tag": "0013_listings_sold_unique",
+      "breakpoints": true
     }
   ]
 }

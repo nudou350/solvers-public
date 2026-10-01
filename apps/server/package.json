@@ -16,6 +16,7 @@
     "cli:seed": "tsx --env-file-if-exists=.env src/cli/seed.ts",
     "cli:retire-escrows": "tsx --env-file-if-exists=.env src/cli/retire-escrows.ts",
     "cli:reindex": "tsx --env-file-if-exists=.env src/cli/reindex.ts",
+    "cli:clean-simulated-resale": "tsx --env-file-if-exists=.env src/cli/clean-simulated-resale.ts",
     "cli:validate": "tsx src/cli/validate.ts",
     "cli:schema": "tsx src/cli/schema.ts",
     "cli:images": "tsx --env-file-if-exists=.env src/cli/images.ts",

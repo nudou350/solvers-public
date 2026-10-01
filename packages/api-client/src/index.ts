@@ -124,9 +124,19 @@ export function createApi(opts: ApiOptions = {}) {
     refreshLicenses: () => post(z.object({ ok: z.boolean() }), "/api/me/licenses/refresh"),
     getMemoriesCount: () =>
       req(z.object({ count: z.number(), agents: z.array(z.object({ agentId: z.string(), updatedAt: z.string() })) }), "/api/me/memories/count"),
-    /** Anúncios ativos de revenda (um por licença), do mais barato ao mais caro; `agent` = slug para filtrar um especialista. */
-    getResaleListings: (params?: { agent?: string }) =>
-      req(z.array(ResaleListing), `/api/market/listings${params?.agent ? `?${new URLSearchParams({ agent: params.agent })}` : ""}`),
+    /**
+     * Anúncios ativos de revenda (um por licença), do mais barato ao mais caro (teto de 200 na listagem geral);
+     * `agent` = slug para filtrar um especialista; `license` = id da licença (o anúncio ativo dela, sem o teto).
+     */
+    getResaleListings: (params?: { agent?: string; license?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.agent) qs.set("agent", params.agent);
+      if (params?.license) qs.set("license", params.license);
+      const q = qs.toString();
+      return req(z.array(ResaleListing), `/api/market/listings${q ? `?${q}` : ""}`);
+    },
+    /** O anúncio ativo de uma licença (checkout de revenda); null quando não há (vendido, cancelado ou inexistente). */
+    getResaleListing: async (licenseId: string) => (await req(z.array(ResaleListing), `/api/market/listings?${new URLSearchParams({ license: licenseId })}`))[0] ?? null,
     getReputation: () => req(UserReputation, "/api/me/reputation"),
     getProfile: () => req(Profile, "/api/me/profile"),
     updateProfile: (data: { displayName?: string | null; email?: string | null }) =>

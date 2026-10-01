@@ -6,6 +6,7 @@ import {
   FREE_TRIAL_USES,
   GUARANTEE_LIMITS_USDC,
   MIN_PERMANENT_PRICE_USDC,
+  RESALE_MAX_CUT_BPS,
   unitsToUsdc,
   usdcToUnits,
   type AgentAccess,
@@ -77,6 +78,9 @@ storeRouter.get(
       guaranteeMinRating: env.GUARANTEE_MIN_RATING,
       pix: pixConfig(),
       sodax: sodaxConfig(),
+      resaleEnabled: env.RESALE_ENABLED,
+      resaleFeeBps: config?.data.feeBps ?? null,
+      resaleMaxCutBps: RESALE_MAX_CUT_BPS,
     };
   }),
 );
@@ -140,37 +144,6 @@ storeRouter.get("/creators", h(async () => listCreators()));
 
 storeRouter.get("/creators/:id", h(async (req) => getCreatorProfile(String(req.params.id))));
 
-/** Mercado de revenda (P2): anúncios de licenças. Na demo os anúncios e o histórico são simulados. */
-storeRouter.get(
-  "/market/listings",
-  h(async () => {
-    const rows = await db.select().from(schema.licenses).where(eq(schema.licenses.listedForResale, true)).orderBy(schema.licenses.resalePrice);
-    const agentRows = await Promise.all([...new Set(rows.map((r) => r.agentId))].map((id) => findAgentRow(id)));
-    const agents = new Map((await mapAgents(agentRows)).map((a) => [a.id, a]));
-    const out = [];
-    for (const r of rows) {
-      const agent = agents.get(r.agentId);
-      if (!agent || r.resalePrice == null) continue;
-      const hist = await db
-        .select()
-        .from(schema.resalePrices)
-        .where(eq(schema.resalePrices.agentId, r.agentId))
-        .orderBy(desc(schema.resalePrices.at))
-        .limit(10);
-      const last = hist[0] ? unitsToUsdc(hist[0].price) : null;
-      const prev = hist[hist.length - 1] ? unitsToUsdc(hist[hist.length - 1]!.price) : null;
-      out.push({
-        license: toLicense(r),
-        agent,
-        priceUsdc: unitsToUsdc(r.resalePrice),
-        priceTrendPct: last && prev ? Math.round(((last - prev) / prev) * 1000) / 10 : 0,
-        simulated: true,
-      });
-    }
-    return out;
-  }),
-);
-
 // ---------- Autenticado ----------
 
 storeRouter.get(
@@ -211,6 +184,7 @@ const KIND_LABEL: Record<string, string> = {
   escrow: "Tarefa com garantia criada",
   milestone: "Etapa de garantia atualizada",
   dispute_resolved: "Contestação resolvida",
+  resale: "Compra de licença revendida",
 };
 
 storeRouter.get(

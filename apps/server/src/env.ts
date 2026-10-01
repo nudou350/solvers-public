@@ -47,6 +47,8 @@ const base = z.object({
   /** 32 bytes em base64: cifra as chaves de memória. */
   SERVER_KEK: z.string().min(40),
 
+  /** Revenda de licenças (mercado entre usuários). Desligada por padrão: o deploy sobe com ela off e só se liga depois do upgrade do programa. */
+  RESALE_ENABLED: bool.default("false"),
   FAUCET_ENABLED: bool.default("false"),
   FAUCET_AMOUNT_USDC: z.coerce.number().default(50),
   /** Cotação de fallback USD->BRL quando a API de câmbio falhar. */

@@ -15,7 +15,9 @@ import {
   escrowNotVisible,
   isFreshTx,
   isInfraError,
+  listingNotVisible,
 } from "./retry-policy.js";
+import { applyCancelled, applyListed, applySold, closeListingsAt, markLicenseAcquired, mirrorListingFlags, resoldOwner } from "./resale-mirror.js";
 import {
   agentIdByAddress,
   recordChainTx,
@@ -23,6 +25,7 @@ import {
   syncCredits,
   syncEscrow,
   syncLicense,
+  syncListing,
   syncReputation,
   syncReview,
   type ChainTxExtra,
@@ -241,6 +244,88 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
       await recordChainTx(signature, "purchase", ev.data.buyer, agentId, fin.amount, fin.extra);
       return;
     }
+    case "LicenseListed": {
+      const agentId = await syncAgent(ev.data.agent);
+      if (!agentId) throw agentMissing(ev.data.agent);
+      const asset = ev.data.asset;
+      const blockTime = await blockTimeOf(ctx);
+      // O anúncio é espelhado com os valores congelados do evento; a conta Listing só confirma que ele ainda vale.
+      const owner = await syncLicense(asset, agentId, signature, ctx.blockTime);
+      const onchain = await chain().fetchMaybeListing(asset);
+      const matches =
+        !!onchain &&
+        onchain.seller === ev.data.seller &&
+        onchain.price === ev.data.price &&
+        onchain.feeBps === ev.data.feeBps &&
+        onchain.royaltyBps === ev.data.royaltyBps;
+      if (!matches || owner !== ev.data.seller) {
+        // Recém-aberto e invisível: o RPC está atrasado. Antigo: já foi vendido, cancelado ou refeito com outro preço (os
+        // eventos seguintes cuidam disso); reprocessar não pode ressuscitar um anúncio fechado.
+        if (isFreshTx(blockTime) && !onchain) throw listingNotVisible(asset);
+        await mirrorListingFlags(asset);
+        return;
+      }
+      await applyListed({
+        licenseId: asset,
+        agentId,
+        listingAddress: await chain().listingPda(asset),
+        seller: ev.data.seller,
+        price: ev.data.price,
+        feeBps: ev.data.feeBps,
+        royaltyBps: ev.data.royaltyBps,
+        listedAt: onchain.listedAt > 0n ? new Date(Number(onchain.listedAt) * 1000) : (blockTime ?? new Date()),
+        signature,
+      });
+      return;
+    }
+    case "LicenseResold": {
+      // Revenda não é venda do criador: NÃO mexe em agents.total_sales (só relido por syncAgent) nem em user_reputation.
+      const agentId = await syncAgent(ev.data.agent);
+      if (!agentId) throw agentMissing(ev.data.agent);
+      const asset = ev.data.asset;
+      const blockTime = await blockTimeOf(ctx);
+      // Fecha o anúncio ANTES de espelhar o novo dono: syncLicense invalida anúncios cujo vendedor não é mais o dono.
+      const listing = await applySold({
+        licenseId: asset,
+        agentId,
+        listingAddress: await chain().listingPda(asset),
+        seller: ev.data.seller,
+        buyer: ev.data.buyer,
+        price: ev.data.price,
+        royalty: ev.data.royalty,
+        fee: ev.data.fee,
+        sellerAmount: ev.data.sellerAmount,
+        signature,
+        blockTime,
+      });
+      // O evento manda no novo dono (a releitura pode vir atrasada e mostrar o vendedor).
+      const fresh = isFreshTx(blockTime);
+      await syncLicense(asset, agentId, signature, ctx.blockTime, (coreOwner) =>
+        resoldOwner(coreOwner, { seller: ev.data.seller, buyer: ev.data.buyer }, fresh),
+      );
+      await markLicenseAcquired(asset, ev.data.buyer, blockTime, signature);
+      await mirrorListingFlags(asset);
+      // Valores do próprio evento: royalty = parte do criador, taxa = parte da plataforma (sem splitFromDeltas, que
+      // contaria o líquido do vendedor como "criador").
+      await recordChainTx(signature, "resale", ev.data.buyer, agentId, ev.data.price, {
+        blockTime,
+        fee: ev.data.fee,
+        creatorAmount: ev.data.royalty,
+        creatorWallet: await creatorWalletOfAgent(agentId),
+        feeBps: listing.feeBps,
+      });
+      return;
+    }
+    case "ListingCancelled": {
+      await applyCancelled({
+        licenseId: ev.data.asset,
+        seller: ev.data.seller,
+        canceller: ev.data.canceller,
+        signature,
+        blockTime: await blockTimeOf(ctx),
+      });
+      return;
+    }
     case "CreditsBought": {
       const agentId = await syncAgent(ev.data.agent);
       if (!agentId) throw agentMissing(ev.data.agent);
@@ -305,6 +390,7 @@ const DISCRIMINATORS: Array<[string, ArrayLike<number>]> = [
   ["credits", gen.CREDITS_DISCRIMINATOR],
   ["review", gen.REVIEW_DISCRIMINATOR],
   ["reputation", gen.USER_REPUTATION_DISCRIMINATOR],
+  ["listing", gen.LISTING_DISCRIMINATOR],
 ];
 
 /** Plano B para logs truncados: identifica cada conta do programa pelo discriminador e espelha. */
@@ -312,7 +398,12 @@ async function resyncAccounts(accounts: readonly Address[]) {
   const c = chain();
   for (const acc of new Set(accounts)) {
     const { value } = await c.rpc.getAccountInfo(acc, { encoding: "base64" }).send();
-    if (!value || value.owner !== c.programId) continue;
+    if (!value) {
+      // Conta fechada (ex.: Listing de uma venda ou cancelamento cujo evento se perdeu): anúncio ativo ali não vale mais.
+      await closeListingsAt(acc);
+      continue;
+    }
+    if (value.owner !== c.programId) continue;
     const data = Buffer.from(value.data[0], "base64");
     const kind = DISCRIMINATORS.find(([, d]) => Array.from(d).every((b, i) => data[i] === b))?.[0];
     if (kind === "agent") await syncAgent(acc);
@@ -324,6 +415,8 @@ async function resyncAccounts(accounts: readonly Address[]) {
       const cr = gen.getCreditsDecoder().decode(data);
       const agentId = await agentIdByAddress(cr.agent);
       if (agentId) await syncCredits(cr.agent, cr.owner, agentId);
+    } else if (kind === "listing") {
+      await syncListing(acc);
     } else if (kind === "review") {
       const rv = gen.getReviewDecoder().decode(data);
       const agentId = await agentIdByAddress(rv.agent);

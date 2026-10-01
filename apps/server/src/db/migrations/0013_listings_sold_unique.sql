@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "listings_sold_sig_idx" ON "listings" USING btree ("license_id","close_signature") WHERE "listings"."status" = 'sold';

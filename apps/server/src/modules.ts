@@ -6,6 +6,7 @@ import { escrowRouter } from "./store/escrow.js";
 import { helpRouter } from "./store/help.js";
 import { imagesRouter } from "./store/images.js";
 import { meRouter } from "./store/me.js";
+import { resaleRouter } from "./store/resale.js";
 import { mountPreview } from "./verifier/preview.js";
 
 // Ponto único onde os módulos se registram no app (rotas extras e jobs periódicos).
@@ -18,6 +19,7 @@ export const mounts: Mount[] = [
     app.use("/api", escrowRouter);
     app.use("/api", imagesRouter);
     app.use("/api", helpRouter);
+    app.use("/api", resaleRouter);
     app.use("/api", meRouter);
   },
 ];

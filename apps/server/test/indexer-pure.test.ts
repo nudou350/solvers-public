@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { TokenDelta } from "@solvers/chain";
 import { effectiveFeeBps, splitByBps, splitFromDeltas } from "../src/indexer/amounts.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, escrowStatusFromMilestones, retirementPlan, staleDisputeDue } from "../src/indexer/escrow-status.js";
-import { FRESH_TX_SECS, IndexerRetryableError, backoffSecs, escrowNotVisible, isFreshTx, isInfraError, MAX_ATTEMPTS } from "../src/indexer/retry-policy.js";
+import { FRESH_TX_SECS, IndexerRetryableError, backoffSecs, escrowNotVisible, isFreshTx, isInfraError, listingNotVisible, MAX_ATTEMPTS } from "../src/indexer/retry-policy.js";
 
 // Regras puras do indexador: valores executados, status do escrow fechado e política de novas tentativas.
 
@@ -153,6 +153,15 @@ describe("EscrowCreated: conta recém-criada ausente tenta de novo", () => {
     const e = escrowNotVisible("Esc1");
     assert.ok(e instanceof IndexerRetryableError);
     assert.match(e.message, /Esc1/);
+    assert.equal(isInfraError(e), true);
+  });
+});
+
+describe("anúncio de revenda ainda não visível", () => {
+  it("é erro de infraestrutura (não gasta tentativas) e cita a licença", () => {
+    const e = listingNotVisible("Asset1");
+    assert.ok(e instanceof IndexerRetryableError);
+    assert.match(e.message, /Asset1/);
     assert.equal(isInfraError(e), true);
   });
 });

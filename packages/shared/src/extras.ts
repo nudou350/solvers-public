@@ -334,8 +334,8 @@ export const PublicConfig = z.object({
   sodax: SodaxConfig.optional(),
   /** Revenda de licenças ligada: sem isso a web esconde Anunciar/Comprar usada e o servidor responde `resale_disabled`. */
   resaleEnabled: z.boolean().default(false),
-  /** Taxa da plataforma aplicada a anúncios NOVOS de revenda (`Config.fee_bps`), em pontos-base. */
-  resaleFeeBps: z.number().default(0),
+  /** Taxa da plataforma aplicada a anúncios NOVOS de revenda (`Config.fee_bps`), em pontos-base. null: a config on-chain não pôde ser lida (a web desabilita Anunciar). */
+  resaleFeeBps: z.number().nullable().default(null),
   /** Teto de royalty + taxa numa revenda, em pontos-base (`RESALE_MAX_CUT_BPS`). */
   resaleMaxCutBps: z.number().default(RESALE_MAX_CUT_BPS),
 });

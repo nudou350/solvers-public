@@ -14,9 +14,12 @@ import { guaranteeOffered, toAgent, toCreator, toReview, type AgentExtras, type 
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
-/** Tendência de uso (% de variação dos usos dos últimos 7 dias contra os 7 anteriores) e piso de revenda. */
+/**
+ * Tendência de uso (% de variação dos usos dos últimos 7 dias contra os 7 anteriores) e piso de revenda: o preço do
+ * anúncio ATIVO mais barato do solver (tabela `listings`) e a licença dele. Com a revenda desligada não há piso.
+ */
 export async function agentExtras(ids: string[]): Promise<Map<string, AgentExtras>> {
-  const out = new Map<string, AgentExtras>(ids.map((id) => [id, { trend7d: 0, resaleFloor: null }]));
+  const out = new Map<string, AgentExtras>(ids.map((id) => [id, { trend7d: 0, resaleFloor: null, resaleListingId: null }]));
   if (ids.length === 0) return out;
   const usage = await db
     .select({
@@ -32,12 +35,21 @@ export async function agentExtras(ids: string[]): Promise<Map<string, AgentExtra
     const trend = u.previous === 0 ? (u.recent > 0 ? 100 : 0) : ((u.recent - u.previous) / u.previous) * 100;
     out.get(u.agentId)!.trend7d = Math.round(trend * 10) / 10;
   }
-  const floors = await db
-    .select({ agentId: schema.licenses.agentId, floor: sql<string>`min(${schema.licenses.resalePrice})` })
-    .from(schema.licenses)
-    .where(and(inArray(schema.licenses.agentId, ids), eq(schema.licenses.listedForResale, true)))
-    .groupBy(schema.licenses.agentId);
-  for (const f of floors) if (f.floor != null) out.get(f.agentId)!.resaleFloor = BigInt(f.floor);
+  if (env.RESALE_ENABLED) {
+    // Um anúncio mais barato por solver (empate de preço: o mais antigo).
+    const floors = await db
+      .selectDistinctOn([schema.listings.agentId], { agentId: schema.listings.agentId, price: schema.listings.price, licenseId: schema.listings.licenseId })
+      .from(schema.listings)
+      .where(and(inArray(schema.listings.agentId, ids), eq(schema.listings.status, "active")))
+      .orderBy(schema.listings.agentId, asc(schema.listings.price), asc(schema.listings.id));
+    for (const f of floors) {
+      const e = out.get(f.agentId);
+      if (e) {
+        e.resaleFloor = f.price;
+        e.resaleListingId = f.licenseId;
+      }
+    }
+  }
   return out;
 }
 
@@ -186,7 +198,8 @@ export async function listReviews(agentId: string, limit = 50) {
 
 export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
   const row = await findAgentRow(idOrSlug);
-  const [agent] = await mapAgents([row]);
+  const extras = (await agentExtras([row.id])).get(row.id)!;
+  const agent = toAgent(row, extras);
   const creator =
     (await getCreator(row.creatorId)) ?? {
       id: row.creatorId,
@@ -203,24 +216,28 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     .from(schema.reviews)
     .where(and(eq(schema.reviews.agentId, row.id), eq(schema.reviews.onchain, true)))
     .groupBy(schema.reviews.rating);
-  const resale = await db
-    .select()
-    .from(schema.resalePrices)
-    .where(eq(schema.resalePrices.agentId, row.id))
-    .orderBy(schema.resalePrices.at)
-    .limit(60);
+  // Histórico de preços = vendas pelo mercado (listings 'sold'), das últimas 60, em ordem cronológica.
+  // Com a revenda desligada o histórico também some (o mesmo critério do piso).
+  const resale = (!env.RESALE_ENABLED ? [] : await db
+      .select({ at: schema.listings.closedAt, price: schema.listings.soldPrice })
+      .from(schema.listings)
+      .where(and(eq(schema.listings.agentId, row.id), eq(schema.listings.status, "sold")))
+      .orderBy(desc(schema.listings.closedAt), desc(schema.listings.id))
+      .limit(60)
+  ).reverse();
   return {
-    agent: agent!,
+    agent,
     creator,
     reviews: await listReviews(row.id, 10),
     images: toImageRefs(await db.select().from(schema.agentImages).where(eq(schema.agentImages.agentId, row.id)).orderBy(asc(schema.agentImages.position))),
     beforeAfter: row.details.beforeAfter ?? [],
     versions: row.details.versions ?? [
-      { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Versão atual", evalScore: agent!.evalScore },
+      { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Versão atual", evalScore: agent.evalScore },
     ],
     trial: agentTrial(row.id),
     priceBrl: Math.round(unitsToUsdc(row.price) * rate * 100) / 100,
-    resalePriceHistory: resale.map((r) => ({ date: r.at.toISOString(), priceUsdc: unitsToUsdc(r.price) })),
+    resalePriceHistory: resale.flatMap((r) => (r.at && r.price != null ? [{ date: r.at.toISOString(), priceUsdc: unitsToUsdc(r.price) }] : [])),
+    resaleListingId: extras.resaleListingId ?? null,
     ratingDistribution: [5, 4, 3, 2, 1].map((star) => dist.find((d) => d.rating === star)?.n ?? 0),
     onchain: {
       agent: row.onchainAddress,

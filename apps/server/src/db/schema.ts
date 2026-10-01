@@ -480,12 +480,51 @@ export const escalations = pgTable("escalations", {
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
+/** LEGADA: histórico de preços inventado pelo seed antigo. Nada lê mais; o histórico real vem de `listings` (sold). */
 export const resalePrices = pgTable("resale_prices", {
   id: serial("id").primaryKey(),
   agentId: text("agent_id").notNull(),
   price: u64("price").notNull(),
   at: ts("at").notNull().defaultNow(),
 });
+
+/**
+ * Anúncios de revenda de licenças (espelho dos eventos LicenseListed / LicenseResold / ListingCancelled).
+ * A conta `Listing` do programa é por ASSET (mesmo PDA a cada relistagem): por isso a chave aqui é `id` serial e o
+ * mesmo `license_id` tem uma linha por anúncio ao longo do tempo. Só um fica `active` (índice único parcial).
+ * status: active | sold | cancelled | invalid (o dono mudou ou um terceiro fechou um anúncio velho).
+ * `fee_bps`/`royalty_bps` são os valores congelados no anúncio; `royalty`/`fee`/`seller_amount` vêm do evento da venda.
+ */
+export const listings = pgTable(
+  "listings",
+  {
+    id: serial("id").primaryKey(),
+    licenseId: text("license_id").notNull(), // asset da licença (licenses.id)
+    agentId: text("agent_id").notNull(),
+    listingAddress: text("listing_address").notNull(), // PDA ["listing", asset] (igual em todas as relistagens)
+    sellerWallet: text("seller_wallet").notNull(),
+    price: u64("price").notNull(),
+    feeBps: integer("fee_bps").notNull(),
+    royaltyBps: integer("royalty_bps").notNull(),
+    status: text("status").notNull().default("active"),
+    listedAt: ts("listed_at").notNull().defaultNow(),
+    closedAt: ts("closed_at"),
+    buyerWallet: text("buyer_wallet"),
+    soldPrice: u64("sold_price"),
+    royalty: u64("royalty"),
+    fee: u64("fee"),
+    sellerAmount: u64("seller_amount"),
+    openSignature: text("open_signature"),
+    closeSignature: text("close_signature"),
+  },
+  (t) => [
+    uniqueIndex("listings_active_license_idx").on(t.licenseId).where(sql`${t.status} = 'active'`),
+    // Uma venda ('sold') por licença e assinatura: o mesmo evento processado em paralelo nunca duplica o histórico.
+    uniqueIndex("listings_sold_sig_idx").on(t.licenseId, t.closeSignature).where(sql`${t.status} = 'sold'`),
+    index("listings_agent_status_idx").on(t.agentId, t.status),
+    index("listings_seller_idx").on(t.sellerWallet),
+  ],
+);
 
 
 /** Cobranças Pix da demo: o comprador paga em reais e recebe USDC de teste (sem conversão real). */

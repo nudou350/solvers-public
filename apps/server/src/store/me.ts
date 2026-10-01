@@ -141,7 +141,8 @@ meRouter.get(
     const when = sql`coalesce(${tx.blockTime}, ${tx.createdAt})`;
     // Parte do criador em cada transação: o valor executado; sem ele (linhas anteriores ao backfill), usa a
     // taxa gravada na própria transação e, só se faltar, a taxa atual.
-    const creatorCut = sql`coalesce(${tx.creatorAmount}, ${tx.amount} - (${tx.amount} * coalesce(${tx.feeBps}, ${sql.raw(String(Math.trunc(feeBps)))}) / 10000))`;
+    // Revenda ('resale') nunca usa esse plano B: a parte do criador é o royalty do evento (ou nada), não "preço - taxa".
+    const creatorCut = sql`case when ${tx.kind} = 'resale' then coalesce(${tx.creatorAmount}, 0) else coalesce(${tx.creatorAmount}, ${tx.amount} - (${tx.amount} * coalesce(${tx.feeBps}, ${sql.raw(String(Math.trunc(feeBps)))}) / 10000)) end`;
     empty.creatorSharePct = Math.round(share * 1000) / 10;
     const agents = await db.select().from(schema.agents).where(eq(schema.agents.creatorId, creatorRow.id));
     if (agents.length === 0) return { ...empty, creator: await getCreator(creatorRow.id) };
@@ -215,7 +216,8 @@ meRouter.get(
         revenue: sql<number>`coalesce(sum(${creatorCut}) filter (where ${tx.kind} in ('purchase', 'credits')), 0)`.mapWith(Number),
       })
       .from(tx)
-      .where(and(inArray(tx.agentId, ids), gt(when, sql`now() - interval '30 days'`)))
+      // Revenda não é venda nem receita do criador (o royalty vai em `totals.royaltiesUsdc`): não cria dia de zeros aqui.
+      .where(and(inArray(tx.agentId, ids), sql`${tx.kind} <> 'resale'`, gt(when, sql`now() - interval '30 days'`)))
       .groupBy(sql`1`)
       .orderBy(sql`1`);
     const usesDaily = await db
@@ -266,6 +268,12 @@ meRouter.get(
       recent: recentGuarantee.map((r) => ({ signature: r.signature, agentId: r.agentId, amountUsdc: unitsToUsdc(r.amount ?? 0n), at: r.at })),
     };
 
+    // Royalties das revendas pelo mercado: o royalty de cada venda ('sold') dos especialistas do criador, como o evento gravou.
+    const [royalty] = await db
+      .select({ total: sql<string>`coalesce(sum(${schema.listings.royalty}), 0)` })
+      .from(schema.listings)
+      .where(and(inArray(schema.listings.agentId, ids), eq(schema.listings.status, "sold")));
+
     const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + f(x), 0);
     return {
       creator: await getCreator(creatorRow.id),
@@ -273,8 +281,7 @@ meRouter.get(
         sales: sum(perAgent, (a) => a.sales),
         uses: sum(perAgent, (a) => a.uses),
         salesRevenueUsdc: Math.round(sum(perAgent, (a) => a.revenueUsdc) * 100) / 100,
-        // Revenda é P2: royalties começam em zero até o mercado de revenda existir on-chain.
-        royaltiesUsdc: 0,
+        royaltiesUsdc: Math.round(unitsToUsdc(BigInt(royalty?.total ?? 0)) * 100) / 100,
         disputesOpened: disputes.length,
         disputesOpen: disputes.filter((d) => d.result === "open").length,
         disputesLost: sum(agents, (a) => a.disputesLost),

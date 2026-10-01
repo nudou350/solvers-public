@@ -29,6 +29,8 @@ import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, delive
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
 import { assertEntriesOpen } from "./pause-gate.js";
+import { licenseReviewUsed } from "./license-review.js";
+import { chooseReviewLicense } from "./review-rules.js";
 import { buildForUserChecked } from "./tx-build.js";
 import { notifyCreator } from "../notify/telegram.js";
 import { agentIsAvailable } from "../runtime/availability.js";
@@ -406,18 +408,29 @@ escrowRouter.post(
       .select()
       .from(schema.licenses)
       .where(and(eq(schema.licenses.ownerWallet, wallet), eq(schema.licenses.agentId, agent.id)));
-    let licenseAsset: string | undefined;
-    for (const l of lic) {
-      if ((await refreshLicenseOwner(l.id)) === wallet) {
-        licenseAsset = l.id;
-        break;
-      }
-    }
+    // Licenças que a carteira tem de fato (on-chain). A avaliação on-chain é uma por LICENÇA (`LicenseReview`): numa licença
+    // comprada usada, a dona anterior pode já ter gasto essa avaliação. Usa a primeira que ainda não foi usada.
+    const owned: string[] = [];
+    for (const l of lic) if ((await refreshLicenseOwner(l.id)) === wallet) owned.push(l.id);
+    const used = await Promise.all(owned.map(async (id) => ({ id, used: await licenseReviewUsed(id) })));
     const [cred] = await db
       .select()
       .from(schema.credits)
       .where(and(eq(schema.credits.ownerWallet, wallet), eq(schema.credits.agentId, agent.id)));
-    if (!licenseAsset && !(cred && cred.purchased > 0)) {
+    const hasCredits = !!cred && cred.purchased > 0;
+    const [ownReview] = await db
+      .select({ id: schema.reviews.id })
+      .from(schema.reviews)
+      .where(and(eq(schema.reviews.agentId, agent.id), eq(schema.reviews.authorWallet, wallet), eq(schema.reviews.onchain, true)));
+    const choice = chooseReviewLicense(used, !!ownReview);
+    const licenseAsset = choice.kind === "use" ? choice.asset : undefined;
+    if (choice.kind === "all_used" && !hasCredits) {
+      throw badRequest(
+        "Esta licença já foi usada para avaliar este especialista por quem a tinha antes. Cada licença só pode avaliar uma vez, então você não pode avaliar com ela.",
+        "license_already_reviewed",
+      );
+    }
+    if (!licenseAsset && !hasCredits) {
       // Quem comprou créditos no modelo antigo (pagamento por uso) ainda pode avaliar.
       throw forbidden("Só quem tem a licença deste especialista pode avaliar.");
     }

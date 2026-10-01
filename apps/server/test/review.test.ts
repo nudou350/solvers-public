@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { sha256Hex } from "../src/lib/crypto.js";
-import { resolvePublishedText, textMatchesHash } from "../src/store/review-rules.js";
+import { chooseReviewLicense, resolvePublishedText, textMatchesHash } from "../src/store/review-rules.js";
 
 // Avaliações: o texto off-chain só vale se o sha256 dele é o hash confirmado on-chain (sem env ou banco).
 
@@ -37,5 +37,25 @@ describe("resolvePublishedText (syncReview)", () => {
 
   it("avaliação sem texto: hash do vazio publica vazio", () => {
     assert.equal(resolvePublishedText(h(""), ["ignorado"]), "");
+  });
+});
+
+describe("chooseReviewLicense (licença comprada usada)", () => {
+  it("usa a primeira licença cuja avaliação ainda não foi gasta", () => {
+    assert.deepEqual(chooseReviewLicense([{ id: "A", used: true }, { id: "B", used: false }], false), { kind: "use", asset: "B" });
+    assert.deepEqual(chooseReviewLicense([{ id: "A", used: false }], false), { kind: "use", asset: "A" });
+  });
+
+  it("todas gastas pela dona anterior: all_used (erro claro, sem tentar a transação)", () => {
+    assert.deepEqual(chooseReviewLicense([{ id: "A", used: true }], false), { kind: "all_used" });
+  });
+
+  it("todas gastas e a própria carteira já avaliou: segue para o programa recusar a avaliação repetida", () => {
+    assert.deepEqual(chooseReviewLicense([{ id: "A", used: true }, { id: "B", used: true }], true), { kind: "use", asset: "A" });
+  });
+
+  it("sem licença: none", () => {
+    assert.deepEqual(chooseReviewLicense([], false), { kind: "none" });
+    assert.deepEqual(chooseReviewLicense([], true), { kind: "none" });
   });
 });

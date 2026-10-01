@@ -20,7 +20,7 @@ type EscrowRow = typeof schema.escrows.$inferSelect;
 type MilestoneRow = typeof schema.milestones.$inferSelect;
 type RepRow = typeof schema.userReputation.$inferSelect;
 
-export type AgentExtras = { trend7d: number; resaleFloor: bigint | null };
+export type AgentExtras = { trend7d: number; resaleFloor: bigint | null; /** Licença do anúncio mais barato (o piso); null sem anúncio. */ resaleListingId?: string | null };
 
 /** Garantia só para quem já provou: vendas e nota mínimas (GUARANTEE_MIN_SALES / GUARANTEE_MIN_RATING). */
 export function guaranteeOffered(row: AgentRow): boolean {
@@ -64,6 +64,7 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     packageContents: row.packageContents,
     guaranteeAvailable: guaranteeOffered(row),
     resaleFloorUsdc: extras.resaleFloor == null ? null : unitsToUsdc(extras.resaleFloor),
+    royaltyBps: row.royaltyBps,
     trend7d: extras.trend7d,
     publishedAt: publishedAt(row),
   };

@@ -50,3 +50,8 @@ export function isFreshTx(blockTime: Date | null, now: Date = new Date()): boole
 export function escrowNotVisible(escrow: string): IndexerRetryableError {
   return new IndexerRetryableError(`escrow ${escrow} ainda não visível no RPC`);
 }
+
+/** Anúncio recém-aberto ainda não visível no RPC: não grava nada e tenta de novo (falha de infraestrutura, não gasta tentativas). */
+export function listingNotVisible(asset: string): IndexerRetryableError {
+  return new IndexerRetryableError(`anúncio da licença ${asset} ainda não visível no RPC`);
+}
