@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RESALE_MAX_CUT_BPS } from "./rules.js";
 import { Agent, Creator, Escrow, GuaranteeLevel, ImageRef, License, Review, UserReputation } from "./schemas.js";
 
 // Extensões ao contrato para telas que o schema base não cobre.
@@ -66,6 +67,8 @@ export const AgentDetail = z.object({
   trial: TrialInfo.nullable(),
   priceBrl: z.number().nullable(),
   resalePriceHistory: z.array(z.object({ date: z.string(), priceUsdc: z.number() })),
+  /** Anúncio de revenda mais barato (id = asset da licença; é o que `resaleFloorUsdc` mostra). null: nada à venda. */
+  resaleListingId: z.string().nullable().default(null),
   /** Quantidade de avaliações por nota, de 5 a 1 estrela. */
   ratingDistribution: z.array(z.number()).length(5),
   /** Contas on-chain do especialista (link "verificar na blockchain"). */
@@ -329,15 +332,30 @@ export const PublicConfig = z.object({
   pix: PixConfig,
   /** Ausente em servidores antigos: o front só mostra a opção SODAX quando vem enabled. */
   sodax: SodaxConfig.optional(),
+  /** Revenda de licenças ligada: sem isso a web esconde Anunciar/Comprar usada e o servidor responde `resale_disabled`. */
+  resaleEnabled: z.boolean().default(false),
+  /** Taxa da plataforma aplicada a anúncios NOVOS de revenda (`Config.fee_bps`), em pontos-base. */
+  resaleFeeBps: z.number().default(0),
+  /** Teto de royalty + taxa numa revenda, em pontos-base (`RESALE_MAX_CUT_BPS`). */
+  resaleMaxCutBps: z.number().default(RESALE_MAX_CUT_BPS),
 });
 
-/** GET /api/market/listings (revenda é P2: dados simulados na demo) */
+/** GET /api/market/listings: anúncios ativos de revenda (on-chain, espelhados pelo indexer). */
 export const ResaleListing = z.object({
+  /** Asset da licença: é a chave do anúncio (um anúncio ativo por licença). */
+  id: z.string(),
   license: License,
   agent: Agent,
   priceUsdc: z.number(),
   priceTrendPct: z.number(),
-  simulated: z.boolean(),
+  sellerWallet: z.string(),
+  /** Reputação (0..100) do vendedor; null quando ele não tem histórico. */
+  sellerReputation: z.number().nullable(),
+  /** Quando foi anunciada (ISO). */
+  listedAt: z.string(),
+  /** Royalty do criador e taxa da plataforma congelados no anúncio, em pontos-base. */
+  royaltyBps: z.number(),
+  feeBps: z.number(),
 });
 
 /** Resposta dos endpoints /api/tx/*: transação serializada pronta para a carteira assinar. */

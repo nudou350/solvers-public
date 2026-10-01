@@ -33,7 +33,10 @@ export type SolversEvent =
   | { name: "SlashProposed"; data: gen.SlashProposedEvent }
   | { name: "SlashContested"; data: gen.SlashContestedEvent }
   | { name: "SlashCancelled"; data: gen.SlashCancelledEvent }
-  | { name: "SlashExecuted"; data: gen.SlashExecutedEvent };
+  | { name: "SlashExecuted"; data: gen.SlashExecutedEvent }
+  | { name: "LicenseListed"; data: gen.LicenseListedEvent }
+  | { name: "LicenseResold"; data: gen.LicenseResoldEvent }
+  | { name: "ListingCancelled"; data: gen.ListingCancelledEvent };
 
 const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) => unknown]> = [
   ["AgentRegistered", gen.AGENT_REGISTERED_EVENT_DISCRIMINATOR, gen.parseAgentRegisteredEvent],
@@ -67,6 +70,9 @@ const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) 
   ["SlashContested", gen.SLASH_CONTESTED_EVENT_DISCRIMINATOR, gen.parseSlashContestedEvent],
   ["SlashCancelled", gen.SLASH_CANCELLED_EVENT_DISCRIMINATOR, gen.parseSlashCancelledEvent],
   ["SlashExecuted", gen.SLASH_EXECUTED_EVENT_DISCRIMINATOR, gen.parseSlashExecutedEvent],
+  ["LicenseListed", gen.LICENSE_LISTED_EVENT_DISCRIMINATOR, gen.parseLicenseListedEvent],
+  ["LicenseResold", gen.LICENSE_RESOLD_EVENT_DISCRIMINATOR, gen.parseLicenseResoldEvent],
+  ["ListingCancelled", gen.LISTING_CANCELLED_EVENT_DISCRIMINATOR, gen.parseListingCancelledEvent],
 ];
 
 type ReadonlyUint8Array = gen.AgentRegisteredEvent["agentId"];

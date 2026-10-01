@@ -99,3 +99,26 @@ export function agentIdToBytes(id: string): Uint8Array {
 export function bytesToHex(bytes: ArrayLike<number>): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/** Teto de `royalty_bps + fee_bps` numa revenda (50%): o vendedor sempre fica com pelo menos metade. Espelha o programa. */
+export const RESALE_MAX_CUT_BPS = 5000;
+const MAX_BPS = 10_000n;
+const U64_MAX = 18446744073709551615n;
+
+/**
+ * Divide o preço de uma revenda em royalty do criador, taxa da plataforma e líquido do vendedor. Espelha
+ * EXATAMENTE `resale_split` do programa (`programs/solvers/src/state.rs`): royalty e taxa arredondam para baixo e a
+ * sobra do arredondamento fica com o vendedor, então `royalty + fee + seller === priceUnits` sempre.
+ * Lança `Error` se `royaltyBps + feeBps` passar de `RESALE_MAX_CUT_BPS` (o programa: `ResaleCutTooHigh`).
+ */
+export function resaleSplit(priceUnits: bigint, royaltyBps: number, feeBps: number): { royalty: bigint; fee: bigint; seller: bigint } {
+  const isBps = (n: number) => Number.isInteger(n) && n >= 0 && n <= 10_000;
+  if (!isBps(royaltyBps) || !isBps(feeBps)) throw new Error(`bps inválido: royalty ${royaltyBps}, taxa ${feeBps}`);
+  if (priceUnits < 0n || priceUnits > U64_MAX) throw new Error(`preço fora do intervalo de u64: ${priceUnits}`);
+  if (royaltyBps + feeBps > RESALE_MAX_CUT_BPS) {
+    throw new Error(`royalty + taxa (${royaltyBps + feeBps} bps) passam do teto de ${RESALE_MAX_CUT_BPS} bps`);
+  }
+  const royalty = (priceUnits * BigInt(royaltyBps)) / MAX_BPS;
+  const fee = (priceUnits * BigInt(feeBps)) / MAX_BPS;
+  return { royalty, fee, seller: priceUnits - royalty - fee };
+}

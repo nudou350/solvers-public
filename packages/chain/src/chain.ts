@@ -44,7 +44,7 @@ import {
 } from "@solana-program/token";
 import { getCreateAccountInstruction, getTransferSolInstruction } from "@solana-program/system";
 import * as gen from "@solvers/client";
-import { agentIdToBytes } from "@solvers/shared";
+import { agentIdToBytes, RESALE_ERROR_CODES, RESALE_MAX_CUT_BPS, resaleSplit, type ResaleErrorCode } from "@solvers/shared";
 import { classifyConfigData, ConfigNotMigratedError, CONFIG_V1_SIZE, type ConfigState } from "./config-state.js";
 import { parseEvents, type SolversEvent } from "./events.js";
 import { describeFailure } from "./program-errors.js";
@@ -87,6 +87,21 @@ export class TxError extends Error {
     public readonly signature?: Signature,
   ) {
     super(message);
+  }
+}
+
+/**
+ * Erro de domínio da revenda, lançado ANTES de simular/enviar: `code` é um dos `RESALE_ERROR_CODES` (de `@solvers/shared`),
+ * que o servidor traduz em HTTP. `details.priceUnits` acompanha `listing_changed` (o preço atual do anúncio).
+ */
+export class ResaleError extends TxError {
+  constructor(
+    public readonly code: ResaleErrorCode,
+    message: string,
+    public readonly details: { priceUnits?: bigint } = {},
+  ) {
+    super(message);
+    this.name = "ResaleError";
   }
 }
 
@@ -754,6 +769,230 @@ export class SolversChain {
     return { instructions: [ix], asset, price };
   }
 
+  // ---------- Revenda de licenças ----------
+
+  /** PDA `market_authority`: o `TransferDelegate` de todo asset anunciado. */
+  async marketAuthorityPda() {
+    return (await gen.findMarketAuthorityPda())[0];
+  }
+
+  /** PDA do anúncio de revenda de um asset (um por asset). */
+  async listingPda(asset: Address) {
+    return (await gen.findListingPda({ asset }))[0];
+  }
+
+  /** Lê o anúncio de um asset em `confirmed` (venda ou cancelamento recém-feitos já contam); `null` se não existe. */
+  async fetchMaybeListing(asset: Address): Promise<gen.Listing | null> {
+    const acc = await gen.fetchMaybeListing(this.rpc, await this.listingPda(asset), { commitment: "confirmed" });
+    return acc.exists ? acc.data : null;
+  }
+
+  /** Dono, coleção e `TransferDelegate` de um asset em `confirmed`; `null` se não é um asset vivo do mpl-core. */
+  async fetchCoreLicense(asset: Address): Promise<CoreLicense | null> {
+    const { value } = await this.rpc.getAccountInfo(asset, { encoding: "base64", commitment: "confirmed" }).send();
+    if (!value || value.owner !== MPL_CORE_PROGRAM_ADDRESS) return null;
+    try {
+      return decodeCoreLicense(Uint8Array.from(getBase64Encoder().encode(value.data[0])));
+    } catch {
+      throw new ResaleError(RESALE_ERROR_CODES.licenseInvalid, "Não foi possível ler esta licença na blockchain.");
+    }
+  }
+
+  /** O solver (conta `Agent`) dono de uma coleção de licenças. Varre as contas do programa: prefira passar o agent id. */
+  async fetchAgentByCollection(collection: Address): Promise<{ address: Address; data: gen.Agent } | null> {
+    const b58 = getBase58Decoder();
+    const res = await this.rpc
+      .getProgramAccounts(this.programId, {
+        encoding: "base64",
+        commitment: "confirmed",
+        filters: [
+          { memcmp: { offset: 0n, bytes: b58.decode(Uint8Array.from(gen.AGENT_DISCRIMINATOR)) as never, encoding: "base58" } },
+          // 8 (discriminador) + 16 (agent_id) + 32 (creator).
+          { memcmp: { offset: 56n, bytes: b58.decode(getAddressEncoder().encode(collection)) as never, encoding: "base58" } },
+        ],
+      })
+      .send();
+    for (const r of res) {
+      const data = gen.getAgentDecoder().decode(Uint8Array.from(getBase64Encoder().encode(r.account.data[0])));
+      if (data.collection === collection) return { address: r.pubkey, data };
+    }
+    return null;
+  }
+
+  private async fetchAgentAccount(agentIdHex: string): Promise<{ address: Address; data: gen.Agent } | null> {
+    const address = await this.agentPda(agentIdHex);
+    const acc = await gen.fetchMaybeAgent(this.rpc, address, { commitment: "confirmed" });
+    return acc.exists ? { address, data: acc.data } : null;
+  }
+
+  /**
+   * Anunciar uma licença à venda. O vendedor assina (o `AddPlugin`/`Approve` do mpl-core é dele) e a plataforma paga o rent
+   * do anúncio. Se já existe um anúncio VELHO do asset (o dono mudou, o delegate foi revogado ou resetado), um
+   * `cancel_listing` assinado pelo vendedor vai antes do `list_license`, na mesma transação. Anúncio ainda válido:
+   * `already_listed`. `opts.agentIdHex` evita a busca da coleção entre as contas do programa.
+   * Valida preço mínimo e teto de corte antes da simulação, espelhando o programa.
+   */
+  async listLicenseIxs(seller: Address, asset: Address, priceUnits: bigint, opts: { agentIdHex?: string } = {}): Promise<ListLicenseIxsResult> {
+    this.assertNotFeePayer(seller);
+    const core = await this.fetchCoreLicense(asset);
+    if (!core || !core.collection) {
+      throw new ResaleError(RESALE_ERROR_CODES.licenseInvalid, "Esta licença não foi encontrada na blockchain.");
+    }
+    if (core.owner !== seller) {
+      throw new ResaleError(RESALE_ERROR_CODES.notOwner, "Esta licença não está na sua carteira.");
+    }
+    const agent = opts.agentIdHex ? await this.fetchAgentAccount(opts.agentIdHex) : await this.fetchAgentByCollection(core.collection);
+    if (!agent || agent.data.collection !== core.collection) {
+      throw new ResaleError(RESALE_ERROR_CODES.licenseInvalid, "Esta licença não pertence a um especialista da plataforma.");
+    }
+    if (agent.data.creator === seller) {
+      throw new ResaleError(RESALE_ERROR_CODES.creatorCannotResell, "O criador não pode revender licenças do próprio especialista.");
+    }
+    const config = await this.fetchConfig();
+    if (priceUnits <= 0n || priceUnits < config.data.minPrice) {
+      throw new ResaleError(RESALE_ERROR_CODES.priceTooLow, "O preço está abaixo do mínimo da plataforma.");
+    }
+    if (priceUnits > U64_MAX) throw new TxError("O preço informado é grande demais.");
+    const feeBps = config.data.feeBps;
+    const royaltyBps = agent.data.royaltyBps;
+    if (royaltyBps + feeBps > RESALE_MAX_CUT_BPS) {
+      throw new ResaleError(
+        RESALE_ERROR_CODES.cutTooHigh,
+        "O royalty do criador somado à taxa da plataforma passa de 50% do preço: esta licença não pode ser anunciada agora.",
+      );
+    }
+
+    const instructions: Instruction[] = [];
+    const existing = await this.fetchMaybeListing(asset);
+    if (existing) {
+      if (listingIsLive(existing, core, agent.data.collection, await this.marketAuthorityPda())) {
+        throw new ResaleError(RESALE_ERROR_CODES.alreadyListed, "Esta licença já está anunciada.");
+      }
+      // Anúncio velho: fecha antes de abrir o novo. O vendedor (novo dono) pode: terceiros só precisam de `!live` e o
+      // vendedor antigo não faz CPI com o anúncio morto. O rent volta ao `rent_payer` gravado.
+      instructions.push(
+        await gen.getCancelListingInstructionAsync({
+          payer: this.feePayer,
+          canceller: createNoopSigner(seller),
+          agent: existing.agent,
+          collection: agent.data.collection,
+          asset,
+          rentPayer: existing.rentPayer,
+        }),
+      );
+    }
+    instructions.push(
+      await gen.getListLicenseInstructionAsync({
+        payer: this.feePayer,
+        seller: createNoopSigner(seller),
+        agent: agent.address,
+        collection: agent.data.collection,
+        asset,
+        price: priceUnits,
+      }),
+    );
+    return {
+      instructions,
+      listing: await this.listingPda(asset),
+      agent: agent.address,
+      feeBps,
+      royaltyBps,
+      replacedStaleListing: existing !== null,
+    };
+  }
+
+  /**
+   * Comprar uma licença anunciada. `expectedPriceUnits` é o preço mostrado ao comprador: se o anúncio mudou, `listing_changed`
+   * (preço atual em `details.priceUnits`). A ATA de USDC do VENDEDOR vem antes, idempotente e com rent da plataforma,
+   * porque o programa a exige inicializada; a do comprador não é criada (sem ela ele não tem saldo, como em `purchaseLicenseIxs`).
+   */
+  async buyListingIxs(buyer: Address, asset: Address, expectedPriceUnits: bigint): Promise<BuyListingIxsResult> {
+    this.assertNotFeePayer(buyer);
+    const listing = await this.fetchMaybeListing(asset);
+    if (!listing) throw new ResaleError(RESALE_ERROR_CODES.listingNotFound, "Este anúncio não existe mais.");
+    if (listing.seller === buyer) {
+      throw new ResaleError(RESALE_ERROR_CODES.ownListing, "Você não pode comprar a sua própria licença anunciada.");
+    }
+    if (listing.price !== expectedPriceUnits) {
+      throw new ResaleError(RESALE_ERROR_CODES.listingChanged, "O preço do anúncio mudou. Atualize a página para ver o novo valor.", {
+        priceUnits: listing.price,
+      });
+    }
+    const agent = await gen.fetchMaybeAgent(this.rpc, listing.agent, { commitment: "confirmed" });
+    if (!agent.exists) throw new ResaleError(RESALE_ERROR_CODES.listingNotFound, "Este anúncio não existe mais.");
+    const config = await this.fetchConfig();
+    if (agent.data.status !== gen.AgentStatus.Active || agent.data.stake < config.data.minStake) {
+      throw new ResaleError(RESALE_ERROR_CODES.agentUnavailable, "Este especialista não está disponível para compra agora.");
+    }
+    const core = await this.fetchCoreLicense(asset);
+    if (!listingIsLive(listing, core, agent.data.collection, await this.marketAuthorityPda())) {
+      throw new ResaleError(RESALE_ERROR_CODES.listingNotFound, "Este anúncio não vale mais: a licença mudou de carteira ou a venda foi cancelada.");
+    }
+    let split: { royalty: bigint; fee: bigint; seller: bigint };
+    try {
+      split = resaleSplit(listing.price, listing.royaltyBps, listing.feeBps);
+    } catch {
+      throw new ResaleError(RESALE_ERROR_CODES.cutTooHigh, "Este anúncio não pode ser comprado: royalty mais taxa passam do teto.");
+    }
+    const ix = await gen.getBuyListingInstructionAsync({
+      payer: this.feePayer,
+      buyer: createNoopSigner(buyer),
+      agent: listing.agent,
+      collection: agent.data.collection,
+      asset,
+      buyerUsdc: await this.ata(buyer),
+      sellerUsdc: await this.ata(listing.seller),
+      creatorUsdc: agent.data.creatorUsdc,
+      treasury: config.data.treasury,
+      usdcMint: this.usdcMint,
+      rentPayer: listing.rentPayer,
+      expectedPrice: expectedPriceUnits,
+    });
+    return {
+      instructions: [await this.ensureAtaIx(listing.seller), ix],
+      seller: listing.seller,
+      agent: listing.agent,
+      listing: await this.listingPda(asset),
+      priceUnits: listing.price,
+      royaltyUnits: split.royalty,
+      feeUnits: split.fee,
+      sellerUnits: split.seller,
+    };
+  }
+
+  /**
+   * Cancelar um anúncio. O vendedor cancela sempre; outra carteira só fecha anúncio VELHO (`not_owner` se ainda vale).
+   * No cancelamento do vendedor com anúncio vivo o rent do plugin volta ao `payer` e o programa exige que ele seja o
+   * `rent_payer` gravado: se este não for o fee payer atual, `cancel_via_wallet` (o vendedor revoga o delegate na carteira).
+   */
+  async cancelListingIxs(canceller: Address, asset: Address): Promise<CancelListingIxsResult> {
+    this.assertNotFeePayer(canceller);
+    const listing = await this.fetchMaybeListing(asset);
+    if (!listing) throw new ResaleError(RESALE_ERROR_CODES.listingNotFound, "Este anúncio não existe mais.");
+    const agent = await gen.fetchMaybeAgent(this.rpc, listing.agent, { commitment: "confirmed" });
+    if (!agent.exists) throw new ResaleError(RESALE_ERROR_CODES.listingNotFound, "Este anúncio não existe mais.");
+    const core = await this.fetchCoreLicense(asset);
+    const live = listingIsLive(listing, core, agent.data.collection, await this.marketAuthorityPda());
+    if (canceller !== listing.seller && live) {
+      throw new ResaleError(RESALE_ERROR_CODES.notOwner, "Este anúncio ainda está valendo: só quem o publicou pode cancelá-lo.");
+    }
+    if (canceller === listing.seller && live && listing.rentPayer !== this.feePayer.address) {
+      throw new ResaleError(
+        RESALE_ERROR_CODES.cancelViaWallet,
+        "Este anúncio foi aberto por outra conta da plataforma. Para cancelar, revogue a permissão de venda direto na sua carteira.",
+      );
+    }
+    const ix = await gen.getCancelListingInstructionAsync({
+      payer: this.feePayer,
+      canceller: createNoopSigner(canceller),
+      agent: listing.agent,
+      collection: agent.data.collection,
+      asset,
+      rentPayer: listing.rentPayer,
+    });
+    return { instructions: [ix], listing: await this.listingPda(asset), seller: listing.seller, stale: !live };
+  }
+
   async buyCreditsIxs(buyer: Address, agentIdHex: string, amount: number, maxTotal?: bigint): Promise<Instruction[]> {
     this.assertNotFeePayer(buyer);
     const agentAddr = await this.agentPda(agentIdHex);
@@ -1004,6 +1243,134 @@ export class SolversChain {
       .send();
     return res.map((r) => r.pubkey);
   }
+}
+
+const U64_MAX = 18446744073709551615n;
+
+export type ListLicenseIxsResult = {
+  /** [cancel_listing do anúncio velho (se houver), list_license]. */
+  instructions: Instruction[];
+  /** PDA do anúncio (`[listing, asset]`). */
+  listing: Address;
+  /** Conta `Agent` do solver da licença. */
+  agent: Address;
+  /** Taxa da plataforma e royalty do criador que ficam congelados no anúncio, em pontos-base. */
+  feeBps: number;
+  royaltyBps: number;
+  /** Um anúncio velho do mesmo asset é fechado na mesma transação (primeira instrução). */
+  replacedStaleListing: boolean;
+};
+
+export type BuyListingIxsResult = {
+  /** [ATA do vendedor (idempotente), buy_listing]. */
+  instructions: Instruction[];
+  seller: Address;
+  agent: Address;
+  listing: Address;
+  /** Preço e partes em unidades de USDC (6 casas): `royaltyUnits + feeUnits + sellerUnits === priceUnits`. */
+  priceUnits: bigint;
+  royaltyUnits: bigint;
+  feeUnits: bigint;
+  sellerUnits: bigint;
+};
+
+export type CancelListingIxsResult = {
+  instructions: Instruction[];
+  listing: Address;
+  seller: Address;
+  /** O anúncio já não podia ser executado (dono mudou, delegate revogado ou asset queimado). */
+  stale: boolean;
+};
+
+/** Authority de um plugin do mpl-core (`PluginAuthority`). */
+export type CoreAuthority = { kind: "None" | "Owner" | "UpdateAuthority" } | { kind: "Address"; address: Address };
+
+/** Dono, coleção e `TransferDelegate` de um asset de licença (o que a revenda precisa; ver `license.rs` do programa). */
+export type CoreLicense = { owner: Address; collection: Address | null; transferDelegate: CoreAuthority | null };
+
+/** `PluginType::TransferDelegate` no mpl-core. */
+const PLUGIN_TYPE_TRANSFER_DELEGATE = 3;
+
+/**
+ * Decodifica um AssetV1 e o registro de plugins para achar o `TransferDelegate`. Espelha `read_license` do programa.
+ * `null` se não é AssetV1; dado truncado ou registro ilegível lança (`RangeError`/`Error`).
+ */
+export function decodeCoreLicense(data: Uint8Array): CoreLicense | null {
+  if (data[0] !== 1) return null; // Key::AssetV1
+  const dec = getBase58Decoder();
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const need = (end: number) => {
+    if (end > data.length) throw new RangeError("asset truncado");
+  };
+  need(34);
+  const owner = dec.decode(data.subarray(1, 33)) as Address;
+  const tag = data[33]!;
+  let offset = 34;
+  let collection: Address | null = null;
+  if (tag === 1 || tag === 2) {
+    need(66);
+    if (tag === 2) collection = dec.decode(data.subarray(34, 66)) as Address;
+    offset = 66;
+  } else if (tag !== 0) {
+    throw new Error("update authority inválida");
+  }
+  const skipString = () => {
+    need(offset + 4);
+    const len = view.getUint32(offset, true);
+    need(offset + 4 + len);
+    offset += 4 + len;
+  };
+  skipString(); // name
+  skipString(); // uri
+  need(offset + 1);
+  offset += data[offset] === 1 ? 9 : 1; // seq: Option<u64>
+  need(offset);
+
+  let transferDelegate: CoreAuthority | null = null;
+  // Sem bytes depois do asset = sem plugins.
+  if (data.length > offset) {
+    need(offset + 9); // PluginHeaderV1: key (1) + plugin_registry_offset (8)
+    const registryOffset = Number(view.getBigUint64(offset + 1, true));
+    need(registryOffset + 5);
+    if (data[registryOffset] !== 4) throw new Error("registro de plugins inválido"); // Key::PluginRegistryV1
+    const count = view.getUint32(registryOffset + 1, true);
+    let p = registryOffset + 5;
+    for (let i = 0; i < count; i++) {
+      need(p + 2);
+      const pluginType = data[p]!;
+      const authTag = data[p + 1]!;
+      p += 2;
+      let authority: CoreAuthority;
+      if (authTag === 3) {
+        need(p + 32);
+        authority = { kind: "Address", address: dec.decode(data.subarray(p, p + 32)) as Address };
+        p += 32;
+      } else if (authTag <= 2) {
+        authority = { kind: (["None", "Owner", "UpdateAuthority"] as const)[authTag]! };
+      } else {
+        throw new Error("authority de plugin inválida");
+      }
+      need(p + 8);
+      p += 8; // offset do plugin dentro do asset
+      if (pluginType === PLUGIN_TYPE_TRANSFER_DELEGATE && transferDelegate === null) transferDelegate = authority;
+    }
+    need(p + 4); // external_registry (o programa também exige que o registro esteja inteiro)
+  }
+  return { owner, collection, transferDelegate };
+}
+
+/**
+ * O anúncio ainda pode ser executado por `buy_listing`: asset vivo, do vendedor, na coleção do solver e com o
+ * `TransferDelegate` apontando para a PDA `market_authority`. Espelha o `live` de `cancel_listing` no programa.
+ */
+export function listingIsLive(listing: { seller: Address }, core: CoreLicense | null, collection: Address, market: Address): boolean {
+  return (
+    core !== null &&
+    core.owner === listing.seller &&
+    core.collection === collection &&
+    core.transferDelegate?.kind === "Address" &&
+    core.transferDelegate.address === market
+  );
 }
 
 export type CoreAsset = { owner: Address; collection: Address | null; name: string; uri: string };

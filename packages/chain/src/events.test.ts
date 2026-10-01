@@ -107,6 +107,67 @@ describe("parseEvents: eventos de governança (rotação de admin, tesouraria, r
   });
 });
 
+describe("parseEvents: eventos de revenda de licenças", () => {
+  const AGENT_A = AGENT;
+  const SELLER = OTHER as Address;
+  const BUYER = "SysvarRent111111111111111111111111111111111" as Address;
+  const ASSET = "SysvarC1ock11111111111111111111111111111111" as Address;
+  const line = (bytes: Uint8Array) => `Program data: ${getBase64Decoder().decode(bytes)}`;
+  const wrap = (...lines: string[]) => [`Program ${PROGRAM_ID} invoke [1]`, ...lines, `Program ${PROGRAM_ID} success`];
+
+  it("decodifica LicenseListed, LicenseResold e ListingCancelled com nome e campos", () => {
+    const listed = { agent: AGENT_A, seller: SELLER, asset: ASSET, price: 25_000_000n, feeBps: 1_000, royaltyBps: 500 };
+    const resold = {
+      agent: AGENT_A,
+      asset: ASSET,
+      seller: SELLER,
+      buyer: BUYER,
+      price: 25_000_000n,
+      royalty: 1_250_000n,
+      fee: 2_500_000n,
+      sellerAmount: 21_250_000n,
+    };
+    const cancelled = { agent: AGENT_A, asset: ASSET, seller: SELLER, canceller: BUYER };
+    const cases: Array<[string, Uint8Array, unknown]> = [
+      ["LicenseListed", gen.getLicenseListedEventEncoder().encode(listed), listed],
+      ["LicenseResold", gen.getLicenseResoldEventEncoder().encode(resold), resold],
+      ["ListingCancelled", gen.getListingCancelledEventEncoder().encode(cancelled), cancelled],
+    ];
+    for (const [name, bytes, data] of cases) {
+      const events = parseEvents(wrap(line(bytes)), PROGRAM_ID);
+      assert.equal(events.length, 1, name);
+      assert.equal(events[0]!.name, name);
+      assert.deepEqual(events[0]!.data, data, name);
+    }
+  });
+
+  it("uma venda num log só: o evento do mpl-core (CPI) é ignorado e royalty + taxa + vendedor fecham o preço", () => {
+    const resold = gen.getLicenseResoldEventEncoder().encode({
+      agent: AGENT_A,
+      asset: ASSET,
+      seller: SELLER,
+      buyer: BUYER,
+      price: 5_000_009n,
+      royalty: 250_000n,
+      fee: 500_000n,
+      sellerAmount: 4_250_009n,
+    });
+    const logs = [
+      `Program ${PROGRAM_ID} invoke [1]`,
+      `Program ${AGENT_A} invoke [2]`,
+      `Program ${AGENT_A} success`,
+      line(resold),
+      `Program ${PROGRAM_ID} success`,
+    ];
+    const events = parseEvents(logs, PROGRAM_ID);
+    assert.equal(events.length, 1);
+    const e = events[0]!;
+    assert.equal(e.name, "LicenseResold");
+    if (e.name !== "LicenseResold") return;
+    assert.equal(e.data.royalty + e.data.fee + e.data.sellerAmount, e.data.price);
+  });
+});
+
 describe("endereços derivados (PDA)", () => {
   it("o PDA de Config é estável e diferente por comprador", async () => {
     const [a] = await gen.findConfigPda();

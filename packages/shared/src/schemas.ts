@@ -36,6 +36,8 @@ export const Agent = z.object({
   packageContents: z.array(z.string()),
   guaranteeAvailable: z.boolean(),
   resaleFloorUsdc: z.number().nullable(),
+  /** Royalty do criador nas revendas pelo mercado, em pontos-base (`Agent.royalty_bps` on-chain). 0 em dados antigos. */
+  royaltyBps: z.number().default(0),
   trend7d: z.number(),
   /** Data da primeira versão publicada (ISO). */
   publishedAt: z.string(),

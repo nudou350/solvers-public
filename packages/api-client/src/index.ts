@@ -124,7 +124,9 @@ export function createApi(opts: ApiOptions = {}) {
     refreshLicenses: () => post(z.object({ ok: z.boolean() }), "/api/me/licenses/refresh"),
     getMemoriesCount: () =>
       req(z.object({ count: z.number(), agents: z.array(z.object({ agentId: z.string(), updatedAt: z.string() })) }), "/api/me/memories/count"),
-    getResaleListings: () => req(z.array(ResaleListing), "/api/market/listings"),
+    /** Anúncios ativos de revenda (um por licença), do mais barato ao mais caro; `agent` = slug para filtrar um especialista. */
+    getResaleListings: (params?: { agent?: string }) =>
+      req(z.array(ResaleListing), `/api/market/listings${params?.agent ? `?${new URLSearchParams({ agent: params.agent })}` : ""}`),
     getReputation: () => req(UserReputation, "/api/me/reputation"),
     getProfile: () => req(Profile, "/api/me/profile"),
     updateProfile: (data: { displayName?: string | null; email?: string | null }) =>
@@ -168,6 +170,16 @@ export function createApi(opts: ApiOptions = {}) {
     // ----- Transações: o servidor monta e paga a taxa; a carteira só assina -----
     /** Compra da licença vitalícia (único tipo de compra). */
     buildPurchase: (agentId: string) => post(TxResponse, "/api/tx/purchase", { agentId }),
+    /**
+     * Revenda de licenças (licenseId = asset da licença = id do anúncio). Erros (`ApiError.code`, ver `RESALE_ERROR_CODES` em
+     * @solvers/shared): resale_disabled 503, listing_not_found 404, listing_changed 409 (body.priceUsdc), not_owner 403,
+     * own_listing 400, price_too_low 400, already_listed 409, cut_too_high 400, agent_unavailable 400,
+     * insufficient_funds 400, operation_rejected 409.
+     */
+    buildListLicense: (licenseId: string, priceUsdc: number) => post(TxResponse, "/api/tx/list", { licenseId, priceUsdc }),
+    /** `expectedPriceUsdc` = preço que o comprador viu: se o anúncio mudou, 409 listing_changed com o preço atual. */
+    buildBuyListing: (licenseId: string, expectedPriceUsdc: number) => post(TxResponse, "/api/tx/buy-listing", { licenseId, expectedPriceUsdc }),
+    buildCancelListing: (licenseId: string) => post(TxResponse, "/api/tx/cancel-listing", { licenseId }),
     /** Anexa uma foto à MINHA avaliação deste especialista (até 3; a avaliação precisa existir). Devolve as fotos atuais. */
     uploadReviewImage: (idOrSlug: string, file: Blob) =>
       req(z.array(ImageRef), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews/mine/images`, { method: "POST", headers: { "content-type": file.type }, body: file }),
