@@ -41,6 +41,7 @@ export function TrialBlock({ slug, trial }: { slug: string; trial: TrialInfo }) 
             <ul className="col small" style={gap("10px")}>
               <Item icon="layers">{stepsText(trial.steps, trial.totalSteps)}</Item>
               <Item icon="search">{searchesText(trial.searches)}</Item>
+              {trial.scope ? <Item icon="layers">{trial.scope}</Item> : null}
               {trial.tools.map((t) => (
                 <Item key={t.name} icon="wrench">
                   {t.name}: {int(t.limit)}×

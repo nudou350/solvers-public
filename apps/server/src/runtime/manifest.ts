@@ -66,6 +66,12 @@ export const Manifest = z.object({
       searches: z.number().int().min(0),
       /** Total de execuções por ferramenta no teste inteiro; ferramenta ausente fica bloqueada. */
       tools: z.record(z.number().int().min(0)).default({}),
+      /** Teto da entrada de cada ferramenta no teste (a licença não tem): arquivos e bytes por execução. */
+      toolLimits: z
+        .record(z.object({ maxFiles: z.number().int().min(1).optional(), maxBytes: z.number().int().min(1).optional() }))
+        .default({}),
+      /** Combinado do tamanho do pedido no teste, repassado à IA (ex.: "1 componente por uso"). */
+      scope: z.string().min(3).max(300).optional(),
       summary: z.string().min(3).max(400),
       lockedSummary: z.string().min(3).max(300),
     })
@@ -84,6 +90,11 @@ export const Manifest = z.object({
   for (const name of Object.keys(m.trial.tools)) {
     if (!m.tools.some((t) => t.name === name)) {
       ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: ferramenta "${name}" não existe em tools` });
+    }
+  }
+  for (const name of Object.keys(m.trial.toolLimits)) {
+    if (!m.tools.some((t) => t.name === name)) {
+      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: ferramenta "${name}" não existe em tools` });
     }
   }
 });

@@ -47,6 +47,8 @@ export const TrialInfo = z.object({
   searches: z.number(),
   /** Execuções por ferramenta no teste inteiro; ferramenta fora da lista fica bloqueada. */
   tools: z.array(z.object({ name: z.string(), limit: z.number() })),
+  /** Combinado do tamanho do pedido no teste (ex.: "1 componente por uso"). */
+  scope: z.string().nullable(),
   summary: z.string(),
   lockedSummary: z.string(),
 });
