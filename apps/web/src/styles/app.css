@@ -90,3 +90,46 @@ button.me-pill { font: inherit; font-weight: 600; color: var(--ink); cursor: poi
 @media (prefers-reduced-motion: reduce) {
   .sv *, .sv *::before, .sv *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* galeria do criador, fotos de avaliação e visualizador */
+.gallery { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 4px 12px; margin: 0 -4px; list-style: none; }
+.gallery-item { flex: none; height: 200px; max-width: 85%; scroll-snap-align: start; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--surface-2); }
+.gallery-item button, .photo-thumb { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.gallery-item button { width: 100%; height: 100%; }
+.gallery-item img, .photo-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.photo-thumb { width: 72px; height: 72px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+.photo-slot { position: relative; flex: none; width: 88px; height: 88px; }
+.photo-slot .photo-thumb { width: 88px; height: 88px; cursor: default; }
+.photo-slot.is-l, .photo-slot.is-l .photo-thumb { width: 150px; height: 108px; }
+.photo-x { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; box-shadow: var(--shadow); }
+.photo-x:hover { background: var(--surface-2); }
+.photo-x[disabled] { opacity: .5; cursor: wait; }
+.photo-add { position: relative; width: 88px; height: 88px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 1.5px dashed var(--line-strong); border-radius: 12px; color: var(--ink-2); font-size: 12.5px; font-weight: 600; cursor: pointer; text-align: center; }
+.photo-add:hover, .photo-add:focus-within { background: var(--surface-2); color: var(--ink); }
+.photo-add input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.photo-add.is-off { opacity: .5; cursor: not-allowed; }
+.photo-cover { position: absolute; left: 4px; bottom: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--brand); color: var(--on-brand); }
+.photo-order { position: absolute; left: 0; right: 0; bottom: -30px; display: flex; justify-content: center; gap: 4px; }
+.photo-order button { width: 28px; height: 24px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+.photo-order button[disabled] { opacity: .35; cursor: default; }
+.photo-grid { display: flex; flex-wrap: wrap; gap: 14px 14px; padding-bottom: 32px; }
+/* com setas de ordem (abaixo de cada foto, 30px), a linha de baixo não pode cobri-las */
+.photo-grid:has(.photo-order) { row-gap: 44px; }
+
+.lightbox { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: rgba(10, 9, 14, .94); color: #fff; overflow: hidden; }
+.lightbox[open] { display: flex; flex-direction: column; }
+.lightbox::backdrop { background: rgba(10, 9, 14, .94); }
+.lightbox-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; flex: none; }
+.lightbox-count { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .85); }
+.lightbox-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 12px 20px; }
+.lightbox-stage img { flex: 0 1 auto; min-width: 0; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 8px; }
+.lightbox-btn { width: 44px; height: 44px; display: grid; place-items: center; flex: none; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer; }
+.lightbox-btn:hover { background: rgba(255, 255, 255, .26); }
+.lightbox :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@container sv (max-width: 700px) {
+  .gallery-item { height: 190px; }
+  .lightbox-nav { position: absolute; bottom: 20px; z-index: 1; }
+  .lightbox-nav:first-of-type { left: 16px; }
+  .lightbox-nav:last-of-type { right: 16px; }
+}

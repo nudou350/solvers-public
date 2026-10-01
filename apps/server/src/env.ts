@@ -11,6 +11,12 @@ const optBool = z
   .optional()
   .transform((v) => (v === undefined ? undefined : v === "true" || v === "1"));
 
+/** Variável vazia no .env (`X=`) conta como ausente. */
+const blankToUndefined = z
+  .string()
+  .optional()
+  .transform((v) => v?.trim() || undefined);
+
 const base = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(3017),
@@ -45,6 +51,11 @@ const base = z.object({
   FAUCET_AMOUNT_USDC: z.coerce.number().default(50),
   /** Cotação de fallback USD->BRL quando a API de câmbio falhar. */
   BRL_PER_USD: z.coerce.number().default(5.4),
+
+  /** CDN das imagens (galeria do criador e fotos de avaliação). Sem as 3, as rotas de imagem respondem 503. */
+  CLOUDINARY_CLOUD_NAME: blankToUndefined,
+  CLOUDINARY_API_KEY: blankToUndefined,
+  CLOUDINARY_API_SECRET: blankToUndefined,
 
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   /** Chat que recebe alertas quando o criador não tem Telegram configurado. */

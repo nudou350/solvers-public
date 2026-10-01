@@ -18,6 +18,8 @@
     "cli:reindex": "tsx --env-file-if-exists=.env src/cli/reindex.ts",
     "cli:validate": "tsx src/cli/validate.ts",
     "cli:schema": "tsx src/cli/schema.ts",
+    "cli:images": "tsx --env-file-if-exists=.env src/cli/images.ts",
+    "cli:images:devnet": "tsx --env-file=.env.devnet src/cli/images.ts",
     "cli:admin": "tsx --env-file-if-exists=.env src/cli/admin.ts",
     "cli:admin:devnet": "tsx --env-file=.env.devnet src/cli/admin.ts",
     "cli:publish:devnet": "tsx --env-file=.env.devnet src/cli/publish.ts"
@@ -36,6 +38,7 @@
     "express-rate-limit": "^8.1.0",
     "jose": "^6.2.12",
     "pg": "^8.16.0",
+    "sharp": "^0.35.5",
     "tweetnacl": "^1.0.3",
     "zod": "^3.25.0",
     "zod-to-json-schema": "^3.25.2"

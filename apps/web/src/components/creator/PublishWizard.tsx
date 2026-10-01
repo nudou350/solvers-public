@@ -1,10 +1,11 @@
 "use client";
 // Assistente de publicação (/criador/publicar).
 // MOCK: ainda não há API de publicação (fase D, FRONT_PLAN.md). Nada aqui é enviado ao servidor:
-// os arquivos ficam no navegador, a bateria de testes é simulada e "Publicar" só mostra "Enviado para revisão".
+// os arquivos e as imagens da vitrine ficam só no navegador (prévias locais), a bateria de testes é simulada e
+// "Publicar" só mostra "Enviado para revisão". No fluxo real, as imagens passam pela revisão junto com o pacote.
 // Da API real vêm apenas os limites e regras (getConfig: minPurchaseUsdc, feeBps, guaranteeMinSales/Rating) e a cotação.
-import type { Requirement } from "@solvers/api-client";
-import { useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { MAX_AGENT_IMAGES, MAX_IMAGE_UPLOAD_BYTES, type Requirement } from "@solvers/api-client";
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -21,6 +22,7 @@ const STEPS = [
   { title: "Descrição", text: "Conte o que o especialista faz e quanto ele custa." },
   { title: "Requisitos", text: "O que o comprador precisa ter para usar." },
   { title: "Arquivos", text: "O conhecimento, os modelos e as ferramentas do pacote." },
+  { title: "Imagens", text: "Capturas de tela que mostram o especialista em ação, como numa loja de apps." },
   { title: "Bateria de testes", text: "Os casos que provam que o especialista funciona." },
   { title: "Revisão e publicação", text: "Confira tudo antes de enviar." },
 ] as const;
@@ -37,8 +39,13 @@ type Conn = { label: string; key: string; optional: boolean; howTo?: string; hel
 type ConnDraft = { label: string; key: string; howTo: string; helpUrl: string };
 const EMPTY_CONN: ConnDraft = { label: "", key: "", howTo: "", helpUrl: "" };
 
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_MB = MAX_IMAGE_UPLOAD_BYTES / (1024 * 1024);
+
 type FileKind = "Conhecimento" | "Modelos" | "Ferramentas";
 type LocalFile = { name: string; size: number; kind: FileKind };
+/** Imagem escolhida no navegador (prévia local; nada é enviado). */
+type LocalImage = { key: number; name: string; url: string };
 type TestCase = { title: string; expect: string };
 type RunResult = { passed: number; partial: number[]; total: number; score: number };
 
@@ -108,6 +115,20 @@ export function PublishWizard() {
   const [result, setResult] = useState<RunResult | null>(null);
   const [published, setPublished] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [images, setImages] = useState<LocalImage[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const imagesRef = useRef<LocalImage[]>([]);
+  imagesRef.current = images;
+  const imageSeq = useRef(0);
+
+  // Solta as prévias locais ao sair.
+  useEffect(
+    () => () => {
+      imagesRef.current.forEach((i) => URL.revokeObjectURL(i.url));
+    },
+    [],
+  );
 
   const minPrice = config?.minPurchaseUsdc ?? null;
   const price = parseNum(form.price);
@@ -171,7 +192,44 @@ export function PublishWizard() {
   const toggle = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   const go = (n: number) => {
     if (step === 1 && n > 1) setTouched(true);
-    setStep(Math.min(5, Math.max(1, n)));
+    setStep(Math.min(STEPS.length, Math.max(1, n)));
+  };
+
+  const onImages = (e: ChangeEvent<HTMLInputElement>) => {
+    const list = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    setImageError(null);
+    let room = MAX_AGENT_IMAGES - imagesRef.current.length;
+    const add: LocalImage[] = [];
+    let msg: string | null = null;
+    for (const f of list) {
+      if (!IMAGE_TYPES.includes(f.type)) msg = `"${f.name}" não é uma imagem JPG, PNG ou WebP.`;
+      else if (f.size > MAX_IMAGE_UPLOAD_BYTES) msg = `"${f.name}" passa de ${IMAGE_MB} MB.`;
+      else if (room <= 0) msg = `Você pode usar até ${MAX_AGENT_IMAGES} imagens.`;
+      else {
+        add.push({ key: ++imageSeq.current, name: f.name, url: URL.createObjectURL(f) });
+        room--;
+      }
+    }
+    if (add.length) setImages((cur) => [...cur, ...add]);
+    if (msg) setImageError(msg);
+    setPublished(false);
+  };
+  const removeImage = (key: number) => {
+    const img = imagesRef.current.find((i) => i.key === key);
+    if (img) URL.revokeObjectURL(img.url);
+    setImages((cur) => cur.filter((i) => i.key !== key));
+    setImageError(null);
+    setPublished(false);
+  };
+  const moveImage = (from: number, to: number) => {
+    setImages((cur) => {
+      if (to < 0 || to >= cur.length) return cur;
+      const next = [...cur];
+      const [it] = next.splice(from, 1);
+      next.splice(to, 0, it!);
+      return next;
+    });
   };
 
   const onFiles = (e: ChangeEvent<HTMLInputElement>) => {
@@ -238,7 +296,7 @@ export function PublishWizard() {
         <div className="card pad-l col" style={gap(22)}>
           <div className="col" style={gap(4)}>
             <span className="eyebrow">
-              Etapa {step} de 5
+              Etapa {step} de {STEPS.length}
             </span>
             <h2 className="display h2s">{info.title}</h2>
             <p className="muted">{info.text}</p>
@@ -425,6 +483,56 @@ export function PublishWizard() {
 
           {step === 4 ? (
             <div className="col" style={gap(18)}>
+              <div className="drop col" style={gap(10, { alignItems: "center" })}>
+                <span className="brand">
+                  <Icon name="upload" size="xl" />
+                </span>
+                <b>Mostre o especialista em ação</b>
+                <span className="small muted" style={{ textAlign: "center" }}>
+                  Até {MAX_AGENT_IMAGES} capturas de tela. A primeira é a capa da galeria. Recomendamos pelo menos 1.
+                </span>
+                <input ref={imageInput} type="file" multiple hidden onChange={onImages} accept={IMAGE_TYPES.join(",")} />
+                <Button variant="secondary" disabled={images.length >= MAX_AGENT_IMAGES} onClick={() => imageInput.current?.click()}>
+                  Escolher imagens
+                </Button>
+                <span className="tiny faint">JPG, PNG ou WebP, até {IMAGE_MB} MB cada. As imagens ficam no seu navegador: nada é enviado nesta pré-visualização.</span>
+              </div>
+              {imageError ? (
+                <Notice tone="warn" role="alert">
+                  {imageError}
+                </Notice>
+              ) : null}
+              {images.length ? (
+                <div className="photo-grid" role="list" aria-label="Imagens escolhidas">
+                  {images.map((im, i) => (
+                    <div key={im.key} className="photo-slot is-l" role="listitem">
+                      <span className="photo-thumb">
+                        <img src={im.url} alt={`Imagem ${i + 1}: ${im.name}`} width={150} height={108} />
+                      </span>
+                      {i === 0 ? <span className="photo-cover">Capa</span> : null}
+                      <button type="button" className="photo-x" aria-label={`Remover ${im.name}`} onClick={() => removeImage(im.key)}>
+                        <Icon name="x" size="s" />
+                      </button>
+                      <div className="photo-order">
+                        <button type="button" aria-label={`Mover ${im.name} para antes`} disabled={i === 0} onClick={() => moveImage(i, i - 1)}>
+                          <Icon name="arrow-left" size="s" />
+                        </button>
+                        <button type="button" aria-label={`Mover ${im.name} para depois`} disabled={i === images.length - 1} onClick={() => moveImage(i, i + 1)}>
+                          <Icon name="arrow-right" size="s" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <Notice tone="brand" icon="info" role="note">
+                As imagens passam pela revisão da equipe junto com o resto do pacote, e qualquer troca depois também precisa ser revisada. Cubra dados pessoais (valores, nomes, documentos) nas capturas.
+              </Notice>
+            </div>
+          ) : null}
+
+          {step === 5 ? (
+            <div className="col" style={gap(18)}>
               <div className="card-flat pad-s row start" style={gap(12)}>
                 <Icon name="info" />
                 <span className="small grow">
@@ -526,7 +634,7 @@ export function PublishWizard() {
             </div>
           ) : null}
 
-          {step === 5 ? (
+          {step === 6 ? (
             <div className="col" style={gap(18)}>
               <div className="card-flat pad-s col" style={gap(12)}>
                 <div className="row start" style={gap(12)}>
@@ -568,13 +676,14 @@ export function PublishWizard() {
                 <SummaryRow label="Conectores" value={conns.length ? conns.map((c) => (c.optional ? `${c.label} (opcional)` : c.label)).join(", ") : "Nenhum"} />
                 <SummaryRow label="Plano recomendado" value={requirements.some((r) => r.type === "plan") ? PAID_PLAN : PLANS[0]!} />
                 <SummaryRow label="Arquivos" value={files.length ? `${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}` : "Nenhum"} />
+                <SummaryRow label="Imagens" value={images.length ? `${images.length} de ${MAX_AGENT_IMAGES}` : `0 de ${MAX_AGENT_IMAGES} (recomendamos pelo menos 1)`} />
                 <SummaryRow label="Nota de desempenho" value={result ? `${result.score}% em ${result.total} casos` : "Bateria não rodada"} bad={!testsOk} good={testsOk} />
               </div>
               {!canPublish ? (
                 <Notice tone="warn" title="Falta pouco">
                   {!step1Ok ? "Complete a descrição e o preço (etapa 1). " : ""}
                   {clients.length === 0 ? "Escolha pelo menos uma IA (etapa 2). " : ""}
-                  {!testsOk ? `Rode a bateria com pelo menos ${MIN_CASES} casos e ${MIN_SCORE}% de acertos (etapa 4).` : ""}
+                  {!testsOk ? `Rode a bateria com pelo menos ${MIN_CASES} casos e ${MIN_SCORE}% de acertos (etapa 5).` : ""}
                 </Notice>
               ) : null}
               {published ? (
@@ -595,7 +704,7 @@ export function PublishWizard() {
             <Button variant="ghost" icon="arrow-left" className={step === 1 ? "off" : ""} disabled={step === 1} onClick={() => go(step - 1)}>
               Voltar
             </Button>
-            {step < 5 ? (
+            {step < STEPS.length ? (
               <Button size="lg" iconRight="arrow-right" onClick={() => go(step + 1)}>
                 Continuar
               </Button>
@@ -610,6 +719,7 @@ export function PublishWizard() {
         <aside className="sticky col" style={gap(16)} aria-label="Pré-visualização do cartão">
           <span className="eyebrow">Como os compradores vão ver</span>
           <div className="card pad-s col" style={gap(14)}>
+            {images[0] ? <img src={images[0].url} alt="Capa da galeria" style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 12 }} /> : null}
             <div className="row start" style={gap(14)}>
               <span className="tile" style={{ "--h": 300 } as CSSProperties} aria-hidden>
                 <Icon name="pen" />

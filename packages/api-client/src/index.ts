@@ -16,6 +16,7 @@ import {
   PixCharge,
   Profile,
   PublicConfig,
+  ImageRef,
   Review,
   SodaxQuote,
   SubmitResponse,
@@ -167,6 +168,14 @@ export function createApi(opts: ApiOptions = {}) {
     // ----- Transações: o servidor monta e paga a taxa; a carteira só assina -----
     /** Compra da licença vitalícia (único tipo de compra). */
     buildPurchase: (agentId: string) => post(TxResponse, "/api/tx/purchase", { agentId }),
+    /** Anexa uma foto à MINHA avaliação deste especialista (até 3; a avaliação precisa existir). Devolve as fotos atuais. */
+    uploadReviewImage: (idOrSlug: string, file: Blob) =>
+      req(z.array(ImageRef), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews/mine/images`, { method: "POST", headers: { "content-type": file.type }, body: file }),
+    deleteReviewImage: (idOrSlug: string, imageId: string) =>
+      req(z.array(ImageRef), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews/mine/images/${encodeURIComponent(imageId)}`, { method: "DELETE" }),
+    /** Pede ajuda ao criador deste especialista. Devolve o protocolo; o criador é avisado e o contato dele não aparece. */
+    requestHelp: (idOrSlug: string, message: string, contact?: string) =>
+      post(z.object({ protocol: z.string(), notified: z.boolean() }), `/api/agents/${encodeURIComponent(idOrSlug)}/help`, { message, contact: contact || undefined }),
     buildReview: (agentId: string, rating: number, text: string) => post(TxResponse, "/api/tx/review", { agentId, rating, text }),
     /**
      * Tarefa com garantia: as etapas e os critérios vêm do modelo do criador (getAgent().guarantee);
