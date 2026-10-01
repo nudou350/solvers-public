@@ -2391,7 +2391,8 @@ fn register_validates_lengths_bps_prices_and_duplicates() {
     // Preço e preço por uso no teto de u64 (não há máximo de preço).
     register_with(&mut env, u64::MAX, u64::MAX, |_| {}).unwrap();
 
-    let too_long: [(&str, Box<dyn Fn(&mut RegisterAgentArgs)>); 5] = [
+    type Tweak = Box<dyn Fn(&mut RegisterAgentArgs)>;
+    let too_long: [(&str, Tweak); 5] = [
         ("nome", Box::new(|a: &mut RegisterAgentArgs| a.name = "n".repeat(MAX_NAME_LEN + 1))),
         ("nome multibyte", Box::new(|a: &mut RegisterAgentArgs| a.name = "é".repeat(17))),
         ("uri", Box::new(|a: &mut RegisterAgentArgs| a.metadata_uri = "u".repeat(MAX_URI_LEN + 1))),
