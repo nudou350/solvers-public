@@ -3,6 +3,7 @@ import { jobs } from "./jobs.js";
 import { mountMcp } from "./mcp/routes.js";
 import { mountOAuth } from "./oauth/routes.js";
 import { escrowRouter } from "./store/escrow.js";
+import { imagesRouter } from "./store/images.js";
 import { meRouter } from "./store/me.js";
 import { mountPreview } from "./verifier/preview.js";
 
@@ -14,6 +15,7 @@ export const mounts: Mount[] = [
   mountPreview,
   (app) => {
     app.use("/api", escrowRouter);
+    app.use("/api", imagesRouter);
     app.use("/api", meRouter);
   },
 ];

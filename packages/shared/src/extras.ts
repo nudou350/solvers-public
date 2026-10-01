@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Agent, Creator, Escrow, GuaranteeLevel, License, Review, UserReputation } from "./schemas.js";
+import { Agent, Creator, Escrow, GuaranteeLevel, ImageRef, License, Review, UserReputation } from "./schemas.js";
 
 // Extensões ao contrato para telas que o schema base não cobre.
 // Nunca alteram os campos de Agent/Creator/...; vêm em objetos separados.
@@ -58,6 +58,8 @@ export const AgentDetail = z.object({
   agent: Agent,
   creator: Creator,
   reviews: z.array(Review),
+  /** Galeria do criador (até MAX_AGENT_IMAGES), já revisada. */
+  images: z.array(ImageRef).default([]),
   beforeAfter: z.array(BeforeAfter),
   versions: z.array(AgentVersion),
   /** null: especialista sem teste grátis. */

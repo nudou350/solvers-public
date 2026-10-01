@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   customType,
   index,
   integer,
@@ -166,6 +167,40 @@ export const reviewDrafts = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.agentId, t.authorWallet, t.contentHash] })],
+);
+
+/**
+ * Galeria do criador (até 5, estilo Play Store) e fotos de avaliação (até 3). `key` é o id da imagem no CDN
+ * (a URL é montada em images/store.ts). O limite é do próprio banco: posição 0..N-1 única por dono,
+ * então duas requisições simultâneas nunca passam do máximo. Alterar a galeria de um especialista é
+ * decisão do admin (cli:images): o criador não troca imagem sem revisão.
+ */
+export const agentImages = pgTable(
+  "agent_images",
+  {
+    id: text("id").primaryKey(),
+    agentId: text("agent_id").notNull(),
+    position: smallint("position").notNull(),
+    key: text("key").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("agent_images_pos_idx").on(t.agentId, t.position), check("agent_images_pos_chk", sql`${t.position} between 0 and 4`)],
+);
+
+export const reviewImages = pgTable(
+  "review_images",
+  {
+    id: text("id").primaryKey(),
+    reviewId: text("review_id").notNull(),
+    position: smallint("position").notNull(),
+    key: text("key").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("review_images_pos_idx").on(t.reviewId, t.position), check("review_images_pos_chk", sql`${t.position} between 0 and 2`)],
 );
 
 export const escrows = pgTable(

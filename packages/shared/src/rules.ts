@@ -10,6 +10,12 @@ export const MIN_PERMANENT_PRICE_USDC = 5;
 /** Usos do teste grátis quando o manifest do especialista não define trial.uses. */
 export const FREE_TRIAL_USES = 3;
 
+/** Galeria do criador (como as capturas da Play Store) e fotos por avaliação. */
+export const MAX_AGENT_IMAGES = 5;
+export const MAX_REVIEW_IMAGES = 3;
+/** Tamanho máximo de cada imagem enviada (o servidor reencoda para WebP bem menor). */
+export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+
 export function usdcToUnits(usdc: number): bigint {
   // Arredonda em centavos de micro-USDC para evitar erros de float (ex: 0.1 + 0.2).
   return BigInt(Math.round(usdc * 1_000_000));

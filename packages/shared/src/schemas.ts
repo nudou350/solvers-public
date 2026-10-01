@@ -62,6 +62,15 @@ export const License = z.object({
   resalePriceUsdc: z.number().nullable(),
 });
 
+/** Imagem hospedada no CDN: `url` é a versão ampliada, `thumbUrl` a miniatura. */
+export const ImageRef = z.object({
+  id: z.string(),
+  url: z.string(),
+  thumbUrl: z.string(),
+  width: z.number().int(),
+  height: z.number().int(),
+});
+
 export const Review = z.object({
   id: z.string(),
   agentId: z.string(),
@@ -72,6 +81,8 @@ export const Review = z.object({
   verifiedPurchase: z.literal(true),
   /** Nome do perfil de quem avaliou (null: a vitrine mostra a carteira encurtada). */
   authorName: z.string().nullable(),
+  /** Fotos que o comprador anexou (até MAX_REVIEW_IMAGES). */
+  images: z.array(ImageRef).default([]),
 });
 
 export const MilestoneStatus = z.enum(["pending", "submitted", "passed", "approved", "disputed", "refunded"]);
@@ -121,6 +132,7 @@ export type Requirement = z.infer<typeof Requirement>;
 export type Agent = z.infer<typeof Agent>;
 export type Creator = z.infer<typeof Creator>;
 export type License = z.infer<typeof License>;
+export type ImageRef = z.infer<typeof ImageRef>;
 export type Review = z.infer<typeof Review>;
 export type MilestoneStatus = z.infer<typeof MilestoneStatus>;
 export type Milestone = z.infer<typeof Milestone>;

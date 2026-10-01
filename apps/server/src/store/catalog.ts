@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Agent, AgentDetail, Creator, CreatorProfile, GuaranteeOffer } from "@solvers/shared";
 import { unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shared";
 import { env } from "../env.js";
 import { db, schema } from "../db/index.js";
+import { toImageRefs } from "../images/refs.js";
 import { notFound } from "../lib/http.js";
 import { isAgentId } from "../runtime/agent-ids.js";
 import { getPackage } from "../runtime/packages.js";
@@ -171,8 +172,16 @@ export async function listReviews(agentId: string, limit = 50) {
         .where(inArray(schema.userProfiles.wallet, wallets))
     : [];
   const nameOf = new Map(names.map((n) => [n.wallet, n.name]));
+  const imgRows = rows.length
+    ? await db
+        .select()
+        .from(schema.reviewImages)
+        .where(inArray(schema.reviewImages.reviewId, rows.map((r) => r.id)))
+        .orderBy(asc(schema.reviewImages.position))
+    : [];
+  const imagesOf = (reviewId: string) => toImageRefs(imgRows.filter((i) => i.reviewId === reviewId));
   // O texto é off-chain: só aparece se o sha256 dele bate com o hash confirmado on-chain.
-  return rows.map((r) => toReview(textMatchesHash(r.text, r.contentHash) ? r : { ...r, text: "" }, nameOf.get(r.authorWallet) ?? null));
+  return rows.map((r) => toReview(textMatchesHash(r.text, r.contentHash) ? r : { ...r, text: "" }, nameOf.get(r.authorWallet) ?? null, imagesOf(r.id)));
 }
 
 export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
@@ -204,6 +213,7 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     agent: agent!,
     creator,
     reviews: await listReviews(row.id, 10),
+    images: toImageRefs(await db.select().from(schema.agentImages).where(eq(schema.agentImages.agentId, row.id)).orderBy(asc(schema.agentImages.position))),
     beforeAfter: row.details.beforeAfter ?? [],
     versions: row.details.versions ?? [
       { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Versão atual", evalScore: agent!.evalScore },

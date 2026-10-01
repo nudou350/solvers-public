@@ -1,4 +1,4 @@
-import type { Agent, Creator, Escrow, License, Milestone, Review, UserReputation } from "@solvers/shared";
+import type { Agent, Creator, Escrow, ImageRef, License, Milestone, Review, UserReputation } from "@solvers/shared";
 import {
   averageRating,
   bpsToScore,
@@ -95,7 +95,7 @@ export function toLicense(row: LicenseRow): License {
   };
 }
 
-export function toReview(row: ReviewRow, authorName: string | null = null): Review {
+export function toReview(row: ReviewRow, authorName: string | null = null, images: ImageRef[] = []): Review {
   return {
     id: row.id,
     agentId: row.agentId,
@@ -105,6 +105,7 @@ export function toReview(row: ReviewRow, authorName: string | null = null): Revi
     createdAt: row.createdAt.toISOString(),
     verifiedPurchase: true,
     authorName,
+    images,
   };
 }
 
