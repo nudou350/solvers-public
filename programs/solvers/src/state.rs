@@ -34,6 +34,9 @@ pub const STAKE_EXIT_DELAY_SECS: i64 = 30 * 86_400;
 pub const MAX_STAKE_EXIT_EXTENSIONS: u8 = 2;
 /// Espera entre propor e executar um confisco de stake.
 pub const SLASH_DELAY_SECS: i64 = 72 * 3_600;
+/// Janela de execução do confisco: de `proposed_at + SLASH_DELAY_SECS` até esse prazo depois dele (inclusive).
+/// Passada a janela a proposta expira: `execute_slash` falha e o criador pode fechá-la (`cancel_slash`).
+pub const SLASH_EXPIRY_GRACE_SECS: i64 = 14 * 86_400;
 
 #[account]
 #[derive(InitSpace)]

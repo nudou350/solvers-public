@@ -44,6 +44,14 @@ fn stake_transfer<'info>(
     )
 }
 
+/// Último segundo em que a proposta ainda pode ser executada (e primeiro em que o criador pode cancelá-la).
+fn slash_expiry(p: &SlashProposal) -> Result<i64> {
+    p.proposed_at
+        .checked_add(SLASH_DELAY_SECS)
+        .and_then(|t| t.checked_add(SLASH_EXPIRY_GRACE_SECS))
+        .ok_or_else(|| error!(SolversError::MathOverflow))
+}
+
 // ------------------------------------------------------------------------------ saída do criador ----
 
 /// O criador pede para sair: o solver vira `Retired` (some da venda como um suspenso) e o stake só pode
@@ -115,6 +123,8 @@ pub fn extend_stake_exit(ctx: Context<ExtendStakeExit>, reason_hash: [u8; 32]) -
 }
 
 /// O criador desiste da saída: volta a `Suspended` (nunca a `Active`; reativar é `approve_agent`).
+/// Não vale depois de uma extensão do admin: cancelar e pedir de novo recomeçaria a espera em 30 dias
+/// e anularia a extensão (denúncia ou disputa em aberto).
 #[derive(Accounts)]
 pub struct CancelStakeExit<'info> {
     pub creator: Signer<'info>,
@@ -140,6 +150,7 @@ pub struct CancelStakeExit<'info> {
 }
 
 pub fn cancel_stake_exit(ctx: Context<CancelStakeExit>) -> Result<()> {
+    require!(ctx.accounts.stake_exit.extensions == 0, SolversError::StakeExitExtended);
     let agent = &mut ctx.accounts.agent;
     agent.status = AgentStatus::Suspended;
     emit!(StakeExitCancelled { agent: agent.key(), creator: ctx.accounts.creator.key() });
@@ -286,11 +297,14 @@ pub fn contest_slash(ctx: Context<ContestSlash>, reason_hash: [u8; 32]) -> Resul
     Ok(())
 }
 
-/// O admin desiste da proposta. O solver continua suspenso até um `approve_agent`.
+/// Cancela a proposta. O admin cancela quando quiser; o criador só depois da expiração (fim da janela
+/// de execução), para que uma proposta esquecida não prenda o saque do stake para sempre. O solver
+/// continua suspenso até um `approve_agent`.
 #[derive(Accounts)]
 pub struct CancelSlash<'info> {
-    pub admin: Signer<'info>,
-    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ SolversError::NotAdmin)]
+    /// Admin, ou o criador do solver depois da expiração.
+    pub signer: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
     #[account(seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump)]
     pub agent: Account<'info, Agent>,
@@ -308,6 +322,12 @@ pub struct CancelSlash<'info> {
 }
 
 pub fn cancel_slash(ctx: Context<CancelSlash>) -> Result<()> {
+    let signer = ctx.accounts.signer.key();
+    if signer != ctx.accounts.config.admin {
+        require!(signer == ctx.accounts.agent.creator, SolversError::NotAdmin);
+        let now = Clock::get()?.unix_timestamp;
+        require!(now >= slash_expiry(&ctx.accounts.slash_proposal)?, SolversError::SlashNotExpired);
+    }
     emit!(SlashCancelled { agent: ctx.accounts.agent.key(), amount: ctx.accounts.slash_proposal.amount });
     Ok(())
 }
@@ -349,6 +369,7 @@ pub fn execute_slash(ctx: Context<ExecuteSlash>) -> Result<()> {
         .checked_add(SLASH_DELAY_SECS)
         .ok_or(SolversError::MathOverflow)?;
     require!(now >= due, SolversError::SlashDelayNotReached);
+    require!(now <= slash_expiry(&ctx.accounts.slash_proposal)?, SolversError::SlashExpired);
 
     let amount = ctx.accounts.slash_proposal.amount.min(ctx.accounts.stake_vault.amount);
     let a = &ctx.accounts;

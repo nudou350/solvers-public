@@ -98,4 +98,10 @@ pub enum SolversError {
     SlashDelayNotReached,
     #[msg("A proposta de confisco já foi contestada")]
     SlashAlreadyContested,
+    #[msg("Com a espera estendida pelo admin o criador não pode cancelar a saída")]
+    StakeExitExtended,
+    #[msg("A proposta de confisco expirou")]
+    SlashExpired,
+    #[msg("A proposta de confisco ainda não expirou: só o admin a cancela")]
+    SlashNotExpired,
 }

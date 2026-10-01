@@ -15,8 +15,8 @@ export const CANCEL_SLASH_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([22
 
 export function getCancelSlashDiscriminatorBytes(): ReadonlyUint8Array { return fixEncoderSize(getBytesEncoder(), 8).encode(CANCEL_SLASH_DISCRIMINATOR); }
 
-export type CancelSlashInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountConfig extends string | AccountMeta<string> = string, TAccountAgent extends string | AccountMeta<string> = string, TAccountSlashProposal extends string | AccountMeta<string> = string, TAccountRentPayer extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? ReadonlySignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountConfig extends string ? ReadonlyAccount<TAccountConfig> : TAccountConfig, TAccountAgent extends string ? ReadonlyAccount<TAccountAgent> : TAccountAgent, TAccountSlashProposal extends string ? WritableAccount<TAccountSlashProposal> : TAccountSlashProposal, TAccountRentPayer extends string ? WritableAccount<TAccountRentPayer> : TAccountRentPayer, ...TRemainingAccounts]>;
+export type CancelSlashInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountSigner extends string | AccountMeta<string> = string, TAccountConfig extends string | AccountMeta<string> = string, TAccountAgent extends string | AccountMeta<string> = string, TAccountSlashProposal extends string | AccountMeta<string> = string, TAccountRentPayer extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountSigner extends string ? ReadonlySignerAccount<TAccountSigner> & AccountSignerMeta<TAccountSigner> : TAccountSigner, TAccountConfig extends string ? ReadonlyAccount<TAccountConfig> : TAccountConfig, TAccountAgent extends string ? ReadonlyAccount<TAccountAgent> : TAccountAgent, TAccountSlashProposal extends string ? WritableAccount<TAccountSlashProposal> : TAccountSlashProposal, TAccountRentPayer extends string ? WritableAccount<TAccountRentPayer> : TAccountRentPayer, ...TRemainingAccounts]>;
 
 export type CancelSlashInstructionData = { discriminator: ReadonlyUint8Array;  };
 
@@ -34,15 +34,16 @@ export function getCancelSlashInstructionDataCodec(): FixedSizeCodec<CancelSlash
     return combineCodec(getCancelSlashInstructionDataEncoder(), getCancelSlashInstructionDataDecoder());
 }
 
-export type CancelSlashAsyncInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput = InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput> =  {
-  admin: TAccountAdmin;
+export type CancelSlashAsyncInput<TAccountSigner extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput = InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput> =  {
+  /** Admin, ou o criador do solver depois da expiração. */
+signer: TAccountSigner;
 config?: TAccountConfig;
 agent: TAccountAgent;
 slashProposal?: TAccountSlashProposal;
 rentPayer: TAccountRentPayer;
 }
 
-export async function getCancelSlashInstructionAsync<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountAgent extends InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CancelSlashAsyncInput<TAccountAdmin, TAccountConfig, TAccountAgent, TAccountSlashProposal, TAccountRentPayer>, config?: { programAddress?: TProgramAddress } ): Promise<CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>> {
+export async function getCancelSlashInstructionAsync<TAccountSigner extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountAgent extends InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CancelSlashAsyncInput<TAccountSigner, TAccountConfig, TAccountAgent, TAccountSlashProposal, TAccountRentPayer>, config?: { programAddress?: TProgramAddress } ): Promise<CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountSigner, InstructionAccountInputAddress<TAccountSigner>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -50,7 +51,7 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: false }, config: { value: input.config ?? null, isSigner: false, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: false }, slashProposal: { value: input.slashProposal ?? null, isSigner: false, isWritable: true }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true } }
+const originalAccounts = { signer: { value: input.signer ?? null, isSigner: true, isWritable: false }, config: { value: input.config ?? null, isSigner: false, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: false }, slashProposal: { value: input.slashProposal ?? null, isSigner: false, isWritable: true }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
@@ -62,18 +63,19 @@ if (!accounts.slashProposal.value) {
 accounts.slashProposal.value = await findSlashProposalPda({ agent: getAddressFromResolvedInstructionAccount("agent", accounts.agent.value) }, { programAddress });
 }
 
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("agent", accounts.agent), getAccountMeta("slashProposal", accounts.slashProposal), getAccountMeta("rentPayer", accounts.rentPayer)], data: getCancelSlashInstructionDataEncoder().encode({}), programAddress } as CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>);
+return Object.freeze({ accounts: [getAccountMeta("signer", accounts.signer), getAccountMeta("config", accounts.config), getAccountMeta("agent", accounts.agent), getAccountMeta("slashProposal", accounts.slashProposal), getAccountMeta("rentPayer", accounts.rentPayer)], data: getCancelSlashInstructionDataEncoder().encode({}), programAddress } as CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountSigner, InstructionAccountInputAddress<TAccountSigner>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>);
 }
 
-export type CancelSlashInput<TAccountAdmin extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput = InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput> =  {
-  admin: TAccountAdmin;
+export type CancelSlashInput<TAccountSigner extends InstructionSignerInput = InstructionSignerInput, TAccountConfig extends InstructionAccountInput = InstructionAccountInput, TAccountAgent extends InstructionAccountInput = InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput = InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput = InstructionAccountInput> =  {
+  /** Admin, ou o criador do solver depois da expiração. */
+signer: TAccountSigner;
 config: TAccountConfig;
 agent: TAccountAgent;
 slashProposal: TAccountSlashProposal;
 rentPayer: TAccountRentPayer;
 }
 
-export function getCancelSlashInstruction<TAccountAdmin extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountAgent extends InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CancelSlashInput<TAccountAdmin, TAccountConfig, TAccountAgent, TAccountSlashProposal, TAccountRentPayer>, config?: { programAddress?: TProgramAddress } ): CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>> {
+export function getCancelSlashInstruction<TAccountSigner extends InstructionSignerInput, TAccountConfig extends InstructionAccountInput, TAccountAgent extends InstructionAccountInput, TAccountSlashProposal extends InstructionAccountInput, TAccountRentPayer extends InstructionAccountInput, TProgramAddress extends Address = typeof SOLVERS_PROGRAM_ADDRESS>(input: CancelSlashInput<TAccountSigner, TAccountConfig, TAccountAgent, TAccountSlashProposal, TAccountRentPayer>, config?: { programAddress?: TProgramAddress } ): CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountSigner, InstructionAccountInputAddress<TAccountSigner>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>> {
   // Program address.
 const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 
@@ -81,18 +83,19 @@ const programAddress = config?.programAddress ?? SOLVERS_PROGRAM_ADDRESS;
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 
  // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isSigner: true, isWritable: false }, config: { value: input.config ?? null, isSigner: false, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: false }, slashProposal: { value: input.slashProposal ?? null, isSigner: false, isWritable: true }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true } }
+const originalAccounts = { signer: { value: input.signer ?? null, isSigner: true, isWritable: false }, config: { value: input.config ?? null, isSigner: false, isWritable: false }, agent: { value: input.agent ?? null, isSigner: false, isWritable: false }, slashProposal: { value: input.slashProposal ?? null, isSigner: false, isWritable: true }, rentPayer: { value: input.rentPayer ?? null, isSigner: false, isWritable: true } }
 const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
 
 
 
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("config", accounts.config), getAccountMeta("agent", accounts.agent), getAccountMeta("slashProposal", accounts.slashProposal), getAccountMeta("rentPayer", accounts.rentPayer)], data: getCancelSlashInstructionDataEncoder().encode({}), programAddress } as CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAdmin, InstructionAccountInputAddress<TAccountAdmin>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>);
+return Object.freeze({ accounts: [getAccountMeta("signer", accounts.signer), getAccountMeta("config", accounts.config), getAccountMeta("agent", accounts.agent), getAccountMeta("slashProposal", accounts.slashProposal), getAccountMeta("rentPayer", accounts.rentPayer)], data: getCancelSlashInstructionDataEncoder().encode({}), programAddress } as CancelSlashInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountSigner, InstructionAccountInputAddress<TAccountSigner>>, ResolvedInstructionAccountMeta<TAccountConfig, InstructionAccountInputAddress<TAccountConfig>>, ResolvedInstructionAccountMeta<TAccountAgent, InstructionAccountInputAddress<TAccountAgent>>, ResolvedInstructionAccountMeta<TAccountSlashProposal, InstructionAccountInputAddress<TAccountSlashProposal>>, ResolvedInstructionAccountMeta<TAccountRentPayer, InstructionAccountInputAddress<TAccountRentPayer>>>);
 }
 
 export type ParsedCancelSlashInstruction<TProgram extends string = typeof SOLVERS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
 accounts: {
-admin: TAccountMetas[0];
+/** Admin, ou o criador do solver depois da expiração. */
+signer: TAccountMetas[0];
 config: TAccountMetas[1];
 agent: TAccountMetas[2];
 slashProposal: TAccountMetas[3];
@@ -110,5 +113,5 @@ const getNextAccount = () => {
   accountIndex += 1;
   return accountMeta;
 }
-  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), config: getNextAccount(), agent: getNextAccount(), slashProposal: getNextAccount(), rentPayer: getNextAccount() }, data: getCancelSlashInstructionDataDecoder().decode(instruction.data) };
+  return { programAddress: instruction.programAddress, accounts: { signer: getNextAccount(), config: getNextAccount(), agent: getNextAccount(), slashProposal: getNextAccount(), rentPayer: getNextAccount() }, data: getCancelSlashInstructionDataDecoder().decode(instruction.data) };
 }

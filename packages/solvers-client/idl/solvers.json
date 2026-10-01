@@ -396,11 +396,11 @@
       ],
       "accounts": [
         {
-          "name": "admin",
-          "signer": true,
-          "relations": [
-            "config"
-          ]
+          "name": "signer",
+          "docs": [
+            "Admin, ou o criador do solver depois da expiração."
+          ],
+          "signer": true
         },
         {
           "name": "config",
@@ -4601,6 +4601,21 @@
       "code": 6047,
       "name": "SlashAlreadyContested",
       "msg": "A proposta de confisco já foi contestada"
+    },
+    {
+      "code": 6048,
+      "name": "StakeExitExtended",
+      "msg": "Com a espera estendida pelo admin o criador não pode cancelar a saída"
+    },
+    {
+      "code": 6049,
+      "name": "SlashExpired",
+      "msg": "A proposta de confisco expirou"
+    },
+    {
+      "code": 6050,
+      "name": "SlashNotExpired",
+      "msg": "A proposta de confisco ainda não expirou: só o admin a cancela"
     }
   ],
   "types": [

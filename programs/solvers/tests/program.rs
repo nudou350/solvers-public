@@ -78,7 +78,7 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("ExtendStakeExit", 11_500),
     ("CancelStakeExit", 11_000),
     ("WithdrawStake", 44_000),
-    ("ProposeSlash", 22_000),
+    ("ProposeSlash", 24_000),
     ("ContestSlash", 9_000),
     ("CancelSlash", 12_000),
     ("ExecuteSlash", 26_500),
@@ -4017,11 +4017,11 @@ fn contest_ix(creator: &Pubkey, agent: &TestAgent, reason_hash: [u8; 32]) -> Ins
     }
 }
 
-fn cancel_slash_ix(admin: &Pubkey, agent: &TestAgent, rent_payer: Pubkey) -> Instruction {
+fn cancel_slash_ix(signer: &Pubkey, agent: &TestAgent, rent_payer: Pubkey) -> Instruction {
     Instruction {
         program_id: solvers::ID,
         accounts: solvers::accounts::CancelSlash {
-            admin: *admin,
+            signer: *signer,
             config: config_pda(),
             agent: agent.key,
             slash_proposal: slash_pda(agent),
@@ -4352,9 +4352,13 @@ fn slash_proposal_delay_contest_cancel_and_execute() {
     // Cancelamento: só o admin; fecha a proposta e o solver continua suspenso até ser aprovado.
     propose(&mut env, &agent, 2 * USDC).unwrap();
     assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Suspended);
+    let ix = cancel_slash_ix(&stranger.pubkey(), &agent, env.payer.pubkey());
+    let err = env.send(ix, &[&stranger]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    // O criador só cancela depois da expiração (testes de expiração mais abaixo).
     let ix = cancel_slash_ix(&creator.pubkey(), &agent, env.payer.pubkey());
     let err = env.send(ix, &[&creator]).unwrap_err();
-    assert!(err.contains("NotAdmin"), "{err}");
+    assert!(err.contains("SlashNotExpired"), "{err}");
     let ix = cancel_slash_ix(&admin.pubkey(), &agent, stranger.pubkey());
     let err = env.send(ix, &[&admin]).unwrap_err();
     assert!(err.contains("ConstraintHasOne"), "{err}");
@@ -4528,6 +4532,137 @@ fn withdraw_destination_is_the_derived_ata_and_rent_payer_may_be_the_creator() {
     env.send(ix, &[&creator]).unwrap();
     assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC);
     assert!(is_closed(&env, &vault_pda(&agent)));
+}
+
+/// Várias instruções numa só transação (assina com o payer do harness + `signers`).
+fn send_tx(env: &mut Env, ixs: &[Instruction], signers: &[&Keypair]) -> Result<(), String> {
+    let mut all: Vec<&Keypair> = vec![&env.payer];
+    all.extend(signers.iter().copied().filter(|k| k.pubkey() != env.payer.pubkey()));
+    let tx = Transaction::new_signed_with_payer(ixs, Some(&env.payer.pubkey()), &all, env.svm.latest_blockhash());
+    let res = env.svm.send_transaction(tx).map(|_| ()).map_err(|e| format!("{:?}", e.meta.logs));
+    env.svm.expire_blockhash();
+    res
+}
+
+#[test]
+fn admin_extension_cannot_be_undone_by_cancel_and_request() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let (creator, admin) = (agent.creator.insecure_clone(), admin_kp(&env));
+    request_exit(&mut env, &agent).unwrap();
+    extend_exit(&mut env, &admin, &agent, [7; 32]).unwrap();
+    let before = env.account::<StakeExit>(&stake_exit_pda(&agent));
+    assert_eq!((before.exit_at, before.extensions), (T0 + 2 * EXIT_DELAY, 1));
+
+    // Com a espera estendida o criador não cancela, nem sozinho nem emendando cancelar + pedir de novo
+    // (que levaria exit_at de volta para agora + 30 dias).
+    let err = cancel_exit(&mut env, &agent).unwrap_err();
+    assert!(err.contains("StakeExitExtended"), "{err}");
+    set_time(&mut env, T0 + 1);
+    let ixs = [
+        cancel_exit_ix(&creator.pubkey(), &agent, env.payer.pubkey()),
+        request_exit_ix(&env.payer.pubkey(), &creator.pubkey(), &agent),
+    ];
+    let err = send_tx(&mut env, &ixs, &[&creator]).unwrap_err();
+    assert!(err.contains("StakeExitExtended"), "{err}");
+    let after = env.account::<StakeExit>(&stake_exit_pda(&agent));
+    assert_eq!((after.exit_at, after.extensions, after.requested_at), (T0 + 2 * EXIT_DELAY, 1, T0));
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Retired);
+
+    // O dia 31 (fim dos 30 dias originais) não libera o saque; só o prazo estendido.
+    set_time(&mut env, T0 + EXIT_DELAY + 1);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("StakeExitNotReached"), "{err}");
+
+    // Sem extensão, cancelar continua valendo (e volta a Suspended).
+    let other = active_agent(&mut env, 12 * USDC, 0);
+    request_exit(&mut env, &other).unwrap();
+    cancel_exit(&mut env, &other).unwrap();
+    assert_eq!(env.account::<Agent>(&other.key).status, AgentStatus::Suspended);
+}
+
+#[test]
+fn slash_proposal_executes_only_inside_its_window_and_creator_closes_it_after() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let (admin, treasury) = (admin_kp(&env), env.treasury);
+    let window_end = SLASH_DELAY_SECS + SLASH_EXPIRY_GRACE_SECS;
+
+    // A: executa no segundo exato do fim da janela.
+    let a = active_agent(&mut env, 12 * USDC, 0);
+    propose(&mut env, &a, 4 * USDC).unwrap();
+    // C: um segundo depois do fim da janela a execução falha.
+    let c = active_agent(&mut env, 12 * USDC, 0);
+    propose(&mut env, &c, 4 * USDC).unwrap();
+    // B: Retired (pedido de saída em T0); a proposta dele vem depois, para o saque cair dentro da janela.
+    let b = active_agent(&mut env, 12 * USDC, 0);
+    request_exit(&mut env, &b).unwrap();
+
+    // A: no último segundo da janela ainda executa.
+    set_time(&mut env, T0 + window_end);
+    execute(&mut env, &a).unwrap();
+    assert_eq!(env.account::<Agent>(&a.key).stake, 6 * USDC);
+    // C: um segundo depois, não; o criador (e só ele, além do admin) fecha a proposta vencida.
+    set_time(&mut env, T0 + window_end + 1);
+    let err = execute(&mut env, &c).unwrap_err();
+    assert!(err.contains("SlashExpired"), "{err}");
+    assert_eq!(env.balance(&treasury), 4 * USDC);
+    let (c_creator, c_stranger) = (c.creator.insecure_clone(), funded(&mut env));
+    let ix = cancel_slash_ix(&c_stranger.pubkey(), &c, env.payer.pubkey());
+    assert!(env.send(ix, &[&c_stranger]).unwrap_err().contains("NotAdmin"));
+    let ix = cancel_slash_ix(&c_creator.pubkey(), &c, env.payer.pubkey());
+    let logs = env.send_logs(ix, &[&c_creator]).unwrap();
+    let ev = events::<solvers::events::SlashCancelled>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].amount), (1, c.key, 4 * USDC));
+    assert!(is_closed(&env, &slash_pda(&c)));
+    assert_eq!((env.account::<Agent>(&c.key).stake, env.balance(&vault_pda(&c))), (10 * USDC, 10 * USDC));
+
+    set_time(&mut env, T0 + 25 * 86_400);
+    let b_proposed = current_time(&env);
+    propose(&mut env, &b, 1).unwrap();
+
+    // Dentro da janela a proposta de B segue travando o saque (prazo de 30 dias já vencido).
+    set_time(&mut env, T0 + EXIT_DELAY);
+    let err = withdraw(&mut env, &b).unwrap_err();
+    assert!(err.contains("SlashPending"), "{err}");
+    // Antes da expiração o criador e estranhos não cancelam.
+    let (b_creator, stranger) = (b.creator.insecure_clone(), funded(&mut env));
+    let ix = cancel_slash_ix(&b_creator.pubkey(), &b, env.payer.pubkey());
+    let err = env.send(ix, &[&b_creator]).unwrap_err();
+    assert!(err.contains("SlashNotExpired"), "{err}");
+    let ix = cancel_slash_ix(&stranger.pubkey(), &b, env.payer.pubkey());
+    let err = env.send(ix, &[&stranger]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+
+    // B: um segundo antes da expiração o criador ainda não cancela; no segundo exato cancela e saca na
+    // mesma transação, e o rent da proposta volta a quem pagou.
+    let b_expiry = b_proposed + window_end;
+    set_time(&mut env, b_expiry - 1);
+    let ix = cancel_slash_ix(&b_creator.pubkey(), &b, env.payer.pubkey());
+    let err = env.send(ix, &[&b_creator]).unwrap_err();
+    assert!(err.contains("SlashNotExpired"), "{err}");
+    set_time(&mut env, b_expiry);
+    let payer_before = lamports(&env, &env.payer.pubkey());
+    let ixs = [
+        cancel_slash_ix(&b_creator.pubkey(), &b, env.payer.pubkey()),
+        withdraw_ix(&env, &b_creator.pubkey(), &b, env.payer.pubkey(), b.creator_usdc),
+    ];
+    send_tx(&mut env, &ixs, &[&b_creator]).unwrap();
+    assert!(is_closed(&env, &slash_pda(&b)) && is_closed(&env, &vault_pda(&b)));
+    assert_eq!(env.balance(&b.creator_usdc), 100 * USDC);
+    assert_eq!(env.account::<Agent>(&b.key).stake, 0);
+    // Rent da proposta (e da StakeExit) de volta ao payer, descontada a taxa da transação.
+    assert!(lamports(&env, &env.payer.pubkey()) + 20_000 > payer_before + rent_for(&env, 8 + SlashProposal::INIT_SPACE));
+    // O admin cancela uma proposta vencida (ou não) quando quiser.
+    let d = active_agent(&mut env, 12 * USDC, 0);
+    propose(&mut env, &d, USDC).unwrap();
+    set_time(&mut env, b_expiry + window_end + 1);
+    let ix = cancel_slash_ix(&admin.pubkey(), &d, env.payer.pubkey());
+    env.send(ix, &[&admin]).unwrap();
+    assert!(is_closed(&env, &slash_pda(&d)));
 }
 
 #[test]
