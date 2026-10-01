@@ -164,7 +164,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
     }),
     {
       key: "added",
-      label: "Conector do Solver adicionado",
+      label: "Conector do Solvers adicionado",
       ok: added,
       statusOk: "Adicionado à sua IA",
       statusNo: "Falta colar o endereço no passo 3",
@@ -193,7 +193,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const required = checks.filter((k) => !k.optional);
   const doneCount = required.filter((k) => k.ok).length;
   const allDone = doneCount === required.length;
-  const name = agent?.name ?? "Solver";
+  const name = agent?.name ?? "Solvers";
 
   return (
     <section className="wrap" style={{ paddingTop: 36, paddingBottom: 56 }}>
@@ -238,7 +238,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               <h2 className="h3">Copie o endereço do conector</h2>
             </div>
             <p className="muted">
-              É um endereço só para todos os especialistas. Quando a sua IA se conectar, você entra com a sua conta do Solver e ela passa a usar o que você comprou.
+              É um endereço só para todos os especialistas. Quando a sua IA se conectar, você entra com a sua conta do Solvers e ela passa a usar o que você comprou.
             </p>
             <div className="row m-col" style={gap(10)}>
               <input className="input mono" readOnly value={url} placeholder="Carregando…" aria-label="Endereço do conector" style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
@@ -287,7 +287,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
               <h2 className="h3">Cole o endereço e confirme</h2>
             </div>
             <p className="muted">
-              Cole o endereço que você copiou no passo 1 e confirme. A sua IA vai abrir uma página do Solver pedindo a sua autorização: entre com a mesma conta que você usa aqui.
+              Cole o endereço que você copiou no passo 1 e confirme. A sua IA vai abrir uma página do Solvers pedindo a sua autorização: entre com a mesma conta que você usa aqui.
             </p>
             <Ill>
               <div className="col" style={{ ...gap(12), padding: 18 }}>
@@ -319,7 +319,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
             </div>
             <p className="muted">Abra uma conversa nova e peça algo simples. Se a sua IA responder citando o especialista, deu certo.</p>
             <div className="card-flat pad-s row between" style={gap(12)}>
-              <span className="grow">{agent ? `“Use o ${agent.name} e me diga como ele pode me ajudar.”` : "“Quais especialistas do Solver eu tenho?”"}</span>
+              <span className="grow">{agent ? `“Use o ${agent.name} e me diga como ele pode me ajudar.”` : "“Quais especialistas do Solvers eu tenho?”"}</span>
             </div>
           </div>
         </div>

@@ -13,7 +13,7 @@ const figtree = Figtree({ subsets: ["latin", "latin-ext"], weight: ["400", "500"
 const serif = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", variable: "--font-serif", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Solver: especialistas de IA", template: "%s · Solver" },
+  title: { default: "Solvers: especialistas de IA", template: "%s · Solvers" },
   description: "Especialistas de IA para usar com o Claude e o ChatGPT que você já tem. Compre uma vez e use onde quiser.",
 };
 

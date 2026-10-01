@@ -271,7 +271,7 @@ export default async function AgentPage({ params }: Props) {
                 <b>{k}</b>
               </div>
             ))}
-            <p className="small muted">Você usa a IA que já tem. O Solver não cobra por ela.</p>
+            <p className="small muted">Você usa a IA que já tem. O Solvers não cobra por ela.</p>
           </div>
           <div className="card pad col" style={gap("14px")}>
             <div className="row" style={gap("12px")}>
@@ -301,7 +301,7 @@ export default async function AgentPage({ params }: Props) {
             <p className="small muted">
               {connectors.length
                 ? "Um conector deixa o especialista ler e organizar seus arquivos, sempre com a sua autorização."
-                : "Basta conectar o Solver à sua IA. Nenhuma outra ferramenta é necessária."}
+                : "Basta conectar o Solvers à sua IA. Nenhuma outra ferramenta é necessária."}
             </p>
           </div>
           <div className="card pad col" style={gap("14px")}>

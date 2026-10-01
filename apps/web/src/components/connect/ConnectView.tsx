@@ -77,7 +77,7 @@ export function ConnectView({ req }: { req: string | null }) {
         <div style={{ display: "grid", gap: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Icon name="shield-check" size="l" />
-            <h1 style={{ margin: 0, fontSize: 24 }}>Conectar sua conta do Solver</h1>
+            <h1 style={{ margin: 0, fontSize: 24 }}>Conectar sua conta do Solvers</h1>
           </div>
 
           {!info && !error ? <Loading text="Carregando o pedido de conexão…" /> : null}
@@ -85,7 +85,7 @@ export function ConnectView({ req }: { req: string | null }) {
           {info ? (
             <>
               <p style={{ margin: 0 }}>
-                <strong>{info.clientName}</strong> quer usar os seus especialistas do Solver. Ele vai ver as suas licenças e poderá
+                <strong>{info.clientName}</strong> quer usar os seus especialistas do Solvers. Ele vai ver as suas licenças e poderá
                 usar as suas memórias. <strong>Isto não autoriza pagamentos.</strong>
               </p>
               <p style={{ margin: 0, fontSize: 14 }}>

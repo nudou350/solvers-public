@@ -26,11 +26,11 @@ export function isActive(pathname: string, href: string) {
 
 export function Logo() {
   return (
-    <Link className="logo" href="/" aria-label="Solver, página inicial">
+    <Link className="logo" href="/" aria-label="Solvers, página inicial">
       <span className="logo-mark">
         <Icon name="diamond" size="s" />
       </span>
-      <span>Solver</span>
+      <span>Solvers</span>
     </Link>
   );
 }

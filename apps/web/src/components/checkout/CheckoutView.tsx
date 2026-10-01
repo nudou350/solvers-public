@@ -712,7 +712,7 @@ export function CheckoutView({ detail, type }: { detail: AgentDetail; type: Chec
                 </div>
                 <div className="row between">
                   <span className="muted">Taxa de rede</span>
-                  <b className="num ok">Por conta do Solver</b>
+                  <b className="num ok">Por conta do Solvers</b>
                 </div>
               </div>
               <div className="divider" />

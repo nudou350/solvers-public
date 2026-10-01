@@ -10,13 +10,13 @@ import { gap } from "@/lib/style";
 const VALUE: { icon: IconName; tone: string; title: string; text: string }[] = [
   { icon: "key", tone: "ok", title: "A licença é sua.", text: "A licença permanente fica registrada na rede Solana, na sua carteira." },
   { icon: "repeat", tone: "brand", title: "Revenda o que não usa.", text: "Terminou o projeto? Anuncie a licença e recupere parte do valor." },
-  { icon: "coin", tone: "warn", title: "O criador ganha em cada revenda.", text: "Uma parte de cada revenda vai para quem criou o especialista." },
+  { icon: "coin", tone: "warn", title: "O criador ganha em cada revenda no Solvers.", text: "Uma parte de cada venda feita pelo mercado vai para quem criou o especialista." },
 ];
 
 const HOW = [
   { title: "Anuncie a licença", text: "Na sua biblioteca, escolha a licença permanente que não usa mais e defina o preço." },
-  { title: "Alguém compra", text: "O comprador paga e a licença passa para a carteira dele na hora, com a mesma nota do original." },
-  { title: "Todo mundo recebe", text: "Você recebe o valor da venda e o criador recebe o royalty, automaticamente." },
+  { title: "Alguém compra", text: "O comprador paga e a licença passa para a carteira dele na hora, e você deixa de ter acesso. A nota do especialista segue a mesma; avaliações pessoais continuam de quem as escreveu." },
+  { title: "Todo mundo recebe", text: "Pelo mercado do Solvers, você recebe o valor da venda e o criador recebe o royalty, automaticamente." },
 ];
 
 export function ResaleSoon() {
@@ -32,7 +32,7 @@ export function ResaleSoon() {
         <h1 className="display h1s">Revenda a licença que você não usa mais</h1>
         <p className="lead">
           A licença permanente é sua. Quando o mercado de revenda abrir, você poderá vender a de um especialista que não usa mais, e o criador ganha uma parte de cada
-          revenda.
+          revenda feita pelo Solvers.
         </p>
       </div>
 

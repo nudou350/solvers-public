@@ -1,6 +1,6 @@
-/* Sistema visual do Solver, portado sem mudanças de design/screens/*.html (o mesmo bloco no início de cada <style>).
+/* Sistema visual do Solvers, portado sem mudanças de design/screens/*.html (o mesmo bloco no início de cada <style>).
    Único ajuste: as fontes vêm do next/font (--font-figtree, --font-serif). Acréscimos do app ficam em app.css. */
-/* Solver: sistema visual compartilhado. Tema claro por padrão, escuro com data-theme="dark". */
+/* Solvers: sistema visual compartilhado. Tema claro por padrão, escuro com data-theme="dark". */
 .sv {
   --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --line: #E3DED3; --line-strong: #CBC4B6;
   --ink: #17161B; --ink-2: #4F4C57; --ink-3: #6B6873;
