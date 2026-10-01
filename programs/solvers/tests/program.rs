@@ -101,6 +101,9 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("CancelUndelivered", 16_500),
     ("ResolveStaleDispute", 23_500),
     ("CloseEscrow", 20_500),
+    ("ListLicense", 70_000),
+    ("BuyListing", 65_000),
+    ("CancelListing", 39_500),
 ];
 
 /// Discriminadores das instruções do programa: o nome vem do dado enviado, não do log `Instruction: X`
@@ -150,6 +153,9 @@ const IX_DISCRIMINATORS: &[(&str, &[u8])] = ix_discriminators![
     CancelUndelivered,
     ResolveStaleDispute,
     CloseEscrow,
+    ListLicense,
+    BuyListing,
+    CancelListing,
 ];
 
 /// Nome da instrução do programa a partir do `data` da instrução (discriminador de 8 bytes).
@@ -4774,7 +4780,7 @@ fn program_errors() -> Vec<String> {
 #[test]
 fn cu_ceilings_cover_every_instruction() {
     let instructions = program_instructions();
-    assert!(instructions.len() >= 38, "lib.rs mudou de forma: {instructions:?}");
+    assert!(instructions.len() >= 41, "lib.rs mudou de forma: {instructions:?}");
     for name in &instructions {
         let row = CU_CEILINGS.iter().find(|(n, _)| n == name);
         let (_, ceiling) = row.unwrap_or_else(|| panic!("{name} sem teto em CU_CEILINGS"));
@@ -4810,4 +4816,1394 @@ fn every_instruction_and_error_code_has_a_test() {
         .filter(|e| !tests.lines().any(|l| l.contains(&marker) && l.contains(e.as_str())))
         .collect();
     assert!(untested_err.is_empty(), "erros sem teste negativo: {untested_err:?}");
+}
+
+// ------------------------------------------------------------------------ revenda de licenças ----
+// Anúncio sem custódia: `Listing` + `TransferDelegate` da PDA `market_authority`. Os testes `core_*` provam, com o
+// `mpl_core.so` real, o comportamento do mpl-core em que o desenho se apoia (a PDA é substituída por uma chave
+// qualquer: a assinatura por PDA é padrão, o que se mede é o mpl-core). Os demais exercitam as 3 instruções.
+
+mod resale {
+    use super::*;
+    use mpl_core::accounts::BaseAssetV1;
+    use mpl_core::DataBlob;
+    use mpl_core::instructions::{
+        AddPluginV1Builder, ApprovePluginAuthorityV1Builder, BurnV1Builder, RemovePluginV1Builder,
+        RevokePluginAuthorityV1Builder, TransferV1Builder, UpdatePluginV1Builder,
+    };
+    use mpl_core::types::{BurnDelegate, FreezeDelegate, Plugin, PluginAuthority, PluginType, TransferDelegate};
+    use solvers::events::{LicenseListed, LicenseResold, ListingCancelled};
+
+    const PRICE: u64 = 20 * USDC;
+
+    /// Converte a Instruction do mpl-core na do Anchor 1.x usada pelos testes.
+    macro_rules! core_ix {
+        ($b:expr) => {{
+            let ix = $b.instruction();
+            Instruction {
+                program_id: ix.program_id,
+                accounts: ix
+                    .accounts
+                    .into_iter()
+                    .map(|a| AccountMeta { pubkey: a.pubkey, is_signer: a.is_signer, is_writable: a.is_writable })
+                    .collect(),
+                data: ix.data,
+            }
+        }};
+    }
+
+    // ------------------------------------------------------------------------------ mpl-core ----
+
+    fn market() -> Pubkey {
+        pda(&[MARKET_AUTHORITY_SEED])
+    }
+
+    fn listing_pda(asset: &Pubkey) -> Pubkey {
+        pda(&[LISTING_SEED, asset.as_ref()])
+    }
+
+    fn owner_of(env: &Env, asset: &Pubkey) -> Pubkey {
+        BaseAssetV1::from_bytes(&env.svm.get_account(asset).unwrap().data).unwrap().owner
+    }
+
+    /// Authority do plugin `TransferDelegate` do asset (`None` = o asset não tem o plugin).
+    fn delegate_of(env: &Env, asset: &Pubkey) -> Option<PluginAuthority> {
+        let acc = env.svm.get_account(asset)?;
+        mpl_core::fetch_plugins(&acc.data)
+            .ok()?
+            .into_iter()
+            .find(|r| r.plugin_type == PluginType::TransferDelegate)
+            .map(|r| r.authority)
+    }
+
+    /// Authority de um plugin qualquer do asset (`None` = o asset não tem o plugin).
+    fn plugin_authority(env: &Env, asset: &Pubkey, plugin_type: PluginType) -> Option<PluginAuthority> {
+        let acc = env.svm.get_account(asset)?;
+        mpl_core::fetch_plugins(&acc.data).ok()?.into_iter().find(|r| r.plugin_type == plugin_type).map(|r| r.authority)
+    }
+
+    /// AddPluginV1 de um plugin com a authority já entregue a `init` (assina o dono).
+    fn plant_ix(env: &Env, asset: Pubkey, coll: Pubkey, owner: &Keypair, plugin: Plugin, init: PluginAuthority) -> Instruction {
+        core_ix!(AddPluginV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(owner.pubkey()))
+            .plugin(plugin)
+            .init_authority(init))
+    }
+
+    /// Muda o estado de uma conta de token (ex.: congelada pela freeze authority do mint).
+    fn set_token_state(env: &mut Env, key: &Pubkey, state: spl_token::state::AccountState) {
+        let mut acc = env.svm.get_account(key).unwrap();
+        let mut token = spl_token::state::Account::unpack(&acc.data).unwrap();
+        token.state = state;
+        token.pack_into_slice(&mut acc.data);
+        env.svm.set_account(*key, acc).unwrap();
+    }
+
+    fn to_market() -> Option<PluginAuthority> {
+        Some(PluginAuthority::Address { address: market() })
+    }
+
+    fn add_delegate_ix(env: &Env, asset: Pubkey, coll: Pubkey, authority: &Keypair, init: PluginAuthority) -> Instruction {
+        core_ix!(AddPluginV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(authority.pubkey()))
+            .plugin(Plugin::TransferDelegate(TransferDelegate {}))
+            .init_authority(init))
+    }
+
+    fn core_transfer_ix(env: &Env, asset: Pubkey, coll: Pubkey, authority: &Keypair, to: Pubkey) -> Instruction {
+        core_ix!(TransferV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(authority.pubkey()))
+            .new_owner(to))
+    }
+
+    fn approve_delegate_ix(env: &Env, asset: Pubkey, coll: Pubkey, authority: &Keypair, to: PluginAuthority) -> Instruction {
+        core_ix!(ApprovePluginAuthorityV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(authority.pubkey()))
+            .plugin_type(PluginType::TransferDelegate)
+            .new_authority(to))
+    }
+
+    fn revoke_delegate_ix(env: &Env, asset: Pubkey, coll: Pubkey, authority: &Keypair) -> Instruction {
+        core_ix!(RevokePluginAuthorityV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(authority.pubkey()))
+            .plugin_type(PluginType::TransferDelegate))
+    }
+
+    fn remove_delegate_ix(env: &Env, asset: Pubkey, coll: Pubkey, authority: &Keypair) -> Instruction {
+        core_ix!(RemovePluginV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(authority.pubkey()))
+            .plugin_type(PluginType::TransferDelegate))
+    }
+
+    /// `add = true`: AddPluginV1 do FreezeDelegate; `add = false`: UpdatePluginV1 (muda `frozen`). Authority = dono.
+    fn freeze_ix(env: &Env, asset: Pubkey, coll: Pubkey, owner: &Keypair, frozen: bool, add: bool) -> Instruction {
+        let plugin = Plugin::FreezeDelegate(FreezeDelegate { frozen });
+        if add {
+            core_ix!(AddPluginV1Builder::new()
+                .asset(asset)
+                .collection(Some(coll))
+                .payer(env.payer.pubkey())
+                .authority(Some(owner.pubkey()))
+                .plugin(plugin))
+        } else {
+            core_ix!(UpdatePluginV1Builder::new()
+                .asset(asset)
+                .collection(Some(coll))
+                .payer(env.payer.pubkey())
+                .authority(Some(owner.pubkey()))
+                .plugin(plugin))
+        }
+    }
+
+    fn burn_ix(env: &Env, asset: Pubkey, coll: Pubkey, owner: &Keypair) -> Instruction {
+        core_ix!(BurnV1Builder::new()
+            .asset(asset)
+            .collection(Some(coll))
+            .payer(env.payer.pubkey())
+            .authority(Some(owner.pubkey())))
+    }
+
+    /// Troca só a ÚLTIMA ocorrência da conta (ex.: `rent_payer` quando ele é a mesma chave do `payer`).
+    fn swap_last(ix: &mut Instruction, from: &Pubkey, to: Pubkey) {
+        let i = ix.accounts.iter().rposition(|m| m.pubkey == *from).expect("conta fora da instrução");
+        ix.accounts[i].pubkey = to;
+    }
+
+    /// Erro do mpl-core pelo código: 9 InvalidAuthority, 15 PluginAlreadyExists, 26 NoApprovals.
+    fn assert_core_err(r: Result<(), String>, code: u32, what: &str) {
+        let e = r.expect_err(what);
+        let needle = format!("custom program error: {code:#x}");
+        assert!(e.contains(&needle), "{what}: esperava `{needle}`, veio {e}");
+    }
+
+    // ------------------------------------------------------------------ instruções do programa ----
+
+    fn list_ix(env: &Env, agent: &TestAgent, seller: &Pubkey, asset: &Pubkey, price: u64) -> Instruction {
+        Instruction {
+            program_id: solvers::ID,
+            accounts: solvers::accounts::ListLicense {
+                payer: env.payer.pubkey(),
+                seller: *seller,
+                config: config_pda(),
+                agent: agent.key,
+                collection: agent.collection,
+                asset: *asset,
+                listing: listing_pda(asset),
+                market_authority: market(),
+                mpl_core_program: mpl_core::ID,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+            data: solvers::instruction::ListLicense { price }.data(),
+        }
+    }
+
+    fn buy_ix(env: &Env, agent: &TestAgent, buyer: &Pubkey, seller: &Pubkey, asset: &Pubkey, expected_price: u64) -> Instruction {
+        Instruction {
+            program_id: solvers::ID,
+            accounts: solvers::accounts::BuyListing {
+                payer: env.payer.pubkey(),
+                buyer: *buyer,
+                config: config_pda(),
+                agent: agent.key,
+                collection: agent.collection,
+                asset: *asset,
+                listing: listing_pda(asset),
+                market_authority: market(),
+                buyer_usdc: env.ata(buyer),
+                seller_usdc: env.ata(seller),
+                creator_usdc: agent.creator_usdc,
+                treasury: env.treasury,
+                usdc_mint: env.mint,
+                rent_payer: env.payer.pubkey(),
+                mpl_core_program: mpl_core::ID,
+                token_program: spl_token::ID,
+            }
+            .to_account_metas(None),
+            data: solvers::instruction::BuyListing { expected_price }.data(),
+        }
+    }
+
+    fn cancel_ix(env: &Env, agent: &TestAgent, canceller: &Pubkey, asset: &Pubkey) -> Instruction {
+        Instruction {
+            program_id: solvers::ID,
+            accounts: solvers::accounts::CancelListing {
+                payer: env.payer.pubkey(),
+                canceller: *canceller,
+                agent: agent.key,
+                collection: agent.collection,
+                asset: *asset,
+                listing: listing_pda(asset),
+                market_authority: market(),
+                rent_payer: env.payer.pubkey(),
+                mpl_core_program: mpl_core::ID,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+            data: solvers::instruction::CancelListing {}.data(),
+        }
+    }
+
+    // ---------------------------------------------------------------------------------- cenário ----
+
+    /// Solver ativo (preço 12, royalty 5%, taxa 10%), um vendedor com a licença (e a ATA vazia) e um comprador rico.
+    struct World {
+        env: Env,
+        agent: TestAgent,
+        seller: Keypair,
+        seller_usdc: Pubkey,
+        asset: Pubkey,
+        buyer: Keypair,
+        buyer_usdc: Pubkey,
+    }
+
+    /// Licença nova (comprada do solver) de um dono novo, com a ATA de USDC vazia.
+    fn fresh_license(env: &mut Env, agent: &TestAgent) -> (Keypair, Pubkey, Pubkey) {
+        let (owner, owner_usdc) = new_buyer(env, 12 * USDC);
+        let asset = purchase(env, agent, &owner).unwrap();
+        (owner, owner_usdc, asset)
+    }
+
+    fn world() -> World {
+        let mut env = Env::new();
+        let agent = active_agent(&mut env, 12 * USDC, 0);
+        let (seller, seller_usdc, asset) = fresh_license(&mut env, &agent);
+        let (buyer, buyer_usdc) = new_buyer(&mut env, 100 * USDC);
+        World { env, agent, seller, seller_usdc, asset, buyer, buyer_usdc }
+    }
+
+    impl World {
+        fn list(&mut self, price: u64) -> Result<Vec<String>, String> {
+            let ix = list_ix(&self.env, &self.agent, &self.seller.pubkey(), &self.asset, price);
+            self.env.send_logs(ix, &[&self.seller])
+        }
+
+        fn buy(&mut self, expected_price: u64) -> Result<Vec<String>, String> {
+            let ix = buy_ix(&self.env, &self.agent, &self.buyer.pubkey(), &self.seller.pubkey(), &self.asset, expected_price);
+            self.env.send_logs(ix, &[&self.buyer])
+        }
+
+        fn cancel_by(&mut self, who: &Keypair) -> Result<Vec<String>, String> {
+            let ix = cancel_ix(&self.env, &self.agent, &who.pubkey(), &self.asset);
+            self.env.send_logs(ix, &[who])
+        }
+
+        fn listing(&self) -> Pubkey {
+            listing_pda(&self.asset)
+        }
+
+        /// Saldos de USDC: comprador, vendedor, criador, tesouro.
+        fn bal(&self) -> [u64; 4] {
+            [
+                self.env.balance(&self.buyer_usdc),
+                self.env.balance(&self.seller_usdc),
+                self.env.balance(&self.agent.creator_usdc),
+                self.env.balance(&self.env.treasury.clone()),
+            ]
+        }
+
+        /// Nada saiu do lugar: o asset é do vendedor e o anúncio segue aberto e comprável pelo preço certo.
+        fn assert_untouched(&self, bal: [u64; 4]) {
+            assert_eq!(self.bal(), bal);
+            assert_eq!(owner_of(&self.env, &self.asset), self.seller.pubkey());
+            assert!(!is_closed(&self.env, &self.listing()));
+        }
+    }
+
+    /// Anuncia (por um vendedor novo) e compra (por um comprador novo): (pago pelo comprador, royalty, taxa, vendedor).
+    fn sell_once(env: &mut Env, agent: &TestAgent, price: u64, buyer_funds: u64) -> (u64, u64, u64, u64) {
+        let (seller, seller_usdc, asset) = fresh_license(env, agent);
+        let (buyer, buyer_usdc) = new_buyer(env, buyer_funds);
+        let ix = list_ix(env, agent, &seller.pubkey(), &asset, price);
+        env.send(ix, &[&seller]).unwrap();
+        let treasury = env.treasury;
+        let before = [env.balance(&buyer_usdc), env.balance(&agent.creator_usdc), env.balance(&treasury), env.balance(&seller_usdc)];
+        let ix = buy_ix(env, agent, &buyer.pubkey(), &seller.pubkey(), &asset, price);
+        env.send(ix, &[&buyer]).unwrap();
+        let after = [env.balance(&buyer_usdc), env.balance(&agent.creator_usdc), env.balance(&treasury), env.balance(&seller_usdc)];
+        assert_eq!(owner_of(env, &asset), buyer.pubkey());
+        (before[0] - after[0], after[1] - before[1], after[2] - before[2], after[3] - before[3])
+    }
+
+    // ----------------------------------------------------------------------------------- feliz ----
+
+    #[test]
+    fn resale_happy_path_pays_four_parties_moves_the_license_and_closes_the_listing() {
+        let mut w = world();
+        let sales_before = w.env.account::<Agent>(&w.agent.key).total_sales;
+        assert_eq!(sales_before, 1);
+        let rep_seller = w.env.account::<UserReputation>(&rep_pda(&w.seller.pubkey())).purchases;
+
+        // Anunciar: nada sai da carteira do vendedor; só ganha um delegate (a PDA) e abre o Listing.
+        let logs = w.list(PRICE).unwrap();
+        let ev = events::<LicenseListed>(&logs);
+        assert_eq!(ev.len(), 1);
+        assert_eq!(
+            (ev[0].agent, ev[0].seller, ev[0].asset, ev[0].price, ev[0].fee_bps, ev[0].royalty_bps),
+            (w.agent.key, w.seller.pubkey(), w.asset, PRICE, FEE_BPS, 500)
+        );
+        let l: Listing = w.env.account(&w.listing());
+        assert_eq!((l.seller, l.asset, l.agent, l.price), (w.seller.pubkey(), w.asset, w.agent.key, PRICE));
+        assert_eq!((l.fee_bps, l.royalty_bps, l.rent_payer), (FEE_BPS, 500, w.env.payer.pubkey()));
+        assert!(l.listed_at >= 0);
+        assert_eq!(w.env.svm.get_account(&w.listing()).unwrap().data.len(), 8 + Listing::INIT_SPACE);
+        assert_eq!(Listing::INIT_SPACE, 32 * 3 + 8 + 2 + 2 + 8 + 32 + 1);
+        assert_eq!(owner_of(&w.env, &w.asset), w.seller.pubkey());
+        assert_eq!(delegate_of(&w.env, &w.asset), to_market());
+
+        // Comprar: royalty 5% ao criador, taxa 10% à plataforma, o resto ao vendedor; o comprador não gasta SOL.
+        let before = w.bal();
+        let logs = w.buy(PRICE).unwrap();
+        let after = w.bal();
+        assert_eq!(before[0] - after[0], PRICE);
+        assert_eq!(after[1] - before[1], 17 * USDC);
+        assert_eq!(after[2] - before[2], USDC);
+        assert_eq!(after[3] - before[3], 2 * USDC);
+        let ev = events::<LicenseResold>(&logs);
+        assert_eq!(ev.len(), 1);
+        assert_eq!(
+            (ev[0].agent, ev[0].asset, ev[0].seller, ev[0].buyer),
+            (w.agent.key, w.asset, w.seller.pubkey(), w.buyer.pubkey())
+        );
+        assert_eq!((ev[0].price, ev[0].royalty, ev[0].fee, ev[0].seller_amount), (PRICE, USDC, 2 * USDC, 17 * USDC));
+
+        // Licença com o comprador; o delegate voltou a `Owner` (a PDA não transfere de novo); Listing fechado.
+        assert_eq!(owner_of(&w.env, &w.asset), w.buyer.pubkey());
+        assert_eq!(delegate_of(&w.env, &w.asset), Some(PluginAuthority::Owner));
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(lamports(&w.env, &w.listing()), 0);
+        assert!(w.env.svm.get_account(&w.buyer.pubkey()).is_none_or(|a| a.lamports == 0));
+        // Revenda não é venda do criador nem compra primária: contadores intactos e sem reputação nova.
+        assert_eq!(w.env.account::<Agent>(&w.agent.key).total_sales, sales_before);
+        assert!(w.env.svm.get_account(&rep_pda(&w.buyer.pubkey())).is_none());
+        assert_eq!(w.env.account::<UserReputation>(&rep_pda(&w.seller.pubkey())).purchases, rep_seller);
+        // Quem tem a licença agora é quem avalia (a prova é o dono atual do asset).
+        let (seller, buyer, asset) = (w.seller.insecure_clone(), w.buyer.insecure_clone(), w.asset);
+        let err = review_with_license(&mut w.env, &w.agent, &seller, asset, 5).unwrap_err();
+        assert!(err.contains("NoLicense"), "{err}");
+        review_with_license(&mut w.env, &w.agent, &buyer, asset, 5).unwrap();
+        // O anúncio acabou: comprar de novo não acha o Listing.
+        assert!(w.buy(PRICE).is_err());
+    }
+
+    // ------------------------------------------------------------------------------ aritmética ----
+
+    #[test]
+    fn resale_split_is_exact_floors_and_rejects_cuts_above_the_ceiling() {
+        let split = |p, r, f| resale_split(p, r, f).unwrap();
+        assert_eq!(split(0, 500, 1_000), (0, 0, 0));
+        assert_eq!(split(100, 0, 0), (0, 0, 100));
+        assert_eq!(split(1, 500, 1_000), (0, 0, 1));
+        assert_eq!(split(19, 500, 1_000), (0, 1, 18));
+        assert_eq!(split(5_000_009, 500, 1_000), (250_000, 500_000, 4_250_009));
+        assert_eq!(split(100, 4_000, 1_000), (40, 10, 50));
+        assert_eq!(split(100, 0, 5_000), (0, 50, 50));
+        assert_eq!(split(100, 5_000, 0), (50, 0, 50));
+        for price in [u64::MAX, u64::MAX - 1, 1 << 63, 999_999_999_999_999_999] {
+            for (r, f) in [(0, 0), (1, 1), (500, 1_000), (2_500, 2_500), (3_000, 2_000), (0, 5_000), (5_000, 0)] {
+                let (royalty, fee, seller) = split(price, r, f);
+                assert_eq!(royalty as u128 + fee as u128 + seller as u128, price as u128, "{price} {r} {f}");
+                assert_eq!(royalty as u128, price as u128 * r as u128 / 10_000);
+                assert_eq!(fee as u128, price as u128 * f as u128 / 10_000);
+                assert!(seller as u128 >= price as u128 / 2, "o vendedor fica com pelo menos metade");
+            }
+        }
+        for (r, f) in [(4_001, 1_000), (5_001, 0), (0, 5_001), (2_501, 2_500), (u16::MAX, u16::MAX), (u16::MAX, 0)] {
+            let e = resale_split(100, r, f).unwrap_err();
+            assert!(format!("{e:?}").contains("ResaleCutTooHigh"), "{r} {f}: {e:?}");
+        }
+    }
+
+    #[test]
+    fn resale_amounts_on_chain_floor_to_the_seller_and_skip_zero_transfers() {
+        let mut env = Env::new();
+        let agent = active_agent(&mut env, 12 * USDC, 0);
+        let expect = |price: u64, r: u128, f: u128| {
+            let (royalty, fee) = ((price as u128 * r / 10_000) as u64, (price as u128 * f / 10_000) as u64);
+            (price, royalty, fee, price - royalty - fee)
+        };
+
+        // Preço mínimo da plataforma e preço que não divide por 10.000: o resto do arredondamento é do vendedor.
+        assert_eq!(sell_once(&mut env, &agent, MIN_PRICE, 50 * USDC), (MIN_PRICE, 250_000, 500_000, 4_250_000));
+        assert_eq!(sell_once(&mut env, &agent, 5_000_009, 50 * USDC), (5_000_009, 250_000, 500_000, 4_250_009));
+        // u64::MAX: o cálculo é em u128 e a soma bate (comprador com u64::MAX gasta tudo).
+        assert_eq!(sell_once(&mut env, &agent, u64::MAX, u64::MAX), expect(u64::MAX, 500, 1_000));
+
+        // Taxa 0%: a tesouraria não recebe nada (transferência de 0 é pulada).
+        env.update_fee(0).unwrap();
+        assert_eq!(sell_once(&mut env, &agent, PRICE, 50 * USDC), (PRICE, USDC, 0, 19 * USDC));
+        // Royalty 0% também: o vendedor recebe o preço inteiro.
+        write_account::<Agent>(&mut env, &agent.key, |a| a.royalty_bps = 0);
+        assert_eq!(sell_once(&mut env, &agent, PRICE, 50 * USDC), (PRICE, 0, 0, PRICE));
+        // Só a taxa.
+        env.update_fee(1_000).unwrap();
+        assert_eq!(sell_once(&mut env, &agent, PRICE, 50 * USDC), (PRICE, 0, 2 * USDC, 18 * USDC));
+        // Corte máximo (royalty 40% + taxa 10%): o vendedor fica com a metade.
+        write_account::<Agent>(&mut env, &agent.key, |a| a.royalty_bps = 4_000);
+        assert_eq!(sell_once(&mut env, &agent, PRICE, 50 * USDC), (PRICE, 8 * USDC, 2 * USDC, 10 * USDC));
+    }
+
+    #[test]
+    fn resale_cut_ceiling_is_exact_and_the_listing_freezes_fee_and_royalty() {
+        let mut w = world();
+        let asset = w.asset;
+        let agent = w.agent.key;
+
+        // 40,01% + 10% passa de 50%: erro próprio e nada muda (nem o plugin).
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 4_001);
+        let err = w.list(PRICE).unwrap_err();
+        assert!(err.contains("ResaleCutTooHigh"), "{err}");
+        assert!(is_closed(&w.env, &w.listing()) && delegate_of(&w.env, &asset).is_none());
+        // Royalty de 100% (válido no cadastro) também.
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 10_000);
+        assert!(w.list(PRICE).unwrap_err().contains("ResaleCutTooHigh"));
+        // Taxa no teto da plataforma (20%): royalty de 30% cabe, de 30,01% não.
+        w.env.update_fee(2_000).unwrap();
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 3_001);
+        assert!(w.list(PRICE).unwrap_err().contains("ResaleCutTooHigh"));
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 3_000);
+        w.list(PRICE).unwrap();
+        let seller = w.seller.insecure_clone();
+        w.cancel_by(&seller).unwrap();
+
+        // 40% + 10% = 50% (o teto exato) passa, e fica congelado no anúncio.
+        w.env.update_fee(1_000).unwrap();
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 4_000);
+        w.list(PRICE).unwrap();
+        let l: Listing = w.env.account(&w.listing());
+        assert_eq!((l.fee_bps, l.royalty_bps), (1_000, 4_000));
+        // Depois do anúncio, taxa e royalty novos não valem para ele: a venda usa o snapshot.
+        w.env.update_fee(0).unwrap();
+        write_account::<Agent>(&mut w.env, &agent, |a| a.royalty_bps = 0);
+        let before = w.bal();
+        w.buy(PRICE).unwrap();
+        let after = w.bal();
+        assert_eq!(
+            (after[1] - before[1], after[2] - before[2], after[3] - before[3]),
+            (10 * USDC, 8 * USDC, 2 * USDC)
+        );
+    }
+
+    // ---------------------------------------------------------------------------------- preços ----
+
+    #[test]
+    fn list_rejects_zero_and_below_minimum_price() {
+        let mut w = world();
+        for price in [0, 1, MIN_PRICE - 1] {
+            let err = w.list(price).unwrap_err();
+            assert!(err.contains("PriceTooLow"), "{price}: {err}");
+        }
+        assert!(is_closed(&w.env, &w.listing()) && delegate_of(&w.env, &w.asset).is_none());
+        // Piso zerado pela administração: 0 continua não sendo preço.
+        let params = ConfigParams { min_price: 0, ..w.env.params(0) };
+        w.env.update_config_with(params).unwrap();
+        let err = w.list(0).unwrap_err();
+        assert!(err.contains("InvalidAmount"), "{err}");
+        w.list(1).unwrap();
+        let seller = w.seller.insecure_clone();
+        w.cancel_by(&seller).unwrap();
+        // O piso volta e o preço mínimo exato passa.
+        let params = w.env.params(0);
+        w.env.update_config_with(params).unwrap();
+        w.list(MIN_PRICE).unwrap();
+        assert_eq!(w.env.account::<Listing>(&w.listing()).price, MIN_PRICE);
+    }
+
+    #[test]
+    fn buy_rejects_a_price_other_than_the_listed_one() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let bal = w.bal();
+        for expected in [0, 1, u64::MAX, PRICE - 1, PRICE + 1] {
+            let err = w.buy(expected).unwrap_err();
+            assert!(err.contains("PriceChanged"), "{expected}: {err}");
+        }
+        w.assert_untouched(bal);
+        // Para mudar o preço é preciso cancelar e anunciar de novo; o comprador com o preço velho falha limpo.
+        let seller = w.seller.insecure_clone();
+        w.cancel_by(&seller).unwrap();
+        w.list(30 * USDC).unwrap();
+        assert!(w.buy(PRICE).unwrap_err().contains("PriceChanged"));
+        w.buy(30 * USDC).unwrap();
+        assert_eq!(owner_of(&w.env, &w.asset), w.buyer.pubkey());
+    }
+
+    // -------------------------------------------------------------------------------- partes ----
+
+    #[test]
+    fn buy_rejects_self_purchase_creator_and_treasury_as_buyer() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let bal = w.bal();
+
+        // O vendedor compra o próprio anúncio: erro próprio (a constraint dispara antes do check de contas duplicadas).
+        let seller = w.seller.insecure_clone();
+        let ix = buy_ix(&w.env, &w.agent, &seller.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        let err = w.env.send(ix, &[&seller]).unwrap_err();
+        assert!(err.contains("SelfPurchase"), "{err}");
+
+        // O criador compra: `buyer_usdc` == `creator_usdc`, a mesma proteção de `purchase_license`.
+        let creator = w.agent.creator.insecure_clone();
+        let ix = buy_ix(&w.env, &w.agent, &creator.pubkey(), &w.seller.pubkey(), &w.asset, PRICE);
+        let err = w.env.send(ix, &[&creator]).unwrap_err();
+        assert!(err.contains("ConstraintDuplicateMutableAccount"), "{err}");
+
+        // A tesouraria apontada para a conta do comprador: `buyer_usdc` == `treasury`.
+        let admin = admin_kp(&w.env);
+        let old_treasury = w.env.treasury;
+        let buyer_usdc = w.buyer_usdc;
+        w.env.send(set_treasury_ix(&w.env, &admin.pubkey(), buyer_usdc), &[&admin]).unwrap();
+        w.env.treasury = buyer_usdc;
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("ConstraintDuplicateMutableAccount"), "{err}");
+        w.env.send(set_treasury_ix(&w.env, &admin.pubkey(), old_treasury), &[&admin]).unwrap();
+        w.env.treasury = old_treasury;
+        w.assert_untouched(bal);
+        w.buy(PRICE).unwrap();
+    }
+
+    #[test]
+    fn creator_cannot_resell_a_license_of_their_own_solver() {
+        let mut w = world();
+        let creator = w.agent.creator.insecure_clone();
+        // Um comprador passa a licença ao criador por fora; o criador não pode anunciá-la.
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        transfer_asset(&mut w.env, asset, coll, &seller, creator.pubkey());
+        let ix = list_ix(&w.env, &w.agent, &creator.pubkey(), &asset, PRICE);
+        let err = w.env.send(ix, &[&creator]).unwrap_err();
+        assert!(err.contains("CreatorCannotResell"), "{err}");
+        assert!(is_closed(&w.env, &w.listing()) && delegate_of(&w.env, &asset).is_none());
+    }
+
+    // --------------------------------------------------------------------- anúncio que envelhece ----
+
+    #[test]
+    fn seller_transfers_outside_after_listing_buy_fails_cancel_is_open_and_the_new_owner_relists() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let a2 = new_keypair();
+        transfer_asset(&mut w.env, asset, coll, &seller, a2.pubkey());
+        // O mpl-core reseta o delegate na transferência, e o dono agora é outro.
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let bal = w.bal();
+
+        // Comprar falha limpo (o anúncio é do vendedor antigo) e nada se move.
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("NotAssetOwner"), "{err}");
+        assert_eq!(w.bal(), bal);
+        assert_eq!(owner_of(&w.env, &asset), a2.pubkey());
+        // O novo dono não consegue anunciar enquanto o Listing velho existe.
+        let a2_usdc = w.env.token_account(&a2.pubkey(), 0);
+        let ix = list_ix(&w.env, &w.agent, &a2.pubkey(), &asset, PRICE);
+        assert!(w.env.send(ix, &[&a2]).unwrap_err().contains("already in use"));
+
+        // Qualquer um fecha o anúncio velho, sem CPI (o asset não é mexido) e o rent volta a quem pagou.
+        let asset_before = w.env.svm.get_account(&asset).unwrap();
+        let payer_before = w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap();
+        let rent = lamports(&w.env, &w.listing());
+        let third = new_keypair();
+        let logs = w.cancel_by(&third).unwrap();
+        let ev = events::<ListingCancelled>(&logs);
+        assert_eq!(ev.len(), 1);
+        assert_eq!((ev[0].agent, ev[0].asset, ev[0].seller, ev[0].canceller), (w.agent.key, asset, seller.pubkey(), third.pubkey()));
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(w.env.svm.get_account(&asset).unwrap(), asset_before);
+        assert_eq!(w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap(), payer_before + rent - 2 * 5_000);
+
+        // O novo dono anuncia (o plugin já existe: Approve) e a venda paga a ele.
+        let ix = list_ix(&w.env, &w.agent, &a2.pubkey(), &asset, PRICE);
+        let logs = w.env.send_logs(ix, &[&a2]).unwrap();
+        assert_eq!(events::<LicenseListed>(&logs)[0].seller, a2.pubkey());
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        let ix = buy_ix(&w.env, &w.agent, &w.buyer.pubkey(), &a2.pubkey(), &asset, PRICE);
+        let buyer = w.buyer.insecure_clone();
+        let logs = w.env.send_logs(ix, &[&buyer]).unwrap();
+        assert_eq!(events::<LicenseResold>(&logs)[0].seller, a2.pubkey());
+        assert_eq!(w.env.balance(&a2_usdc), 17 * USDC);
+        assert_eq!(owner_of(&w.env, &asset), buyer.pubkey());
+    }
+
+    #[test]
+    fn seller_revokes_the_delegate_buy_fails_and_cancel_closes_without_cpi() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        // O dono revoga a authority do plugin por fora do programa.
+        let ix = revoke_delegate_ix(&w.env, asset, coll, &seller);
+        w.env.send(ix, &[&seller]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let bal = w.bal();
+
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("ListingNotAuthorized"), "{err}");
+        w.assert_untouched(bal);
+
+        // Terceiro fecha: não há o que revogar, então o asset não muda um byte nem um lamport.
+        let asset_before = w.env.svm.get_account(&asset).unwrap();
+        let third = new_keypair();
+        w.cancel_by(&third).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(w.env.svm.get_account(&asset).unwrap(), asset_before);
+
+        // O vendedor anuncia de novo (Approve) e a venda sai.
+        w.list(PRICE).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+    }
+
+    #[test]
+    fn seller_freezing_the_asset_blocks_only_their_own_sale_atomically() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let ix = freeze_ix(&w.env, asset, coll, &seller, true, true);
+        w.env.send(ix, &[&seller]).unwrap();
+        let bal = w.bal();
+
+        // O TransferV1 do mpl-core recusa (InvalidAuthority, 9) e a transação inteira volta: ninguém paga nada.
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("custom program error: 0x9"), "{err}");
+        w.assert_untouched(bal);
+
+        // O dono descongela e a venda passa; o anúncio nunca ficou preso.
+        let ix = freeze_ix(&w.env, asset, coll, &seller, false, false);
+        w.env.send(ix, &[&seller]).unwrap();
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+    }
+
+    #[test]
+    fn frozen_listing_can_be_cancelled_by_the_seller() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let ix = freeze_ix(&w.env, asset, coll, &seller, true, true);
+        w.env.send(ix, &[&seller]).unwrap();
+        // Congelado o anúncio ainda é "vivo": terceiros não o fecham, e o vendedor pode.
+        assert!(w.cancel_by(&new_keypair()).unwrap_err().contains("ListingStillValid"));
+        w.cancel_by(&seller).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+    }
+
+    #[test]
+    fn burned_asset_listing_is_invalid_and_anyone_can_close_it() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let ix = burn_ix(&w.env, asset, coll, &seller);
+        w.env.send(ix, &[&seller]).unwrap();
+        // O mpl-core deixa a conta com 1 byte (Key::Uninitialized), ainda dono = mpl-core.
+        let acc = w.env.svm.get_account(&asset).unwrap();
+        assert_eq!((acc.owner, acc.data.clone()), (mpl_core::ID, vec![0u8]));
+
+        let bal = w.bal();
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("InvalidLicenseAccount"), "{err}");
+        assert_eq!(w.bal(), bal);
+        // Terceiro fecha sem CPI e o rent volta.
+        let third = new_keypair();
+        let rent = lamports(&w.env, &w.listing());
+        let payer_before = w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap();
+        w.cancel_by(&third).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap(), payer_before + rent - 2 * 5_000);
+        assert_eq!(w.env.svm.get_account(&asset).unwrap().data, vec![0u8]);
+
+        // O vendedor também cancela um anúncio de asset queimado (sem CPI).
+        let (s2, _, asset2) = fresh_license(&mut w.env, &w.agent);
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        w.env.send(ix, &[&s2]).unwrap();
+        let ix = burn_ix(&w.env, asset2, coll, &s2);
+        w.env.send(ix, &[&s2]).unwrap();
+        let ix = cancel_ix(&w.env, &w.agent, &s2.pubkey(), &asset2);
+        w.env.send(ix, &[&s2]).unwrap();
+        assert!(is_closed(&w.env, &listing_pda(&asset2)));
+    }
+
+    // ------------------------------------------------------------------------- ativos inválidos ----
+
+    #[test]
+    fn list_rejects_foreign_non_core_and_truncated_assets_and_non_owners() {
+        let mut w = world();
+        let other = active_agent(&mut w.env, 12 * USDC, 0);
+        let seller = w.seller.insecure_clone();
+        let asset = w.asset;
+
+        // Licença de OUTRO solver (do mesmo vendedor) anunciada pelas contas deste: coleção errada.
+        w.env.token_account(&seller.pubkey(), 12 * USDC);
+        let foreign = purchase(&mut w.env, &other, &seller).unwrap();
+        let ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &foreign, PRICE);
+        let err = w.env.send(ix, &[&seller]).unwrap_err();
+        assert!(err.contains("AssetNotInCollection"), "{err}");
+        // Coleção de outro solver junto das contas deste: has_one do agente.
+        let mut ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &asset, PRICE);
+        swap_account(&mut ix, &w.agent.collection, other.collection);
+        let err = w.env.send(ix, &[&seller]).unwrap_err();
+        assert!(err.contains("ConstraintHasOne"), "{err}");
+        // Quem assina não é o dono do asset.
+        let thief = new_keypair();
+        let ix = list_ix(&w.env, &w.agent, &thief.pubkey(), &asset, PRICE);
+        let err = w.env.send(ix, &[&thief]).unwrap_err();
+        assert!(err.contains("NotAssetOwner"), "{err}");
+
+        // Contas que não são asset do mpl-core: token account, conta do próprio programa, endereço vazio.
+        for bad in [w.seller_usdc, config_pda(), unique_key()] {
+            let ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &bad, PRICE);
+            let err = w.env.send(ix, &[&seller]).unwrap_err();
+            assert!(err.contains("InvalidLicenseAccount"), "{bad}: {err}");
+        }
+        // Dono mpl-core mas sem asset vivo: vazia, `Uninitialized` (queimado) e `AssetV1` truncado.
+        let real = w.env.svm.get_account(&asset).unwrap().data;
+        for (i, data) in [vec![], vec![0u8], vec![1u8, 0, 0], real[..40].to_vec(), real[..real.len() - 1].to_vec()].into_iter().enumerate() {
+            let fake = unique_key();
+            put_program_account(&mut w.env, fake, mpl_core::ID, data);
+            let ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &fake, PRICE);
+            let err = w.env.send(ix, &[&seller]).unwrap_err();
+            // Inclusive o asset inteiro menos 1 byte: o `BaseAssetV1` decodifica, mas o registro de plugins não.
+            assert!(err.contains("InvalidLicenseAccount"), "caso {i}: {err}");
+        }
+        assert!(is_closed(&w.env, &w.listing()) && delegate_of(&w.env, &asset).is_none());
+    }
+
+    #[test]
+    fn buy_fails_cleanly_when_the_asset_gets_truncated_and_cancel_closes_it() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let asset = w.asset;
+        let bal = w.bal();
+        // Registro de plugins cortado depois do anúncio (não acontece com o mpl-core real; é defesa).
+        let acc = w.env.svm.get_account(&asset).unwrap();
+        let base_len = BaseAssetV1::from_bytes(&acc.data).unwrap().len();
+        let mut cut = acc.clone();
+        cut.data.truncate(base_len + 4);
+        w.env.svm.set_account(asset, cut).unwrap();
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("InvalidLicenseAccount"), "{err}");
+        assert_eq!(w.bal(), bal);
+        // Nem a leitura quebrada prende o anúncio: terceiros o fecham (nada vivo para vender).
+        w.cancel_by(&new_keypair()).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+    }
+
+    // --------------------------------------------------------------------------- contas trocadas ----
+
+    #[test]
+    fn buy_rejects_swapped_accounts_bad_funds_and_fake_programs() {
+        let mut w = world();
+        let other = active_agent(&mut w.env, 12 * USDC, 0);
+        let (other_seller, _, other_asset) = fresh_license(&mut w.env, &other);
+        let ix = list_ix(&w.env, &other, &other_seller.pubkey(), &other_asset, PRICE);
+        w.env.send(ix, &[&other_seller]).unwrap();
+        w.list(PRICE).unwrap();
+        let buyer = w.buyer.insecure_clone();
+        let (treasury, buyer_usdc, seller_usdc) = (w.env.treasury, w.buyer_usdc, w.seller_usdc);
+        let (asset, collection) = (w.asset, w.agent.collection);
+        let bal = w.bal();
+
+        let run = |w: &mut World, tweak: &dyn Fn(&mut Instruction)| -> String {
+            let mut ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &w.seller.pubkey(), &w.asset, PRICE);
+            tweak(&mut ix);
+            w.env.send(ix, &[&buyer]).unwrap_err()
+        };
+        let wrong_treasury = w.env.token_account(&unique_key(), 0);
+        let err = run(&mut w, &|ix| swap_account(ix, &treasury, wrong_treasury));
+        assert!(err.contains("ConstraintHasOne"), "tesouro: {err}");
+        let creator_usdc = w.agent.creator_usdc;
+        let err = run(&mut w, &|ix| swap_account(ix, &creator_usdc, other.creator_usdc));
+        assert!(err.contains("ConstraintHasOne"), "criador: {err}");
+        let err = run(&mut w, &|ix| swap_account(ix, &collection, other.collection));
+        assert!(err.contains("ConstraintHasOne"), "coleção: {err}");
+        let fake_mint = unique_key();
+        let mut data = vec![0u8; spl_token::state::Mint::LEN];
+        spl_token::state::Mint { mint_authority: None.into(), supply: 0, decimals: 6, is_initialized: true, freeze_authority: None.into() }
+            .pack_into_slice(&mut data);
+        w.env.set_token_program_account(fake_mint, data);
+        let mint = w.env.mint;
+        let err = run(&mut w, &|ix| swap_account(ix, &mint, fake_mint));
+        assert!(err.contains("ConstraintHasOne"), "mint: {err}");
+        // O vendedor tem que ser pago na ATA derivada dele: outra conta (do mesmo mint) é recusada.
+        let (_, thief_usdc) = new_buyer(&mut w.env, 0);
+        let err = run(&mut w, &|ix| swap_account(ix, &seller_usdc, thief_usdc));
+        assert!(err.contains("ConstraintAddress"), "vendedor: {err}");
+        // Pagar com a conta de outro dono (a assinatura é do comprador).
+        let err = run(&mut w, &|ix| swap_account(ix, &buyer_usdc, thief_usdc));
+        assert!(err.contains("ConstraintTokenOwner"), "conta alheia: {err}");
+        // Destino do rent, PDA do delegate, asset e agente trocados.
+        let payer = w.env.payer.pubkey();
+        let err = run(&mut w, &|ix| swap_last(ix, &payer, unique_key()));
+        assert!(err.contains("ConstraintHasOne"), "rent: {err}");
+        let err = run(&mut w, &|ix| swap_account(ix, &market(), unique_key()));
+        assert!(err.contains("ConstraintSeeds"), "market_authority: {err}");
+        let err = run(&mut w, &|ix| swap_account(ix, &asset, other_asset));
+        assert!(err.contains("ConstraintSeeds"), "asset de outro anúncio: {err}");
+        let err = run(&mut w, &|ix| swap_account(ix, &asset, unique_key()));
+        assert!(err.contains("InvalidLicenseAccount"), "asset que não existe: {err}");
+        // Anúncio de OUTRO solver com as contas deste: o Listing aponta para outro agente.
+        let ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &other_seller.pubkey(), &other_asset, PRICE);
+        let err = w.env.send(ix, &[&buyer]).unwrap_err();
+        assert!(err.contains("ListingMismatch"), "agente errado: {err}");
+        // Programas falsos: token, mpl-core.
+        let err = run(&mut w, &|ix| swap_account(ix, &spl_token::ID, unique_key()));
+        assert!(err.contains("InvalidProgramId"), "token: {err}");
+        let err = run(&mut w, &|ix| swap_account(ix, &mpl_core::ID, unique_key()));
+        assert!(err.contains("ConstraintAddress"), "mpl-core: {err}");
+        w.assert_untouched(bal);
+
+        // Saldo insuficiente: a licença NÃO sai (a transferência do asset volta junto).
+        let (poor, _) = new_buyer(&mut w.env, USDC);
+        let ix = buy_ix(&w.env, &w.agent, &poor.pubkey(), &w.seller.pubkey(), &w.asset, PRICE);
+        let err = w.env.send(ix, &[&poor]).unwrap_err();
+        assert!(err.contains("insufficient funds"), "{err}");
+        w.assert_untouched(bal);
+    }
+
+    #[test]
+    fn buy_without_seller_ata_fails_and_with_a_swapped_ata_owner_still_pays_the_derived_address() {
+        let mut w = world();
+        // Vendedor sem ATA de USDC (licença recebida por fora): a compra falha limpo, sem mover nada.
+        let (holder, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let nobody = new_keypair();
+        transfer_asset(&mut w.env, asset, coll, &holder, nobody.pubkey());
+        let ix = list_ix(&w.env, &w.agent, &nobody.pubkey(), &asset, PRICE);
+        w.env.send(ix, &[&nobody]).unwrap();
+        let before = w.env.balance(&w.buyer_usdc);
+        let buyer = w.buyer.insecure_clone();
+        let ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &nobody.pubkey(), &asset, PRICE);
+        let err = w.env.send(ix, &[&buyer]).unwrap_err();
+        assert!(err.contains("AccountNotInitialized"), "{err}");
+        assert_eq!((w.env.balance(&w.buyer_usdc), owner_of(&w.env, &asset)), (before, nobody.pubkey()));
+
+        // Com a ATA criada mas com o DONO trocado por quem a possuía: o vendedor continua sendo pago no endereço.
+        let ata = w.env.token_account(&nobody.pubkey(), 0);
+        swap_ata_owner(&mut w.env, &nobody, &unique_key());
+        let ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &nobody.pubkey(), &asset, PRICE);
+        w.env.send(ix, &[&buyer]).unwrap();
+        assert_eq!(w.env.balance(&ata), 17 * USDC);
+    }
+
+    /// `seller_usdc` leva `dup` (para o `SelfPurchase` aparecer): os dois outros casos em que ela repete uma
+    /// conta mutável de USDC não perdem nem desviam dinheiro.
+    #[test]
+    fn seller_usdc_shared_with_the_buyer_or_the_treasury_moves_funds_correctly() {
+        // ATA do vendedor com o dono trocado para o comprador: a conta do comprador É a do vendedor; o
+        // comprador paga só royalty e taxa (o "pagamento ao vendedor" é dele para ele mesmo).
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, buyer) = (w.seller.insecure_clone(), w.buyer.insecure_clone());
+        let ata = w.env.ata(&seller.pubkey());
+        w.env.token_account(&seller.pubkey(), 50 * USDC);
+        swap_ata_owner(&mut w.env, &seller, &buyer.pubkey());
+        let (creator, treasury) = (w.env.balance(&w.agent.creator_usdc), w.env.balance(&w.env.treasury.clone()));
+        let ix = buy_ix(&w.env, &w.agent, &seller.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        // O vendedor ainda não pode comprar o próprio anúncio (agora com a conta repetida).
+        assert!(w.env.send(ix, &[&seller]).unwrap_err().contains("SelfPurchase"));
+        let mut ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        swap_account(&mut ix, &w.env.ata(&buyer.pubkey()), ata);
+        w.env.send(ix, &[&buyer]).unwrap();
+        assert_eq!(w.env.balance(&ata), 47 * USDC);
+        assert_eq!(w.env.balance(&w.agent.creator_usdc) - creator, USDC);
+        assert_eq!(w.env.balance(&w.env.treasury.clone()) - treasury, 2 * USDC);
+        assert_eq!(owner_of(&w.env, &w.asset), buyer.pubkey());
+
+        // Tesouraria apontada para a ATA do vendedor: ela recebe a taxa e o líquido na mesma conta.
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let admin = admin_kp(&w.env);
+        w.env.send(set_treasury_ix(&w.env, &admin.pubkey(), w.seller_usdc), &[&admin]).unwrap();
+        w.env.treasury = w.seller_usdc;
+        let (before, creator, buyer_before) = (w.env.balance(&w.seller_usdc), w.env.balance(&w.agent.creator_usdc), w.env.balance(&w.buyer_usdc));
+        w.buy(PRICE).unwrap();
+        assert_eq!(w.env.balance(&w.seller_usdc) - before, 19 * USDC);
+        assert_eq!(w.env.balance(&w.agent.creator_usdc) - creator, USDC);
+        assert_eq!(buyer_before - w.env.balance(&w.buyer_usdc), PRICE);
+    }
+
+    // ----------------------------------------------------------------------------- assinaturas ----
+
+    #[test]
+    fn every_resale_authority_must_sign() {
+        let mut w = world();
+        let seller = w.seller.insecure_clone();
+        let ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &w.asset, PRICE);
+        let mut unsigned = ix.clone();
+        unsign(&mut unsigned, &seller.pubkey());
+        let err = w.env.send(unsigned, &[]).unwrap_err();
+        assert!(err.contains("AccountNotSigner"), "list: {err}");
+        assert!(is_closed(&w.env, &w.listing()) && delegate_of(&w.env, &w.asset).is_none());
+
+        w.env.send(ix, &[&seller]).unwrap();
+        let bal = w.bal();
+        let buyer = w.buyer.pubkey();
+        let mut unsigned = buy_ix(&w.env, &w.agent, &buyer, &seller.pubkey(), &w.asset, PRICE);
+        unsign(&mut unsigned, &buyer);
+        let err = w.env.send(unsigned, &[]).unwrap_err();
+        assert!(err.contains("AccountNotSigner"), "buy: {err}");
+        // Nomear o vendedor como `buyer` sem a assinatura dele também não passa.
+        let mut unsigned = buy_ix(&w.env, &w.agent, &seller.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        unsign(&mut unsigned, &seller.pubkey());
+        assert!(w.env.send(unsigned, &[]).is_err());
+
+        // Cancelar citando o vendedor sem a assinatura dele (quem assina é outro) não vale como cancelamento do vendedor.
+        let mut unsigned = cancel_ix(&w.env, &w.agent, &seller.pubkey(), &w.asset);
+        unsign(&mut unsigned, &seller.pubkey());
+        let err = w.env.send(unsigned, &[]).unwrap_err();
+        assert!(err.contains("AccountNotSigner"), "cancel: {err}");
+        w.assert_untouched(bal);
+    }
+
+    // ------------------------------------------------------------------------------------ pausa ----
+
+    #[test]
+    fn pause_blocks_list_and_buy_but_never_cancel() {
+        let mut w = world();
+        let (s2, _, asset2) = fresh_license(&mut w.env, &w.agent);
+        w.list(PRICE).unwrap();
+        let admin = admin_kp(&w.env);
+
+        set_pause(&mut w.env, &admin, PAUSE_ENTRIES).unwrap();
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        let err = w.env.send(ix, &[&s2]).unwrap_err();
+        assert!(err.contains("Error Code: Paused."), "list: {err}");
+        assert!(is_closed(&w.env, &listing_pda(&asset2)));
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("Error Code: Paused."), "buy: {err}");
+        // Cancelar (o vendedor e, em anúncio velho, qualquer um) segue funcionando com tudo pausado.
+        set_pause(&mut w.env, &admin, PAUSE_MASK).unwrap();
+        let seller = w.seller.insecure_clone();
+        w.cancel_by(&seller).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(delegate_of(&w.env, &w.asset), Some(PluginAuthority::Owner));
+
+        // A pausa de pagamentos sozinha não bloqueia a revenda (usa o bit de entradas, como a compra primária).
+        set_pause(&mut w.env, &admin, PAUSE_PAYMENTS).unwrap();
+        w.list(PRICE).unwrap();
+        w.buy(PRICE).unwrap();
+        set_pause(&mut w.env, &admin, PAUSE_MASK).unwrap();
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        assert!(w.env.send(ix, &[&s2]).is_err());
+        set_pause(&mut w.env, &admin, 0).unwrap();
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        w.env.send(ix, &[&s2]).unwrap();
+        // Pausado depois de anunciar: o vendedor ainda cancela.
+        set_pause(&mut w.env, &admin, PAUSE_ENTRIES).unwrap();
+        let ix = cancel_ix(&w.env, &w.agent, &s2.pubkey(), &asset2);
+        w.env.send(ix, &[&s2]).unwrap();
+    }
+
+    // --------------------------------------------------------------------------- estado do solver ----
+
+    #[test]
+    fn suspended_retired_or_understaked_solver_blocks_buy_but_not_list_or_cancel() {
+        let mut w = world();
+        let (s2, _, asset2) = fresh_license(&mut w.env, &w.agent);
+        let admin = admin_kp(&w.env);
+        w.list(PRICE).unwrap();
+        let bal = w.bal();
+
+        // Suspenso: não vende, mas anunciar e cancelar funcionam.
+        w.env.send(status_ix(&admin.pubkey(), &w.agent, false), &[&admin]).unwrap();
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("AgentNotActive"), "{err}");
+        w.assert_untouched(bal);
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        w.env.send(ix, &[&s2]).unwrap();
+        let ix = cancel_ix(&w.env, &w.agent, &s2.pubkey(), &asset2);
+        w.env.send(ix, &[&s2]).unwrap();
+        // Um anúncio de solver suspenso não fecha por terceiros (ainda é válido); reativado, vende.
+        assert!(w.cancel_by(&new_keypair()).unwrap_err().contains("ListingStillValid"));
+        w.env.send(status_ix(&admin.pubkey(), &w.agent, true), &[&admin]).unwrap();
+
+        // Stake abaixo do mínimo (o admin sobe `min_stake`): compra bloqueada, resto livre.
+        w.env.update_min_stake(10 * USDC);
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("InsufficientStake"), "{err}");
+        w.assert_untouched(bal);
+        w.env.update_min_stake(0);
+
+        // Aposentado (pediu saída do stake): mesma coisa.
+        request_exit(&mut w.env, &w.agent).unwrap();
+        assert_eq!(w.env.account::<Agent>(&w.agent.key).status, AgentStatus::Retired);
+        let err = w.buy(PRICE).unwrap_err();
+        assert!(err.contains("AgentNotActive"), "{err}");
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        w.env.send(ix, &[&s2]).unwrap();
+        let seller = w.seller.insecure_clone();
+        w.cancel_by(&seller).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+    }
+
+    // ------------------------------------------------------------------------------ relistar ----
+
+    #[test]
+    fn relist_after_purchase_uses_approve_and_each_sale_pays_royalty() {
+        let mut w = world();
+        let sales = w.env.account::<Agent>(&w.agent.key).total_sales;
+        w.list(PRICE).unwrap();
+        w.buy(PRICE).unwrap();
+
+        // O comprador vira vendedor: o plugin existe (authority Owner) e o anúncio usa Approve.
+        let (b, asset) = (w.buyer.insecure_clone(), w.asset);
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let ix = list_ix(&w.env, &w.agent, &b.pubkey(), &asset, 30 * USDC);
+        let logs = w.env.send_logs(ix, &[&b]).unwrap();
+        assert_eq!(events::<LicenseListed>(&logs)[0].price, 30 * USDC);
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        // Um terceiro (C) compra do comprador: royalty 1,5, taxa 3, comprador/vendedor 25,5.
+        let (c, c_usdc) = new_buyer(&mut w.env, 100 * USDC);
+        let before = (w.env.balance(&w.agent.creator_usdc), w.env.balance(&w.buyer_usdc));
+        let ix = buy_ix(&w.env, &w.agent, &c.pubkey(), &b.pubkey(), &asset, 30 * USDC);
+        w.env.send(ix, &[&c]).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), c.pubkey());
+        assert_eq!(w.env.balance(&c_usdc), 70 * USDC);
+        assert_eq!(w.env.balance(&w.agent.creator_usdc) - before.0, 1_500_000);
+        assert_eq!(w.env.balance(&w.buyer_usdc) - before.1, 25_500_000);
+
+        // Cancelar e anunciar de novo (o mesmo dono): Revoke devolve a authority a Owner e o Approve a reaponta.
+        let ix = list_ix(&w.env, &w.agent, &c.pubkey(), &asset, PRICE);
+        w.env.send(ix, &[&c]).unwrap();
+        let ix = cancel_ix(&w.env, &w.agent, &c.pubkey(), &asset);
+        w.env.send(ix, &[&c]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let ix = list_ix(&w.env, &w.agent, &c.pubkey(), &asset, PRICE);
+        w.env.send(ix, &[&c]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        assert_eq!(w.env.account::<Agent>(&w.agent.key).total_sales, sales);
+    }
+
+    #[test]
+    fn list_skips_the_cpi_when_the_delegate_already_points_to_the_market() {
+        let mut w = world();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        // O dono aprova a PDA por conta própria (AddPlugin direto) antes de anunciar: o anúncio só abre o Listing.
+        let ix = add_delegate_ix(&w.env, asset, coll, &seller, PluginAuthority::Address { address: market() });
+        w.env.send(ix, &[&seller]).unwrap();
+        let asset_before = w.env.svm.get_account(&asset).unwrap();
+        w.list(PRICE).unwrap();
+        assert_eq!(w.env.svm.get_account(&asset).unwrap(), asset_before);
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+    }
+
+    // ----------------------------------------------------------------- repetição e atomicidade ----
+
+    #[test]
+    fn double_buy_in_one_transaction_fails_atomically_and_double_list_is_refused() {
+        let mut w = world();
+        let seller = w.seller.insecure_clone();
+        w.list(PRICE).unwrap();
+        // Anunciar de novo o mesmo asset: o Listing já existe.
+        let ix = list_ix(&w.env, &w.agent, &seller.pubkey(), &w.asset, 30 * USDC);
+        assert!(w.env.send(ix, &[&seller]).unwrap_err().contains("already in use"));
+        assert_eq!(w.env.account::<Listing>(&w.listing()).price, PRICE);
+
+        let bal = w.bal();
+        let buyer = w.buyer.insecure_clone();
+        let ix = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        let err = send_tx(&mut w.env, &[ix.clone(), ix], &[&buyer]).unwrap_err();
+        // A segunda instrução encontra o Listing fechado pela primeira e a transação inteira volta.
+        assert!(err.contains("AccountNotInitialized"), "{err}");
+        w.assert_untouched(bal);
+        // Duas compras do mesmo anúncio por compradores diferentes na mesma transação: só a primeira existiria.
+        let (b2, _) = new_buyer(&mut w.env, 100 * USDC);
+        let first = buy_ix(&w.env, &w.agent, &buyer.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        let second = buy_ix(&w.env, &w.agent, &b2.pubkey(), &seller.pubkey(), &w.asset, PRICE);
+        assert!(send_tx(&mut w.env, &[first, second], &[&buyer, &b2]).is_err());
+        w.assert_untouched(bal);
+        w.buy(PRICE).unwrap();
+    }
+
+    // ---------------------------------------------------------------------------------- cancelar ----
+
+    #[test]
+    fn seller_cancel_revokes_the_delegate_and_returns_every_rent_to_the_platform() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset) = (w.seller.insecure_clone(), w.asset);
+        let listing_rent = lamports(&w.env, &w.listing());
+        let asset_lamports = lamports(&w.env, &asset);
+        let payer_before = w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap();
+
+        let logs = w.cancel_by(&seller).unwrap();
+        let ev = events::<ListingCancelled>(&logs);
+        assert_eq!(ev.len(), 1);
+        assert_eq!((ev[0].agent, ev[0].asset, ev[0].seller, ev[0].canceller), (w.agent.key, asset, seller.pubkey(), seller.pubkey()));
+        assert!(is_closed(&w.env, &w.listing()));
+        // A authority volta ao dono, o aluguel do delegate sai do asset e vai para o payer (junto com o do Listing).
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let plugin_rent = asset_lamports - lamports(&w.env, &asset);
+        assert!(plugin_rent > 0, "o Revoke pelo dono devolve o aluguel do delegate");
+        let payer_after = w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap();
+        assert_eq!(payer_after, payer_before + listing_rent + plugin_rent - 2 * 5_000);
+        assert_eq!(owner_of(&w.env, &asset), seller.pubkey());
+        // Cancelado: não há mais o que comprar, e a PDA não transfere nada.
+        assert!(w.buy(PRICE).is_err());
+    }
+
+    #[test]
+    fn third_parties_cannot_cancel_a_valid_listing_and_wrong_rent_payer_is_refused() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let bal = w.bal();
+        let third = new_keypair();
+        let err = w.cancel_by(&third).unwrap_err();
+        assert!(err.contains("ListingStillValid"), "{err}");
+        w.assert_untouched(bal);
+
+        // Destino do rent diferente do gravado no anúncio.
+        let seller = w.seller.insecure_clone();
+        let mut ix = cancel_ix(&w.env, &w.agent, &seller.pubkey(), &w.asset);
+        let payer = w.env.payer.pubkey();
+        // `payer` e `rent_payer` são a mesma conta aqui: separar o destino exige trocar só a segunda meta.
+        let last = ix.accounts.iter().rposition(|m| m.pubkey == payer).unwrap();
+        ix.accounts[last].pubkey = unique_key();
+        let err = w.env.send(ix, &[&seller]).unwrap_err();
+        assert!(err.contains("ConstraintHasOne"), "{err}");
+        // Anúncio de outro solver com as contas deste agente.
+        let other = active_agent(&mut w.env, 12 * USDC, 0);
+        let ix = cancel_ix(&w.env, &other, &seller.pubkey(), &w.asset);
+        let err = w.env.send(ix, &[&seller]).unwrap_err();
+        assert!(err.contains("ListingMismatch"), "{err}");
+        w.assert_untouched(bal);
+    }
+
+    // ------------------------------------------------------------------ revisão independente ----
+
+    #[test]
+    fn planted_freeze_and_burn_delegates_go_back_to_owner_after_the_sale() {
+        let mut w = world();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        // O vendedor planta Freeze e Burn com authority de OUTRA chave (para congelar ou queimar depois da venda).
+        let rugger = new_keypair();
+        let by = || PluginAuthority::Address { address: rugger.pubkey() };
+        let ix = plant_ix(&w.env, asset, coll, &seller, Plugin::FreezeDelegate(FreezeDelegate { frozen: false }), by());
+        w.env.send(ix, &[&seller]).unwrap();
+        let ix = plant_ix(&w.env, asset, coll, &seller, Plugin::BurnDelegate(BurnDelegate {}), by());
+        w.env.send(ix, &[&seller]).unwrap();
+        assert_eq!(plugin_authority(&w.env, &asset, PluginType::FreezeDelegate), Some(by()));
+        assert_eq!(plugin_authority(&w.env, &asset, PluginType::BurnDelegate), Some(by()));
+
+        w.list(PRICE).unwrap();
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+        // A transferência devolveu as duas authorities ao novo dono: a chave antiga não congela nem queima.
+        assert_eq!(plugin_authority(&w.env, &asset, PluginType::FreezeDelegate), Some(PluginAuthority::Owner));
+        assert_eq!(plugin_authority(&w.env, &asset, PluginType::BurnDelegate), Some(PluginAuthority::Owner));
+        let ix = freeze_ix(&w.env, asset, coll, &rugger, true, false);
+        assert_core_err(w.env.send(ix, &[&rugger]), 26, "a chave antiga congela depois da venda");
+        let ix = burn_ix(&w.env, asset, coll, &rugger);
+        assert_core_err(w.env.send(ix, &[&rugger]), 26, "a chave antiga queima depois da venda");
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+    }
+
+    #[test]
+    fn list_replaces_a_third_party_transfer_delegate_with_the_market() {
+        let mut w = world();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let third = new_keypair();
+        let ix = add_delegate_ix(&w.env, asset, coll, &seller, PluginAuthority::Address { address: third.pubkey() });
+        w.env.send(ix, &[&seller]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Address { address: third.pubkey() }));
+
+        // Revoke (dono) + Approve na mesma instrução: o delegate passa a ser só a PDA.
+        w.list(PRICE).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        let ix = core_transfer_ix(&w.env, asset, coll, &third, third.pubkey());
+        assert_core_err(w.env.send(ix, &[&third]), 26, "o delegate antigo transfere depois do anúncio");
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), w.buyer.pubkey());
+    }
+
+    #[test]
+    fn cancel_with_a_payer_other_than_the_rent_payer_is_refused_and_the_direct_revoke_is_the_way_out() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        // O vendedor paga a própria transação: o reembolso do Revoke seria dele. Recusado, nada muda.
+        let own_payer = funded(&mut w.env);
+        let mut ix = cancel_ix(&w.env, &w.agent, &seller.pubkey(), &asset);
+        ix.accounts[0].pubkey = own_payer.pubkey();
+        let err = w.env.send(ix.clone(), &[&seller, &own_payer]).unwrap_err();
+        assert!(err.contains("CancelPayerMismatch"), "{err}");
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+        assert!(!is_closed(&w.env, &w.listing()));
+        let own_before = w.env.svm.get_balance(&own_payer.pubkey()).unwrap();
+
+        // Saída do vendedor: revogar o delegate direto no mpl-core (o rent do plugin volta a quem pagou).
+        let ix_revoke = revoke_delegate_ix(&w.env, asset, coll, &seller);
+        w.env.send(ix_revoke, &[&seller]).unwrap();
+        // Agora o anúncio cai no ramo sem CPI, que não usa o payer: o mesmo cancelamento passa.
+        w.env.send(ix, &[&seller, &own_payer]).unwrap();
+        assert!(is_closed(&w.env, &w.listing()));
+        assert_eq!(w.env.svm.get_balance(&own_payer.pubkey()).unwrap(), own_before);
+        // Anúncio velho (ramo de terceiros) também não depende do payer.
+        let (s2, _, asset2) = fresh_license(&mut w.env, &w.agent);
+        let ix = list_ix(&w.env, &w.agent, &s2.pubkey(), &asset2, PRICE);
+        w.env.send(ix, &[&s2]).unwrap();
+        let new_owner = new_keypair();
+        transfer_asset(&mut w.env, asset2, coll, &s2, new_owner.pubkey());
+        let mut ix = cancel_ix(&w.env, &w.agent, &new_owner.pubkey(), &asset2);
+        ix.accounts[0].pubkey = own_payer.pubkey();
+        w.env.send(ix, &[&new_owner, &own_payer]).unwrap();
+        assert!(is_closed(&w.env, &listing_pda(&asset2)));
+    }
+
+    #[test]
+    fn stale_cancel_by_the_new_owner_and_relist_fit_in_one_transaction() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let (seller, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let a2 = new_keypair();
+        transfer_asset(&mut w.env, asset, coll, &seller, a2.pubkey());
+        let cancel = cancel_ix(&w.env, &w.agent, &a2.pubkey(), &asset);
+        let list = list_ix(&w.env, &w.agent, &a2.pubkey(), &asset, 30 * USDC);
+        send_tx(&mut w.env, &[cancel, list], &[&a2]).unwrap();
+        let l: Listing = w.env.account(&w.listing());
+        assert_eq!((l.seller, l.price), (a2.pubkey(), 30 * USDC));
+        assert_eq!(delegate_of(&w.env, &asset), to_market());
+    }
+
+    #[test]
+    fn frozen_seller_or_creator_ata_makes_buy_fail_atomically_without_moving_the_asset() {
+        let mut w = world();
+        w.list(PRICE).unwrap();
+        let bal = w.bal();
+        for (label, ata) in [("vendedor", w.seller_usdc), ("criador", w.agent.creator_usdc)] {
+            set_token_state(&mut w.env, &ata, spl_token::state::AccountState::Frozen);
+            let err = w.buy(PRICE).unwrap_err();
+            assert!(err.contains("custom program error: 0x11"), "{label}: {err}");
+            w.assert_untouched(bal);
+            assert_eq!(delegate_of(&w.env, &w.asset), to_market());
+            set_token_state(&mut w.env, &ata, spl_token::state::AccountState::Initialized);
+        }
+        // Com tudo descongelado a mesma compra passa.
+        w.buy(PRICE).unwrap();
+        assert_eq!(owner_of(&w.env, &w.asset), w.buyer.pubkey());
+    }
+
+    // ------------------------------------------------------- comportamento do mpl-core (fixture) ----
+
+    #[test]
+    fn core_transfer_resets_the_delegate_so_the_market_cannot_transfer_twice() {
+        let mut w = world();
+        let standin = new_keypair();
+        let (a, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let (b, c) = (new_keypair(), new_keypair());
+        // (a) O dono adiciona o TransferDelegate com a authority já no delegate; a coleção é obrigatória.
+        let mut no_coll = add_delegate_ix(&w.env, asset, coll, &a, PluginAuthority::Address { address: standin.pubkey() });
+        no_coll.accounts[1] = AccountMeta::new_readonly(mpl_core::ID, false);
+        assert_core_err(w.env.send(no_coll, &[&a]), 25, "sem coleção => MissingCollection");
+        let ix = add_delegate_ix(&w.env, asset, coll, &a, PluginAuthority::Address { address: standin.pubkey() });
+        w.env.send(ix, &[&a]).unwrap();
+        // Quem não é o dono não adiciona o plugin.
+        let (_, _, other_asset) = fresh_license(&mut w.env, &w.agent);
+        let ix = add_delegate_ix(&w.env, other_asset, coll, &standin, PluginAuthority::Address { address: standin.pubkey() });
+        assert_core_err(w.env.send(ix, &[&standin]), 26, "não dono => NoApprovals");
+
+        // (b) O delegate transfere A -> B (mesmo com Royalties RuleSet::None) e o comprador não precisa de SOL.
+        let ix = core_transfer_ix(&w.env, asset, coll, &standin, b.pubkey());
+        w.env.send(ix, &[&standin]).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), b.pubkey());
+        // (c) O plugin continua no asset, mas a authority voltou a Owner: o delegate não transfere de novo.
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let ix = core_transfer_ix(&w.env, asset, coll, &standin, c.pubkey());
+        assert_core_err(w.env.send(ix, &[&standin]), 26, "B->C pelo delegate => NoApprovals");
+        // (g) O mesmo vale para uma transferência por fora com o delegate ativo.
+        let ix = approve_delegate_ix(&w.env, asset, coll, &b, PluginAuthority::Address { address: standin.pubkey() });
+        w.env.send(ix, &[&b]).unwrap();
+        let ix = core_transfer_ix(&w.env, asset, coll, &b, c.pubkey());
+        w.env.send(ix, &[&b]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        let ix = core_transfer_ix(&w.env, asset, coll, &standin, b.pubkey());
+        assert_core_err(w.env.send(ix, &[&standin]), 26, "delegate resetado pela transferência por fora");
+    }
+
+    #[test]
+    fn core_add_twice_fails_approve_replaces_and_only_the_owner_revoke_returns_the_rent() {
+        let mut w = world();
+        let standin = new_keypair();
+        let (a, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let delegate = || PluginAuthority::Address { address: standin.pubkey() };
+        let ix = add_delegate_ix(&w.env, asset, coll, &a, delegate());
+        w.env.send(ix, &[&a]).unwrap();
+        // (d) Adicionar de novo falha (por isso o relistar usa Approve); o delegate não remove o próprio plugin.
+        let ix = add_delegate_ix(&w.env, asset, coll, &a, delegate());
+        assert_core_err(w.env.send(ix, &[&a]), 15, "AddPlugin duplicado => PluginAlreadyExists");
+        let ix = remove_delegate_ix(&w.env, asset, coll, &standin);
+        assert_core_err(w.env.send(ix, &[&standin]), 26, "delegate não remove o plugin");
+
+        // Aprovar outra authority por cima de uma `Address` falha (por isso `list_license` revoga antes).
+        let other = new_keypair();
+        let ix = approve_delegate_ix(&w.env, asset, coll, &a, PluginAuthority::Address { address: other.pubkey() });
+        assert_core_err(w.env.send(ix, &[&a]), 27, "Approve sobre authority Address => 0x1b");
+
+        // (e) O delegate revogando a si mesmo deixa o aluguel parado no asset...
+        let before = lamports(&w.env, &asset);
+        let ix = revoke_delegate_ix(&w.env, asset, coll, &standin);
+        w.env.send(ix, &[&standin]).unwrap();
+        assert_eq!(delegate_of(&w.env, &asset), Some(PluginAuthority::Owner));
+        assert_eq!(lamports(&w.env, &asset), before);
+        // ...e o dono revogando o delegate que ele mesmo aprovou devolve o aluguel ao payer.
+        let ix = approve_delegate_ix(&w.env, asset, coll, &a, delegate());
+        w.env.send(ix, &[&a]).unwrap();
+        let (asset_before, payer_before) = (lamports(&w.env, &asset), w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap());
+        let ix = revoke_delegate_ix(&w.env, asset, coll, &a);
+        w.env.send(ix, &[&a]).unwrap();
+        let refund = asset_before - lamports(&w.env, &asset);
+        assert!(refund > 0);
+        assert_eq!(w.env.svm.get_balance(&w.env.payer.pubkey()).unwrap(), payer_before + refund - 2 * 5_000);
+        // O dono remove o plugin quando quiser.
+        let ix = approve_delegate_ix(&w.env, asset, coll, &a, delegate());
+        w.env.send(ix, &[&a]).unwrap();
+        let ix = remove_delegate_ix(&w.env, asset, coll, &a);
+        w.env.send(ix, &[&a]).unwrap();
+        assert!(delegate_of(&w.env, &asset).is_none());
+    }
+
+    #[test]
+    fn core_freeze_blocks_everyone_and_burn_leaves_an_uninitialized_account() {
+        let mut w = world();
+        let standin = new_keypair();
+        let (a, asset, coll) = (w.seller.insecure_clone(), w.asset, w.agent.collection);
+        let b = new_keypair();
+        let ix = add_delegate_ix(&w.env, asset, coll, &a, PluginAuthority::Address { address: standin.pubkey() });
+        w.env.send(ix, &[&a]).unwrap();
+        // (f) O dono congela: nem o delegate nem o próprio dono transferem (InvalidAuthority); só ele descongela.
+        let ix = freeze_ix(&w.env, asset, coll, &a, true, true);
+        w.env.send(ix, &[&a]).unwrap();
+        let ix = core_transfer_ix(&w.env, asset, coll, &standin, b.pubkey());
+        assert_core_err(w.env.send(ix, &[&standin]), 9, "delegate com o asset congelado");
+        let ix = core_transfer_ix(&w.env, asset, coll, &a, b.pubkey());
+        assert_core_err(w.env.send(ix, &[&a]), 9, "dono com o asset congelado");
+        let ix = freeze_ix(&w.env, asset, coll, &a, false, false);
+        w.env.send(ix, &[&a]).unwrap();
+        let ix = core_transfer_ix(&w.env, asset, coll, &standin, b.pubkey());
+        w.env.send(ix, &[&standin]).unwrap();
+        assert_eq!(owner_of(&w.env, &asset), b.pubkey());
+        // (h) Queimar deixa a conta com 1 byte (Key::Uninitialized), ainda do mpl-core.
+        let ix = burn_ix(&w.env, asset, coll, &b);
+        w.env.send(ix, &[&b]).unwrap();
+        let acc = w.env.svm.get_account(&asset).unwrap();
+        assert_eq!((acc.owner, acc.data), (mpl_core::ID, vec![0u8]));
+    }
 }

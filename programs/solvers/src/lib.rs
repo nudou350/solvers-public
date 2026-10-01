@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 pub mod errors;
 pub mod events;
 pub mod instructions;
+mod license;
 pub mod state;
 
 use instructions::*;
@@ -114,6 +115,17 @@ pub mod solvers {
         content_hash: [u8; 32],
     ) -> Result<()> {
         instructions::review::submit_review_with_credits(ctx, rating, content_hash)
+    }
+
+    // Revenda de licenças (delegate sem custódia)
+    pub fn list_license(ctx: Context<ListLicense>, price: u64) -> Result<()> {
+        instructions::resale::list_license(ctx, price)
+    }
+    pub fn buy_listing(ctx: Context<BuyListing>, expected_price: u64) -> Result<()> {
+        instructions::resale::buy_listing(ctx, expected_price)
+    }
+    pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
+        instructions::resale::cancel_listing(ctx)
     }
 
     // Garantia

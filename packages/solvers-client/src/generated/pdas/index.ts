@@ -11,6 +11,8 @@ export * from './config.js';
 export * from './credits.js';
 export * from './escrow.js';
 export * from './licenseReview.js';
+export * from './listing.js';
+export * from './marketAuthority.js';
 export * from './pendingAdmin.js';
 export * from './reputation.js';
 export * from './review.js';

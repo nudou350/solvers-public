@@ -9,7 +9,9 @@
 export * from './acceptAdmin.js';
 export * from './approveAgent.js';
 export * from './buyCredits.js';
+export * from './buyListing.js';
 export * from './cancelAdminTransfer.js';
+export * from './cancelListing.js';
 export * from './cancelSlash.js';
 export * from './cancelStakeExit.js';
 export * from './cancelUndelivered.js';
@@ -20,6 +22,7 @@ export * from './createEscrow.js';
 export * from './executeSlash.js';
 export * from './extendStakeExit.js';
 export * from './initializeConfig.js';
+export * from './listLicense.js';
 export * from './markPassed.js';
 export * from './migrateConfig.js';
 export * from './openDispute.js';

@@ -193,13 +193,14 @@ jobs:
           test -s target/deploy/solvers.so
           test -s target/idl/solvers.json
 
-      # Teto de tamanho do .so: 797.496 bytes medidos em 2026-10-01 + 4% = 829.396. O -inline-threshold de
+      # Teto de tamanho do .so: 909.888 bytes medidos em 2026-10-01 com a revenda de licenças (list_license,
+      # buy_listing, cancel_listing; +112.392 sobre os 797.496 anteriores) + 4% = 946.244. O -inline-threshold de
       # .cargo/config.toml só vale para o alvo de `--arch v1` (`[target.sbpfv1-solana-solana]`): com outro --arch
       # o alvo muda e a flag some em silêncio (sem a flag o .so mede ~880 KB). Este passo transforma isso em falha.
       # Se o programa crescer de verdade, suba o teto aqui junto com docs/devnet-upgrade.md (conta de SOL).
       - name: Tamanho do .so dentro do teto
         run: |
-          max=829396
+          max=946244
           size=$(stat -c %s target/deploy/solvers.so)
           echo "solvers.so: ${size} bytes (teto ${max})"
           if [ "$size" -gt "$max" ]; then

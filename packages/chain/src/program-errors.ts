@@ -65,6 +65,19 @@ export const PROGRAM_ERROR_MESSAGES = {
   [gen.SOLVERS_ERROR__INVALID_PAUSE_FLAGS]: "Valor de pausa inválido: use apenas os bits 1 (entradas) e 2 (pagamentos), ou 0 para liberar tudo.",
   [gen.SOLVERS_ERROR__NOT_PAUSE_AUTHORITY]: "Só a administração ou o guardian da plataforma pode alterar a pausa.",
   [gen.SOLVERS_ERROR__GUARDIAN_CANNOT_UNPAUSE]: "O guardian só pode ligar a pausa; liberar de novo é da administração da plataforma.",
+  // Revenda de licenças. Os textos chegam a quem compra ou anuncia: linguagem simples, sem jargão.
+  [gen.SOLVERS_ERROR__SELF_PURCHASE]: "Você não pode comprar a sua própria licença anunciada.",
+  [gen.SOLVERS_ERROR__LISTING_MISMATCH]: "Este anúncio não é desta licença ou deste especialista. Atualize a página e tente de novo.",
+  [gen.SOLVERS_ERROR__RESALE_CUT_TOO_HIGH]:
+    "O royalty do criador somado à taxa da plataforma passa de 50% do preço, então esta licença não pode ser anunciada agora. Fale com o suporte.",
+  [gen.SOLVERS_ERROR__NOT_ASSET_OWNER]: "Esta licença não está mais na sua carteira.",
+  [gen.SOLVERS_ERROR__ASSET_NOT_IN_COLLECTION]: "Esta licença não pertence a este especialista.",
+  [gen.SOLVERS_ERROR__LISTING_STILL_VALID]: "Este anúncio ainda está valendo: só quem o publicou pode cancelá-lo.",
+  [gen.SOLVERS_ERROR__CREATOR_CANNOT_RESELL]: "O criador não pode revender licenças do próprio especialista.",
+  [gen.SOLVERS_ERROR__LISTING_NOT_AUTHORIZED]:
+    "Este anúncio não vale mais: a licença mudou de carteira ou a venda foi desautorizada. Atualize a página.",
+  [gen.SOLVERS_ERROR__CANCEL_PAYER_MISMATCH]:
+    "Não foi possível cancelar por esta via: a taxa da transação precisa ser paga pela plataforma. Atualize a página e tente de novo.",
 } satisfies Record<gen.SolversError, string>;
 
 const MESSAGES: Readonly<Record<number, string>> = PROGRAM_ERROR_MESSAGES;

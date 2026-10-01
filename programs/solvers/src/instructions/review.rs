@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-use mpl_core::accounts::BaseAssetV1;
-use mpl_core::types::{Key as CoreKey, UpdateAuthority};
 
 use crate::errors::SolversError;
 use crate::events::*;
+use crate::license::holds_license;
 use crate::state::*;
 
 /// Avaliação provada por uma licença (asset Metaplex Core da coleção do solver).
@@ -60,15 +59,6 @@ pub struct SubmitReviewWithCredits<'info> {
     )]
     pub credits: Account<'info, Credits>,
     pub system_program: Program<'info, System>,
-}
-
-fn holds_license(asset: &AccountInfo, author: &Pubkey, collection: &Pubkey) -> Result<bool> {
-    let data = asset.try_borrow_data()?;
-    if data.first() != Some(&(CoreKey::AssetV1 as u8)) {
-        return Ok(false);
-    }
-    let base = BaseAssetV1::from_bytes(&data).map_err(|_| error!(SolversError::InvalidLicenseAccount))?;
-    Ok(base.owner == *author && base.update_authority == UpdateAuthority::Collection(*collection))
 }
 
 fn apply_review(

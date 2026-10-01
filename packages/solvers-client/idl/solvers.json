@@ -305,6 +305,200 @@
       ]
     },
     {
+      "name": "buy_listing",
+      "discriminator": [
+        115,
+        149,
+        42,
+        108,
+        44,
+        49,
+        140,
+        153
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Fee payer da plataforma: paga a taxa da transação; nunca autoriza."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          },
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "collection",
+          "docs": [
+            "gravável no TransferV1."
+          ],
+          "writable": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "asset",
+          "writable": true,
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Anúncio (PDA `[listing, asset]`); fecha para o `rent_payer` gravado."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_usdc",
+          "writable": true
+        },
+        {
+          "name": "seller_usdc",
+          "docs": [
+            "ATA de USDC do vendedor (pelo endereço derivado + mint)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "creator_usdc",
+          "writable": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "expected_price",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "cancel_admin_transfer",
       "discriminator": [
         38,
@@ -378,6 +572,149 @@
           "relations": [
             "pending_admin"
           ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_listing",
+      "discriminator": [
+        41,
+        183,
+        50,
+        232,
+        230,
+        233,
+        157,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Fee payer da plataforma; recebe de volta o rent do plugin quando o vendedor revoga o delegate."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "canceller",
+          "docs": [
+            "Vendedor (cancela sempre) ou qualquer carteira (só anúncio velho)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          },
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "collection",
+          "docs": [
+            "gravável no RevokePluginAuthority."
+          ],
+          "writable": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "asset",
+          "docs": [
+            "em `read_license` e qualquer coisa que não seja um asset vivo conta como anúncio velho."
+          ],
+          "writable": true,
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "listing"
+          ]
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -1417,6 +1754,156 @@
               "name": "ConfigParams"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "list_license",
+      "discriminator": [
+        56,
+        81,
+        252,
+        186,
+        21,
+        24,
+        37,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Fee payer da plataforma: paga o rent do `Listing` e do plugin; nunca autoriza."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "seller",
+          "docs": [
+            "Dono da licença; assina o `AddPlugin`/`Approve` do mpl-core."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collection",
+          "docs": [
+            "gravável no AddPlugin/Approve."
+          ],
+          "writable": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": "u64"
         }
       ]
     },
@@ -3891,6 +4378,19 @@
       ]
     },
     {
+      "name": "Listing",
+      "discriminator": [
+        218,
+        32,
+        50,
+        73,
+        43,
+        134,
+        26,
+        58
+      ]
+    },
+    {
       "name": "PendingAdmin",
       "discriminator": [
         220,
@@ -4140,6 +4640,19 @@
       ]
     },
     {
+      "name": "LicenseListed",
+      "discriminator": [
+        149,
+        28,
+        51,
+        46,
+        124,
+        15,
+        210,
+        9
+      ]
+    },
+    {
       "name": "LicensePurchased",
       "discriminator": [
         42,
@@ -4150,6 +4663,32 @@
         153,
         56,
         79
+      ]
+    },
+    {
+      "name": "LicenseResold",
+      "discriminator": [
+        159,
+        126,
+        153,
+        221,
+        163,
+        156,
+        24,
+        207
+      ]
+    },
+    {
+      "name": "ListingCancelled",
+      "discriminator": [
+        11,
+        46,
+        163,
+        10,
+        103,
+        80,
+        139,
+        194
       ]
     },
     {
@@ -4616,6 +5155,51 @@
       "code": 6050,
       "name": "SlashNotExpired",
       "msg": "A proposta de confisco ainda não expirou: só o admin a cancela"
+    },
+    {
+      "code": 6051,
+      "name": "SelfPurchase",
+      "msg": "Você não pode comprar a sua própria licença anunciada"
+    },
+    {
+      "code": 6052,
+      "name": "ListingMismatch",
+      "msg": "O anúncio não corresponde a este solver ou a esta licença"
+    },
+    {
+      "code": 6053,
+      "name": "ResaleCutTooHigh",
+      "msg": "Royalty mais taxa passam do teto de 50% do preço da revenda"
+    },
+    {
+      "code": 6054,
+      "name": "NotAssetOwner",
+      "msg": "A licença não pertence à carteira indicada"
+    },
+    {
+      "code": 6055,
+      "name": "AssetNotInCollection",
+      "msg": "A licença não é deste solver"
+    },
+    {
+      "code": 6056,
+      "name": "ListingStillValid",
+      "msg": "O anúncio ainda é válido: só o vendedor pode cancelá-lo"
+    },
+    {
+      "code": 6057,
+      "name": "CreatorCannotResell",
+      "msg": "O criador não pode revender licenças do próprio solver"
+    },
+    {
+      "code": 6058,
+      "name": "ListingNotAuthorized",
+      "msg": "A venda desta licença não está mais autorizada: o anúncio foi invalidado"
+    },
+    {
+      "code": 6059,
+      "name": "CancelPayerMismatch",
+      "msg": "Para cancelar com a revogação do delegate, quem paga a transação tem que ser quem abriu o anúncio"
     }
   ],
   "types": [
@@ -5302,6 +5886,44 @@
       }
     },
     {
+      "name": "LicenseListed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Taxa da plataforma congelada no anúncio."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "royalty_bps",
+            "docs": [
+              "Royalty do criador congelado no anúncio."
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
       "name": "LicensePurchased",
       "type": {
         "kind": "struct",
@@ -5320,6 +5942,46 @@
           },
           {
             "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LicenseResold",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "royalty",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "seller_amount",
             "type": "u64"
           }
         ]
@@ -5345,6 +6007,94 @@
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Listing",
+      "docs": [
+        "Anúncio de revenda de uma licença (PDA `[listing, asset]`, um por asset): existe só entre `list_license`",
+        "e `buy_listing`/`cancel_listing`. A licença não sai da carteira do vendedor até a venda: ele apenas",
+        "aprova a PDA `market_authority` como `TransferDelegate`. Taxa e royalty são congelados no anúncio."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "docs": [
+              "Preço em USDC (6 casas)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "`Config.fee_bps` no momento do anúncio: mudar a taxa depois não afeta este anúncio."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "royalty_bps",
+            "docs": [
+              "`Agent.royalty_bps` no momento do anúncio."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "listed_at",
+            "type": "i64"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Quem pagou o rent (recebe de volta ao fechar)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListingCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "canceller",
+            "docs": [
+              "Quem assinou o cancelamento (o vendedor ou, num anúncio velho, qualquer um)."
+            ],
+            "type": "pubkey"
           }
         ]
       }

@@ -13,6 +13,9 @@ pub const LICENSE_REVIEW_SEED: &[u8] = b"license_review";
 pub const PENDING_ADMIN_SEED: &[u8] = b"pending_admin";
 pub const STAKE_EXIT_SEED: &[u8] = b"stake_exit";
 pub const SLASH_SEED: &[u8] = b"slash";
+pub const LISTING_SEED: &[u8] = b"listing";
+/// PDA que o vendedor aprova como `TransferDelegate` do asset ao anunciar; só `buy_listing` assina com ela.
+pub const MARKET_AUTHORITY_SEED: &[u8] = b"market_authority";
 
 pub const MAX_URI_LEN: usize = 200;
 pub const MAX_VERSION_LEN: usize = 16;
@@ -37,6 +40,8 @@ pub const SLASH_DELAY_SECS: i64 = 72 * 3_600;
 /// Janela de execução do confisco: de `proposed_at + SLASH_DELAY_SECS` até esse prazo depois dele (inclusive).
 /// Passada a janela a proposta expira: `execute_slash` falha e o criador pode fechá-la (`cancel_slash`).
 pub const SLASH_EXPIRY_GRACE_SECS: i64 = 14 * 86_400;
+/// Teto de `royalty_bps + fee_bps` numa revenda (50%): o vendedor sempre fica com pelo menos metade.
+pub const RESALE_MAX_CUT_BPS: u16 = 5_000;
 
 #[account]
 #[derive(InitSpace)]
@@ -122,6 +127,27 @@ pub struct SlashProposal {
     /// Contestação do criador (só evidência); `contested_at == 0` = sem contestação.
     pub contest_hash: [u8; 32],
     pub contested_at: i64,
+    /// Quem pagou o rent (recebe de volta ao fechar).
+    pub rent_payer: Pubkey,
+    pub bump: u8,
+}
+
+/// Anúncio de revenda de uma licença (PDA `[listing, asset]`, um por asset): existe só entre `list_license`
+/// e `buy_listing`/`cancel_listing`. A licença não sai da carteira do vendedor até a venda: ele apenas
+/// aprova a PDA `market_authority` como `TransferDelegate`. Taxa e royalty são congelados no anúncio.
+#[account]
+#[derive(InitSpace)]
+pub struct Listing {
+    pub seller: Pubkey,
+    pub asset: Pubkey,
+    pub agent: Pubkey,
+    /// Preço em USDC (6 casas).
+    pub price: u64,
+    /// `Config.fee_bps` no momento do anúncio: mudar a taxa depois não afeta este anúncio.
+    pub fee_bps: u16,
+    /// `Agent.royalty_bps` no momento do anúncio.
+    pub royalty_bps: u16,
+    pub listed_at: i64,
     /// Quem pagou o rent (recebe de volta ao fechar).
     pub rent_payer: Pubkey,
     pub bump: u8,
@@ -292,4 +318,28 @@ pub fn fee_split(amount: u64, fee_bps: u16) -> Result<(u64, u64)> {
         .and_then(|v| v.checked_div(MAX_BPS as u128))
         .ok_or(error!(crate::errors::SolversError::MathOverflow))? as u64;
     Ok((fee, amount - fee))
+}
+
+/// Divide o preço de uma revenda em (royalty do criador, taxa da plataforma, líquido do vendedor).
+/// Royalty e taxa arredondam para baixo (u128, sem estouro) e a sobra do arredondamento fica com o vendedor.
+/// O corte `royalty_bps + fee_bps` não pode passar de `RESALE_MAX_CUT_BPS`.
+pub fn resale_split(price: u64, royalty_bps: u16, fee_bps: u16) -> Result<(u64, u64, u64)> {
+    let cut = (royalty_bps as u128)
+        .checked_add(fee_bps as u128)
+        .ok_or(error!(crate::errors::SolversError::MathOverflow))?;
+    require!(cut <= RESALE_MAX_CUT_BPS as u128, crate::errors::SolversError::ResaleCutTooHigh);
+    let part = |bps: u16| -> Result<u64> {
+        (price as u128)
+            .checked_mul(bps as u128)
+            .and_then(|v| v.checked_div(MAX_BPS as u128))
+            .and_then(|v| u64::try_from(v).ok())
+            .ok_or(error!(crate::errors::SolversError::MathOverflow))
+    };
+    let royalty = part(royalty_bps)?;
+    let fee = part(fee_bps)?;
+    let seller = price
+        .checked_sub(royalty)
+        .and_then(|v| v.checked_sub(fee))
+        .ok_or(error!(crate::errors::SolversError::MathOverflow))?;
+    Ok((royalty, fee, seller))
 }

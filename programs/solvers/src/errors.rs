@@ -104,4 +104,22 @@ pub enum SolversError {
     SlashExpired,
     #[msg("A proposta de confisco ainda não expirou: só o admin a cancela")]
     SlashNotExpired,
+    #[msg("Você não pode comprar a sua própria licença anunciada")]
+    SelfPurchase,
+    #[msg("O anúncio não corresponde a este solver ou a esta licença")]
+    ListingMismatch,
+    #[msg("Royalty mais taxa passam do teto de 50% do preço da revenda")]
+    ResaleCutTooHigh,
+    #[msg("A licença não pertence à carteira indicada")]
+    NotAssetOwner,
+    #[msg("A licença não é deste solver")]
+    AssetNotInCollection,
+    #[msg("O anúncio ainda é válido: só o vendedor pode cancelá-lo")]
+    ListingStillValid,
+    #[msg("O criador não pode revender licenças do próprio solver")]
+    CreatorCannotResell,
+    #[msg("A venda desta licença não está mais autorizada: o anúncio foi invalidado")]
+    ListingNotAuthorized,
+    #[msg("Para cancelar com a revogação do delegate, quem paga a transação tem que ser quem abriu o anúncio")]
+    CancelPayerMismatch,
 }

@@ -218,3 +218,36 @@ pub struct SlashExecuted {
     pub amount: u64,
     pub treasury: Pubkey,
 }
+
+#[event]
+pub struct LicenseListed {
+    pub agent: Pubkey,
+    pub seller: Pubkey,
+    pub asset: Pubkey,
+    pub price: u64,
+    /// Taxa da plataforma congelada no anúncio.
+    pub fee_bps: u16,
+    /// Royalty do criador congelado no anúncio.
+    pub royalty_bps: u16,
+}
+
+#[event]
+pub struct LicenseResold {
+    pub agent: Pubkey,
+    pub asset: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub price: u64,
+    pub royalty: u64,
+    pub fee: u64,
+    pub seller_amount: u64,
+}
+
+#[event]
+pub struct ListingCancelled {
+    pub agent: Pubkey,
+    pub asset: Pubkey,
+    pub seller: Pubkey,
+    /// Quem assinou o cancelamento (o vendedor ou, num anúncio velho, qualquer um).
+    pub canceller: Pubkey,
+}
