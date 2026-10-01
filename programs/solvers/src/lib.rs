@@ -26,9 +26,6 @@ pub mod solvers {
     pub fn suspend_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
         instructions::admin::suspend_agent(ctx)
     }
-    pub fn slash_stake(ctx: Context<SlashStake>, amount: u64) -> Result<()> {
-        instructions::admin::slash_stake(ctx, amount)
-    }
 
     pub fn propose_admin(ctx: Context<ProposeAdmin>, new_admin: Pubkey) -> Result<()> {
         instructions::admin::propose_admin(ctx, new_admin)
@@ -50,6 +47,32 @@ pub mod solvers {
     }
     pub fn set_guardian(ctx: Context<SetGuardian>, new_guardian: Pubkey) -> Result<()> {
         instructions::admin::set_guardian(ctx, new_guardian)
+    }
+
+    // Stake: saída do criador e confisco em duas etapas
+    pub fn request_stake_exit(ctx: Context<RequestStakeExit>) -> Result<()> {
+        instructions::stake::request_stake_exit(ctx)
+    }
+    pub fn extend_stake_exit(ctx: Context<ExtendStakeExit>, reason_hash: [u8; 32]) -> Result<()> {
+        instructions::stake::extend_stake_exit(ctx, reason_hash)
+    }
+    pub fn cancel_stake_exit(ctx: Context<CancelStakeExit>) -> Result<()> {
+        instructions::stake::cancel_stake_exit(ctx)
+    }
+    pub fn withdraw_stake(ctx: Context<WithdrawStake>) -> Result<()> {
+        instructions::stake::withdraw_stake(ctx)
+    }
+    pub fn propose_slash(ctx: Context<ProposeSlash>, amount: u64, reason_hash: [u8; 32]) -> Result<()> {
+        instructions::stake::propose_slash(ctx, amount, reason_hash)
+    }
+    pub fn contest_slash(ctx: Context<ContestSlash>, reason_hash: [u8; 32]) -> Result<()> {
+        instructions::stake::contest_slash(ctx, reason_hash)
+    }
+    pub fn cancel_slash(ctx: Context<CancelSlash>) -> Result<()> {
+        instructions::stake::cancel_slash(ctx)
+    }
+    pub fn execute_slash(ctx: Context<ExecuteSlash>) -> Result<()> {
+        instructions::stake::execute_slash(ctx)
     }
 
     // Publicação

@@ -134,7 +134,7 @@ pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> R
     Ok(())
 }
 
-/// O criador repõe stake do próprio solver (por exemplo, depois de um `slash_stake`). Vale em
+/// O criador repõe stake do próprio solver (por exemplo, depois de um confisco parcial: `execute_slash`). Vale em
 /// qualquer status; o solver só volta a vender quando o admin o aprova de novo (`approve_agent`).
 #[derive(Accounts)]
 pub struct TopUpStake<'info> {

@@ -84,4 +84,18 @@ pub enum SolversError {
     NotPauseAuthority,
     #[msg("O guardian só pode ligar a pausa; desligar é do admin")]
     GuardianCannotUnpause,
+    #[msg("Solver em saída de stake (aposentado)")]
+    AgentRetired,
+    #[msg("Solver não pediu saída de stake")]
+    AgentNotRetired,
+    #[msg("A espera da saída de stake ainda não terminou")]
+    StakeExitNotReached,
+    #[msg("A espera da saída de stake já foi estendida o máximo de vezes")]
+    StakeExitExtensionsExhausted,
+    #[msg("Há uma proposta de confisco pendente")]
+    SlashPending,
+    #[msg("A espera de 72 h do confisco ainda não terminou")]
+    SlashDelayNotReached,
+    #[msg("A proposta de confisco já foi contestada")]
+    SlashAlreadyContested,
 }

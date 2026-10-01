@@ -67,7 +67,6 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("UpdateConfig", 5_500),
     ("ApproveAgent", 9_500),
     ("SuspendAgent", 9_500),
-    ("SlashStake", 20_000),
     ("ProposeAdmin", 11_500),
     ("AcceptAdmin", 9_000),
     ("CancelAdminTransfer", 8_000),
@@ -75,7 +74,15 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("MigrateConfig", 10_000),
     ("SetPause", 6_000),
     ("SetGuardian", 6_000),
-    ("RegisterAgent", 77_500),
+    ("RequestStakeExit", 22_500),
+    ("ExtendStakeExit", 11_500),
+    ("CancelStakeExit", 11_000),
+    ("WithdrawStake", 44_000),
+    ("ProposeSlash", 22_000),
+    ("ContestSlash", 9_000),
+    ("CancelSlash", 12_000),
+    ("ExecuteSlash", 26_500),
+    ("RegisterAgent", 81_500),
     ("TopUpStake", 20_000),
     ("UpdateVersion", 8_000),
     ("UpdatePricing", 9_500),
@@ -1894,23 +1901,11 @@ fn set_treasury_rejects_delegate_and_close_authority() {
     assert_eq!(env.account::<Config>(&config_pda()).treasury, good);
 }
 
+/// Confisco completo pelo fluxo novo: propõe, espera as 72 h e executa.
 fn slash(env: &mut Env, agent: &TestAgent, amount: u64) -> Result<(), String> {
-    let ix = Instruction {
-        program_id: solvers::ID,
-        accounts: solvers::accounts::SlashStake {
-            admin: env.admin.pubkey(),
-            config: config_pda(),
-            agent: agent.key,
-            stake_vault: pda(&[STAKE_SEED, agent.key.as_ref()]),
-            treasury: env.treasury,
-            usdc_mint: env.mint,
-            token_program: spl_token::ID,
-        }
-        .to_account_metas(None),
-        data: solvers::instruction::SlashStake { amount }.data(),
-    };
-    let admin = env.admin.insecure_clone();
-    env.send(ix, &[&admin])
+    propose(env, agent, amount)?;
+    warp(env, SLASH_DELAY_SECS);
+    execute(env, agent).map(|_| ())
 }
 
 fn top_up_ix(env: &Env, agent: &TestAgent, creator: &Pubkey, source: Pubkey, amount: u64) -> Instruction {
@@ -2075,23 +2070,6 @@ fn status_ix(signer: &Pubkey, agent: &TestAgent, approve: bool) -> Instruction {
         solvers::instruction::SuspendAgent {}.data()
     };
     Instruction { program_id: solvers::ID, accounts, data }
-}
-
-fn slash_ix(env: &Env, signer: &Pubkey, agent: &TestAgent, amount: u64) -> Instruction {
-    Instruction {
-        program_id: solvers::ID,
-        accounts: solvers::accounts::SlashStake {
-            admin: *signer,
-            config: config_pda(),
-            agent: agent.key,
-            stake_vault: pda(&[STAKE_SEED, agent.key.as_ref()]),
-            treasury: env.treasury,
-            usdc_mint: env.mint,
-            token_program: spl_token::ID,
-        }
-        .to_account_metas(None),
-        data: solvers::instruction::SlashStake { amount }.data(),
-    }
 }
 
 fn update_version_ix(signer: &Pubkey, agent: &TestAgent, version: &str, hash: [u8; 32]) -> Instruction {
@@ -2302,58 +2280,6 @@ fn suspend_agent_blocks_new_sales_but_keeps_open_escrows_payable() {
     assert_eq!(env.account::<Agent>(&pending.key).status, AgentStatus::Suspended);
     approve(&mut env, &pending);
     assert_eq!(env.account::<Agent>(&pending.key).status, AgentStatus::Active);
-}
-
-#[test]
-fn slash_stake_permissions_limits_and_exact_amount() {
-    let mut env = Env::new();
-    env.update_min_stake(10 * USDC);
-    let agent = active_agent(&mut env, 12 * USDC, 0);
-    let vault = pda(&[STAKE_SEED, agent.key.as_ref()]);
-    let treasury = env.treasury;
-    let (creator, admin) = (agent.creator.insecure_clone(), admin_kp(&env));
-
-    // Só o admin; o criador do solver não confisca nem o próprio stake.
-    let err = env.send(slash_ix(&env, &creator.pubkey(), &agent, USDC), &[&creator]).unwrap_err();
-    assert!(err.contains("NotAdmin"), "{err}");
-
-    // Valor 0, acima do stake e u64::MAX: InsufficientStake, nada se move.
-    for amount in [0, 10 * USDC + 1, u64::MAX] {
-        let err = env.send(slash_ix(&env, &admin.pubkey(), &agent, amount), &[&admin]).unwrap_err();
-        assert!(err.contains("InsufficientStake"), "{amount}: {err}");
-    }
-    assert_eq!((env.balance(&vault), env.balance(&treasury)), (10 * USDC, 0));
-    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
-
-    // Tesouro trocado e cofre de outro solver são recusados.
-    let other_treasury = env.token_account(&unique_key(), 0);
-    let mut ix = slash_ix(&env, &admin.pubkey(), &agent, USDC);
-    swap_account(&mut ix, &treasury, other_treasury);
-    let err = env.send(ix, &[&admin]).unwrap_err();
-    assert!(err.contains("ConstraintHasOne"), "{err}");
-    let other = register(&mut env, 12 * USDC, 0).unwrap();
-    let mut ix = slash_ix(&env, &admin.pubkey(), &agent, USDC);
-    swap_account(&mut ix, &vault, pda(&[STAKE_SEED, other.key.as_ref()]));
-    let err = env.send(ix, &[&admin]).unwrap_err();
-    assert!(err.contains("ConstraintSeeds"), "{err}");
-
-    // 1 unidade mínima funciona e já suspende.
-    let logs = env.send_logs(slash_ix(&env, &admin.pubkey(), &agent, 1), &[&admin]).unwrap();
-    let slashed = events::<solvers::events::StakeSlashed>(&logs);
-    assert_eq!((slashed.len(), slashed[0].agent, slashed[0].amount), (1, agent.key, 1));
-    let changed = events::<solvers::events::AgentStatusChanged>(&logs);
-    assert_eq!(changed[0].status, AgentStatus::Suspended as u8);
-    assert_eq!(env.account::<Agent>(&agent.key).stake, 10 * USDC - 1);
-
-    // O saldo restante exato zera o stake; depois disso qualquer valor falha.
-    env.send(slash_ix(&env, &admin.pubkey(), &agent, 10 * USDC - 1), &[&admin]).unwrap();
-    assert_eq!(env.account::<Agent>(&agent.key).stake, 0);
-    assert_eq!((env.balance(&vault), env.balance(&treasury)), (0, 10 * USDC));
-    let err = env.send(slash_ix(&env, &admin.pubkey(), &agent, 1), &[&admin]).unwrap_err();
-    assert!(err.contains("InsufficientStake"), "{err}");
-    // Sem stake não reativa (min_stake > 0).
-    let err = env.send(status_ix(&admin.pubkey(), &agent, true), &[&admin]).unwrap_err();
-    assert!(err.contains("InsufficientStake"), "{err}");
 }
 
 #[test]
@@ -3413,7 +3339,14 @@ fn every_authority_must_sign_not_just_be_named() {
     let mut cases: Vec<(&str, Instruction, Pubkey)> = vec![
         ("approve_agent", status_ix(&admin, &pending, true), admin),
         ("suspend_agent", status_ix(&admin, &agent, false), admin),
-        ("slash_stake", slash_ix(&env, &admin, &agent, USDC), admin),
+        ("propose_slash", propose_slash_ix(&env.payer.pubkey(), &admin, &agent, USDC, [1; 32]), admin),
+        ("execute_slash", execute_ix(&env, &admin, &agent, env.payer.pubkey()), admin),
+        ("cancel_slash", cancel_slash_ix(&admin, &agent, env.payer.pubkey()), admin),
+        ("extend_stake_exit", extend_exit_ix(&admin, &agent, [1; 32]), admin),
+        ("contest_slash", contest_ix(&creator, &agent, [1; 32]), creator),
+        ("request_stake_exit", request_exit_ix(&env.payer.pubkey(), &creator, &agent), creator),
+        ("cancel_stake_exit", cancel_exit_ix(&creator, &agent, env.payer.pubkey()), creator),
+        ("withdraw_stake", withdraw_ix(&env, &creator, &agent, env.payer.pubkey(), agent.creator_usdc), creator),
         ("update_config", {
             Instruction {
                 program_id: solvers::ID,
@@ -3874,10 +3807,10 @@ fn pause_blocks_entries_and_payments_each_by_its_own_bit() {
     assert!(env.svm.get_account(&pda(&[ESCROW_SEED, buyer.pubkey().as_ref(), agent.key.as_ref(), &2u64.to_le_bytes()])).is_none());
     mark_passed(&mut env, &escrow, 0).unwrap();
 
-    // Bit 1 (pagamentos): as três instruções de pagamento param; as entradas voltam.
+    // Bit 1 (pagamentos): as duas instruções que movem dinheiro param; as entradas voltam. `mark_passed`
+    // não pausa (não move dinheiro; senão o prazo de entrega venceria com o verificador impedido).
     set_pause(&mut env, &admin, PAUSE_PAYMENTS).unwrap();
-    let err = mark_passed(&mut env, &escrow, 1).unwrap_err();
-    assert!(err.contains("Error Code: Paused."), "mark_passed: {err}");
+    mark_passed(&mut env, &escrow, 1).unwrap();
     let err = release(&mut env, &agent, &escrow, &buyer, 1).unwrap_err();
     assert!(err.contains("Error Code: Paused."), "release_milestone: {err}");
     let err = resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 2, true).unwrap_err();
@@ -3885,7 +3818,7 @@ fn pause_blocks_entries_and_payments_each_by_its_own_bit() {
     let e: Escrow = env.account(&escrow.key);
     assert_eq!(
         e.milestones.iter().map(|m| m.status).collect::<Vec<_>>(),
-        [MilestoneStatus::Passed, MilestoneStatus::Pending, MilestoneStatus::Disputed]
+        [MilestoneStatus::Passed, MilestoneStatus::Passed, MilestoneStatus::Disputed]
     );
     assert_eq!(env.balance(&escrow.vault), 15 * USDC);
     register(&mut env, 12 * USDC, 0).unwrap();
@@ -3895,7 +3828,6 @@ fn pause_blocks_entries_and_payments_each_by_its_own_bit() {
 
     // Pausa desligada: as mesmas instruções passam.
     set_pause(&mut env, &admin, 0).unwrap();
-    mark_passed(&mut env, &escrow, 1).unwrap();
     release(&mut env, &agent, &escrow, &buyer, 1).unwrap();
     resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 2, true).unwrap();
     let e: Escrow = env.account(&escrow.key);
@@ -3951,6 +3883,675 @@ fn buyer_exits_and_admin_instructions_never_pause() {
     set_pause(&mut env, &admin, 0).unwrap();
 }
 
+// ------------------------------------------------------------------- governança v2: stake ----
+// Saída do criador (30 dias + 2 extensões), confisco em duas etapas (72 h) e `min_stake` aplicado,
+// sempre com `min_stake` > 0 (a devnet tem 0, mas o código precisa estar pronto).
+
+const EXIT_DELAY: i64 = STAKE_EXIT_DELAY_SECS;
+
+fn stake_exit_pda(agent: &TestAgent) -> Pubkey {
+    pda(&[STAKE_EXIT_SEED, agent.key.as_ref()])
+}
+
+fn slash_pda(agent: &TestAgent) -> Pubkey {
+    pda(&[SLASH_SEED, agent.key.as_ref()])
+}
+
+fn vault_pda(agent: &TestAgent) -> Pubkey {
+    pda(&[STAKE_SEED, agent.key.as_ref()])
+}
+
+fn request_exit_ix(payer: &Pubkey, creator: &Pubkey, agent: &TestAgent) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::RequestStakeExit {
+            payer: *payer,
+            creator: *creator,
+            agent: agent.key,
+            stake_exit: stake_exit_pda(agent),
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::RequestStakeExit {}.data(),
+    }
+}
+
+fn request_exit(env: &mut Env, agent: &TestAgent) -> Result<Vec<String>, String> {
+    let creator = agent.creator.insecure_clone();
+    let ix = request_exit_ix(&env.payer.pubkey(), &creator.pubkey(), agent);
+    env.send_logs(ix, &[&creator])
+}
+
+fn extend_exit_ix(admin: &Pubkey, agent: &TestAgent, reason_hash: [u8; 32]) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ExtendStakeExit {
+            admin: *admin,
+            config: config_pda(),
+            agent: agent.key,
+            stake_exit: stake_exit_pda(agent),
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::ExtendStakeExit { reason_hash }.data(),
+    }
+}
+
+fn extend_exit(env: &mut Env, signer: &Keypair, agent: &TestAgent, reason_hash: [u8; 32]) -> Result<Vec<String>, String> {
+    env.send_logs(extend_exit_ix(&signer.pubkey(), agent, reason_hash), &[signer])
+}
+
+fn cancel_exit_ix(creator: &Pubkey, agent: &TestAgent, rent_payer: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::CancelStakeExit {
+            creator: *creator,
+            agent: agent.key,
+            stake_exit: stake_exit_pda(agent),
+            rent_payer,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::CancelStakeExit {}.data(),
+    }
+}
+
+fn cancel_exit(env: &mut Env, agent: &TestAgent) -> Result<Vec<String>, String> {
+    let creator = agent.creator.insecure_clone();
+    let ix = cancel_exit_ix(&creator.pubkey(), agent, env.payer.pubkey());
+    env.send_logs(ix, &[&creator])
+}
+
+fn withdraw_ix(env: &Env, creator: &Pubkey, agent: &TestAgent, rent_payer: Pubkey, creator_usdc: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::WithdrawStake {
+            creator: *creator,
+            config: config_pda(),
+            agent: agent.key,
+            stake_vault: vault_pda(agent),
+            stake_exit: stake_exit_pda(agent),
+            rent_payer,
+            slash_proposal: slash_pda(agent),
+            creator_usdc,
+            usdc_mint: env.mint,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::WithdrawStake {}.data(),
+    }
+}
+
+fn withdraw(env: &mut Env, agent: &TestAgent) -> Result<Vec<String>, String> {
+    let creator = agent.creator.insecure_clone();
+    let ix = withdraw_ix(env, &creator.pubkey(), agent, env.payer.pubkey(), agent.creator_usdc);
+    env.send_logs(ix, &[&creator])
+}
+
+fn propose_slash_ix(payer: &Pubkey, admin: &Pubkey, agent: &TestAgent, amount: u64, reason_hash: [u8; 32]) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ProposeSlash {
+            payer: *payer,
+            admin: *admin,
+            config: config_pda(),
+            agent: agent.key,
+            slash_proposal: slash_pda(agent),
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::ProposeSlash { amount, reason_hash }.data(),
+    }
+}
+
+fn propose(env: &mut Env, agent: &TestAgent, amount: u64) -> Result<Vec<String>, String> {
+    let admin = admin_kp(env);
+    let ix = propose_slash_ix(&env.payer.pubkey(), &admin.pubkey(), agent, amount, [4; 32]);
+    env.send_logs(ix, &[&admin])
+}
+
+fn contest_ix(creator: &Pubkey, agent: &TestAgent, reason_hash: [u8; 32]) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ContestSlash { creator: *creator, agent: agent.key, slash_proposal: slash_pda(agent) }
+            .to_account_metas(None),
+        data: solvers::instruction::ContestSlash { reason_hash }.data(),
+    }
+}
+
+fn cancel_slash_ix(admin: &Pubkey, agent: &TestAgent, rent_payer: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::CancelSlash {
+            admin: *admin,
+            config: config_pda(),
+            agent: agent.key,
+            slash_proposal: slash_pda(agent),
+            rent_payer,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::CancelSlash {}.data(),
+    }
+}
+
+fn execute_ix(env: &Env, admin: &Pubkey, agent: &TestAgent, rent_payer: Pubkey) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::ExecuteSlash {
+            admin: *admin,
+            config: config_pda(),
+            agent: agent.key,
+            stake_vault: vault_pda(agent),
+            treasury: env.treasury,
+            usdc_mint: env.mint,
+            slash_proposal: slash_pda(agent),
+            rent_payer,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::ExecuteSlash {}.data(),
+    }
+}
+
+fn execute(env: &mut Env, agent: &TestAgent) -> Result<Vec<String>, String> {
+    let admin = admin_kp(env);
+    let ix = execute_ix(env, &admin.pubkey(), agent, env.payer.pubkey());
+    env.send_logs(ix, &[&admin])
+}
+
+fn is_closed(env: &Env, key: &Pubkey) -> bool {
+    env.svm.get_account(key).is_none_or(|a| a.lamports == 0 || a.data.is_empty())
+}
+
+#[test]
+fn agent_status_retired_is_appended_without_renumbering() {
+    let decode = |b: u8| AgentStatus::try_from_slice(&[b]);
+    assert_eq!(decode(0).unwrap(), AgentStatus::Pending);
+    assert_eq!(decode(1).unwrap(), AgentStatus::Active);
+    assert_eq!(decode(2).unwrap(), AgentStatus::Suspended);
+    assert_eq!(decode(3).unwrap(), AgentStatus::Retired);
+    assert!(decode(4).is_err());
+    assert_eq!(
+        [AgentStatus::Pending as u8, AgentStatus::Active as u8, AgentStatus::Suspended as u8, AgentStatus::Retired as u8],
+        [0, 1, 2, 3]
+    );
+    // O Agent não muda de tamanho: contas existentes (status 0, 1 ou 2) seguem iguais.
+    assert_eq!(AgentStatus::INIT_SPACE, 1);
+}
+
+#[test]
+fn stake_exit_full_cycle_with_real_min_stake() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (creator, admin) = (agent.creator.insecure_clone(), admin_kp(&env));
+    let vault = vault_pda(&agent);
+    let (buyer, _) = new_buyer(&mut env, 100 * USDC);
+    // `register_agent` cobrou o stake do criador e o cofre guarda o valor exato.
+    assert_eq!(env.balance(&agent.creator_usdc), 90 * USDC);
+    assert_eq!((env.balance(&vault), env.account::<Agent>(&agent.key).stake), (10 * USDC, 10 * USDC));
+
+    // Só o criador do solver pede a saída.
+    let stranger = funded(&mut env);
+    for who in [&stranger, &admin] {
+        let ix = request_exit_ix(&env.payer.pubkey(), &who.pubkey(), &agent);
+        let err = env.send(ix, &[who]).unwrap_err();
+        assert!(err.contains("NotCreator"), "{err}");
+    }
+    let logs = request_exit(&mut env, &agent).unwrap();
+    let ev = events::<solvers::events::StakeExitRequested>(&logs);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].agent, ev[0].creator, ev[0].exit_at), (agent.key, creator.pubkey(), T0 + EXIT_DELAY));
+    let st = events::<solvers::events::AgentStatusChanged>(&logs);
+    assert_eq!(st[0].status, 3);
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.status, a.stake), (AgentStatus::Retired, 10 * USDC));
+    let exit: StakeExit = env.account(&stake_exit_pda(&agent));
+    assert_eq!(
+        (exit.exit_at, exit.requested_at, exit.extensions, exit.rent_payer),
+        (T0 + EXIT_DELAY, T0, 0, env.payer.pubkey())
+    );
+
+    // Não pede de novo (a StakeExit já existe: o `init` recusa); `approve_agent` e `suspend_agent` não tiram o solver da saída.
+    assert!(request_exit(&mut env, &agent).is_err());
+    assert_eq!(env.account::<StakeExit>(&stake_exit_pda(&agent)).exit_at, T0 + EXIT_DELAY);
+    let err = approve_as(&mut env, &admin, &agent).unwrap_err();
+    assert!(err.contains("AgentRetired"), "{err}");
+    let err = env.send(status_ix(&admin.pubkey(), &agent, false), &[&admin]).unwrap_err();
+    assert!(err.contains("AgentRetired"), "{err}");
+
+    // Retired não vende nem abre garantia (como Suspended).
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("AgentNotActive"), "{err}");
+    let err = buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap_err();
+    assert!(err.contains("AgentNotActive"), "{err}");
+    let err = create_escrow(&mut env, &agent, &buyer, &[5 * USDC]).err().unwrap();
+    assert!(err.contains("AgentNotActive"), "{err}");
+
+    // Espera de 30 dias: 1 segundo antes falha; no segundo exato passa. Só o criador saca.
+    let exit_at = T0 + EXIT_DELAY;
+    set_time(&mut env, exit_at - 1);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("StakeExitNotReached"), "{err}");
+    set_time(&mut env, exit_at);
+    let ix = withdraw_ix(&env, &stranger.pubkey(), &agent, env.payer.pubkey(), agent.creator_usdc);
+    let err = env.send(ix, &[&stranger]).unwrap_err();
+    assert!(err.contains("NotCreator"), "{err}");
+    let creator_sol = lamports(&env, &creator.pubkey());
+    let logs = withdraw(&mut env, &agent).unwrap();
+    let ev = events::<solvers::events::StakeWithdrawn>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].creator, ev[0].amount), (1, agent.key, creator.pubkey(), 10 * USDC));
+    // Devolve o valor exato, fecha cofre e StakeExit, zera o stake e o rent do cofre vai ao criador.
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC);
+    assert!(is_closed(&env, &vault) && is_closed(&env, &stake_exit_pda(&agent)));
+    assert_eq!(lamports(&env, &creator.pubkey()) - creator_sol, rent_for(&env, spl_token::state::Account::LEN));
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.status, a.stake), (AgentStatus::Retired, 0));
+
+    // O fim é definitivo: nada de saque duplo, aporte, novo pedido ou reativação.
+    assert!(withdraw(&mut env, &agent).is_err());
+    let ix = top_up_ix(&env, &agent, &creator.pubkey(), agent.creator_usdc, USDC);
+    assert!(env.send(ix, &[&creator]).is_err());
+    let err = request_exit(&mut env, &agent).unwrap_err();
+    assert!(err.contains("AgentRetired"), "{err}");
+    let err = approve_as(&mut env, &admin, &agent).unwrap_err();
+    assert!(err.contains("AgentRetired"), "{err}");
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC);
+}
+
+#[test]
+fn stake_exit_extensions_are_capped_and_admin_only_and_pending_slash_blocks_withdraw() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let (creator, admin) = (agent.creator.insecure_clone(), admin_kp(&env));
+    request_exit(&mut env, &agent).unwrap();
+    // Denúncia em aberto: o admin propõe o confisco (o solver já está Retired e continua Retired).
+    let logs = propose(&mut env, &agent, 3 * USDC).unwrap();
+    assert!(events::<solvers::events::AgentStatusChanged>(&logs).is_empty());
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Retired);
+
+    // Só o admin estende (nem o criador, nem o guardian que não existe).
+    let err = extend_exit(&mut env, &creator, &agent, [7; 32]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    let logs = extend_exit(&mut env, &admin, &agent, [7; 32]).unwrap();
+    let ev = events::<solvers::events::StakeExitExtended>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].exit_at, ev[0].extensions, ev[0].reason_hash), (1, agent.key, T0 + 2 * EXIT_DELAY, 1, [7; 32]));
+    let logs = extend_exit(&mut env, &admin, &agent, [8; 32]).unwrap();
+    let ev = events::<solvers::events::StakeExitExtended>(&logs);
+    assert_eq!((ev[0].exit_at, ev[0].extensions, ev[0].reason_hash), (T0 + 3 * EXIT_DELAY, 2, [8; 32]));
+    let err = extend_exit(&mut env, &admin, &agent, [9; 32]).unwrap_err();
+    assert!(err.contains("StakeExitExtensionsExhausted"), "{err}");
+    let exit: StakeExit = env.account(&stake_exit_pda(&agent));
+    assert_eq!((exit.exit_at, exit.extensions), (T0 + 3 * EXIT_DELAY, 2));
+
+    // Os 30 dias originais não bastam; nem 1 segundo antes do prazo estendido.
+    set_time(&mut env, T0 + EXIT_DELAY);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("StakeExitNotReached"), "{err}");
+    set_time(&mut env, T0 + 3 * EXIT_DELAY - 1);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("StakeExitNotReached"), "{err}");
+
+    // No prazo, a proposta de confisco pendente ainda trava o saque (mesmo com os 72 h vencidos).
+    set_time(&mut env, T0 + 3 * EXIT_DELAY);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("SlashPending"), "{err}");
+    assert_eq!(env.balance(&vault_pda(&agent)), 10 * USDC);
+    // Cancelada a proposta, o saque passa e leva o stake inteiro.
+    let admin_cancel = cancel_slash_ix(&admin.pubkey(), &agent, env.payer.pubkey());
+    env.send(admin_cancel, &[&admin]).unwrap();
+    withdraw(&mut env, &agent).unwrap();
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC);
+}
+
+#[test]
+fn cancel_stake_exit_goes_back_to_suspended_never_active() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let (buyer, _) = new_buyer(&mut env, 100 * USDC);
+    request_exit(&mut env, &agent).unwrap();
+
+    let stranger = funded(&mut env);
+    let ix = cancel_exit_ix(&stranger.pubkey(), &agent, env.payer.pubkey());
+    let err = env.send(ix, &[&stranger]).unwrap_err();
+    assert!(err.contains("NotCreator"), "{err}");
+    // O rent só volta a quem pagou: outro destino é recusado.
+    let creator = agent.creator.insecure_clone();
+    let ix = cancel_exit_ix(&creator.pubkey(), &agent, stranger.pubkey());
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("ConstraintHasOne"), "{err}");
+
+    // Defesa em profundidade: com a invariante quebrada (StakeExit existe, mas o solver não está Retired)
+    // nem cancelar nem sacar passam.
+    write_account::<Agent>(&mut env, &agent.key, |a| a.status = AgentStatus::Active);
+    let err = cancel_exit(&mut env, &agent).unwrap_err();
+    assert!(err.contains("AgentNotRetired"), "{err}");
+    set_time(&mut env, T0 + EXIT_DELAY);
+    let err = withdraw(&mut env, &agent).unwrap_err();
+    assert!(err.contains("AgentNotRetired"), "{err}");
+    write_account::<Agent>(&mut env, &agent.key, |a| a.status = AgentStatus::Retired);
+
+    let payer_before = lamports(&env, &env.payer.pubkey());
+    let logs = cancel_exit(&mut env, &agent).unwrap();
+    let ev = events::<solvers::events::StakeExitCancelled>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].creator), (1, agent.key, creator.pubkey()));
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.status, a.stake), (AgentStatus::Suspended, 10 * USDC));
+    assert!(is_closed(&env, &stake_exit_pda(&agent)));
+    assert!(lamports(&env, &env.payer.pubkey()) > payer_before - 10_000, "rent da StakeExit volta a quem pagou");
+    // Cancelar de novo (ou sacar) já não há o que fazer.
+    assert!(cancel_exit(&mut env, &agent).is_err());
+    assert!(withdraw(&mut env, &agent).is_err());
+    // Continua sem vender até o admin aprovar; aprovar com o stake completo reativa.
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("AgentNotActive"), "{err}");
+    approve(&mut env, &agent);
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+    purchase(&mut env, &agent, &buyer).unwrap();
+    // O PDA fechado pode ser reaberto: novo pedido, novo prazo.
+    set_time(&mut env, T0 + 5 * EXIT_DELAY);
+    request_exit(&mut env, &agent).unwrap();
+    assert_eq!(env.account::<StakeExit>(&stake_exit_pda(&agent)).exit_at, T0 + 6 * EXIT_DELAY);
+}
+
+#[test]
+fn slash_proposal_delay_contest_cancel_and_execute() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let (creator, admin) = (agent.creator.insecure_clone(), admin_kp(&env));
+    let (vault, treasury) = (vault_pda(&agent), env.treasury);
+
+    // Só o admin propõe; valor 0 e acima do stake são recusados e nada se move.
+    let ix = propose_slash_ix(&env.payer.pubkey(), &creator.pubkey(), &agent, USDC, [4; 32]);
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    let err = propose(&mut env, &agent, 0).unwrap_err();
+    assert!(err.contains("InvalidAmount"), "{err}");
+    for amount in [10 * USDC + 1, u64::MAX] {
+        let err = propose(&mut env, &agent, amount).unwrap_err();
+        assert!(err.contains("InsufficientStake"), "{err}");
+    }
+    assert!(is_closed(&env, &slash_pda(&agent)));
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+
+    // Proposta de 4: suspende já, não move dinheiro e conta 72 h.
+    let logs = propose(&mut env, &agent, 4 * USDC).unwrap();
+    let ev = events::<solvers::events::SlashProposed>(&logs);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].agent, ev[0].amount, ev[0].reason_hash, ev[0].executable_at), (agent.key, 4 * USDC, [4; 32], T0 + SLASH_DELAY_SECS));
+    assert_eq!(events::<solvers::events::AgentStatusChanged>(&logs)[0].status, AgentStatus::Suspended as u8);
+    let p: SlashProposal = env.account(&slash_pda(&agent));
+    assert_eq!((p.amount, p.proposed_at, p.contested_at, p.contest_hash, p.rent_payer), (4 * USDC, T0, 0, [0; 32], env.payer.pubkey()));
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Suspended);
+    assert_eq!((env.balance(&vault), env.balance(&treasury)), (10 * USDC, 0));
+    // Uma proposta por solver.
+    assert!(propose(&mut env, &agent, USDC).is_err());
+    assert_eq!(env.account::<SlashProposal>(&slash_pda(&agent)).amount, 4 * USDC);
+
+    // Contestação: só o criador, uma única vez; é só evidência (nada muda no dinheiro).
+    let stranger = funded(&mut env);
+    for who in [&stranger, &admin] {
+        let err = env.send(contest_ix(&who.pubkey(), &agent, [6; 32]), &[who]).unwrap_err();
+        assert!(err.contains("NotCreator"), "{err}");
+    }
+    set_time(&mut env, T0 + 100);
+    let logs = env.send_logs(contest_ix(&creator.pubkey(), &agent, [6; 32]), &[&creator]).unwrap();
+    let ev = events::<solvers::events::SlashContested>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].contest_hash), (1, agent.key, [6; 32]));
+    let err = env.send(contest_ix(&creator.pubkey(), &agent, [7; 32]), &[&creator]).unwrap_err();
+    assert!(err.contains("SlashAlreadyContested"), "{err}");
+    let p: SlashProposal = env.account(&slash_pda(&agent));
+    assert_eq!((p.contest_hash, p.contested_at, p.amount), ([6; 32], T0 + 100, 4 * USDC));
+
+    // Execução: só o admin, só com tesouro e cofre certos e só a partir de proposed_at + 72 h.
+    let ix = execute_ix(&env, &creator.pubkey(), &agent, env.payer.pubkey());
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    set_time(&mut env, T0 + SLASH_DELAY_SECS - 1);
+    let err = execute(&mut env, &agent).unwrap_err();
+    assert!(err.contains("SlashDelayNotReached"), "{err}");
+    let other_treasury = env.token_account(&unique_key(), 0);
+    let mut ix = execute_ix(&env, &admin.pubkey(), &agent, env.payer.pubkey());
+    swap_account(&mut ix, &treasury, other_treasury);
+    let err = env.send(ix, &[&admin]).unwrap_err();
+    assert!(err.contains("ConstraintHasOne"), "{err}");
+    let other = register(&mut env, 12 * USDC, 0).unwrap();
+    let mut ix = execute_ix(&env, &admin.pubkey(), &agent, env.payer.pubkey());
+    swap_account(&mut ix, &vault, vault_pda(&other));
+    let err = env.send(ix, &[&admin]).unwrap_err();
+    assert!(err.contains("ConstraintSeeds"), "{err}");
+    let mut ix = execute_ix(&env, &admin.pubkey(), &agent, env.payer.pubkey());
+    swap_account(&mut ix, &env.payer.pubkey(), stranger.pubkey());
+    let err = env.send(ix, &[&admin]).unwrap_err();
+    assert!(err.contains("ConstraintHasOne"), "{err}");
+
+    set_time(&mut env, T0 + SLASH_DELAY_SECS);
+    let logs = execute(&mut env, &agent).unwrap();
+    let ev = events::<solvers::events::SlashExecuted>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].amount, ev[0].treasury), (1, agent.key, 4 * USDC, treasury));
+    assert_eq!(events::<solvers::events::StakeSlashed>(&logs).len(), 1);
+    assert_eq!((env.balance(&vault), env.balance(&treasury)), (6 * USDC, 4 * USDC));
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.stake, a.status), (6 * USDC, AgentStatus::Suspended));
+    assert!(is_closed(&env, &slash_pda(&agent)));
+    assert!(execute(&mut env, &agent).is_err());
+
+    // Stake abaixo do mínimo: não reativa nem vende até o aporte; aportar + aprovar reativa.
+    let err = approve_as(&mut env, &admin, &agent).unwrap_err();
+    assert!(err.contains("InsufficientStake"), "{err}");
+    let ix = top_up_ix(&env, &agent, &creator.pubkey(), agent.creator_usdc, 4 * USDC);
+    env.send(ix, &[&creator]).unwrap();
+    approve(&mut env, &agent);
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+
+    // Cancelamento: só o admin; fecha a proposta e o solver continua suspenso até ser aprovado.
+    propose(&mut env, &agent, 2 * USDC).unwrap();
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Suspended);
+    let ix = cancel_slash_ix(&creator.pubkey(), &agent, env.payer.pubkey());
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("NotAdmin"), "{err}");
+    let ix = cancel_slash_ix(&admin.pubkey(), &agent, stranger.pubkey());
+    let err = env.send(ix, &[&admin]).unwrap_err();
+    assert!(err.contains("ConstraintHasOne"), "{err}");
+    let ix = cancel_slash_ix(&admin.pubkey(), &agent, env.payer.pubkey());
+    let logs = env.send_logs(ix, &[&admin]).unwrap();
+    let ev = events::<solvers::events::SlashCancelled>(&logs);
+    assert_eq!((ev.len(), ev[0].agent, ev[0].amount), (1, agent.key, 2 * USDC));
+    assert!(is_closed(&env, &slash_pda(&agent)));
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Suspended);
+    assert_eq!((env.balance(&vault), env.balance(&treasury)), (10 * USDC, 4 * USDC));
+
+    // Reaprovado entre a proposta e a execução, o solver volta a Suspended ao executar.
+    approve(&mut env, &agent);
+    propose(&mut env, &agent, 2 * USDC).unwrap();
+    approve(&mut env, &agent);
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+    set_time(&mut env, T0 + 2 * SLASH_DELAY_SECS);
+    let logs = execute(&mut env, &agent).unwrap();
+    assert_eq!(events::<solvers::events::AgentStatusChanged>(&logs)[0].status, AgentStatus::Suspended as u8);
+    assert_eq!((env.account::<Agent>(&agent.key).stake, env.balance(&treasury)), (8 * USDC, 6 * USDC));
+}
+
+#[test]
+fn slash_on_retired_agent_keeps_it_retired_and_withdraw_pays_the_rest() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    request_exit(&mut env, &agent).unwrap();
+    propose(&mut env, &agent, 4 * USDC).unwrap();
+    set_time(&mut env, T0 + SLASH_DELAY_SECS);
+    let logs = execute(&mut env, &agent).unwrap();
+    assert!(events::<solvers::events::AgentStatusChanged>(&logs).is_empty());
+    let a: Agent = env.account(&agent.key);
+    assert_eq!((a.status, a.stake), (AgentStatus::Retired, 6 * USDC));
+    set_time(&mut env, T0 + EXIT_DELAY);
+    withdraw(&mut env, &agent).unwrap();
+    // 100 - 10 de stake + 6 devolvidos (os outros 4 foram para a tesouraria).
+    assert_eq!(env.balance(&agent.creator_usdc), 96 * USDC);
+    assert_eq!(env.balance(&env.treasury.clone()), 4 * USDC);
+}
+
+#[test]
+fn retired_agent_keeps_open_escrows_and_licenses_working() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (buyer, _) = new_buyer(&mut env, 100 * USDC);
+    let asset = purchase(&mut env, &agent, &buyer).unwrap();
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    let escrow = create_escrow(&mut env, &agent, &buyer, &[5 * USDC, 5 * USDC, 5 * USDC]).unwrap();
+    dispute(&mut env, &escrow, &buyer, 2).unwrap();
+    request_exit(&mut env, &agent).unwrap();
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Retired);
+
+    // Com o solver Retired: verificação, liberação, julgamento, créditos e avaliação seguem normais.
+    mark_passed(&mut env, &escrow, 0).unwrap();
+    release(&mut env, &agent, &escrow, &buyer, 0).unwrap();
+    mark_passed(&mut env, &escrow, 1).unwrap();
+    resolve(&mut env, &agent, &escrow, &buyer.pubkey(), 2, true).unwrap();
+    let keeper = new_keypair();
+    warp(&mut env, REVIEW_WINDOW + 1);
+    release(&mut env, &agent, &escrow, &keeper, 1).unwrap();
+    let e: Escrow = env.account(&escrow.key);
+    assert_eq!(e.status, EscrowStatus::Completed);
+    assert_eq!(env.balance(&escrow.vault), 0);
+    let usage = usage_kp(&env);
+    env.send(consume_ix(&usage.pubkey(), &agent, credits_pda(&agent, &buyer.pubkey())), &[&usage]).unwrap();
+    review_with_license(&mut env, &agent, &buyer, asset, 5).unwrap();
+    // O que não pode: nova venda ou nova garantia.
+    let err = create_escrow_full(&mut env, &agent, &buyer, 2, &[5 * USDC], REVIEW_WINDOW, 0).err().unwrap();
+    assert!(err.contains("AgentNotActive"), "{err}");
+}
+
+#[test]
+fn min_stake_gates_sales_and_escrows() {
+    let mut env = Env::new();
+    set_time(&mut env, T0);
+    // min_stake = 0: stake 0 vende normalmente (sem efeito).
+    let agent = active_agent(&mut env, 12 * USDC, USDC / 2);
+    let (buyer, _) = new_buyer(&mut env, 200 * USDC);
+    assert_eq!(env.account::<Agent>(&agent.key).stake, 0);
+    purchase(&mut env, &agent, &buyer).unwrap();
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    create_escrow(&mut env, &agent, &buyer, &[5 * USDC]).unwrap();
+
+    // O admin sobe o mínimo: o solver ativo, mas com stake menor, para de vender.
+    env.update_min_stake(10 * USDC);
+    assert_eq!(env.account::<Agent>(&agent.key).status, AgentStatus::Active);
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("InsufficientStake"), "{err}");
+    let err = buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap_err();
+    assert!(err.contains("InsufficientStake"), "{err}");
+    let err = create_escrow_full(&mut env, &agent, &buyer, 2, &[5 * USDC], REVIEW_WINDOW, 0).err().unwrap();
+    assert!(err.contains("InsufficientStake"), "{err}");
+
+    // Um aporte parcial não basta; no mínimo exato volta a vender.
+    let creator = agent.creator.insecure_clone();
+    let ix = top_up_ix(&env, &agent, &creator.pubkey(), agent.creator_usdc, 10 * USDC - 1);
+    env.send(ix, &[&creator]).unwrap();
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("InsufficientStake"), "{err}");
+    let ix = top_up_ix(&env, &agent, &creator.pubkey(), agent.creator_usdc, 1);
+    env.send(ix, &[&creator]).unwrap();
+    purchase(&mut env, &agent, &buyer).unwrap();
+    buy_credits(&mut env, &agent, &buyer, 10, 5 * USDC).unwrap();
+    create_escrow_full(&mut env, &agent, &buyer, 2, &[5 * USDC], REVIEW_WINDOW, 0).unwrap();
+}
+
+#[test]
+fn prefunded_stake_pdas_do_not_block_the_flow() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let a = active_agent(&mut env, 12 * USDC, 0);
+    let b = active_agent(&mut env, 12 * USDC, 0);
+
+    // Agente A: ninguém propôs confisco, mas o endereço da proposta foi pré-financiado (conta do
+    // System Program, sem dados). Isso não conta como proposta: pedido e saque passam.
+    for pda_key in [slash_pda(&a), stake_exit_pda(&a)] {
+        env.svm.airdrop(&pda_key, 5_000_000).unwrap();
+    }
+    assert_eq!(env.svm.get_account(&slash_pda(&a)).unwrap().owner, system_program::ID);
+    request_exit(&mut env, &a).unwrap();
+    set_time(&mut env, T0 + EXIT_DELAY);
+    withdraw(&mut env, &a).unwrap();
+    assert_eq!(env.balance(&a.creator_usdc), 100 * USDC);
+    assert!(is_closed(&env, &slash_pda(&a)) || env.svm.get_account(&slash_pda(&a)).unwrap().owner == system_program::ID);
+
+    // Agente B: com os dois endereços pré-financiados, propor/contestar/cancelar/executar funcionam.
+    env.svm.airdrop(&slash_pda(&b), 5_000_000).unwrap();
+    propose(&mut env, &b, 3 * USDC).unwrap();
+    assert_eq!(env.svm.get_account(&slash_pda(&b)).unwrap().owner, solvers::ID);
+    let admin = admin_kp(&env);
+    let ix = cancel_slash_ix(&admin.pubkey(), &b, env.payer.pubkey());
+    env.send(ix, &[&admin]).unwrap();
+    propose(&mut env, &b, 3 * USDC).unwrap();
+    set_time(&mut env, T0 + EXIT_DELAY + SLASH_DELAY_SECS);
+    execute(&mut env, &b).unwrap();
+    assert_eq!(env.account::<Agent>(&b.key).stake, 7 * USDC);
+}
+
+#[test]
+fn withdraw_destination_is_the_derived_ata_and_rent_payer_may_be_the_creator() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let creator = agent.creator.insecure_clone();
+    // O criador paga o próprio rent (payer == creator): o destino do rent da StakeExit é o próprio criador,
+    // que também recebe o rent do cofre; as duas contas mutáveis iguais não derrubam o saque.
+    let ix = request_exit_ix(&creator.pubkey(), &creator.pubkey(), &agent);
+    env.send(ix, &[&creator]).unwrap();
+    assert_eq!(env.account::<StakeExit>(&stake_exit_pda(&agent)).rent_payer, creator.pubkey());
+    set_time(&mut env, T0 + EXIT_DELAY);
+
+    // Destino que não é a ATA derivada do criador, dono errado e rent_payer errado: recusados.
+    let (_, other_usdc) = new_buyer(&mut env, 0);
+    let ix = withdraw_ix(&env, &creator.pubkey(), &agent, creator.pubkey(), other_usdc);
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("ConstraintAddress"), "{err}");
+    let ix = withdraw_ix(&env, &creator.pubkey(), &agent, env.payer.pubkey(), agent.creator_usdc);
+    let err = env.send(ix, &[&creator]).unwrap_err();
+    assert!(err.contains("ConstraintHasOne"), "{err}");
+
+    // O criador troca o dono da própria ATA (SetAuthority): o saque ainda chega ao endereço derivado.
+    let new_owner = unique_key();
+    swap_ata_owner(&mut env, &creator, &new_owner);
+    let ix = withdraw_ix(&env, &creator.pubkey(), &agent, creator.pubkey(), agent.creator_usdc);
+    env.send(ix, &[&creator]).unwrap();
+    assert_eq!(env.balance(&agent.creator_usdc), 100 * USDC);
+    assert!(is_closed(&env, &vault_pda(&agent)));
+}
+
+#[test]
+fn execute_slash_with_treasury_equal_to_the_vault_hits_the_duplicate_mutable_check() {
+    let mut env = Env::new();
+    env.update_min_stake(10 * USDC);
+    set_time(&mut env, T0);
+    let agent = active_agent(&mut env, 12 * USDC, 0);
+    let (admin, vault, old_treasury) = (admin_kp(&env), vault_pda(&agent), env.treasury);
+    propose(&mut env, &agent, 4 * USDC).unwrap();
+    set_time(&mut env, T0 + SLASH_DELAY_SECS);
+    // O admin (por engano) aponta a tesouraria para o cofre de stake: a execução é recusada, não desvia nada.
+    env.send(set_treasury_ix(&env, &admin.pubkey(), vault), &[&admin]).unwrap();
+    env.treasury = vault;
+    let err = execute(&mut env, &agent).unwrap_err();
+    assert!(err.contains("ConstraintDuplicateMutableAccount"), "{err}");
+    assert_eq!(env.balance(&vault), 10 * USDC);
+    // Corrigida a tesouraria, a mesma proposta executa.
+    env.send(set_treasury_ix(&env, &admin.pubkey(), old_treasury), &[&admin]).unwrap();
+    env.treasury = old_treasury;
+    execute(&mut env, &agent).unwrap();
+    assert_eq!((env.balance(&vault), env.balance(&old_treasury)), (6 * USDC, 4 * USDC));
+}
+
 // ------------------------------------------------------------------------ meta: cobertura ----
 
 fn camel(snake: &str) -> String {
@@ -3987,7 +4588,7 @@ fn program_errors() -> Vec<String> {
 #[test]
 fn cu_ceilings_cover_every_instruction() {
     let instructions = program_instructions();
-    assert!(instructions.len() >= 31, "lib.rs mudou de forma: {instructions:?}");
+    assert!(instructions.len() >= 38, "lib.rs mudou de forma: {instructions:?}");
     for name in &instructions {
         let row = CU_CEILINGS.iter().find(|(n, _)| n == name);
         let (_, ceiling) = row.unwrap_or_else(|| panic!("{name} sem teto em CU_CEILINGS"));

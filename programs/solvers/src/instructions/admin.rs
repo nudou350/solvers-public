@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
+use anchor_spl::token::{Mint, TokenAccount};
 
 use crate::errors::SolversError;
 use crate::events::*;
@@ -301,7 +301,9 @@ pub struct SetAgentStatus<'info> {
 
 pub fn approve_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
     let agent = &mut ctx.accounts.agent;
-    // Aprovar também reativa um solver suspenso, desde que o stake esteja completo.
+    // Aprovar também reativa um solver suspenso, desde que o stake esteja completo. Quem pediu
+    // saída de stake (`Retired`) só volta por `cancel_stake_exit` (que o deixa `Suspended`).
+    require!(agent.status != AgentStatus::Retired, SolversError::AgentRetired);
     require!(agent.status != AgentStatus::Active, SolversError::AgentNotPending);
     require!(agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     agent.status = AgentStatus::Active;
@@ -311,48 +313,9 @@ pub fn approve_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
 
 pub fn suspend_agent(ctx: Context<SetAgentStatus>) -> Result<()> {
     let agent = &mut ctx.accounts.agent;
+    // `Retired` já não vende e tem a saída em andamento: suspender não pode tirá-lo da saída.
+    require!(agent.status != AgentStatus::Retired, SolversError::AgentRetired);
     agent.status = AgentStatus::Suspended;
-    emit!(AgentStatusChanged { agent: agent.key(), status: agent.status as u8 });
-    Ok(())
-}
-
-#[derive(Accounts)]
-pub struct SlashStake<'info> {
-    pub admin: Signer<'info>,
-    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ SolversError::NotAdmin, has_one = treasury, has_one = usdc_mint)]
-    pub config: Box<Account<'info, Config>>,
-    #[account(mut, seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump)]
-    pub agent: Box<Account<'info, Agent>>,
-    #[account(mut, seeds = [STAKE_SEED, agent.key().as_ref()], bump)]
-    pub stake_vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut)]
-    pub treasury: Box<Account<'info, TokenAccount>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub token_program: Program<'info, Token>,
-}
-
-pub fn slash_stake(ctx: Context<SlashStake>, amount: u64) -> Result<()> {
-    let agent = &mut ctx.accounts.agent;
-    require!(amount > 0 && amount <= agent.stake, SolversError::InsufficientStake);
-    let agent_id = agent.agent_id;
-    let seeds: &[&[u8]] = &[AGENT_SEED, agent_id.as_ref(), &[agent.bump]];
-    token::transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.stake_vault.to_account_info(),
-                mint: ctx.accounts.usdc_mint.to_account_info(),
-                to: ctx.accounts.treasury.to_account_info(),
-                authority: agent.to_account_info(),
-            },
-            &[seeds],
-        ),
-        amount,
-        ctx.accounts.usdc_mint.decimals,
-    )?;
-    agent.stake -= amount;
-    agent.status = AgentStatus::Suspended;
-    emit!(StakeSlashed { agent: agent.key(), amount });
     emit!(AgentStatusChanged { agent: agent.key(), status: agent.status as u8 });
     Ok(())
 }

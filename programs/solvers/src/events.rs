@@ -162,3 +162,59 @@ pub struct GuardianChanged {
     pub old_guardian: Pubkey,
     pub new_guardian: Pubkey,
 }
+
+#[event]
+pub struct StakeExitRequested {
+    pub agent: Pubkey,
+    pub creator: Pubkey,
+    pub exit_at: i64,
+}
+
+#[event]
+pub struct StakeExitExtended {
+    pub agent: Pubkey,
+    pub exit_at: i64,
+    pub extensions: u8,
+    pub reason_hash: [u8; 32],
+}
+
+#[event]
+pub struct StakeExitCancelled {
+    pub agent: Pubkey,
+    pub creator: Pubkey,
+}
+
+#[event]
+pub struct StakeWithdrawn {
+    pub agent: Pubkey,
+    pub creator: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SlashProposed {
+    pub agent: Pubkey,
+    pub amount: u64,
+    pub reason_hash: [u8; 32],
+    /// Primeiro instante em que `execute_slash` passa.
+    pub executable_at: i64,
+}
+
+#[event]
+pub struct SlashContested {
+    pub agent: Pubkey,
+    pub contest_hash: [u8; 32],
+}
+
+#[event]
+pub struct SlashCancelled {
+    pub agent: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SlashExecuted {
+    pub agent: Pubkey,
+    pub amount: u64,
+    pub treasury: Pubkey,
+}

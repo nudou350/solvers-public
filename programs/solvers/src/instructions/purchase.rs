@@ -94,6 +94,8 @@ pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> R
     ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
+    // Stake abaixo do mínimo (depois de um confisco parcial ou de o admin subir `min_stake`): sem vendas.
+    require!(agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     let price = agent.price;
     require!(price == expected_price, SolversError::PriceChanged);
 
@@ -191,6 +193,7 @@ pub fn buy_credits(ctx: Context<BuyCredits>, amount: u32, max_total: u64) -> Res
     ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     let agent = &ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, SolversError::AgentNotActive);
+    require!(agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     require!(agent.price_per_use > 0, SolversError::PayPerUseDisabled);
     require!(amount > 0, SolversError::InvalidAmount);
     let total = agent.price_per_use.checked_mul(amount as u64).ok_or(SolversError::MathOverflow)?;

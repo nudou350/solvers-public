@@ -67,6 +67,7 @@ pub fn create_escrow(
 ) -> Result<()> {
     ctx.accounts.config.require_not_paused(PAUSE_ENTRIES)?;
     require!(ctx.accounts.agent.status == AgentStatus::Active, SolversError::AgentNotActive);
+    require!(ctx.accounts.agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     require!(!milestones.is_empty() && milestones.len() <= MAX_MILESTONES, SolversError::InvalidMilestones);
     require!(
         (MIN_REVIEW_WINDOW..=MAX_REVIEW_WINDOW).contains(&review_window_secs),
@@ -154,7 +155,8 @@ pub struct MarkPassed<'info> {
 }
 
 pub fn mark_passed(ctx: Context<MarkPassed>, index: u8, deliverable_hash: [u8; 32]) -> Result<()> {
-    ctx.accounts.config.require_not_paused(PAUSE_PAYMENTS)?;
+    // Não respeita a pausa: não move dinheiro, e bloqueá-la faria o `delivery_deadline` vencer com o
+    // verificador impedido de marcar a entrega (o comprador cancelaria e o criador perderia a etapa).
     let escrow = &mut ctx.accounts.escrow;
     let now = Clock::get()?.unix_timestamp;
     let window = escrow.review_window_secs;

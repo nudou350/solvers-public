@@ -11,6 +11,8 @@ pub const ESCROW_VAULT_SEED: &[u8] = b"escrow_vault";
 pub const COLLECTION_AUTHORITY_SEED: &[u8] = b"collection_authority";
 pub const LICENSE_REVIEW_SEED: &[u8] = b"license_review";
 pub const PENDING_ADMIN_SEED: &[u8] = b"pending_admin";
+pub const STAKE_EXIT_SEED: &[u8] = b"stake_exit";
+pub const SLASH_SEED: &[u8] = b"slash";
 
 pub const MAX_URI_LEN: usize = 200;
 pub const MAX_VERSION_LEN: usize = 16;
@@ -26,6 +28,12 @@ pub const DEFAULT_DELIVERY_DAYS: u16 = 14;
 pub const MAX_DELIVERY_DAYS: u16 = 60;
 /// Depois de 7 dias sem o admin julgar, qualquer um pode devolver a etapa contestada ao comprador.
 pub const DISPUTE_SLA_SECS: i64 = 7 * 86_400;
+/// Espera entre o pedido de saída do criador e o saque do stake; o admin pode estendê-la.
+pub const STAKE_EXIT_DELAY_SECS: i64 = 30 * 86_400;
+/// Quantas vezes o admin pode estender a espera (cada uma soma `STAKE_EXIT_DELAY_SECS`).
+pub const MAX_STAKE_EXIT_EXTENSIONS: u8 = 2;
+/// Espera entre propor e executar um confisco de stake.
+pub const SLASH_DELAY_SECS: i64 = 72 * 3_600;
 
 #[account]
 #[derive(InitSpace)]
@@ -68,7 +76,7 @@ pub const CONFIG_V1_LEN: usize = 8 + 179;
 pub const CONFIG_LAYOUT_VERSION: u8 = 2;
 /// Bit 0: entradas (`register_agent`, `purchase_license`, `buy_credits`, `create_escrow`).
 pub const PAUSE_ENTRIES: u8 = 1 << 0;
-/// Bit 1: pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`).
+/// Bit 1: pagamentos (`release_milestone`, `resolve_dispute`). `mark_passed` não pausa (não move dinheiro).
 pub const PAUSE_PAYMENTS: u8 = 1 << 1;
 pub const PAUSE_MASK: u8 = PAUSE_ENTRIES | PAUSE_PAYMENTS;
 
@@ -87,11 +95,43 @@ pub struct PendingAdmin {
     pub bump: u8,
 }
 
+/// Pedido de saída do stake (PDA `[stake_exit, agent]`): existe só enquanto o solver está `Retired`.
+#[account]
+#[derive(InitSpace)]
+pub struct StakeExit {
+    /// A partir daqui (inclusive) o criador pode sacar.
+    pub exit_at: i64,
+    pub requested_at: i64,
+    /// Extensões já aplicadas pelo admin (máximo `MAX_STAKE_EXIT_EXTENSIONS`).
+    pub extensions: u8,
+    /// Quem pagou o rent (recebe de volta ao fechar).
+    pub rent_payer: Pubkey,
+    pub bump: u8,
+}
+
+/// Proposta de confisco (PDA `[slash, agent]`): uma por solver, fechada ao executar ou cancelar.
+#[account]
+#[derive(InitSpace)]
+pub struct SlashProposal {
+    pub amount: u64,
+    pub reason_hash: [u8; 32],
+    pub proposed_at: i64,
+    /// Contestação do criador (só evidência); `contested_at == 0` = sem contestação.
+    pub contest_hash: [u8; 32],
+    pub contested_at: i64,
+    /// Quem pagou o rent (recebe de volta ao fechar).
+    pub rent_payer: Pubkey,
+    pub bump: u8,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub enum AgentStatus {
     Pending,
     Active,
     Suspended,
+    /// Saída de stake pedida (`request_stake_exit`). Sempre no FIM do enum: os valores
+    /// de `Pending`/`Active`/`Suspended` (0, 1, 2) não mudam e contas antigas seguem decodificando.
+    Retired,
 }
 
 #[account]

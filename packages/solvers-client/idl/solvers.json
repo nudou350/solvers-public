@@ -383,6 +383,178 @@
       "args": []
     },
     {
+      "name": "cancel_slash",
+      "discriminator": [
+        222,
+        163,
+        161,
+        54,
+        103,
+        113,
+        42,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "slash_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "slash_proposal"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_stake_exit",
+      "discriminator": [
+        184,
+        9,
+        42,
+        239,
+        145,
+        177,
+        122,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_exit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "stake_exit"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_undelivered",
       "discriminator": [
         43,
@@ -685,6 +857,83 @@
       "args": []
     },
     {
+      "name": "contest_slash",
+      "discriminator": [
+        91,
+        155,
+        139,
+        10,
+        242,
+        84,
+        188,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "slash_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "create_escrow",
       "discriminator": [
         253,
@@ -867,6 +1116,238 @@
         {
           "name": "delivery_days",
           "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "execute_slash",
+      "discriminator": [
+        15,
+        240,
+        38,
+        73,
+        175,
+        55,
+        88,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "slash_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "slash_proposal"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "extend_stake_exit",
+      "discriminator": [
+        144,
+        40,
+        118,
+        147,
+        177,
+        185,
+        126,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_exit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -1205,6 +1686,115 @@
         {
           "name": "new_admin",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "propose_slash",
+      "discriminator": [
+        198,
+        144,
+        128,
+        49,
+        72,
+        78,
+        74,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "slash_proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -1874,6 +2464,88 @@
       ]
     },
     {
+      "name": "request_stake_exit",
+      "discriminator": [
+        186,
+        55,
+        99,
+        67,
+        160,
+        33,
+        115,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_exit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "resolve_dispute",
       "discriminator": [
         231,
@@ -2382,114 +3054,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "slash_stake",
-      "discriminator": [
-        190,
-        242,
-        137,
-        27,
-        41,
-        18,
-        233,
-        37
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "signer": true,
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "agent",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  103,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent.agent_id",
-                "account": "Agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "stake_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "agent"
-              }
-            ]
-          }
-        },
-        {
-          "name": "treasury",
-          "writable": true,
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "usdc_mint",
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
     },
     {
       "name": "submit_review",
@@ -3096,6 +3660,168 @@
           }
         }
       ]
+    },
+    {
+      "name": "withdraw_stake",
+      "discriminator": [
+        153,
+        8,
+        22,
+        138,
+        105,
+        176,
+        87,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "docs": [
+            "Recebe o rent do cofre; assina."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_exit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "stake_exit"
+          ]
+        },
+        {
+          "name": "slash_proposal",
+          "docs": [
+            "(dono = System Program, sem dados) quando não há proposta, mesmo que alguém a tenha pré-financiado."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -3188,6 +3914,32 @@
         30,
         222,
         15
+      ]
+    },
+    {
+      "name": "SlashProposal",
+      "discriminator": [
+        104,
+        26,
+        13,
+        94,
+        65,
+        203,
+        107,
+        43
+      ]
+    },
+    {
+      "name": "StakeExit",
+      "discriminator": [
+        223,
+        22,
+        3,
+        218,
+        229,
+        21,
+        44,
+        124
       ]
     },
     {
@@ -3453,6 +4205,97 @@
       ]
     },
     {
+      "name": "SlashCancelled",
+      "discriminator": [
+        30,
+        217,
+        21,
+        135,
+        62,
+        236,
+        194,
+        221
+      ]
+    },
+    {
+      "name": "SlashContested",
+      "discriminator": [
+        39,
+        130,
+        58,
+        236,
+        104,
+        104,
+        214,
+        130
+      ]
+    },
+    {
+      "name": "SlashExecuted",
+      "discriminator": [
+        170,
+        48,
+        78,
+        119,
+        242,
+        155,
+        108,
+        61
+      ]
+    },
+    {
+      "name": "SlashProposed",
+      "discriminator": [
+        158,
+        90,
+        179,
+        8,
+        227,
+        190,
+        15,
+        231
+      ]
+    },
+    {
+      "name": "StakeExitCancelled",
+      "discriminator": [
+        230,
+        147,
+        53,
+        233,
+        60,
+        5,
+        59,
+        51
+      ]
+    },
+    {
+      "name": "StakeExitExtended",
+      "discriminator": [
+        159,
+        157,
+        209,
+        199,
+        117,
+        149,
+        95,
+        80
+      ]
+    },
+    {
+      "name": "StakeExitRequested",
+      "discriminator": [
+        151,
+        150,
+        181,
+        44,
+        63,
+        193,
+        171,
+        213
+      ]
+    },
+    {
       "name": "StakeSlashed",
       "discriminator": [
         43,
@@ -3476,6 +4319,19 @@
         26,
         161,
         239
+      ]
+    },
+    {
+      "name": "StakeWithdrawn",
+      "discriminator": [
+        33,
+        120,
+        159,
+        58,
+        140,
+        255,
+        174,
+        79
       ]
     },
     {
@@ -3710,6 +4566,41 @@
       "code": 6040,
       "name": "GuardianCannotUnpause",
       "msg": "O guardian só pode ligar a pausa; desligar é do admin"
+    },
+    {
+      "code": 6041,
+      "name": "AgentRetired",
+      "msg": "Solver em saída de stake (aposentado)"
+    },
+    {
+      "code": 6042,
+      "name": "AgentNotRetired",
+      "msg": "Solver não pediu saída de stake"
+    },
+    {
+      "code": 6043,
+      "name": "StakeExitNotReached",
+      "msg": "A espera da saída de stake ainda não terminou"
+    },
+    {
+      "code": 6044,
+      "name": "StakeExitExtensionsExhausted",
+      "msg": "A espera da saída de stake já foi estendida o máximo de vezes"
+    },
+    {
+      "code": 6045,
+      "name": "SlashPending",
+      "msg": "Há uma proposta de confisco pendente"
+    },
+    {
+      "code": 6046,
+      "name": "SlashDelayNotReached",
+      "msg": "A espera de 72 h do confisco ainda não terminou"
+    },
+    {
+      "code": 6047,
+      "name": "SlashAlreadyContested",
+      "msg": "A proposta de confisco já foi contestada"
     }
   ],
   "types": [
@@ -3915,6 +4806,9 @@
           },
           {
             "name": "Suspended"
+          },
+          {
+            "name": "Retired"
           }
         ]
       }
@@ -4758,6 +5652,255 @@
       }
     },
     {
+      "name": "SlashCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashContested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "contest_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashProposal",
+      "docs": [
+        "Proposta de confisco (PDA `[slash, agent]`): uma por solver, fechada ao executar ou cancelar."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "contest_hash",
+            "docs": [
+              "Contestação do criador (só evidência); `contested_at == 0` = sem contestação."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "contested_at",
+            "type": "i64"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Quem pagou o rent (recebe de volta ao fechar)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "executable_at",
+            "docs": [
+              "Primeiro instante em que `execute_slash` passa."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeExit",
+      "docs": [
+        "Pedido de saída do stake (PDA `[stake_exit, agent]`): existe só enquanto o solver está `Retired`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "exit_at",
+            "docs": [
+              "A partir daqui (inclusive) o criador pode sacar."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "requested_at",
+            "type": "i64"
+          },
+          {
+            "name": "extensions",
+            "docs": [
+              "Extensões já aplicadas pelo admin (máximo `MAX_STAKE_EXIT_EXTENSIONS`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Quem pagou o rent (recebe de volta ao fechar)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeExitCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeExitExtended",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "exit_at",
+            "type": "i64"
+          },
+          {
+            "name": "extensions",
+            "type": "u8"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeExitRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "exit_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "StakeSlashed",
       "type": {
         "kind": "struct",
@@ -4795,6 +5938,26 @@
             "docs": [
               "Stake do solver depois do aporte."
             ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           }
         ]

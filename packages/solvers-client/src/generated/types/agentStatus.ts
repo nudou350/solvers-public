@@ -8,7 +8,7 @@
 
 import { combineCodec, getEnumDecoder, getEnumEncoder, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder } from '@solana/kit';
 
-export enum AgentStatus { Pending, Active, Suspended }
+export enum AgentStatus { Pending, Active, Suspended, Retired }
 
 export type AgentStatusArgs = AgentStatus;
 

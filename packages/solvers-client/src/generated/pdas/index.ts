@@ -14,6 +14,8 @@ export * from './licenseReview.js';
 export * from './pendingAdmin.js';
 export * from './reputation.js';
 export * from './review.js';
+export * from './slashProposal.js';
+export * from './stakeExit.js';
 export * from './stakeVault.js';
 export * from './submitReviewWithCreditsCredits.js';
 export * from './vault.js';

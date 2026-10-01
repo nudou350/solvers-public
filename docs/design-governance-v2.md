@@ -37,7 +37,7 @@ Proposta: `propose_slash(amount, reason_hash)` e `execute_slash` após 72 h, no 
 | A. `Config.pause_flags` | 0 contas extras: `register_agent`, `purchase_license`, `buy_credits`, `create_escrow`, `mark_passed`, `release_milestone`, `resolve_dispute` já leem Config. IDL das instruções intacto |
 | B. PDA `[b"pause"]` | +1 conta em cada instrução bloqueada: IDL, cliente, servidor e tx mudam; "inexistente = livre" pede checagem manual |
 
-**Recomendo A.** Bit0 entradas (`register_agent`, `purchase_license`, `buy_credits`, `create_escrow`); bit1 pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`). Saídas do comprador nunca pausam (`cancel_undelivered`, `resolve_stale_dispute`, `close_escrow`, `open_dispute` já não leem Config). `set_pause`: `guardian` só liga; admin liga e desliga. Bug numa saída só se corrige com upgrade.
+**Recomendo A.** Bit0 entradas (`register_agent`, `purchase_license`, `buy_credits`, `create_escrow`); bit1 pagamentos (`release_milestone`, `resolve_dispute`); `mark_passed` fica de fora de propósito: não move dinheiro e, se pausasse, o `delivery_deadline` venceria com o verificador impedido de marcar a entrega (o comprador cancelaria e o criador perderia a etapa). Saídas do comprador nunca pausam (`cancel_undelivered`, `resolve_stale_dispute`, `close_escrow`, `open_dispute` já não leem Config). `set_pause`: `guardian` só liga; admin liga e desliga. Bug numa saída só se corrige com upgrade.
 
 ## 4. Migração do Config
 
