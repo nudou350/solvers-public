@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { unitsToUsdc } from "@solvers/shared";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
@@ -32,7 +32,7 @@ import {
   responseHash,
   watermark,
 } from "../runtime/engine.js";
-import { agentIsAvailable, assertAgentAvailable, UNAVAILABLE_TEXT } from "../runtime/availability.js";
+import { agentIsAvailable, RETIRED_TEXT, servePolicy, trialAllowed, UNAVAILABLE_TEXT } from "../runtime/availability.js";
 import { canUseMemory, MEMORY_NO_ACCESS_TEXT } from "../runtime/memory-access.js";
 import { getPackage, type SolverPackage } from "../runtime/packages.js";
 import { guaranteesText, milestoneDeliveryBlock, resolveEscrowId } from "../runtime/guarantee-text.js";
@@ -89,11 +89,20 @@ function reportUsageLogFailure(tool: string, wallet: string, e: unknown): void {
  * Antes aceitava qualquer agent_id do catálogo.
  */
 export async function assertMemoryAccess(wallet: string, row: typeof schema.agents.$inferSelect): Promise<void> {
-  assertAgentAvailable(row);
+  const policy = servePolicy(row);
+  if (policy === "closed") throw new HttpError(403, UNAVAILABLE_TEXT, "agent_unavailable");
+  // Solver aposentado: sessão de teste não conta; só licença ou sessão paga.
   const [open] = await db
     .select({ id: schema.sessions.id })
     .from(schema.sessions)
-    .where(and(eq(schema.sessions.wallet, wallet), eq(schema.sessions.agentId, row.id), gt(schema.sessions.expiresAt, new Date())))
+    .where(
+      and(
+        eq(schema.sessions.wallet, wallet),
+        eq(schema.sessions.agentId, row.id),
+        gt(schema.sessions.expiresAt, new Date()),
+        policy === "paid_only" ? ne(schema.sessions.access, "trial") : undefined,
+      ),
+    )
     .limit(1);
   const licensed = open ? false : (await ownedAgents(wallet)).has(row.id);
   if (!canUseMemory({ licensed, openSession: !!open })) throw new HttpError(403, MEMORY_NO_ACCESS_TEXT, "memory_no_access");
@@ -239,6 +248,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     tool(ctx, "get_purchase_link", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
+      if (!agentIsAvailable(row)) return { text: servePolicy(row) === "paid_only" ? RETIRED_TEXT : UNAVAILABLE_TEXT, agentId: row.id };
       return { text: `Link para ${row.name} (licença vitalícia, ${unitsToUsdc(row.price)} USDC): ${purchaseLink(row.slug)}`, agentId: row.id };
     }),
   );
@@ -274,7 +284,8 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     tool(ctx, "activate_solver", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
       const pkg = requirePackage(row.id);
-      if (!agentIsAvailable(row)) return { text: UNAVAILABLE_TEXT, agentId: row.id };
+      // Aposentado ("paid_only") ainda atende quem tem direito pago; fechado (suspenso) corta tudo.
+      if (servePolicy(row) === "closed") return { text: UNAVAILABLE_TEXT, agentId: row.id };
       let open = await findOpenSession(ctx.wallet, row.id, pkg.manifest.version, pkg.steps.length);
       // Licença revendida ou garantia encerrada: descarta a sessão e segue o fluxo normal.
       if (open && !(await sessionGrantValid(open))) {
@@ -285,6 +296,11 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       if (open?.access === "trial") {
         const paid = await paidAccess(ctx.wallet, row);
         if (paid) open = await promoteSession(open, paid);
+      }
+      // Aposentado: sessão de teste que sobrou não serve (sem direito pago, fecha e cai no fluxo normal, que recusa).
+      if (open?.access === "trial" && !trialAllowed(row)) {
+        await expireSession(open.id);
+        open = null;
       }
       if (open) {
         const step = Math.min(open.stepIndex + 1, pkg.steps.length);
@@ -300,9 +316,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           sessionId: open.id,
         };
       }
-      const access = await resolveAccess(ctx.wallet, row, pkg, { consume: true });
+      const access = await resolveAccess(ctx.wallet, row, pkg, { consume: true, allowTrial: trialAllowed(row) });
       if (!access.ok) {
         const price = `${unitsToUsdc(row.price)} USDC`;
+        if (access.reason === "retired") return { text: RETIRED_TEXT, agentId: row.id };
         const why =
           access.reason === "no_trial"
             ? `${row.name} não tem teste grátis: para usar, o usuário precisa da licença vitalícia (${price}).`

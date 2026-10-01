@@ -5,7 +5,7 @@ import { forbidden, notFound } from "../lib/http.js";
 import { randomId, sha256Hex } from "../lib/crypto.js";
 import type { SolverPackage } from "./packages.js";
 import { escrowIsOpen, paidAccessById, sessionGrantValid, type PaidAccess } from "./access.js";
-import { assertAgentAvailable } from "./availability.js";
+import { assertAgentCanServe, servePolicy, type AccessKind } from "./availability.js";
 import { licenseRecheckDue, withSummary } from "./session-rules.js";
 
 // Motor de etapas (INSTRUCTIONS.md 5.4): sessão por ativação, uma etapa por vez, gates,
@@ -96,7 +96,7 @@ export async function expireSession(sessionId: string): Promise<void> {
  * grátis não passou do teto e que a licença (se for o caso) continua com a mesma carteira.
  */
 export async function getSession(sessionId: string, wallet: string): Promise<Session> {
-  const [s] = await db
+  let [s] = await db
     .update(schema.sessions)
     .set({ calls: sql`${schema.sessions.calls} + 1` })
     .where(and(eq(schema.sessions.id, sessionId), eq(schema.sessions.wallet, wallet)))
@@ -111,7 +111,13 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
     .select({ status: schema.agents.status, platformStatus: schema.agents.platformStatus })
     .from(schema.agents)
     .where(eq(schema.agents.id, s.agentId));
-  assertAgentAvailable(agent ?? { status: "missing", platformStatus: "suspended" });
+  const availability = agent ?? { status: "missing", platformStatus: "suspended" };
+  // Solver aposentado: só o direito pago segue. Sessão de teste de quem comprou depois vira paga; sem direito, fecha.
+  if (s.access === "trial" && servePolicy(availability) === "paid_only") {
+    const paid = await paidAccessById(wallet, s.agentId);
+    if (paid) s = await promoteSession(s, paid);
+  }
+  assertAgentCanServe(availability, s.access as AccessKind);
   if (s.expiresAt < new Date()) throw forbidden("Sessão expirada. Ative o solver de novo com activate_solver.");
   if (s.access === "trial" && s.calls > TRIAL_MAX_CALLS) {
     // Só no momento de bloquear: quem comprou durante o teste segue na mesma sessão, sem limites.

@@ -2,7 +2,7 @@
 
 Fora daqui (outro agente): `propose/accept/cancel_admin`, `set_treasury`, `top_up_stake`. Só proposta, sem código.
 
-**Conferido no código:** o cofre `[stake, agent]` só se move por `slash_stake`. `Escrow` guarda `agent`, mas `Agent` não conta escrows nem disputas, e `resolve_dispute` paga do cofre do escrow: a stake não garante escrow nenhum. Config na devnet tem 187 bytes e `Account<Config>` numa conta curta falha com `AccountDidNotDeserialize` (anchor-attribute-account 1.2.0, `lib.rs:284`). O `resize` zera bytes novos (solana-account-info 3.1.1).
+**Conferido no código:** o cofre `[stake, agent]` só se movia por `slash_stake` (removido na fase 2: hoje se move por `execute_slash` e `withdraw_stake`). `Escrow` guarda `agent`, mas `Agent` não conta escrows nem disputas, e `resolve_dispute` paga do cofre do escrow: a stake não garante escrow nenhum. Config na devnet tem 187 bytes e `Account<Config>` numa conta curta falha com `AccountDidNotDeserialize` (anchor-attribute-account 1.2.0, `lib.rs:284`). O `resize` zera bytes novos (solana-account-info 3.1.1).
 
 ## 1. `withdraw_stake` (sem mudar layout existente)
 
@@ -18,11 +18,11 @@ Conta nova `StakeLock` `[b"stake_lock", agent]` (`exit_at`, `slash_amount`, `sla
 
 **Limite honesto:** sem layout novo não se prova "nenhuma disputa aberta"; etapa entregue e contestada só sai pelo admin, sem prazo. Mitigação: `extend_stake_exit` do admin (máx. 2 × 30 dias, com evento). O contador `Agent.open_escrows` exigiria realocar os Agents e passar `agent` a `cancel_undelivered` e `resolve_stale_dispute` (IDL muda em 3 instruções); não vale, pois a stake não cobre escrow.
 
-## 2. `slash_stake`
+## 2. Confisco (`slash_stake` foi substituído por `propose_slash` → 72 h → `execute_slash`)
 
-Hoje: admin, qualquer valor, imediato, sempre suspende, destino tesouraria, evento sem motivo, sem teste.
+Antes (removido): admin, qualquer valor, imediato, sempre suspende, destino tesouraria, evento sem motivo, sem teste.
 
-Proposta: `propose_slash(amount, reason_hash)` e `execute_slash` após 72 h, no mesmo `StakeLock` (um caso por agente). Propor já suspende. Eventos `StakeSlashProposed`/`StakeSlashExecuted`; ajustar `DECODERS` em `packages/chain/src/events.ts`. Remover o `slash_stake` direto, senão o prazo é decorativo (nenhum cliente TS o usa).
+Proposta: `propose_slash(amount, reason_hash)` e `execute_slash` após 72 h, no mesmo `StakeLock` (um caso por agente). Propor já suspende. Eventos `SlashProposed`/`SlashExecuted` (nomes finais); ajustar `DECODERS` em `packages/chain/src/events.ts`. `slash_stake` direto foi removido, senão o prazo é decorativo (nenhum cliente TS o usava). Implementado como PDA `[slash, agent]` (e `[stake_exit, agent]` para a saída), não `StakeLock`.
 
 - **Teto por evento:** não recomendo; N eventos o contornam. A defesa é prazo + multisig.
 - **Recurso:** `contest_slash(reason_hash)` só registra evidência; o admin decide.

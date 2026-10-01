@@ -19,7 +19,7 @@ import { DailyChart } from "./DailyChart";
 type Dash = CreatorDashboard;
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; data: Dash };
 
-const STATUS_LABEL: Record<Dash["agents"][number]["status"], string> = { active: "no ar", pending: "em revisão", suspended: "suspenso" };
+const STATUS_LABEL: Record<Dash["agents"][number]["status"], string> = { active: "no ar", pending: "em revisão", suspended: "suspenso", retired: "Aposentado" };
 const RESULT: Record<Dash["disputes"][number]["result"], { label: string; chip: "warn" | "red" | "ok"; tone: string }> = {
   open: { label: "Em análise", chip: "warn", tone: "warn" },
   buyer: { label: "Favorável ao comprador", chip: "red", tone: "bad" },

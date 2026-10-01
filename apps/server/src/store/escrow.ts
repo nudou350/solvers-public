@@ -28,6 +28,7 @@ import { criteriaHash, discardAcceptance, filesHash, readDeliverable, saveAccept
 import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, deliveryDeadlineFrom, deliveryIntact, resolveDeliveryDays } from "./delivery-rules.js";
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
+import { assertEntriesOpen } from "./pause-gate.js";
 import { buildForUserChecked } from "./tx-build.js";
 import { notifyCreator } from "../notify/telegram.js";
 import { agentIsAvailable } from "../runtime/availability.js";
@@ -120,6 +121,7 @@ escrowRouter.post(
   requireAuth,
   h(async (req): Promise<TxResponse> => {
     const wallet = address(requireWallet(req));
+    await assertEntriesOpen("escrow"); // pausa de emergência (bit de entradas): 503 antes de montar a transação
     const body = parse(CreateBody, req.body);
     const deliveryDays = resolveDeliveryDays(body.deliveryDays);
     const agent = await findAgentRow(body.agentId);

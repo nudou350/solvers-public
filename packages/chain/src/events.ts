@@ -23,7 +23,17 @@ export type SolversEvent =
   | { name: "AdminTransferCancelled"; data: gen.AdminTransferCancelledEvent }
   | { name: "AdminTransferred"; data: gen.AdminTransferredEvent }
   | { name: "TreasuryUpdated"; data: gen.TreasuryUpdatedEvent }
-  | { name: "StakeToppedUp"; data: gen.StakeToppedUpEvent };
+  | { name: "StakeToppedUp"; data: gen.StakeToppedUpEvent }
+  | { name: "PauseChanged"; data: gen.PauseChangedEvent }
+  | { name: "GuardianChanged"; data: gen.GuardianChangedEvent }
+  | { name: "StakeExitRequested"; data: gen.StakeExitRequestedEvent }
+  | { name: "StakeExitExtended"; data: gen.StakeExitExtendedEvent }
+  | { name: "StakeExitCancelled"; data: gen.StakeExitCancelledEvent }
+  | { name: "StakeWithdrawn"; data: gen.StakeWithdrawnEvent }
+  | { name: "SlashProposed"; data: gen.SlashProposedEvent }
+  | { name: "SlashContested"; data: gen.SlashContestedEvent }
+  | { name: "SlashCancelled"; data: gen.SlashCancelledEvent }
+  | { name: "SlashExecuted"; data: gen.SlashExecutedEvent };
 
 const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) => unknown]> = [
   ["AgentRegistered", gen.AGENT_REGISTERED_EVENT_DISCRIMINATOR, gen.parseAgentRegisteredEvent],
@@ -47,6 +57,16 @@ const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) 
   ["AdminTransferred", gen.ADMIN_TRANSFERRED_EVENT_DISCRIMINATOR, gen.parseAdminTransferredEvent],
   ["TreasuryUpdated", gen.TREASURY_UPDATED_EVENT_DISCRIMINATOR, gen.parseTreasuryUpdatedEvent],
   ["StakeToppedUp", gen.STAKE_TOPPED_UP_EVENT_DISCRIMINATOR, gen.parseStakeToppedUpEvent],
+  ["PauseChanged", gen.PAUSE_CHANGED_EVENT_DISCRIMINATOR, gen.parsePauseChangedEvent],
+  ["GuardianChanged", gen.GUARDIAN_CHANGED_EVENT_DISCRIMINATOR, gen.parseGuardianChangedEvent],
+  ["StakeExitRequested", gen.STAKE_EXIT_REQUESTED_EVENT_DISCRIMINATOR, gen.parseStakeExitRequestedEvent],
+  ["StakeExitExtended", gen.STAKE_EXIT_EXTENDED_EVENT_DISCRIMINATOR, gen.parseStakeExitExtendedEvent],
+  ["StakeExitCancelled", gen.STAKE_EXIT_CANCELLED_EVENT_DISCRIMINATOR, gen.parseStakeExitCancelledEvent],
+  ["StakeWithdrawn", gen.STAKE_WITHDRAWN_EVENT_DISCRIMINATOR, gen.parseStakeWithdrawnEvent],
+  ["SlashProposed", gen.SLASH_PROPOSED_EVENT_DISCRIMINATOR, gen.parseSlashProposedEvent],
+  ["SlashContested", gen.SLASH_CONTESTED_EVENT_DISCRIMINATOR, gen.parseSlashContestedEvent],
+  ["SlashCancelled", gen.SLASH_CANCELLED_EVENT_DISCRIMINATOR, gen.parseSlashCancelledEvent],
+  ["SlashExecuted", gen.SLASH_EXECUTED_EVENT_DISCRIMINATOR, gen.parseSlashExecutedEvent],
 ];
 
 type ReadonlyUint8Array = gen.AgentRegisteredEvent["agentId"];

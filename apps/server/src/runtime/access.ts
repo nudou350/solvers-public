@@ -12,7 +12,7 @@ export type { PaidAccess } from "./access-rules.js";
 export type Access =
   | ({ ok: true } & PaidAccess)
   | { ok: true; kind: "trial"; trial: TrialLimits; used: number; remaining: number; usage: TrialUsage }
-  | { ok: false; reason: "no_trial" | "trial_exhausted"; trial: TrialLimits | null };
+  | { ok: false; reason: "no_trial" | "trial_exhausted" | "retired"; trial: TrialLimits | null };
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
@@ -100,9 +100,16 @@ export async function sessionGrantValid(s: typeof schema.sessions.$inferSelect):
  * Decide como a carteira acessa o solver nesta ativação: licença vitalícia > tarefa com garantia
  * aberta > teste grátis (se o especialista tiver; usos por carteira contados off-chain).
  */
-export async function resolveAccess(wallet: string, agent: AgentRow, pkg: SolverPackage, opts: { consume: boolean }): Promise<Access> {
+export async function resolveAccess(
+  wallet: string,
+  agent: AgentRow,
+  pkg: SolverPackage,
+  /** `allowTrial: false` (solver aposentado): só o direito pago vale, nunca o teste grátis. */
+  opts: { consume: boolean; allowTrial?: boolean },
+): Promise<Access> {
   const paid = await paidAccess(wallet, agent);
   if (paid) return { ok: true, ...paid };
+  if (opts.allowTrial === false) return { ok: false, reason: "retired", trial: null };
 
   const trial = trialLimits(pkg.manifest);
   if (!trial) return { ok: false, reason: "no_trial", trial: null };

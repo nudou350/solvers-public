@@ -342,7 +342,7 @@ pub struct MilestoneState {
 | `approve_agent` | admin | Pending para Active (moderação) | P0 |
 | `update_version(version, version_hash)` | criador | Nova versão; zera `eval_score_bps` até nova avaliação | P1 |
 | `set_eval(eval_score_bps, eval_hash)` | verifier | Registra nota de desempenho da versão atual | P0 |
-| `suspend_agent` / `slash_stake(amount)` | admin | Suspende e move stake para treasury | P1 |
+| `suspend_agent` / `propose_slash(amount, reason_hash)` → (72 h) → `execute_slash` | admin | Suspende; o confisco move stake para a treasury só depois de 72 h (`cancel_slash` desiste; o criador pode `contest_slash`) | P1 |
 
 **Compra e uso**
 

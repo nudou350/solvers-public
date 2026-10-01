@@ -46,6 +46,7 @@ import { agentIsAvailable } from "../runtime/availability.js";
 import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
+import { assertEntriesOpen } from "./pause-gate.js";
 import { buildForUserChecked } from "./tx-build.js";
 
 export const storeRouter = Router();
@@ -379,6 +380,7 @@ storeRouter.post(
   requireAuth,
   h(async (req): Promise<TxResponse> => {
     const wallet = address(requireWallet(req));
+    await assertEntriesOpen("purchase"); // pausa de emergência (bit de entradas): 503 antes de montar a transação
     // Só licença vitalícia: o pagamento por uso (type "credits") acabou e é recusado com 400.
     const body = parse(z.object({ agentId: z.string(), type: z.literal("permanent").default("permanent") }), req.body);
     const row = await findAgentRow(body.agentId);

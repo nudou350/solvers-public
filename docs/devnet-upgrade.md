@@ -23,15 +23,20 @@ Quem faz o trabalho é `scripts/chain/upgrade-devnet.sh` (dry-run por padrão; s
 - O ProgramData pode não ter folga sobre o `.so` implantado: qualquer crescimento além do `Data Length` atual
   (`solana program show <id> --url devnet`) exige extensão; o script estende o crescimento + 1 KB de margem.
 - **Config (fee_bps)**: o novo `update_config` recusa `fee_bps` > 2000. Confira antes (somente leitura, a partir
-  de `apps/server`; se passar de 2000, corrija a Config antes do upgrade):
+  de `apps/server`; se passar de 2000, corrija a Config antes do upgrade). O cliente gerado novo só decodifica a
+  Config **v2** (285 bytes) e a da devnet ainda é **v1** (187 bytes), então o trecho lê o `fee_bps` direto dos bytes
+  (u16 no offset 168: 8 do discriminador + 5 endereços de 32):
 
 ```bash
 cd apps/server && node --input-type=module - <<'EOF'
 import { createSolanaRpc } from "@solana/kit";
 import * as c from "@solvers/client";
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
-const cfg = await c.fetchConfig(rpc, (await c.findConfigPda())[0]);
-console.log("fee_bps =", cfg.data.feeBps, cfg.data.feeBps <= 2000 ? "(ok)" : "(ACIMA de 2000)");
+const [pda] = await c.findConfigPda();
+const { value } = await rpc.getAccountInfo(pda, { encoding: "base64" }).send();
+const d = Buffer.from(value.data[0], "base64");
+const fee = d.readUInt16LE(168);
+console.log("Config", pda, "| tamanho =", d.length, "(v1 = 187) | fee_bps =", fee, fee <= 2000 ? "(ok)" : "(ACIMA de 2000)");
 EOF
 ```
   Hoje: `fee_bps = 1000` (ok).
@@ -51,9 +56,48 @@ EOF
    do `.so` novo) -> transferência fee-payer -> admin (se faltar) -> `extend` (blocos de 10000 bytes) ->
    `solana program deploy` (upgrade, `--with-compute-unit-price 1000`) -> conferência (Last Deployed Slot mudou,
    Data Length >= `.so`, conteúdo on-chain idêntico ao `.so`) -> saldos finais (e devolução, se pedida).
+4a. **Migrar a Config (v1 -> v2), logo depois do upgrade e antes de qualquer outra coisa.** O programa novo lê a
+   Config com 285 bytes; a da devnet tem 187 e só `migrate_config` a estende (acrescenta `layout_version`,
+   `pause_flags`, `guardian` e 64 reservados, tudo zerado, e grava `layout_version = 2`; os 187 bytes antigos ficam
+   intactos). Assina a **upgrade authority** (na devnet é a chave do admin, `~/solvers-keys/admin.json`); o fee payer
+   paga o rent adicional (~0,0007 SOL, fica na conta Config). Dry-run primeiro, depois `--yes`:
+
+```bash
+pnpm --filter @solvers/server cli:admin:devnet migrate-config --keypair ~/solvers-keys/admin.json
+pnpm --filter @solvers/server cli:admin:devnet migrate-config --keypair ~/solvers-keys/admin.json --yes
+```
+   O dry-run lê a Config **sem decodificar** (ela é v1), confere que a chave é mesmo a upgrade authority gravada no
+   ProgramData e simula. Depois de enviado, `migrate-config` recusa uma segunda vez ("já está no layout v2"), e o
+   programa também (`ConfigAlreadyMigrated`, 6037).
+
+   **Janela:** entre o fim do passo 4 e o fim do 4a, **toda instrução do programa que lê a Config falha**
+   (`AccountDidNotDeserialize`: compras, garantias, pagamentos, `update_config`, `set_treasury`...). Dura segundos
+   se você rodar o 4a em seguida; não rode nada além do 4a nesse intervalo. No servidor, o decoder novo também
+   falha em Config v1: `fetchConfig()` lança `ConfigNotMigratedError` (mensagem aponta o `migrate-config`) e a leitura
+   da pausa (`fetchConfigState`) devolve `v1` sem lançar (o servidor segue sem bloquear; ver "Pausa" abaixo).
+   Por isso o push do servidor (passo 6) só vem depois do 4a.
+
+   **Conferir (somente leitura):** a conta Config deve ter **285 bytes** (v1 = 187) e `layoutVersion = 2`:
+
+```bash
+cd apps/server && node --input-type=module - <<'EOF'
+import { createSolanaRpc } from "@solana/kit";
+import * as c from "@solvers/client";
+const rpc = createSolanaRpc("https://api.devnet.solana.com");
+const [pda] = await c.findConfigPda();
+const { value } = await rpc.getAccountInfo(pda, { encoding: "base64" }).send();
+const d = Buffer.from(value.data[0], "base64");
+console.log("Config", pda, "| tamanho =", d.length, d.length === 285 ? "(v2, ok)" : "(ESPERADO 285)");
+if (d.length === 285) { const x = c.getConfigDecoder().decode(d); console.log({ layoutVersion: x.layoutVersion, pauseFlags: x.pauseFlags, guardian: x.guardian, feeBps: x.feeBps, admin: x.admin }); }
+EOF
+```
+   Esperado: `layoutVersion: 2`, `pauseFlags: 0`, `guardian: 1111...1111` (sem guardian) e os demais campos como antes
+   (`feeBps`, `admin`...). Alternativa sem Node: `solana account 4F8CXntHkggs1XyFB156UH55zpHQT3tq4GGxp6bLt8tt --url devnet`
+   mostra `Length: 285`. Se o tamanho não for 285, **não dê push**.
+   Se o 4a falhar no meio, a transação é atômica: a Config continua v1 e dá para repetir.
 5. **Conferir as outras contas** (somente leitura; só depois disto liberar o push). Hoje o programa tem 53 contas
    (6 Agent, 19 LicenseReview, 19 Review, 7 UserReputation, 1 Config e o escrow de teste antigo); depois do
-   upgrade devem decodificar todas, exceto o escrow antigo:
+   upgrade (e a migração do passo 4a) devem decodificar todas, exceto o escrow antigo (a Config já migrada conta como v2):
 
 ```bash
 cd apps/server && node --input-type=module - <<'EOF'
@@ -73,7 +117,7 @@ EOF
 ```
    Esperado após o upgrade: só `CY8GP4eM25jL7ofX4oEfedoCVh3BHtP4oHucmwWKvTzd` (o escrow antigo) pode falhar; se
    outra conta falhar, **não dê push**: investigue (ou faça rollback).
-6. **Servidor + web**: só agora, `git push` na `master` (o CI faz o deploy na VPS). Acompanhe o Actions e
+6. **Servidor + web**: só agora (upgrade feito, Config com 285 bytes), `git push` na `master` (o CI faz o deploy na VPS). Acompanhe o Actions e
    `pm2 logs solvers-api`. Veja a janela de incompatibilidade abaixo.
 7. **Retirar o escrow antigo no banco da VPS** (PG `solvers`, porta 5433). Faça `pg_dump` antes e rode, na VPS:
    `pnpm --filter @solvers/server cli:retire-escrows` (dry-run: só lista, lê o RPC, não altera nada) e, revisando a
@@ -86,23 +130,58 @@ EOF
 
 ## O que muda neste upgrade (governança do admin)
 
-- **5 instruções novas**: `propose_admin(new_admin)`, `accept_admin`, `cancel_admin_transfer` (rotação do admin em 2 etapas),
-  `set_treasury` (troca a conta de USDC da tesouraria) e `top_up_stake(amount)` (o criador repõe stake; reativar o
-  solver ainda exige `approve_agent`). Retirada de stake e pausa continuam inexistentes (`docs/design-governance-v2.md`).
-- **PDA nova** `PendingAdmin` (seeds `["pending_admin", config]`, 73 bytes): só existe entre a proposta e o aceite ou
-  cancelamento. Não muda o layout de `Config` nem de nenhuma conta existente, então o passo 5 não muda.
-- **5 eventos e 2 erros novos** (`NotPendingAdmin` 6034, `InvalidNewAdmin` 6035). O indexador já os trata: `StakeToppedUp`
-  relê o solver (o stake é espelhado) e `TreasuryUpdated` limpa o cache da tesouraria; os de admin só ficam registrados.
-- **O `.so` cresce de 715.664 para 773.992 bytes (+58.328)**. Em 2026-10-01 o `solana program show` da devnet mostrava
-  `Data Length: 726216` (o ProgramData já tem folga sobre o `.so` anterior), então o crescimento a cobrir é de
-  47.776 bytes. Pelo cálculo do script (crescimento + 1.024 de margem, arredondado a blocos de 10.240): **extensão de
-  51.200 bytes (5 blocos), ~0,26 SOL (51.200 × 5,08e-6, não volta)**. O buffer do upgrade passa de ~3,5 para
-  **~3,9 SOL** (774.029 bytes; volta ao admin). Necessário no admin: ~3,9 + 0,26 + 0,05 de margem = **~4,2 SOL**
-  (a linha "Hoje" dos pré-requisitos, ~3,83, era para o `.so` de 715.664 bytes). Com o admin em ~3,70 SOL faltam ~0,5
-  e o script transfere ~0,6 do fee-payer (~2,40 SOL), que fica com ~1,8, acima da reserva de 1 SOL. Estimativa: o
-  `Data Length` muda a cada upgrade, então confira o valor atual antes e use o dry-run do passo 2, que imprime os
-  números reais.
-- **Ordem (a mesma de sempre)**: build, dry-run, `--yes`, conferência e **só então** `git push` do servidor. O servidor
+- **16 instruções novas (e `slash_stake` removida)**: `propose_admin(new_admin)`, `accept_admin`, `cancel_admin_transfer` (rotação do admin em 2 etapas),
+  `set_treasury` (troca a conta de USDC da tesouraria), `top_up_stake(amount)` (o criador repõe stake; reativar o
+  solver ainda exige `approve_agent`), `migrate_config` (passo 4a, instrução de transição), `set_pause(flags)` e
+  `set_guardian(novo)` (pausa de emergência), mais as 8 do **stake com saída e confisco com prazo**:
+  `request_stake_exit`, `cancel_stake_exit`, `withdraw_stake`, `contest_slash` (assinadas pelo **criador**) e
+  `extend_stake_exit`, `propose_slash`, `cancel_slash`, `execute_slash` (**admin**). `slash_stake` (confisco imediato) deixa
+  de existir: o confisco é propor -> 72 h -> executar. As do criador **existem on-chain mas não entram no `cli:admin`**: o
+  criador co-assina pelo site (D2 do `PACKAGE_SPEC.md`).
+- **Janela do confisco e saída com extensão**: a proposta só executa de 72 h até 72 h + 14 dias (`SlashExpired` depois); vencida, o
+  criador pode fechar a proposta (`cancel_slash`, `SlashNotExpired` antes disso; o admin cancela quando quiser) e então sacar o
+  stake. O criador **não consegue cancelar a saída** (`cancel_stake_exit`) enquanto houver extensão do admin (`StakeExitExtended`).
+- **Stake com saída** (regras no programa, `instructions/stake.rs`): o criador pede saída (`request_stake_exit`) e o solver vira
+  **`Retired`** (status 3, fora da venda); o saque (`withdraw_stake`) só passa **30 dias** depois, sem proposta de confisco
+  pendente. O admin pode estender a espera em 30 dias, no máximo **2 vezes** (`extend_stake_exit`, com motivo). Confisco:
+  `propose_slash(valor, hash do motivo)` suspende o solver na hora; só `execute_slash` **72 h depois** move o dinheiro
+  (para a tesouraria); o criador pode `contest_slash` (só evidência) e o admin pode `cancel_slash`. PDAs novas por solver:
+  `StakeExit` (`["stake_exit", agent]`) e `SlashProposal` (`["slash", agent]`), fechadas no fim do ciclo. `min_stake` passa a
+  valer em compra, créditos, garantia e `approve_agent`.
+- **Config muda de layout (v1 187 B -> v2 285 B)**, só com campos novos no fim: `layout_version`, `pause_flags`,
+  `guardian`, `_reserved[64]`. Exige o passo 4a. **PDA nova** `PendingAdmin` (seeds `["pending_admin", config]`,
+  73 bytes): só existe entre a proposta e o aceite ou cancelamento; nenhuma outra conta existente muda.
+- **Pausa de emergência** (`Config.pause_flags`): bit 1 entradas (`register_agent`, `purchase_license`, `buy_credits`,
+  `create_escrow`), bit 2 pagamentos (`release_milestone`, `mark_passed`, `resolve_dispute`). Saídas do comprador nunca
+  pausam. O admin liga e desliga; o `guardian` só liga. Nasce desligada (`0`) e sem guardian.
+- **15 eventos e 17 erros novos** (`NotPendingAdmin` 6034, `InvalidNewAdmin` 6035, `Paused` 6036, `ConfigAlreadyMigrated` 6037,
+  `InvalidPauseFlags` 6038, `NotPauseAuthority` 6039, `GuardianCannotUnpause` 6040, `AgentRetired` 6041, `AgentNotRetired` 6042,
+  `StakeExitNotReached` 6043, `StakeExitExtensionsExhausted` 6044, `SlashPending` 6045, `SlashDelayNotReached` 6046,
+  `SlashAlreadyContested` 6047, `StakeExitExtended` 6048, `SlashExpired` 6049, `SlashNotExpired` 6050; eventos: os 5 de governança, `PauseChanged`, `GuardianChanged` e os 8 de stake/slash). O indexador trata todos: `StakeToppedUp` relê o solver (o stake é espelhado),
+  `TreasuryUpdated` limpa o cache da tesouraria, `PauseChanged`/`GuardianChanged`/`SlashProposed`/`SlashExecuted` escrevem `[ALERTA]` no log do servidor
+  (e `PauseChanged` zera o cache da pausa); os de saída de stake e `SlashExecuted` relêem o solver; `Retired` é espelhado como
+  `retired` (some da vitrine, da compra e do teste grátis; licença vitalícia e garantia aberta continuam servindo); os de admin só ficam registrados.
+- **Servidor e pausa**: antes de montar compra (`/tx/purchase`) ou garantia (criar escrow), o servidor lê `pause_flags`
+  (cache de 10 s, commitment `confirmed`); com o bit de entradas ligado responde **503** `platform_paused` com
+  "Compras pausadas temporariamente". Leitura que falha, Config v1 ou tamanho desconhecido **não bloqueiam**
+  (fail-open): o programa recusa com `Paused` e a simulação antes da assinatura devolve a mensagem em português
+  como 409. Pagamentos pausados (bit 2) só aparecem pela simulação (409), não por 503.
+- **O `.so` cresce de 715.664 para 904.576 bytes (+188.912)** (o `.so` final, com Config v2, pausa, guardian e stake com saída;
+  `ls -l target/deploy/solvers.so`). Em 2026-10-01 o `solana program show` da devnet mostrava `Data Length: 726216`, então o
+  ProgramData **não** comporta o novo e a extensão é obrigatória. Conta (a regra do script: crescimento + 1.024 de margem,
+  arredondado para cima a blocos de 10.240; 5,08e-6 SOL por byte):
+  - crescimento = 904.576 - 726.216 = **178.360** bytes; + 1.024 = 179.384; / 10.240 = 17,52 -> **18 blocos = 184.320 bytes**;
+  - extensão = 184.320 x 5,08e-6 = **~0,936 SOL** (não volta);
+  - buffer do upgrade = (904.576 + 37) x 5,08e-6 = **~4,595 SOL** (volta ao admin ao final);
+  - necessário no admin = 4,595 + 0,936 + 0,05 de margem = **~5,58 SOL** (a linha "Hoje" dos pré-requisitos, ~3,83, era para
+    o `.so` de 715.664 bytes). Com o admin em ~3,70 SOL faltam ~1,88 e o script transfere ~1,9 do fee-payer (arredondado a
+    0,1), que fica com ~2,3 se hoje tiver ~4,2, acima da reserva de 1 SOL. Some ~0,0007 SOL da migração da Config (pago pelo
+    fee-payer). Estimativa: o saldo do admin e o `Data Length` mudam, então confira antes e use o dry-run do passo 2, que
+    imprime os números reais.
+- **Sequência final (a ordem que vale)**: **build** (`build-program.sh`) -> **dry-run** (`upgrade-devnet.sh`) -> **upgrade**
+  (`upgrade-devnet.sh --yes`) -> **`migrate-config`** (passo 4a, dry-run e `--yes`) -> **conferir** (Config com **285 bytes**,
+  `layoutVersion` 2, e as outras contas do passo 5) -> **push do servidor**.
+- **Ordem**: a sequência final acima, e o push do servidor só no fim. O servidor
   novo conhece os eventos, mas não depende deles para funcionar; já o programa novo com servidor antigo só deixa os
   eventos novos sem tratamento (o parser ignora discriminador desconhecido), sem derrubar o indexador.
 
@@ -124,7 +203,25 @@ pnpm --filter @solvers/server cli:admin:devnet cancel [--yes]                   
 pnpm --filter @solvers/server cli:admin:devnet set-treasury <conta-usdc> [--yes]
 # stake: assinado pelo CRIADOR (chave em CREATOR_KEYS_DIR/<creator.id>.json ou --keypair); sem a chave só imprime o plano
 pnpm --filter @solvers/server cli:admin:devnet top-up-stake <slug> <usdc> [--yes]
+# migração da Config v1 -> v2 (passo 4a): assina a UPGRADE AUTHORITY (na devnet, a chave do admin) com --keypair
+pnpm --filter @solvers/server cli:admin:devnet migrate-config --keypair <upgrade-authority.json> [--yes]
+# pausa de emergência: none | entradas | pagamentos | tudo (ou 0 a 3). Admin liga e desliga; o guardian (--keypair) só liga
+pnpm --filter @solvers/server cli:admin:devnet set-pause <none|entradas|pagamentos|tudo> [--keypair <guardian.json>] [--yes]
+# guardian da pausa (só o admin): endereço, ou none para remover
+pnpm --filter @solvers/server cli:admin:devnet set-guardian <endereço|none> [--yes]
+# confisco (admin): propor -> esperar 72 h -> executar. reason_hash = sha256 do texto do motivo (o comando imprime o hash)
+pnpm --filter @solvers/server cli:admin:devnet propose-slash <slug> <usdc> "<motivo>" [--yes]
+pnpm --filter @solvers/server cli:admin:devnet execute-slash <slug> [--yes]     # o dry-run mostra quanto falta para as 72 h
+pnpm --filter @solvers/server cli:admin:devnet cancel-slash <slug> [--yes]
+# saída de stake (admin): +30 dias na espera do saque, no máximo 2 vezes
+pnpm --filter @solvers/server cli:admin:devnet extend-stake-exit <slug> "<motivo>" [--yes]
 ```
+`migrate-config` confere a chave contra a upgrade authority lida no ProgramData e recusa Config que já é v2, ausente ou de
+tamanho inesperado. `set-pause` descobre se a chave é do admin ou do guardian e recusa, antes de enviar, o guardian que tentar
+soltar um bit. Os dois lêem a Config e simulam no dry-run (a migração lê a conta crua, sem decodificar). `execute-slash --yes` recusa antes
+de enviar se as 72 h não passaram e avisa quando o criador contestou. Guarde o texto do motivo: só o hash vai on-chain.
+Os comandos do **criador** (`request_stake_exit`, `cancel_stake_exit`, `withdraw_stake`, `contest_slash`) existem no
+programa e no cliente, mas **não** estão no CLI: ele co-assina pelo site (D2).
 
 Depois do `accept`, a chave antiga deixa de ser admin: troque `ADMIN_KEYPAIR` do servidor (se ele usa admin) pela nova.
 Se o criador reabastecer um solver suspenso, o admin ainda precisa aprovar de novo (`approve_agent`).
@@ -138,7 +235,9 @@ de teste da devnet). Não tente liberá-lo; basta retirá-lo do banco (passo 7).
 
 ## Janela de incompatibilidade servidor x programa
 
-- Programa novo + servidor antigo (entre os passos 4 e 6): só impede criar garantias; compras, licenças,
+- Programa novo + Config ainda v1 (entre os passos 4 e 4a): toda instrução que lê a Config falha, e o servidor novo
+  (decoder v2) não lê a Config. Só existe até o `migrate-config`; não dê push antes.
+- Programa novo + servidor antigo (entre os passos 4a e 6): só impede criar garantias; compras, licenças,
   leituras e o resto seguem funcionando. Se o indexador registrar falhas, o `cli:reindex --dead` do passo 8 recupera.
 - Servidor novo + programa antigo (push antes do upgrade): **o pior caso**. O servidor cria escrow no layout
   antigo sem aviso e ele fica irrecuperável depois do upgrade. Por isso o push só acontece no passo 6.
@@ -158,7 +257,15 @@ solana program show DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW --url https://a
 O ProgramData não encolhe: o `.so` antigo (menor) cabe no espaço já estendido. O rollback também precisa de
 ~3,5 SOL de buffer no admin (devolvidos): se usou `--return-excess`, devolva antes o saldo ao admin. Se o push já
 foi dado, desfaça o deploy do servidor/web (revert + push) para voltar ao par compatível. Escrows criados com o
-layout novo ficam ilegíveis para o programa antigo; o rollback só é limpo se ninguém os criou.
+layout novo ficam ilegíveis para o programa antigo; o rollback só é limpo se ninguém os criou. A Config v2 (285 bytes)
+é o v1 mais 98 bytes no fim, e o programa antigo a lê (teste `config_v2_is_the_v1_prefix_and_v1_readers_still_decode_it`
+em `programs/solvers/tests/program.rs`; não rodei esse teste nesta sessão), então o rollback do binário não exige
+desmigrar. O que o rollback perde: a pausa e o guardian (o binário antigo ignora `pause_flags`).
+
+**AVISO: depois do primeiro pedido de saída de stake não dá mais para voltar ao `.so` anterior.** O pedido grava o status
+`Retired` (valor 3) no Agent, e o binário antigo **não decodifica** um Agent com esse valor (o enum dele só tem 0 a 2): o
+solver (e toda instrução que o lê) passa a falhar. Até o primeiro `request_stake_exit` o rollback é limpo; depois, só
+corrigindo para a frente (novo upgrade). Combine com os criadores antes de liberar o site para o pedido de saída.
 
 ## Se algo falhar no meio
 

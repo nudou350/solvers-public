@@ -97,7 +97,7 @@ D5 (infra compartilhada da VPS), D9 (revisão em **5 dias úteis**), D10, D12 e 
 Nada da coluna "Abertura" é liberado para desconhecidos antes de tudo abaixo estar feito:
 
 1. **Jurídico**: termos do criador com cláusulas de tratamento de dados e direitos autorais; política de denúncia, retirada e prazo; textos de privacidade; revisão por advogado. Categorias Finanças, Jurídico e Saúde só para criadores verificados e com ressalva obrigatória (§17 (item 6)).
-2. **Economia**: regra contra criador mau. Hoje o depósito é 0, então `slash_stake` não tem o que confiscar, e a compra de licença paga o criador na hora, sem reembolso. O caminho sem alterar o programa é exigir depósito maior que zero (`min_stake`, que é só configuração); reter o repasse por N dias exigiria mudar o programa Anchor.
+2. **Economia**: regra contra criador mau. Hoje o depósito é 0, então o confisco (`propose_slash` → 72 h → `execute_slash`) não tem o que confiscar, e a compra de licença paga o criador na hora, sem reembolso. O caminho sem alterar o programa é exigir depósito maior que zero (`min_stake`, que é só configuração); reter o repasse por N dias exigiria mudar o programa Anchor.
 3. **Kill switch testado** (§15.4): suspender derruba sessões abertas e bloqueia a venda, inclusive a direta na cadeia.
 4. **Produção alinhada**: `GUARANTEE_MIN_SALES` e `GUARANTEE_MIN_RATING` com os valores da regra no ambiente real (a demo usa 0; D11). Alterar `infra/setup-vps.sh` não basta: é preciso ajustar o `.env` de produção.
 5. **Capacidade medida** (benchmark de ingestão e processo separado, §16) e **teste de segurança do upload**. O teste de segurança do `http` é pré-requisito para ligar o `http`, não para abrir.

@@ -1,10 +1,12 @@
 import {
   address,
   appendTransactionMessageInstructions,
+  assertAccountExists,
   compileTransaction,
   createNoopSigner,
   createSolanaRpc,
   createTransactionMessage,
+  fetchEncodedAccount,
   generateKeyPairSigner,
   getAddressEncoder,
   getBase58Decoder,
@@ -43,6 +45,7 @@ import {
 import { getCreateAccountInstruction, getTransferSolInstruction } from "@solana-program/system";
 import * as gen from "@solvers/client";
 import { agentIdToBytes } from "@solvers/shared";
+import { classifyConfigData, ConfigNotMigratedError, CONFIG_V1_SIZE, type ConfigState } from "./config-state.js";
 import { parseEvents, type SolversEvent } from "./events.js";
 import { describeFailure } from "./program-errors.js";
 
@@ -245,8 +248,21 @@ export class SolversChain {
     return (await findAssociatedTokenPda({ owner, mint: this.usdcMint, tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0];
   }
 
+  /** Config v2. Numa Config v1 (devnet antes de `migrate_config`) lança `ConfigNotMigratedError`, nunca um erro de codec. */
   async fetchConfig() {
-    return gen.fetchConfig(this.rpc, await this.configPda());
+    const acc = await fetchEncodedAccount(this.rpc, await this.configPda());
+    if (acc.exists && acc.data.length === CONFIG_V1_SIZE) throw new ConfigNotMigratedError();
+    assertAccountExists(acc);
+    return gen.decodeConfig(acc);
+  }
+
+  /**
+   * Lê a Config sem lançar por layout: `missing` | `v1` | `v2` | `unknown` (ver `config-state.ts`). `confirmed` por padrão,
+   * para a pausa valer logo depois do `set_pause` (o padrão do RPC é `finalized`, ~13 s atrás).
+   */
+  async fetchConfigState(commitment: "processed" | "confirmed" | "finalized" = "confirmed"): Promise<ConfigState> {
+    const { value } = await this.rpc.getAccountInfo(await this.configPda(), { encoding: "base64", commitment }).send();
+    return classifyConfigData(value ? Uint8Array.from(getBase64Encoder().encode(value.data[0])) : null);
   }
 
   async fetchAgent(agentIdHex: string) {
@@ -635,6 +651,56 @@ export class SolversChain {
   /** Troca a conta de USDC da tesouraria: `newTreasury` é a conta de token (não o dono). */
   async setTreasuryIx(admin: TransactionSigner, newTreasury: Address) {
     return gen.getSetTreasuryInstructionAsync({ admin, usdcMint: this.usdcMint, newTreasury });
+  }
+
+  /**
+   * Migra a Config v1 (187 B) para a v2 (285 B). `payer` (o fee payer) paga o rent extra; `authority` precisa ser a
+   * upgrade authority do programa (a mesma regra de `initialize_config`). Instrução de transição.
+   */
+  async migrateConfigIx(authority: TransactionSigner) {
+    return gen.getMigrateConfigInstructionAsync({ payer: this.feePayer, authority, programData: await this.programDataAddress() });
+  }
+
+  /** Pausa de emergência: o admin define qualquer combinação de bits; o guardian só acrescenta (nunca remove). */
+  async setPauseIx(signer: TransactionSigner, flags: number) {
+    return gen.getSetPauseInstructionAsync({ signer, flags });
+  }
+
+  /** Define o guardian da pausa (só o admin). Endereço de sistema (`11111111111111111111111111111111`) remove o guardian. */
+  async setGuardianIx(admin: TransactionSigner, newGuardian: Address) {
+    return gen.getSetGuardianInstructionAsync({ admin, newGuardian });
+  }
+
+  // ---------- Stake: saída do criador e confisco com prazo (o admin propõe, espera 72 h, executa) ----------
+
+  /** Proposta de confisco do solver (null se não há). */
+  async fetchMaybeSlashProposal(agentIdHex: string) {
+    return gen.fetchMaybeSlashProposal(this.rpc, (await gen.findSlashProposalPda({ agent: await this.agentPda(agentIdHex) }))[0]);
+  }
+
+  /** Pedido de saída de stake do solver (null se não pediu). */
+  async fetchMaybeStakeExit(agentIdHex: string) {
+    return gen.fetchMaybeStakeExit(this.rpc, (await gen.findStakeExitPda({ agent: await this.agentPda(agentIdHex) }))[0]);
+  }
+
+  /** Admin propõe confiscar `amount` (suspende o solver na hora; executável só depois de 72 h). O fee payer paga o rent da proposta. */
+  async proposeSlashIx(admin: TransactionSigner, agentIdHex: string, amount: bigint, reasonHash: Uint8Array) {
+    return gen.getProposeSlashInstructionAsync({ payer: this.feePayer, admin, agent: await this.agentPda(agentIdHex), amount, reasonHash });
+  }
+
+  /** Admin executa depois das 72 h. `treasury` = `Config.treasury`; o rent da proposta volta a `rentPayer` (`SlashProposal.rentPayer`). */
+  async executeSlashIx(admin: TransactionSigner, agentIdHex: string, treasury: Address, rentPayer: Address) {
+    return gen.getExecuteSlashInstructionAsync({ admin, agent: await this.agentPda(agentIdHex), treasury, usdcMint: this.usdcMint, rentPayer });
+  }
+
+  /** Desiste da proposta (o solver segue suspenso até `approve_agent`). `signer`: o admin quando quiser, ou o criador depois da expiração (72 h + 14 dias). */
+  async cancelSlashIx(signer: TransactionSigner, agentIdHex: string, rentPayer: Address) {
+    return gen.getCancelSlashInstructionAsync({ signer, agent: await this.agentPda(agentIdHex), rentPayer });
+  }
+
+  /** Admin estende em 30 dias a espera da saída de stake (máximo 2 vezes). */
+  async extendStakeExitIx(admin: TransactionSigner, agentIdHex: string, reasonHash: Uint8Array) {
+    return gen.getExtendStakeExitInstructionAsync({ admin, agent: await this.agentPda(agentIdHex), reasonHash });
   }
 
   /** O criador repõe stake do próprio solver, a partir da conta de USDC (ATA) dele. Reativar o solver ainda exige `approve_agent`. */

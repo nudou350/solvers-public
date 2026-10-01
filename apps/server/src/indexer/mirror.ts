@@ -6,7 +6,10 @@ import { bytesToHexStr } from "../lib/crypto.js";
 // IMPORTANTE: este objeto NÃO pode conter `platformStatus`. O indexador reescreve estas colunas a cada evento
 // (inclusive UsageRecorded e LicensePurchased); a suspensão da plataforma vive em outra coluna e sobrevive.
 
-const AGENT_STATUS = ["pending", "active", "suspended"] as const;
+// Índice = enum `AgentStatus` on-chain (Pending, Active, Suspended, Retired). `Retired` (saída de stake pedida pelo criador)
+// é "retired": sem venda nova, sem teste grátis e fora da vitrine, mas quem tem direito PAGO (licença vitalícia, garantia
+// aberta) continua usando (runtime/availability.ts). `agents.status` é `text` sem CHECK nem enum no banco.
+const AGENT_STATUS = ["pending", "active", "suspended", "retired"] as const;
 
 export function agentMirrorValues(a: gen.Agent, agentAddr: Address) {
   return {

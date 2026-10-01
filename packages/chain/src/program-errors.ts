@@ -46,6 +46,25 @@ export const PROGRAM_ERROR_MESSAGES = {
     "Só a conta indicada na proposta pode aceitar a troca de administrador. Assine com a chave do novo administrador, ou peça ao administrador atual para propor de novo com a conta certa.",
   [gen.SOLVERS_ERROR__INVALID_NEW_ADMIN]:
     "O novo administrador é inválido: não pode ser o endereço vazio nem o próprio administrador atual. Confira o endereço e tente de novo.",
+  // Pausa de emergência. `Paused` pode chegar a qualquer pessoa que compre ou pague: texto para leigo, sem prometer prazo.
+  [gen.SOLVERS_ERROR__PAUSED]:
+    "Esta operação está temporariamente pausada por segurança. Tente de novo mais tarde; o que você já contratou continua valendo.",
+  // Saída de stake e confisco. `AgentRetired` pode chegar a quem usa a plataforma: texto para leigo; os demais são de operação.
+  [gen.SOLVERS_ERROR__AGENT_RETIRED]: "Este especialista foi aposentado pelo criador e não está mais à venda.",
+  [gen.SOLVERS_ERROR__AGENT_NOT_RETIRED]: "Este especialista não pediu saída do depósito de segurança: só quem está aposentado pode sacar ou estender a espera.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_NOT_REACHED]: "A espera de 30 dias para sacar o depósito de segurança ainda não terminou.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENSIONS_EXHAUSTED]: "A espera do saque já foi estendida duas vezes, o máximo permitido.",
+  [gen.SOLVERS_ERROR__SLASH_PENDING]: "Há uma proposta de confisco em andamento para este especialista: o saque do depósito fica travado até ela ser cancelada ou executada.",
+  [gen.SOLVERS_ERROR__SLASH_DELAY_NOT_REACHED]: "A espera de 72 horas do confisco ainda não terminou.",
+  [gen.SOLVERS_ERROR__SLASH_ALREADY_CONTESTED]: "Esta proposta de confisco já foi contestada pelo criador.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENDED]: "O admin estendeu a espera da saída; não dá para cancelar agora.",
+  [gen.SOLVERS_ERROR__SLASH_EXPIRED]: "A proposta de confisco venceu (72 horas mais 14 dias) e não pode mais ser executada; ela só pode ser cancelada.",
+  [gen.SOLVERS_ERROR__SLASH_NOT_EXPIRED]: "A proposta de confisco ainda não venceu: antes disso só o admin pode cancelá-la.",
+  // Operações de admin (migração da configuração, pausa e guardian): o texto é para quem opera a plataforma.
+  [gen.SOLVERS_ERROR__CONFIG_ALREADY_MIGRATED]: "A configuração da plataforma já está no formato atual: não há nada a migrar.",
+  [gen.SOLVERS_ERROR__INVALID_PAUSE_FLAGS]: "Valor de pausa inválido: use apenas os bits 1 (entradas) e 2 (pagamentos), ou 0 para liberar tudo.",
+  [gen.SOLVERS_ERROR__NOT_PAUSE_AUTHORITY]: "Só a administração ou o guardian da plataforma pode alterar a pausa.",
+  [gen.SOLVERS_ERROR__GUARDIAN_CANNOT_UNPAUSE]: "O guardian só pode ligar a pausa; liberar de novo é da administração da plataforma.",
 } satisfies Record<gen.SolversError, string>;
 
 const MESSAGES: Readonly<Record<number, string>> = PROGRAM_ERROR_MESSAGES;

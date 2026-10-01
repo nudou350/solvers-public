@@ -101,7 +101,7 @@ export const CreatorDashboard = z.object({
       name: z.string(),
       category: z.string(),
       version: z.string(),
-      status: z.enum(["active", "pending", "suspended"]),
+      status: z.enum(["active", "pending", "suspended", "retired"]),
       listed: z.boolean(),
       userRating: z.number(),
       evalScore: z.number(),

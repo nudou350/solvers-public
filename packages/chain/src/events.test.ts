@@ -50,13 +50,14 @@ describe("parseEvents: logs do programa", () => {
   });
 });
 
-describe("parseEvents: eventos de governança (rotação de admin, tesouraria, reposição de stake)", () => {
+describe("parseEvents: eventos de governança (rotação de admin, tesouraria, reposição de stake, pausa e guardian)", () => {
   const A = AGENT;
   const B = OTHER as Address;
+  const HASH = new Uint8Array(32).fill(7);
   const line = (bytes: Uint8Array) => `Program data: ${getBase64Decoder().decode(bytes)}`;
   const wrap = (...lines: string[]) => [`Program ${PROGRAM_ID} invoke [1]`, ...lines, `Program ${PROGRAM_ID} success`];
 
-  it("decodifica os 5 eventos novos com nome e campos", () => {
+  it("decodifica os 15 eventos novos com nome e campos", () => {
     const cases: Array<[string, Uint8Array, unknown]> = [
       ["AdminTransferProposed", gen.getAdminTransferProposedEventEncoder().encode({ admin: A, newAdmin: B }), { admin: A, newAdmin: B }],
       ["AdminTransferCancelled", gen.getAdminTransferCancelledEventEncoder().encode({ admin: A, newAdmin: B }), { admin: A, newAdmin: B }],
@@ -67,6 +68,28 @@ describe("parseEvents: eventos de governança (rotação de admin, tesouraria, r
         gen.getStakeToppedUpEventEncoder().encode({ agent: A, creator: B, amount: 5_000_000n, stake: 15_000_000n }),
         { agent: A, creator: B, amount: 5_000_000n, stake: 15_000_000n },
       ],
+      ["PauseChanged", gen.getPauseChangedEventEncoder().encode({ by: A, oldFlags: 0, newFlags: 3 }), { by: A, oldFlags: 0, newFlags: 3 }],
+      [
+        "GuardianChanged",
+        gen.getGuardianChangedEventEncoder().encode({ admin: A, oldGuardian: B, newGuardian: A }),
+        { admin: A, oldGuardian: B, newGuardian: A },
+      ],
+      ["StakeExitRequested", gen.getStakeExitRequestedEventEncoder().encode({ agent: A, creator: B, exitAt: 1_700_000_000n }), { agent: A, creator: B, exitAt: 1_700_000_000n }],
+      [
+        "StakeExitExtended",
+        gen.getStakeExitExtendedEventEncoder().encode({ agent: A, exitAt: 1_702_592_000n, extensions: 1, reasonHash: HASH }),
+        { agent: A, exitAt: 1_702_592_000n, extensions: 1, reasonHash: HASH },
+      ],
+      ["StakeExitCancelled", gen.getStakeExitCancelledEventEncoder().encode({ agent: A, creator: B }), { agent: A, creator: B }],
+      ["StakeWithdrawn", gen.getStakeWithdrawnEventEncoder().encode({ agent: A, creator: B, amount: 10_000_000n }), { agent: A, creator: B, amount: 10_000_000n }],
+      [
+        "SlashProposed",
+        gen.getSlashProposedEventEncoder().encode({ agent: A, amount: 3_000_000n, reasonHash: HASH, executableAt: 1_700_259_200n }),
+        { agent: A, amount: 3_000_000n, reasonHash: HASH, executableAt: 1_700_259_200n },
+      ],
+      ["SlashContested", gen.getSlashContestedEventEncoder().encode({ agent: A, contestHash: HASH }), { agent: A, contestHash: HASH }],
+      ["SlashCancelled", gen.getSlashCancelledEventEncoder().encode({ agent: A, amount: 3_000_000n }), { agent: A, amount: 3_000_000n }],
+      ["SlashExecuted", gen.getSlashExecutedEventEncoder().encode({ agent: A, amount: 3_000_000n, treasury: B }), { agent: A, amount: 3_000_000n, treasury: B }],
     ];
     for (const [name, bytes, data] of cases) {
       const events = parseEvents(wrap(line(bytes)), PROGRAM_ID);

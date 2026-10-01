@@ -197,7 +197,7 @@ meRouter.get(
       name: a.name,
       category: a.category,
       version: a.version,
-      status: (["active", "pending", "suspended"].includes(a.status) ? a.status : "pending") as "active" | "pending" | "suspended",
+      status: (["active", "pending", "suspended", "retired"].includes(a.status) ? a.status : "pending") as "active" | "pending" | "suspended" | "retired",
       listed: a.listed,
       userRating: averageRating(a.ratingSum, a.ratingCount),
       evalScore: bpsToScore(a.evalScoreBps),

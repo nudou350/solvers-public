@@ -1,8 +1,9 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
-import { parseEventsDetailed, type Address, type SolversEvent, type Signature, type TxInfo } from "@solvers/chain";
+import { describePauseFlags, parseEventsDetailed, type Address, type SolversEvent, type Signature, type TxInfo } from "@solvers/chain";
 import * as gen from "@solvers/client";
 import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
+import { invalidatePauseCache } from "../store/pause-gate.js";
 import { effectiveFeeBps, splitFromDeltas, type Split } from "./amounts.js";
 import { MILESTONE_STATUS, type MilestoneStatusName } from "./escrow-status.js";
 import {
@@ -185,6 +186,9 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
     case "EvalUpdated":
     case "StakeSlashed":
     case "StakeToppedUp": // top_up_stake: agents.stake é espelhado, relê a conta
+    case "StakeExitRequested": // vira Retired (espelhado como retired) e o stake fica em espera
+    case "StakeExitCancelled":
+    case "StakeWithdrawn": // o cofre foi devolvido: stake zerado
     case "UsageRecorded":
     case "PricingUpdated": // update_pricing agora emite evento: o preço do espelho não fica mais defasado
       await syncAgent(ev.data.agent);
@@ -192,6 +196,32 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
     case "ConfigUpdated":
     case "TreasuryUpdated": // set_treasury: a conta de USDC da tesouraria mudou; a próxima transação relê a config
       invalidatePlatformConfig();
+      return;
+    case "PauseChanged":
+      // Pausa de emergência: nada é espelhado (vive na Config on-chain). Alerta no log e o cache do servidor relê já.
+      invalidatePauseCache();
+      console.warn(`[ALERTA] pausa alterada por ${ev.data.by}: ${describePauseFlags(ev.data.oldFlags)} -> ${describePauseFlags(ev.data.newFlags)} (tx ${signature})`);
+      return;
+    case "GuardianChanged":
+      console.warn(`[ALERTA] guardian da pausa alterado por ${ev.data.admin}: ${ev.data.oldGuardian} -> ${ev.data.newGuardian} (tx ${signature})`);
+      return;
+    case "SlashProposed":
+      // Proposta de confisco: já suspende o solver ativo. Execução só depois de 72 h.
+      await syncAgent(ev.data.agent);
+      console.warn(`[ALERTA] confisco proposto para ${ev.data.agent}: ${Number(ev.data.amount) / 1e6} USDC, executável a partir de ${new Date(Number(ev.data.executableAt) * 1000).toISOString()} (tx ${signature})`);
+      return;
+    case "SlashExecuted":
+      await syncAgent(ev.data.agent); // StakeSlashed (emitido junto) também relê; é idempotente
+      console.warn(`[ALERTA] confisco executado em ${ev.data.agent}: ${Number(ev.data.amount) / 1e6} USDC para a tesouraria ${ev.data.treasury} (tx ${signature})`);
+      return;
+    case "SlashCancelled": // o solver segue suspenso (reativar é approve_agent); nada é espelhado
+      console.warn(`[confisco] proposta de ${ev.data.agent} cancelada pelo admin (${Number(ev.data.amount) / 1e6} USDC) (tx ${signature})`);
+      return;
+    case "SlashContested":
+      console.warn(`[confisco] o criador contestou a proposta de ${ev.data.agent} (tx ${signature})`);
+      return;
+    case "StakeExitExtended":
+      console.warn(`[stake] saída de ${ev.data.agent} estendida pelo admin (${ev.data.extensions} de 2), nova data ${new Date(Number(ev.data.exitAt) * 1000).toISOString()} (tx ${signature})`);
       return;
     case "AdminTransferProposed":
     case "AdminTransferCancelled":

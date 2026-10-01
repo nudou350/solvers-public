@@ -60,6 +60,7 @@ describe("indexador: a suspensão da plataforma sobrevive ao espelho da cadeia",
     assert.equal(agentMirrorValues(account(0), "x" as never).status, "pending");
     assert.equal(agentMirrorValues(account(1), "x" as never).status, "active");
     assert.equal(agentMirrorValues(account(2), "x" as never).status, "suspended");
+    assert.equal(agentMirrorValues(account(3), "x" as never).status, "retired", "Retired (3) é espelhado como retired (não como suspended)");
     assert.equal(agentMirrorValues(account(9), "x" as never).status, "pending");
   });
 
