@@ -46,6 +46,7 @@ import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 
+import { buildForUserChecked } from "./tx-build.js";
 export const storeRouter = Router();
 
 // ---------- Público ----------
@@ -386,7 +387,7 @@ storeRouter.post(
     const c = chain();
     await assertBalance(wallet, row.price);
     const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
-    return c.buildForUser(instructions, { kind: "purchase", asset: asset.address, priceUsdc: unitsToUsdc(price), agentId: row.id });
+    return buildForUserChecked(instructions, { kind: "purchase", asset: asset.address, priceUsdc: unitsToUsdc(price), agentId: row.id });
   }),
 );
 

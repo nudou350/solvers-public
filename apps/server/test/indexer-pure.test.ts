@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { TokenDelta } from "@solvers/chain";
 import { effectiveFeeBps, splitByBps, splitFromDeltas } from "../src/indexer/amounts.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, escrowStatusFromMilestones, retirementPlan, staleDisputeDue } from "../src/indexer/escrow-status.js";
-import { IndexerRetryableError, backoffSecs, isInfraError, MAX_ATTEMPTS } from "../src/indexer/retry-policy.js";
+import { FRESH_TX_SECS, IndexerRetryableError, backoffSecs, escrowNotVisible, isFreshTx, isInfraError, MAX_ATTEMPTS } from "../src/indexer/retry-policy.js";
 
 // Regras puras do indexador: valores executados, status do escrow fechado e política de novas tentativas.
 
@@ -131,5 +131,28 @@ describe("programa v2: cancelamento, disputa parada e aposentadoria", () => {
     assert.deepEqual(retirementPlan("pending", "legacy"), { status: "refunded", closed: true });
     assert.deepEqual(retirementPlan("approved", "gone"), { closed: true });
     assert.equal(retirementPlan("approved", "legacy"), null);
+  });
+});
+
+describe("EscrowCreated: conta recém-criada ausente tenta de novo", () => {
+  const now = new Date("2026-10-01T12:00:00Z");
+  const at = (secsAgo: number) => new Date(now.getTime() - secsAgo * 1000);
+
+  it("transação recente (ou sem horário de bloco) conta como recente: a ausência é do RPC, não do escrow", () => {
+    assert.equal(isFreshTx(at(5), now), true);
+    assert.equal(isFreshTx(at(FRESH_TX_SECS - 1), now), true);
+    assert.equal(isFreshTx(null, now), true);
+  });
+
+  it("transação antiga: a conta pode ter sido fechada de verdade, então não fica na fila de tentativas", () => {
+    assert.equal(isFreshTx(at(FRESH_TX_SECS), now), false);
+    assert.equal(isFreshTx(at(3 * 86400), now), false);
+  });
+
+  it("o erro é o de nova tentativa e não gasta tentativas (infraestrutura), com o escrow na mensagem", () => {
+    const e = escrowNotVisible("Esc1");
+    assert.ok(e instanceof IndexerRetryableError);
+    assert.match(e.message, /Esc1/);
+    assert.equal(isInfraError(e), true);
   });
 });

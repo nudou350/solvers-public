@@ -43,6 +43,11 @@ export function saveAcceptance(escrowId: string, idx: number, tests: Files): { p
   return { path: dir, hash: filesHash(files).toString("hex") };
 }
 
+/** Apaga o que `saveAcceptance` gravou para um escrow que não chegou a ser criado (simulação recusada). Só para escrow novo: apaga a pasta inteira dele. */
+export function discardAcceptance(escrowId: string): void {
+  rmSync(join(root(), escrowId), { recursive: true, force: true });
+}
+
 export function criteriaHash(title: string, criteria: string, acceptanceHash?: string | null): Buffer {
   return sha256(`${title}\n${criteria}${acceptanceHash ? `\n${acceptanceHash}` : ""}`);
 }

@@ -11,6 +11,8 @@ import {
   MAX_ATTEMPTS,
   MAX_INFRA_AGE_DAYS,
   backoffSecs,
+  escrowNotVisible,
+  isFreshTx,
   isInfraError,
 } from "./retry-policy.js";
 import {
@@ -182,12 +184,19 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
     case "AgentVersionUpdated":
     case "EvalUpdated":
     case "StakeSlashed":
+    case "StakeToppedUp": // top_up_stake: agents.stake é espelhado, relê a conta
     case "UsageRecorded":
     case "PricingUpdated": // update_pricing agora emite evento: o preço do espelho não fica mais defasado
       await syncAgent(ev.data.agent);
       return;
     case "ConfigUpdated":
+    case "TreasuryUpdated": // set_treasury: a conta de USDC da tesouraria mudou; a próxima transação relê a config
       invalidatePlatformConfig();
+      return;
+    case "AdminTransferProposed":
+    case "AdminTransferCancelled":
+    case "AdminTransferred":
+      // Rotação de admin: nada é espelhado (o admin só vive na Config on-chain). Entra em processed_events e nos listeners.
       return;
     case "EscrowClosed":
       // Idempotente; não apaga as etapas (o histórico e a entrega paga continuam consultáveis).
@@ -228,7 +237,10 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
       return;
     }
     case "EscrowCreated": {
-      await syncEscrow(ev.data.escrow);
+      // Conta recém-criada não pode estar ausente: se o RPC ainda não a mostra, tenta de novo em vez de seguir sem
+      // espelhar o escrow (syncEscrow devolve false sem erro). Em transação antiga a ausência pode ser um fechamento real.
+      const fresh = isFreshTx(await blockTimeOf(ctx));
+      if (!(await syncEscrow(ev.data.escrow, undefined, { leaveIfMissing: fresh })) && fresh) throw escrowNotVisible(ev.data.escrow);
       await syncReputation(ev.data.buyer);
       await recordChainTx(signature, "escrow", ev.data.buyer, await agentIdByAddress(ev.data.agent), ev.data.total, {
         blockTime: await blockTimeOf(ctx),

@@ -33,3 +33,20 @@ export function isInfraError(e: unknown): boolean {
     .map(String);
   return INFRA_PATTERN.test(parts.join(" "));
 }
+
+/**
+ * Até quando (desde o bloco da transação) a falta de uma conta que a própria transação criou é atribuída ao RPC
+ * atrasado. Passado isso, a conta pode ter sido fechada de verdade (backfill/reindex de histórico antigo) e a
+ * ausência deixa de ser erro: sem este teto, todo escrow antigo já fechado ficaria 7 dias na fila de novas tentativas.
+ */
+export const FRESH_TX_SECS = 600;
+
+/** A transação é recente o bastante para uma conta que ela criou ainda ter de existir? Sem horário de bloco, sim (na dúvida, tenta de novo). */
+export function isFreshTx(blockTime: Date | null, now: Date = new Date()): boolean {
+  return blockTime == null || now.getTime() - blockTime.getTime() < FRESH_TX_SECS * 1000;
+}
+
+/** Escrow recém-criado ainda não visível no RPC: não grava nada e tenta de novo (falha de infraestrutura, não gasta tentativas). */
+export function escrowNotVisible(escrow: string): IndexerRetryableError {
+  return new IndexerRetryableError(`escrow ${escrow} ainda não visível no RPC`);
+}

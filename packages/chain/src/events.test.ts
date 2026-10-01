@@ -50,6 +50,40 @@ describe("parseEvents: logs do programa", () => {
   });
 });
 
+describe("parseEvents: eventos de governança (rotação de admin, tesouraria, reposição de stake)", () => {
+  const A = AGENT;
+  const B = OTHER as Address;
+  const line = (bytes: Uint8Array) => `Program data: ${getBase64Decoder().decode(bytes)}`;
+  const wrap = (...lines: string[]) => [`Program ${PROGRAM_ID} invoke [1]`, ...lines, `Program ${PROGRAM_ID} success`];
+
+  it("decodifica os 5 eventos novos com nome e campos", () => {
+    const cases: Array<[string, Uint8Array, unknown]> = [
+      ["AdminTransferProposed", gen.getAdminTransferProposedEventEncoder().encode({ admin: A, newAdmin: B }), { admin: A, newAdmin: B }],
+      ["AdminTransferCancelled", gen.getAdminTransferCancelledEventEncoder().encode({ admin: A, newAdmin: B }), { admin: A, newAdmin: B }],
+      ["AdminTransferred", gen.getAdminTransferredEventEncoder().encode({ oldAdmin: A, newAdmin: B }), { oldAdmin: A, newAdmin: B }],
+      ["TreasuryUpdated", gen.getTreasuryUpdatedEventEncoder().encode({ oldTreasury: A, newTreasury: B }), { oldTreasury: A, newTreasury: B }],
+      [
+        "StakeToppedUp",
+        gen.getStakeToppedUpEventEncoder().encode({ agent: A, creator: B, amount: 5_000_000n, stake: 15_000_000n }),
+        { agent: A, creator: B, amount: 5_000_000n, stake: 15_000_000n },
+      ],
+    ];
+    for (const [name, bytes, data] of cases) {
+      const events = parseEvents(wrap(line(bytes)), PROGRAM_ID);
+      assert.equal(events.length, 1, name);
+      assert.equal(events[0]!.name, name);
+      assert.deepEqual(events[0]!.data, data, name);
+    }
+  });
+
+  it("evento de discriminador desconhecido (versão futura do programa) é ignorado e os vizinhos continuam", () => {
+    const unknown = Uint8Array.from([9, 9, 9, 9, 9, 9, 9, 9, 1, 2, 3, 4]);
+    const stake = gen.getStakeToppedUpEventEncoder().encode({ agent: A, creator: B, amount: 1n, stake: 2n });
+    const events = parseEvents(wrap(eventLine(1), line(unknown), line(stake)), PROGRAM_ID);
+    assert.deepEqual(events.map((e) => e.name), ["AgentStatusChanged", "StakeToppedUp"]);
+  });
+});
+
 describe("endereços derivados (PDA)", () => {
   it("o PDA de Config é estável e diferente por comprador", async () => {
     const [a] = await gen.findConfigPda();

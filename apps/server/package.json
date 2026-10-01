@@ -18,6 +18,8 @@
     "cli:reindex": "tsx --env-file-if-exists=.env src/cli/reindex.ts",
     "cli:validate": "tsx src/cli/validate.ts",
     "cli:schema": "tsx src/cli/schema.ts",
+    "cli:admin": "tsx --env-file-if-exists=.env src/cli/admin.ts",
+    "cli:admin:devnet": "tsx --env-file=.env.devnet src/cli/admin.ts",
     "cli:publish:devnet": "tsx --env-file=.env.devnet src/cli/publish.ts"
   },
   "dependencies": {

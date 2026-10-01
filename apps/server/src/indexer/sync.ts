@@ -164,7 +164,12 @@ export async function applyMilestoneToClosedEscrow(escrowAddr: string, hint: { i
 }
 
 /** Espelha o escrow. Devolve false se a conta on-chain já não existe (escrow fechado). */
-export async function syncEscrow(escrowAddr: Address, hint?: { index: number; status: MilestoneStatusName }): Promise<boolean> {
+export async function syncEscrow(
+  escrowAddr: Address,
+  hint?: { index: number; status: MilestoneStatusName },
+  /** `leaveIfMissing`: conta ausente não marca o escrow como fechado (o chamador vai tentar de novo: RPC atrasado). */
+  opts?: { leaveIfMissing?: boolean },
+): Promise<boolean> {
   const layout = await chain().fetchEscrowLayout(escrowAddr);
   if (layout.kind === "legacy") {
     // Conta do programa v1 (o cliente v2 a decodifica sem erro, mas os campos novos são lixo): não espelha nada.
@@ -173,6 +178,7 @@ export async function syncEscrow(escrowAddr: Address, hint?: { index: number; st
     return true;
   }
   if (layout.kind === "missing") {
+    if (opts?.leaveIfMissing) return false;
     if (hint) await applyMilestoneToClosedEscrow(escrowAddr, hint);
     else await db.update(schema.escrows).set({ closed: true }).where(eq(schema.escrows.id, escrowAddr));
     return false;

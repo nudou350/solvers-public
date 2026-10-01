@@ -44,6 +44,7 @@ import { getCreateAccountInstruction, getTransferSolInstruction } from "@solana-
 import * as gen from "@solvers/client";
 import { agentIdToBytes } from "@solvers/shared";
 import { parseEvents, type SolversEvent } from "./events.js";
+import { describeFailure } from "./program-errors.js";
 
 export const MPL_CORE_PROGRAM_ADDRESS = address("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
 export const PROGRAM_ID = gen.SOLVERS_PROGRAM_ADDRESS as Address;
@@ -140,6 +141,18 @@ export type TxInfo = {
   accounts: Address[];
   tokenDeltas: TokenDelta[];
 };
+
+/**
+ * Resultado de `simulate`:
+ * - rejected: a simulação falhou por regra do programa (ou saldo): a operação falharia de verdade; `message` é amigável.
+ * - failed: falhou por outro motivo (blockhash, conta ausente, orçamento): não bloqueia, só registrar.
+ * - infra: a própria simulação não rodou (RPC fora, timeout): não diz nada sobre a transação.
+ */
+export type SimulationResult =
+  | { ok: true; unitsConsumed: bigint | null }
+  | { ok: false; kind: "rejected"; code: number | null; name: string | null; message: string; logs: readonly string[] }
+  | { ok: false; kind: "failed"; message: string; logs: readonly string[] }
+  | { ok: false; kind: "infra"; message: string };
 
 /** Etapas por garantia no programa (Vec com capacidade fixa: a conta é alocada para o máximo). */
 export const MAX_MILESTONES = 5;
@@ -290,6 +303,37 @@ export class SolversChain {
     };
   }
 
+  /**
+   * Simula a transação montada (ainda sem a assinatura do usuário) para descobrir ANTES da assinatura se ela
+   * falharia. `sigVerify: false` + `replaceRecentBlockhash: true`: não exige assinaturas e usa um blockhash
+   * atual (o da transação pode já ter alguns segundos). Nunca lança: o desfecho vem tipado em `SimulationResult`.
+   * `getBase64EncodedWireTransaction` já aceita a transação parcialmente assinada de `buildForUser` (a
+   * assinatura que falta vai como 64 bytes zero), então `wire` é o próprio `BuiltTx.transaction`.
+   */
+  async simulate(wire: Base64EncodedWireTransaction, opts: { timeoutMs?: number } = {}): Promise<SimulationResult> {
+    let value: { err: unknown; logs: readonly string[] | null; unitsConsumed?: bigint | number | null };
+    try {
+      ({ value } = await this.rpc
+        .simulateTransaction(wire, {
+          encoding: "base64",
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+          commitment: "confirmed",
+        })
+        .send({ abortSignal: AbortSignal.timeout(opts.timeoutMs ?? 8000) }));
+    } catch (e) {
+      // RPC fora do ar, timeout, limite de requisições: não diz nada sobre a transação.
+      return { ok: false, kind: "infra", message: rawReason(e) };
+    }
+    const logs = value.logs ?? [];
+    if (value.err == null) return { ok: true, unitsConsumed: value.unitsConsumed == null ? null : BigInt(value.unitsConsumed) };
+    // Mesma classificação do envio (friendlyError): o erro vem do programa que falhou PRIMEIRO no log.
+    const rejection = describeFailure(value.err, logs);
+    if (rejection) return { ok: false, kind: "rejected", ...rejection, logs };
+    // Falhou por outro motivo (blockhash, conta ausente, orçamento...): não dá para dizer que é culpa da operação.
+    return { ok: false, kind: "failed", message: rawReason(JSON.stringify(value.err, bigintJson)), logs };
+  }
+
   /** Assina tudo no servidor sem enviar: a assinatura fica conhecida antes do envio (para persistir). */
   async signServerTx(instructions: Instruction[]): Promise<SignedTx> {
     const { value: latest } = await this.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
@@ -413,8 +457,9 @@ export class SolversChain {
 
   /** Logs, contas e variações de saldo de uma transação confirmada (null se ainda não visível no RPC). */
   async txLogs(signature: Signature): Promise<TxInfo | null> {
+    // Versão 1 aceita legacy, v0 e v1: com 0 o RPC rejeita (-32015) uma tx v1 de terceiro que chame o programa.
     const tx = await this.rpc
-      .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0, encoding: "json" })
+      .getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 1, encoding: "json" })
       .send();
     if (!tx) return null;
     const keys = tx.transaction.message.accountKeys as readonly Address[];
@@ -559,6 +604,48 @@ export class SolversChain {
 
   async suspendAgentIx(admin: TransactionSigner, agentIdHex: string) {
     return gen.getSuspendAgentInstructionAsync({ admin, agent: await this.agentPda(agentIdHex) });
+  }
+
+  // ---------- Governança do admin (rotação em 2 etapas, tesouraria) e reposição de stake ----------
+
+  async pendingAdminPda() {
+    return (await gen.findPendingAdminPda({ config: await this.configPda() }))[0];
+  }
+
+  /** Proposta de troca de admin em andamento (null se não há). */
+  async fetchMaybePendingAdmin() {
+    return gen.fetchMaybePendingAdmin(this.rpc, await this.pendingAdminPda());
+  }
+
+  /** Passo 1: o admin atual indica o novo. O fee payer da plataforma paga o rent da proposta (devolvido ao fechar). */
+  async proposeAdminIx(admin: TransactionSigner, newAdmin: Address) {
+    return gen.getProposeAdminInstructionAsync({ payer: this.feePayer, admin, newAdmin });
+  }
+
+  /** Passo 2: quem foi indicado aceita. `rentPayer` = quem pagou a proposta (`PendingAdmin.rentPayer`); recebe o rent de volta. */
+  async acceptAdminIx(newAdmin: TransactionSigner, rentPayer: Address) {
+    return gen.getAcceptAdminInstructionAsync({ newAdmin, rentPayer });
+  }
+
+  /** O admin atual desiste da proposta. `rentPayer` como em `acceptAdminIx`. */
+  async cancelAdminTransferIx(admin: TransactionSigner, rentPayer: Address) {
+    return gen.getCancelAdminTransferInstructionAsync({ admin, rentPayer });
+  }
+
+  /** Troca a conta de USDC da tesouraria: `newTreasury` é a conta de token (não o dono). */
+  async setTreasuryIx(admin: TransactionSigner, newTreasury: Address) {
+    return gen.getSetTreasuryInstructionAsync({ admin, usdcMint: this.usdcMint, newTreasury });
+  }
+
+  /** O criador repõe stake do próprio solver, a partir da conta de USDC (ATA) dele. Reativar o solver ainda exige `approve_agent`. */
+  async topUpStakeIx(creator: TransactionSigner, agentIdHex: string, amount: bigint) {
+    return gen.getTopUpStakeInstructionAsync({
+      creator,
+      agent: await this.agentPda(agentIdHex),
+      creatorUsdc: await this.ata(creator.address),
+      usdcMint: this.usdcMint,
+      amount,
+    });
   }
 
   async setEvalIx(verifier: TransactionSigner, agentIdHex: string, scoreBps: number, evalHash: Uint8Array) {
@@ -903,17 +990,6 @@ function extractLogs(e: unknown): string[] {
   return ctx.context?.logs ?? ctx.cause?.context?.logs ?? [];
 }
 
-const FRIENDLY: Record<string, string> = {
-  AgentNotActive: "Este especialista ainda não está disponível para compra.",
-  PriceTooLow: "O preço está abaixo do mínimo da plataforma.",
-  NoLicense: "Você precisa ter a licença deste especialista para avaliar.",
-  NoCredits: "Seus créditos acabaram.",
-  BuyerNotEligible: "Sua conta não pode abrir novas garantias no momento.",
-  DisputeWindowClosed: "O prazo para contestar esta etapa já passou.",
-  AutoReleaseNotReached: "Ainda não chegou o prazo de liberação automática.",
-  InvalidMilestoneStatus: "Esta etapa não está no estado certo para esta ação.",
-};
-
 /** Motivo bruto do erro (mensagem + causa, p.ex. "Blockhash not found" da simulação), sem URLs do RPC nem chaves. */
 function rawReason(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
@@ -926,9 +1002,8 @@ function rawReason(e: unknown): string {
 }
 
 export function friendlyError(e: unknown, logs: readonly string[]): string {
-  const joined = logs.join("\n");
-  for (const [code, msg] of Object.entries(FRIENDLY)) if (joined.includes(code)) return msg;
-  if (/insufficient funds/i.test(joined)) return "Saldo de USDC insuficiente.";
+  const known = describeFailure(e, logs);
+  if (known) return known.message;
   // Simulação recusada sem logs do programa (blockhash vencido, conta inexistente...): mostra o motivo bruto.
   return rawReason(e);
 }

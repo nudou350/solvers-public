@@ -18,7 +18,12 @@ export type SolversEvent =
   | { name: "DisputeResolved"; data: gen.DisputeResolvedEvent }
   | { name: "ConfigUpdated"; data: gen.ConfigUpdatedEvent }
   | { name: "EscrowClosed"; data: gen.EscrowClosedEvent }
-  | { name: "PricingUpdated"; data: gen.PricingUpdatedEvent };
+  | { name: "PricingUpdated"; data: gen.PricingUpdatedEvent }
+  | { name: "AdminTransferProposed"; data: gen.AdminTransferProposedEvent }
+  | { name: "AdminTransferCancelled"; data: gen.AdminTransferCancelledEvent }
+  | { name: "AdminTransferred"; data: gen.AdminTransferredEvent }
+  | { name: "TreasuryUpdated"; data: gen.TreasuryUpdatedEvent }
+  | { name: "StakeToppedUp"; data: gen.StakeToppedUpEvent };
 
 const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) => unknown]> = [
   ["AgentRegistered", gen.AGENT_REGISTERED_EVENT_DISCRIMINATOR, gen.parseAgentRegisteredEvent],
@@ -37,6 +42,11 @@ const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) 
   ["ConfigUpdated", gen.CONFIG_UPDATED_EVENT_DISCRIMINATOR, gen.parseConfigUpdatedEvent],
   ["EscrowClosed", gen.ESCROW_CLOSED_EVENT_DISCRIMINATOR, gen.parseEscrowClosedEvent],
   ["PricingUpdated", gen.PRICING_UPDATED_EVENT_DISCRIMINATOR, gen.parsePricingUpdatedEvent],
+  ["AdminTransferProposed", gen.ADMIN_TRANSFER_PROPOSED_EVENT_DISCRIMINATOR, gen.parseAdminTransferProposedEvent],
+  ["AdminTransferCancelled", gen.ADMIN_TRANSFER_CANCELLED_EVENT_DISCRIMINATOR, gen.parseAdminTransferCancelledEvent],
+  ["AdminTransferred", gen.ADMIN_TRANSFERRED_EVENT_DISCRIMINATOR, gen.parseAdminTransferredEvent],
+  ["TreasuryUpdated", gen.TREASURY_UPDATED_EVENT_DISCRIMINATOR, gen.parseTreasuryUpdatedEvent],
+  ["StakeToppedUp", gen.STAKE_TOPPED_UP_EVENT_DISCRIMINATOR, gen.parseStakeToppedUpEvent],
 ];
 
 type ReadonlyUint8Array = gen.AgentRegisteredEvent["agentId"];

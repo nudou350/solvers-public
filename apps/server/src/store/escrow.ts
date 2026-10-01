@@ -24,10 +24,11 @@ import { randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { processSignature } from "../indexer/processor.js";
 import { refreshLicenseOwner } from "../indexer/sync.js";
-import { criteriaHash, filesHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
+import { criteriaHash, discardAcceptance, filesHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
 import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, deliveryDeadlineFrom, deliveryIntact, resolveDeliveryDays } from "./delivery-rules.js";
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
 import { toEscrow, toReputation } from "./mappers.js";
+import { buildForUserChecked } from "./tx-build.js";
 import { notifyCreator } from "../notify/telegram.js";
 import { agentIsAvailable } from "../runtime/availability.js";
 import { splitCriteria } from "../runtime/guarantee-text.js";
@@ -175,6 +176,11 @@ escrowRouter.post(
       criteriaHash: criteriaHash(m.title, m.criteria, acceptance[idx]?.hash),
     }));
     const { instructions } = await c.createEscrowIxs(wallet, agent.id, nonce, milestones, BigInt(env.ESCROW_REVIEW_WINDOW_SECS), deliveryDays);
+    // Simula ANTES de gravar: uma recusa do programa não pode deixar a garantia "pending" prendendo o limite do comprador.
+    const built = await buildForUserChecked(instructions, { kind: "escrow", escrowId: escrow, totalUsdc: total }).catch((e: unknown) => {
+      discardAcceptance(escrow); // recusada: a bateria de aceite gravada em disco não tem escrow
+      throw e;
+    });
     // Prazo e taxa ficam gravados já na criação; o indexador confirma com o valor on-chain.
     const deliveryDeadline = deliveryDeadlineFrom(new Date(), deliveryDays);
 
@@ -222,7 +228,7 @@ escrowRouter.post(
         })),
       );
     });
-    return c.buildForUser(instructions, { kind: "escrow", escrowId: escrow, totalUsdc: total });
+    return built;
   }),
 );
 
@@ -239,7 +245,7 @@ escrowRouter.post(
     if (!m || !["pending", "submitted", "passed"].includes(m.status)) throw badRequest("Esta etapa não pode ser aprovada agora.");
     const c = chain();
     const ixs = await c.releaseMilestoneIxs(createNoopSigner(address(wallet)), address(row.id), index);
-    return c.buildForUser(ixs, { kind: "release", escrowId: row.id, index });
+    return buildForUserChecked(ixs, { kind: "release", escrowId: row.id, index });
   }),
 );
 
@@ -252,7 +258,7 @@ async function buildCancelUndelivered(idParam: string, wallet: string, index: nu
   if (blocked) throw badRequest(blocked, "cancel_not_allowed");
   const c = chain();
   const ixs = await c.cancelUndeliveredIxs(address(wallet), address(row.id), index);
-  return c.buildForUser(ixs, { kind: "cancel", escrowId: row.id, index });
+  return buildForUserChecked(ixs, { kind: "cancel", escrowId: row.id, index });
 }
 
 escrowRouter.post(
@@ -298,13 +304,15 @@ escrowRouter.post(
     if (!criteria.includes(body.criterion.trim())) {
       throw badRequest("Indique qual dos critérios combinados falhou.", "invalid_criterion", { criteria });
     }
+    const ix = await chain().openDisputeIx(address(wallet), address(row.id), body.index, sha256(`${body.criterion}\n${body.reason}`));
+    // Simula antes de gravar critério/motivo: uma contestação que o programa recusaria não deixa rascunho.
+    const built = await buildForUserChecked([ix], { kind: "dispute", escrowId: row.id, index: body.index });
     await db
       .update(schema.milestones)
       // disputedAt só é gravado pelo indexador quando a contestação é confirmada on-chain.
       .set({ disputeCriterion: body.criterion, disputeReason: body.reason })
       .where(and(eq(schema.milestones.escrowId, row.id), eq(schema.milestones.idx, body.index)));
-    const ix = await chain().openDisputeIx(address(wallet), address(row.id), body.index, sha256(`${body.criterion}\n${body.reason}`));
-    return chain().buildForUser([ix], { kind: "dispute", escrowId: row.id, index: body.index });
+    return built;
   }),
 );
 
@@ -414,6 +422,8 @@ escrowRouter.post(
     const contentHash = sha256(body.text);
     const c = chain();
     const ixs = await c.submitReviewIxs(wallet, agent.id, body.rating, contentHash, licenseAsset ? { licenseAsset: address(licenseAsset) } : { hasCredits: true });
+    // Simula antes de gravar o rascunho da avaliação (ex.: licença já usada em outra avaliação).
+    const built = await buildForUserChecked(ixs, { kind: "review", agentId: agent.id });
     // Texto fica off-chain, só como rascunho por hash: nada público muda antes da assinatura. O indexador
     // (syncReview) promove o rascunho quando o mesmo hash aparece confirmado on-chain.
     const hashHex = contentHash.toString("hex");
@@ -428,7 +438,7 @@ escrowRouter.post(
     await db
       .delete(schema.reviewDrafts)
       .where(and(eq(schema.reviewDrafts.authorWallet, wallet), lt(schema.reviewDrafts.createdAt, sql`now() - interval '1 day'`)));
-    return c.buildForUser(ixs, { kind: "review", agentId: agent.id });
+    return built;
   }),
 );
 
