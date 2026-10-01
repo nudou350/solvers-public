@@ -29,7 +29,7 @@ const base = z.object({
   FEE_PAYER_KEYPAIR: z.string().min(1),
   VERIFIER_KEYPAIR: z.string().min(1),
   USAGE_AUTHORITY_KEYPAIR: z.string().min(1),
-  /** Só em desenvolvimento/demo: permite aprovar solvers e resolver disputas pelo servidor. */
+  /** Só em desenvolvimento/demo: permite aprovar solvers e resolver disputas pelo servidor. Recusada com SOLANA_CLUSTER=mainnet-beta (MAINNET_FORBIDDEN_KEYS). */
   ADMIN_KEYPAIR: z.string().optional(),
   PRIORITY_FEE_MICROLAMPORTS: z.coerce.bigint().default(0n),
 
@@ -94,11 +94,33 @@ const schema = base.transform((e) => {
 
 export type Env = z.infer<typeof schema>;
 
+/**
+ * Chaves que dão poder sobre o programa e que o servidor NUNCA pode carregar na mainnet-beta (docs/design-governance-v2.md §5,
+ * docs/mainnet-runbook.md): admin on-chain, guardian da pausa e upgrade authority. Só ADMIN_KEYPAIR existe no schema hoje; os
+ * outros nomes ficam na lista para que ninguém os acrescente por engano ao .env da produção (o zod ignoraria a variável).
+ */
+export const MAINNET_FORBIDDEN_KEYS = ["ADMIN_KEYPAIR", "GUARDIAN_KEYPAIR", "UPGRADE_AUTHORITY_KEYPAIR"] as const;
+
+/** Variáveis proibidas definidas (não vazias) em `source`. Vazio ou só espaços conta como ausente (.env com `ADMIN_KEYPAIR=`). */
+export function forbiddenMainnetKeys(source: NodeJS.ProcessEnv): string[] {
+  return MAINNET_FORBIDDEN_KEYS.filter((k) => (source[k] ?? "").trim() !== "");
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Variáveis de ambiente inválidas:\n${issues}`);
+  }
+  if (parsed.data.SOLANA_CLUSTER === "mainnet-beta") {
+    const found = forbiddenMainnetKeys(source);
+    if (found.length > 0) {
+      throw new Error(
+        `Configuração recusada: ${found.join(", ")} não pode existir com SOLANA_CLUSTER=mainnet-beta. ` +
+          "Na mainnet o servidor nunca assina como admin, guardian ou upgrade authority: remova a variável do .env. " +
+          "Essas chaves ficam em carteira fria / Squads e são usadas só de fora (cli:admin --keypair, Squads). Veja docs/mainnet-runbook.md.",
+      );
+    }
   }
   return parsed.data;
 }
