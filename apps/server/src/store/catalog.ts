@@ -140,7 +140,7 @@ export async function listCreators(): Promise<Creator[]> {
     .select()
     .from(schema.creators)
     .where(
-      sql`exists (select 1 from ${schema.agents} a where a.creator_id = ${schema.creators.id} and a.status = 'active' and a.listed)`,
+      sql`exists (select 1 from ${schema.agents} a where a.creator_id = ${schema.creators.id} and a.status = 'active' and a.platform_status = 'active' and a.listed)`,
     )
     .orderBy(schema.creators.name);
   return Promise.all(rows.map(async (r) => toCreator(r, await creatorStats(r.id))));

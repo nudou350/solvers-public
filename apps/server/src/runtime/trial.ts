@@ -89,10 +89,12 @@ export function toolInputSize(input: unknown): { files: number | null; bytes: nu
   return { files: entries.length, bytes: entries.reduce((a, [path, content]) => a + Buffer.byteLength(path) + Buffer.byteLength(content), 0) };
 }
 
-const kb = (bytes: number) => `${Math.round(bytes / 1000)} KB`;
+// O teto arredonda para baixo e o enviado para cima: quem passa do teto nunca lê "30 KB" contra "30 KB".
+const capKb = (bytes: number) => `${Math.floor(bytes / 1000)} KB`;
+const sentKb = (bytes: number) => `${Math.ceil(bytes / 1000)} KB`;
 
 function capText(cap: ToolCap): string {
-  const parts = [cap.maxFiles ? `${cap.maxFiles} ${cap.maxFiles === 1 ? "arquivo" : "arquivos"}` : "", cap.maxBytes ? kb(cap.maxBytes) : ""].filter(Boolean);
+  const parts = [cap.maxFiles ? `${cap.maxFiles} ${cap.maxFiles === 1 ? "arquivo" : "arquivos"}` : "", cap.maxBytes ? capKb(cap.maxBytes) : ""].filter(Boolean);
   return listPt(parts);
 }
 
@@ -106,7 +108,7 @@ export function trialToolCapError(tool: string, cap: ToolCap | undefined, input:
   const tooMany = cap.maxFiles != null && size.files != null && size.files > cap.maxFiles;
   const tooBig = cap.maxBytes != null && size.bytes > cap.maxBytes;
   if (!tooMany && !tooBig) return null;
-  const sent = [size.files != null ? `${size.files} ${size.files === 1 ? "arquivo" : "arquivos"}` : "", kb(size.bytes)].filter(Boolean).join(", ");
+  const sent = [size.files != null ? `${size.files} ${size.files === 1 ? "arquivo" : "arquivos"}` : "", sentKb(size.bytes)].filter(Boolean).join(", ");
   return `Nada foi executado e o saldo do teste não foi gasto. No teste grátis, ${tool} aceita até ${capText(cap)} por execução (você enviou ${sent}). Envie só o componente principal e o teste dele e rode de novo. A licença vitalícia remove esse limite. Comprar: ${purchaseLink}`;
 }
 

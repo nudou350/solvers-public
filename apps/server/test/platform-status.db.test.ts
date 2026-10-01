@@ -52,6 +52,7 @@ describe("kill switch e memória com banco", { skip: url ? false : "defina TEST_
     await db.delete(schema.sessions).where(like(schema.sessions.id, `${PREFIX}%`));
     await db.delete(schema.licenses).where(like(schema.licenses.id, `${PREFIX}%`));
     await db.delete(schema.agents).where(like(schema.agents.slug, `${PREFIX}%`));
+    await db.delete(schema.creators).where(like(schema.creators.id, `${PREFIX}%`));
   }
 
   before(async () => {
@@ -150,5 +151,18 @@ describe("kill switch e memória com banco", { skip: url ? false : "defina TEST_
     assert.equal((await findAgentRow(AGENT)).slug, `${PREFIX}-agente`);
     assert.equal((await findAgentRow(`${PREFIX}-outro`)).id, OTHER);
     await assert.rejects(findAgentRow(`${PREFIX}-nao-existe`), (e: unknown) => (e as { status?: number }).status === 404);
+  });
+
+  it("listCreators: criador só com especialistas suspensos sai da lista", async () => {
+    const { listCreators } = await import("../src/store/catalog.js");
+    const ids = async () => (await listCreators()).map((c) => c.id);
+    await db.insert(schema.creators).values({ id: `${PREFIX}-creator`, wallet: `${PREFIX}-creator-wallet`, name: "Criador de teste" });
+    assert.ok((await ids()).includes(`${PREFIX}-creator`));
+
+    await db.update(schema.agents).set({ platformStatus: "suspended" }).where(like(schema.agents.slug, `${PREFIX}%`));
+    assert.ok(!(await ids()).includes(`${PREFIX}-creator`));
+
+    await db.update(schema.agents).set({ platformStatus: "active" }).where(eq(schema.agents.id, AGENT));
+    assert.ok((await ids()).includes(`${PREFIX}-creator`), "um especialista ativo basta para listar o criador");
   });
 });

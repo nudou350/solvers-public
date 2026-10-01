@@ -143,10 +143,13 @@ describe("teto da entrada das ferramentas no teste", () => {
   it("passa do teto: texto em português sem gastar saldo, com o que foi enviado e o link", () => {
     const many = trialToolCapError("run_tests", cap, arr(5), link)!;
     assert.match(many, /^Nada foi executado e o saldo do teste não foi gasto\./);
-    assert.match(many, /run_tests aceita até 3 arquivos e 30 KB por execução \(você enviou 5 arquivos, 0 KB\)/);
+    assert.match(many, /run_tests aceita até 3 arquivos e 30 KB por execução \(você enviou 5 arquivos, 1 KB\)/);
     assert.match(many, /Comprar: https:\/\/x\/compra$/);
     const big = trialToolCapError("a11y_check", cap, arr(1, "x".repeat(31_000)), link)!;
-    assert.match(big, /você enviou 1 arquivo, 31 KB/);
+    assert.match(big, /você enviou 1 arquivo, 32 KB/); // 31.000 de conteúdo + o caminho, arredondado para cima
+    // Passou por menos de 1 KB: o enviado não pode aparecer igual ao teto.
+    const barely = trialToolCapError("run_tests", cap, arr(1, "x".repeat(30_400)), link)!;
+    assert.match(barely, /aceita até 3 arquivos e 30 KB por execução \(você enviou 1 arquivo, 31 KB\)/);
     assert.ok(trialToolCapError("run_tests", { maxBytes: 10 }, { anything: "x".repeat(50) }, link));
   });
 
