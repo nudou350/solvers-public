@@ -11,6 +11,7 @@ export * from './config.js';
 export * from './credits.js';
 export * from './escrow.js';
 export * from './licenseReview.js';
+export * from './pendingAdmin.js';
 export * from './reputation.js';
 export * from './review.js';
 export * from './stakeVault.js';

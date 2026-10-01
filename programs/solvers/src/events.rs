@@ -109,6 +109,39 @@ pub struct EscrowClosed {
 }
 
 #[event]
+pub struct AdminTransferProposed {
+    pub admin: Pubkey,
+    pub new_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminTransferCancelled {
+    pub admin: Pubkey,
+    pub new_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminTransferred {
+    pub old_admin: Pubkey,
+    pub new_admin: Pubkey,
+}
+
+#[event]
+pub struct TreasuryUpdated {
+    pub old_treasury: Pubkey,
+    pub new_treasury: Pubkey,
+}
+
+#[event]
+pub struct StakeToppedUp {
+    pub agent: Pubkey,
+    pub creator: Pubkey,
+    pub amount: u64,
+    /// Stake do solver depois do aporte.
+    pub stake: u64,
+}
+
+#[event]
 pub struct PricingUpdated {
     pub agent: Pubkey,
     pub price: u64,

@@ -8,6 +8,85 @@
   },
   "instructions": [
     {
+      "name": "accept_admin",
+      "discriminator": [
+        112,
+        42,
+        45,
+        90,
+        116,
+        181,
+        13,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true,
+          "relations": [
+            "pending_admin"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pending_admin",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  101,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  95,
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "pending_admin"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "approve_agent",
       "discriminator": [
         140,
@@ -226,6 +305,84 @@
       ]
     },
     {
+      "name": "cancel_admin_transfer",
+      "discriminator": [
+        38,
+        131,
+        157,
+        31,
+        240,
+        137,
+        44,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pending_admin",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  101,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  95,
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "relations": [
+            "pending_admin"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_undelivered",
       "discriminator": [
         43,
@@ -419,94 +576,7 @@
           "docs": [
             "Recebe qualquer sobra do cofre (ex: USDC enviado por fora)."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "path": "escrow.buyer",
-                "account": "Escrow"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "usdc_mint"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
-          }
+          "writable": true
         },
         {
           "name": "usdc_mint"
@@ -986,6 +1056,94 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "propose_admin",
+      "discriminator": [
+        121,
+        214,
+        199,
+        212,
+        87,
+        39,
+        117,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Paga o rent da proposta (a plataforma patrocina as taxas); recebe de volta ao fechar."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pending_admin",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  101,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  95,
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
         }
       ]
     },
@@ -1797,94 +1955,7 @@
         },
         {
           "name": "buyer_usdc",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "path": "escrow.buyer",
-                "account": "Escrow"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "usdc_mint"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
-          }
+          "writable": true
         },
         {
           "name": "buyer_reputation",
@@ -2011,94 +2082,7 @@
         },
         {
           "name": "buyer_usdc",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "path": "escrow.buyer",
-                "account": "Escrow"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "usdc_mint"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
-          }
+          "writable": true
         },
         {
           "name": "usdc_mint"
@@ -2192,6 +2176,60 @@
           }
         }
       ]
+    },
+    {
+      "name": "set_treasury",
+      "discriminator": [
+        57,
+        97,
+        196,
+        95,
+        195,
+        206,
+        106,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "new_treasury",
+          "docs": [
+            "Precisa existir, ser do USDC da plataforma e não estar congelada."
+          ]
+        }
+      ],
+      "args": []
     },
     {
       "name": "slash_stake",
@@ -2616,6 +2654,114 @@
       "args": []
     },
     {
+      "name": "top_up_stake",
+      "discriminator": [
+        152,
+        222,
+        110,
+        73,
+        38,
+        18,
+        139,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_usdc",
+          "docs": [
+            "Origem dos fundos: qualquer conta de USDC do criador (ele assina a transferência)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_config",
       "discriminator": [
         29,
@@ -2867,6 +3013,19 @@
       ]
     },
     {
+      "name": "PendingAdmin",
+      "discriminator": [
+        220,
+        45,
+        135,
+        16,
+        196,
+        153,
+        181,
+        56
+      ]
+    },
+    {
       "name": "Review",
       "discriminator": [
         124,
@@ -2894,6 +3053,45 @@
     }
   ],
   "events": [
+    {
+      "name": "AdminTransferCancelled",
+      "discriminator": [
+        93,
+        23,
+        69,
+        55,
+        216,
+        128,
+        106,
+        56
+      ]
+    },
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [
+        203,
+        168,
+        175,
+        51,
+        239,
+        104,
+        20,
+        85
+      ]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [
+        255,
+        147,
+        182,
+        5,
+        199,
+        217,
+        38,
+        179
+      ]
+    },
     {
       "name": "AgentRegistered",
       "discriminator": [
@@ -3090,6 +3288,32 @@
       ]
     },
     {
+      "name": "StakeToppedUp",
+      "discriminator": [
+        198,
+        194,
+        194,
+        30,
+        127,
+        26,
+        161,
+        239
+      ]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [
+        80,
+        239,
+        54,
+        168,
+        43,
+        38,
+        85,
+        145
+      ]
+    },
+    {
       "name": "UsageRecorded",
       "discriminator": [
         166,
@@ -3273,9 +3497,67 @@
       "code": 6033,
       "name": "StaleDisputeNeedsJudgment",
       "msg": "Etapa já entregue e contestada: só o admin julga"
+    },
+    {
+      "code": 6034,
+      "name": "NotPendingAdmin",
+      "msg": "Somente o admin indicado pode aceitar a transferência"
+    },
+    {
+      "code": 6035,
+      "name": "InvalidNewAdmin",
+      "msg": "Novo admin inválido"
     }
   ],
   "types": [
+    {
+      "name": "AdminTransferCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
     {
       "name": "Agent",
       "type": {
@@ -4031,6 +4313,36 @@
       }
     },
     {
+      "name": "PendingAdmin",
+      "docs": [
+        "Transferência de admin em andamento (PDA por config, só existe entre `propose_admin` e",
+        "`accept_admin`/`cancel_admin_transfer`). Conta à parte para não mudar o layout de `Config`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "docs": [
+              "Quem pode aceitar a transferência."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Quem pagou o rent (recebe de volta ao fechar a conta)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "PricingUpdated",
       "type": {
         "kind": "struct",
@@ -4178,6 +4490,49 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeToppedUp",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "stake",
+            "docs": [
+              "Stake do solver depois do aporte."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
           }
         ]
       }

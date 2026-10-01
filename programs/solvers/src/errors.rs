@@ -70,4 +70,8 @@ pub enum SolversError {
     NotRentPayer,
     #[msg("Etapa já entregue e contestada: só o admin julga")]
     StaleDisputeNeedsJudgment,
+    #[msg("Somente o admin indicado pode aceitar a transferência")]
+    NotPendingAdmin,
+    #[msg("Novo admin inválido")]
+    InvalidNewAdmin,
 }

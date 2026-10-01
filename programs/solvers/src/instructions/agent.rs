@@ -133,6 +133,46 @@ pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> R
     Ok(())
 }
 
+/// O criador repõe stake do próprio solver (por exemplo, depois de um `slash_stake`). Vale em
+/// qualquer status; o solver só volta a vender quando o admin o aprova de novo (`approve_agent`).
+#[derive(Accounts)]
+pub struct TopUpStake<'info> {
+    pub creator: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = usdc_mint)]
+    pub config: Box<Account<'info, Config>>,
+    #[account(mut, seeds = [AGENT_SEED, agent.agent_id.as_ref()], bump = agent.bump, has_one = creator @ SolversError::NotCreator)]
+    pub agent: Box<Account<'info, Agent>>,
+    #[account(mut, seeds = [STAKE_SEED, agent.key().as_ref()], bump, token::mint = usdc_mint, token::authority = agent)]
+    pub stake_vault: Box<Account<'info, TokenAccount>>,
+    /// Origem dos fundos: qualquer conta de USDC do criador (ele assina a transferência).
+    #[account(mut, token::mint = usdc_mint, token::authority = creator)]
+    pub creator_usdc: Box<Account<'info, TokenAccount>>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn top_up_stake(ctx: Context<TopUpStake>, amount: u64) -> Result<()> {
+    require!(amount > 0, SolversError::InvalidAmount);
+    let new_stake = ctx.accounts.agent.stake.checked_add(amount).ok_or(SolversError::MathOverflow)?;
+    token::transfer_checked(
+        CpiContext::new(
+            ctx.accounts.token_program.key(),
+            TransferChecked {
+                from: ctx.accounts.creator_usdc.to_account_info(),
+                mint: ctx.accounts.usdc_mint.to_account_info(),
+                to: ctx.accounts.stake_vault.to_account_info(),
+                authority: ctx.accounts.creator.to_account_info(),
+            },
+        ),
+        amount,
+        ctx.accounts.usdc_mint.decimals,
+    )?;
+    let agent = &mut ctx.accounts.agent;
+    agent.stake = new_stake;
+    emit!(StakeToppedUp { agent: agent.key(), creator: ctx.accounts.creator.key(), amount, stake: agent.stake });
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct UpdateVersion<'info> {
     pub creator: Signer<'info>,

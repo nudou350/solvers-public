@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::errors::SolversError;
@@ -311,8 +312,9 @@ pub fn open_dispute(ctx: Context<OpenDispute>, index: u8, reason_hash: [u8; 32])
     Ok(())
 }
 
-/// Resolução de disputa pelo admin. As contas do comprador e do criador são ATAs: se alguém
-/// fechar a sua, ela pode ser recriada no mesmo endereço e a resolução nunca trava.
+/// Resolução de disputa pelo admin. A conta do comprador é validada pelo ENDEREÇO da ATA (dono
+/// esperado + mint), não pelo dono atual do token: quem troca o dono da própria ATA (SetAuthority)
+/// não consegue travar a resolução, e o destino continua sendo o endereço derivado do comprador.
 #[derive(Accounts)]
 pub struct ResolveDispute<'info> {
     pub admin: Signer<'info>,
@@ -339,7 +341,7 @@ pub struct ResolveDispute<'info> {
     pub creator_usdc: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     pub treasury: Box<Account<'info, TokenAccount>>,
-    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    #[account(mut, token::mint = usdc_mint, address = get_associated_token_address(&escrow.buyer, &usdc_mint.key()))]
     pub buyer_usdc: Box<Account<'info, TokenAccount>>,
     #[account(mut, seeds = [REP_SEED, escrow.buyer.as_ref()], bump = buyer_reputation.bump)]
     pub buyer_reputation: Box<Account<'info, UserReputation>>,
@@ -446,7 +448,7 @@ pub struct ResolveStaleDispute<'info> {
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
     pub vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    #[account(mut, token::mint = usdc_mint, address = get_associated_token_address(&escrow.buyer, &usdc_mint.key()))]
     pub buyer_usdc: Box<Account<'info, TokenAccount>>,
     pub usdc_mint: Box<Account<'info, Mint>>,
     pub token_program: Program<'info, Token>,
@@ -501,7 +503,7 @@ pub struct CloseEscrow<'info> {
     #[account(mut, seeds = [ESCROW_VAULT_SEED, escrow.key().as_ref()], bump = escrow.vault_bump)]
     pub vault: Account<'info, TokenAccount>,
     /// Recebe qualquer sobra do cofre (ex: USDC enviado por fora).
-    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = escrow.buyer)]
+    #[account(mut, token::mint = usdc_mint, address = get_associated_token_address(&escrow.buyer, &usdc_mint.key()))]
     pub buyer_usdc: Account<'info, TokenAccount>,
     pub usdc_mint: Account<'info, Mint>,
     pub token_program: Program<'info, Token>,

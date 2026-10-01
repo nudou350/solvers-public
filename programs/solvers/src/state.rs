@@ -10,6 +10,7 @@ pub const ESCROW_SEED: &[u8] = b"escrow";
 pub const ESCROW_VAULT_SEED: &[u8] = b"escrow_vault";
 pub const COLLECTION_AUTHORITY_SEED: &[u8] = b"collection_authority";
 pub const LICENSE_REVIEW_SEED: &[u8] = b"license_review";
+pub const PENDING_ADMIN_SEED: &[u8] = b"pending_admin";
 
 pub const MAX_URI_LEN: usize = 200;
 pub const MAX_VERSION_LEN: usize = 16;
@@ -41,6 +42,18 @@ pub struct Config {
     /// Valor mínimo de qualquer compra (licença, pacote de créditos ou garantia): cobre o rent
     /// das contas que a plataforma paga como fee payer.
     pub min_price: u64,
+    pub bump: u8,
+}
+
+/// Transferência de admin em andamento (PDA por config, só existe entre `propose_admin` e
+/// `accept_admin`/`cancel_admin_transfer`). Conta à parte para não mudar o layout de `Config`.
+#[account]
+#[derive(InitSpace)]
+pub struct PendingAdmin {
+    /// Quem pode aceitar a transferência.
+    pub new_admin: Pubkey,
+    /// Quem pagou o rent (recebe de volta ao fechar a conta).
+    pub rent_payer: Pubkey,
     pub bump: u8,
 }
 

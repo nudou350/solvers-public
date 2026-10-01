@@ -6,6 +6,9 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './adminTransferCancelled.js';
+export * from './adminTransferProposed.js';
+export * from './adminTransferred.js';
 export * from './agentRegistered.js';
 export * from './agentStatusChanged.js';
 export * from './agentVersionUpdated.js';
@@ -21,4 +24,6 @@ export * from './milestoneUpdated.js';
 export * from './pricingUpdated.js';
 export * from './reviewSubmitted.js';
 export * from './stakeSlashed.js';
+export * from './stakeToppedUp.js';
+export * from './treasuryUpdated.js';
 export * from './usageRecorded.js';

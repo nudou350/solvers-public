@@ -30,9 +30,25 @@ pub mod solvers {
         instructions::admin::slash_stake(ctx, amount)
     }
 
+    pub fn propose_admin(ctx: Context<ProposeAdmin>, new_admin: Pubkey) -> Result<()> {
+        instructions::admin::propose_admin(ctx, new_admin)
+    }
+    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
+        instructions::admin::accept_admin(ctx)
+    }
+    pub fn cancel_admin_transfer(ctx: Context<CancelAdminTransfer>) -> Result<()> {
+        instructions::admin::cancel_admin_transfer(ctx)
+    }
+    pub fn set_treasury(ctx: Context<SetTreasury>) -> Result<()> {
+        instructions::admin::set_treasury(ctx)
+    }
+
     // Publicação
     pub fn register_agent(ctx: Context<RegisterAgent>, args: RegisterAgentArgs) -> Result<()> {
         instructions::agent::register_agent(ctx, args)
+    }
+    pub fn top_up_stake(ctx: Context<TopUpStake>, amount: u64) -> Result<()> {
+        instructions::agent::top_up_stake(ctx, amount)
     }
     pub fn update_version(ctx: Context<UpdateVersion>, version: String, version_hash: [u8; 32]) -> Result<()> {
         instructions::agent::update_version(ctx, version, version_hash)

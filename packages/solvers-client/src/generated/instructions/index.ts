@@ -6,8 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './acceptAdmin.js';
 export * from './approveAgent.js';
 export * from './buyCredits.js';
+export * from './cancelAdminTransfer.js';
 export * from './cancelUndelivered.js';
 export * from './closeEscrow.js';
 export * from './consumeCredit.js';
@@ -15,6 +17,7 @@ export * from './createEscrow.js';
 export * from './initializeConfig.js';
 export * from './markPassed.js';
 export * from './openDispute.js';
+export * from './proposeAdmin.js';
 export * from './purchaseLicense.js';
 export * from './recordUsageBatch.js';
 export * from './registerAgent.js';
@@ -22,10 +25,12 @@ export * from './releaseMilestone.js';
 export * from './resolveDispute.js';
 export * from './resolveStaleDispute.js';
 export * from './setEval.js';
+export * from './setTreasury.js';
 export * from './slashStake.js';
 export * from './submitReview.js';
 export * from './submitReviewWithCredits.js';
 export * from './suspendAgent.js';
+export * from './topUpStake.js';
 export * from './updateConfig.js';
 export * from './updatePricing.js';
 export * from './updateVersion.js';
