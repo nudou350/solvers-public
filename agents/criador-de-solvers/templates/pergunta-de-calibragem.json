@@ -1,0 +1,23 @@
+{
+  "onboarding": {
+    "questions": [
+      {
+        "id": "nivel",
+        "ask": "Qual é o seu nível com este assunto: iniciante, intermediário ou avançado?",
+        "why": "Define o quanto eu explico cada termo e o tamanho das respostas",
+        "options": ["Iniciante", "Intermediário", "Avançado"]
+      },
+      {
+        "id": "objetivo",
+        "ask": "Qual é o seu objetivo principal agora, em poucas palavras?",
+        "why": "Ajuda a escolher o que priorizar nas etapas"
+      },
+      {
+        "id": "porte",
+        "ask": "Qual é o tamanho do seu negócio ou projeto?",
+        "why": "O caminho muda conforme o porte e a rotina",
+        "options": ["Só eu", "De 2 a 5 pessoas", "Mais de 5 pessoas"]
+      }
+    ]
+  }
+}

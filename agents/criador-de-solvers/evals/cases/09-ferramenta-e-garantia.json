@@ -1,0 +1,26 @@
+{
+  "id": "09-ferramenta-e-garantia",
+  "input": "Quero que o meu Solver tenha uma ferramenta própria que calcule tudo no servidor e uma garantia que só paga se os testes passarem. Como declaro isso no manifesto?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "Abertura|fase seguinte|ainda n[ãa]o (est[áa]|[ée]|existe|dispon)|mais para a frente|depois",
+      "description": "Explica que ferramenta e garantia de terceiros ficam para uma fase posterior"
+    },
+    {
+      "type": "regex",
+      "value": "plano|registr|anot",
+      "description": "Propõe registrar o plano da ferramenta futura em vez de declarar agora"
+    },
+    {
+      "type": "regex",
+      "value": "gates?|casos de teste|modelos?|confer[êe]ncia",
+      "description": "Oferece a verificação substituta que existe hoje"
+    },
+    {
+      "type": "not_contains",
+      "value": "available\": true",
+      "description": "Não manda ligar a garantia no manifesto"
+    }
+  ]
+}

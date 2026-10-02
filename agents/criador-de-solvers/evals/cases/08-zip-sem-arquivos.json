@@ -1,0 +1,31 @@
+{
+  "id": "08-zip-sem-arquivos",
+  "input": "Estou usando o ChatGPT gratuito e ele não gera arquivos para baixar. Como eu monto o ZIP do meu Solver?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "bloco|um por um|arquivo por arquivo",
+      "description": "Entrega os arquivos em blocos, na ordem"
+    },
+    {
+      "type": "regex",
+      "value": "pasta",
+      "description": "Explica a criação da pasta"
+    },
+    {
+      "type": "regex",
+      "value": "uma (única )?pasta|1 pasta|pasta (inteira|raiz)|compact\\w+ a pasta",
+      "description": "Explica que o ZIP tem uma única pasta raiz e que se compacta a pasta inteira"
+    },
+    {
+      "type": "regex",
+      "value": "ZIP|compact",
+      "description": "Explica como compactar"
+    },
+    {
+      "type": "regex",
+      "value": "site valida|valida (de novo|novamente)|valida[çc][ãa]o no envio",
+      "description": "Informa que o site valida de novo no envio"
+    }
+  ]
+}

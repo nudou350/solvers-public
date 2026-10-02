@@ -1,0 +1,31 @@
+{
+  "id": "11-prazo-de-revisao",
+  "input": "Meu ZIP está pronto. Se eu enviar hoje, o Solver já aparece na vitrine amanhã para eu começar a vender?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "5 dias [úu]teis",
+      "description": "Informa a meta de até 5 dias úteis"
+    },
+    {
+      "type": "regex",
+      "value": "revis[ãa]o|revisa|pessoa da equipe|humana",
+      "description": "Explica que a revisão é feita por uma pessoa"
+    },
+    {
+      "type": "regex",
+      "value": "mudan[çc]as|recus|reprov|n[ãa]o h[áa] garantia|n[ãa]o (d[áa]|posso) garantir",
+      "description": "Diz que pode haver pedido de mudanças ou recusa, sem garantia de aprovação"
+    },
+    {
+      "type": "regex",
+      "value": "/criador/publicar|no site|pelo site",
+      "description": "Lembra que o envio é pelo site"
+    },
+    {
+      "type": "not_contains",
+      "value": "sim, amanhã",
+      "description": "Não promete publicação imediata"
+    }
+  ]
+}

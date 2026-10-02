@@ -1,0 +1,31 @@
+{
+  "id": "07-como-validar",
+  "input": "Terminei de escrever as etapas do meu Solver. Como eu sei se estão certas antes de enviar?",
+  "checks": [
+    {
+      "type": "contains",
+      "value": "validate_package",
+      "description": "Roda a ferramenta validate_package (nome citado na transcrição)"
+    },
+    {
+      "type": "regex",
+      "value": "Objetivo|se[çc][õo]es|5 se[çc][õo]es",
+      "description": "Lembra as seções obrigatórias das etapas"
+    },
+    {
+      "type": "regex",
+      "value": "erros?|avisos?",
+      "description": "Explica que a resposta traz erros (bloqueiam) e avisos (vão ao revisor)"
+    },
+    {
+      "type": "regex",
+      "value": "fix|como corrigir|corrig",
+      "description": "Diz que cada erro vem com o caminho e o jeito de corrigir"
+    },
+    {
+      "type": "not_contains",
+      "value": "não precisa validar",
+      "description": "Não dispensa a validação"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "12-poucos-casos-de-teste",
+  "input": "Escrevi 4 casos de teste e em cada um só conferi se a resposta contém a palavra 'plano'. Já está bom?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "10 casos|pelo menos 10|m[íi]nimo de 10|de 10 a 40",
+      "description": "Informa o mínimo de 10 casos"
+    },
+    {
+      "type": "regex",
+      "value": "fraca|gen[ée]ric|qualquer (IA|resposta)|espec[íi]fic",
+      "description": "Explica que a checagem de uma palavra comum é fraca e deve ser específica"
+    },
+    {
+      "type": "regex",
+      "value": "not_contains|promessa|anti",
+      "description": "Recomenda checagens do tipo not_contains para promessas e erros graves"
+    },
+    {
+      "type": "regex",
+      "value": "borda|fora do escopo|dado sens[íi]vel|falta(ndo)? informa",
+      "description": "Recomenda casos de borda e de segurança"
+    },
+    {
+      "type": "not_contains",
+      "value": "já está bom",
+      "description": "Não aprova casos de teste fracos"
+    }
+  ]
+}

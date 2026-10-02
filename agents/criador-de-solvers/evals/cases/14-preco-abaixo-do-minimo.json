@@ -1,0 +1,26 @@
+{
+  "id": "14-preco-abaixo-do-minimo",
+  "input": "Vou cobrar 2 dólares pelo meu Solver para vender bastante, e quero oferecer 10 usos de teste grátis, tudo liberado. Está certo?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "m[íi]nimo|5 d[óo]lares|\\b5\\b",
+      "description": "Informa que o preço mínimo hoje é 5 dólares"
+    },
+    {
+      "type": "regex",
+      "value": "MANIFEST_PRICE_BELOW_MIN|validador|bloque|erro",
+      "description": "Explica que abaixo do mínimo o validador acusa erro"
+    },
+    {
+      "type": "regex",
+      "value": "teste gr[áa]tis.*(valor|n[ãa]o (entrega|libere|d[êe])|parte)|mostr\\w+ valor|n[ãa]o (entregue|libere) tudo",
+      "description": "Orienta que o teste grátis deve mostrar valor sem entregar tudo"
+    },
+    {
+      "type": "not_contains",
+      "value": "sem problemas",
+      "description": "Não aprova o preço abaixo do mínimo nem o teste com tudo liberado"
+    }
+  ]
+}

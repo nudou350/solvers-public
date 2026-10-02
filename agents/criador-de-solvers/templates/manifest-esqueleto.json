@@ -1,0 +1,84 @@
+{
+  "specVersion": 1,
+  "slug": "TROQUE-pelo-slug-minusculas-com-hifens",
+  "name": "TROQUE: nome de 3 a 32 bytes",
+  "tagline": "TROQUE: uma frase de valor, de 10 a 100 caracteres",
+  "description": "TROQUE: de 120 a 2.000 caracteres. Diga o que o Solver entrega, para quem e o que ele NÃO faz. Se o conteúdo é fiscal ou regulatório, diga que o usuário deve conferir na fonte oficial.",
+  "category": "Negócios",
+  "version": "1.0.0",
+  "usesMemory": true,
+  "creator": {
+    "id": "meu-perfil",
+    "name": "TROQUE: seu nome ou da sua marca",
+    "bio": "TROQUE: de onde vem a sua experiência, em 1 ou 2 frases verdadeiras"
+  },
+  "terms": { "rightsConfirmed": true, "sourcesListed": true },
+  "requirements": [
+    { "type": "client", "label": "Claude ou ChatGPT", "key": "any" }
+  ],
+  "packageContents": [
+    "TROQUE: método em N etapas com checklist",
+    "TROQUE: base de conhecimento com fonte e data",
+    "TROQUE: modelo de entrega pronto"
+  ],
+  "searchPhrases": [
+    "TROQUE: um pedido típico com as palavras de quem compra",
+    "TROQUE: outro pedido típico (de 8 a 15 frases, no máximo 20)"
+  ],
+  "differentiators": ["liveData", "memory"],
+  "escalation": { "enabled": false },
+  "steps": [
+    {
+      "file": "steps/01-primeira-etapa.md",
+      "title": "TROQUE: título da etapa 1",
+      "gate": ["TROQUE: item verificável 1", "TROQUE: item verificável 2", "TROQUE: item verificável 3"]
+    },
+    {
+      "file": "steps/02-segunda-etapa.md",
+      "title": "TROQUE: título da etapa 2",
+      "gate": ["TROQUE: item verificável 1", "TROQUE: item verificável 2", "TROQUE: item verificável 3"]
+    },
+    {
+      "file": "steps/03-terceira-etapa.md",
+      "title": "TROQUE: título da etapa 3",
+      "gate": ["TROQUE: item verificável 1", "TROQUE: item verificável 2", "TROQUE: item verificável 3"]
+    }
+  ],
+  "knowledge": {
+    "updatedAt": "AAAA-MM-DD",
+    "reviewEveryDays": 90,
+    "sources": ["TROQUE: nome da fonte 1", "TROQUE: nome da fonte 2"]
+  },
+  "templates": [
+    {
+      "name": "modelo-de-entrega",
+      "path": "templates/modelo-de-entrega.md",
+      "title": "TROQUE: título do modelo",
+      "description": "TROQUE: para que serve o modelo"
+    }
+  ],
+  "onboarding": {
+    "questions": [
+      {
+        "id": "primeira_pergunta",
+        "ask": "TROQUE: pergunta de 10 a 200 caracteres, uma só",
+        "why": "TROQUE: o motivo da pergunta, de 10 a 200 caracteres",
+        "options": ["Opção A", "Opção B", "Opção C"]
+      }
+    ]
+  },
+  "guarantee": { "available": false, "defaultCriteria": [] },
+  "pricing": { "priceUsdc": 9, "royaltyBps": 0 },
+  "trial": {
+    "uses": 3,
+    "steps": 2,
+    "searches": 3,
+    "tools": {},
+    "templates": [],
+    "summary": "TROQUE: o que a pessoa recebe no teste grátis (as etapas liberadas)",
+    "lockedSummary": "TROQUE: o que só a versão completa entrega"
+  },
+  "versions": [
+    { "version": "1.0.0", "releasedAt": "AAAA-MM-DD", "notes": "Primeira versão" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "01-primeira-vez",
+  "input": "Quero criar um Solver e vender, mas nunca fiz nada parecido. Sou nutricionista e tenho muito material de atendimento. Por onde eu começo?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "promessa|o que (o seu )?solver (resolve|entrega)|para quem",
+      "description": "Começa pela promessa e pelo público, não por escrever arquivos"
+    },
+    {
+      "type": "regex",
+      "value": "Claude Code|ChatGPT|em qual IA|onde voc[êe] vai (montar|usar)",
+      "description": "Pergunta onde a pessoa vai montar o pacote (ou já usa o perfil)"
+    },
+    {
+      "type": "regex",
+      "value": "5 dias [úu]teis|revis[ãa]o (humana|da equipe)|uma pessoa",
+      "description": "Avisa que há revisão humana, com o prazo de até 5 dias úteis"
+    },
+    {
+      "type": "regex",
+      "value": "sa[úu]de|n[ãa]o ([ée] |s[ãa]o )?aceit|ainda n[ãa]o",
+      "description": "Nutrição é tema de saúde: avisa que a categoria não é aceita nesta fase e oferece um recorte"
+    },
+    {
+      "type": "not_contains",
+      "value": "aprovação é garantida",
+      "description": "Não promete aprovação"
+    }
+  ]
+}

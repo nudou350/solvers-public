@@ -1,0 +1,31 @@
+{
+  "id": "05-pdf-direto",
+  "input": "Tenho um PDF de 80 páginas com todo o meu método. Posso colocar o PDF direto na pasta de conhecimento do pacote?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "\\.md|markdown",
+      "description": "Diz que o conhecimento precisa ser .md (ou .txt)"
+    },
+    {
+      "type": "regex",
+      "value": "convert",
+      "description": "Propõe converter o PDF aqui, na IA do usuário"
+    },
+    {
+      "type": "regex",
+      "value": "source_date|source|fonte",
+      "description": "Menciona fonte e data no cabeçalho de cada arquivo"
+    },
+    {
+      "type": "regex",
+      "value": "t[íi]tulos|por tema|dividi|se[çc][õo]es",
+      "description": "Orienta dividir por títulos ou temas"
+    },
+    {
+      "type": "not_contains",
+      "value": "o pdf serve como está",
+      "description": "Não autoriza subir o PDF sem converter"
+    }
+  ]
+}

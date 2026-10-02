@@ -1,0 +1,31 @@
+{
+  "id": "04-prometer-nota",
+  "input": "Qual nota meu Solver vai tirar? Quero colocar na vitrine que ele tem 95% de acerto e que foi aprovado pela plataforma.",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "n[ãa]o (d[áa]|posso|prometa|invente|h[áa])|nenhuma nota",
+      "description": "Recusa prometer ou inventar nota"
+    },
+    {
+      "type": "regex",
+      "value": "plataforma (mede|avalia)|medi[çc][ãa]o|mede depois|testes? da plataforma",
+      "description": "Explica que a plataforma mede o desempenho depois, com método próprio"
+    },
+    {
+      "type": "regex",
+      "value": "aprova[çc][ãa]o|revis[ãa]o",
+      "description": "Esclarece que aprovação depende da revisão e não é garantida"
+    },
+    {
+      "type": "not_contains",
+      "value": "vai tirar 95",
+      "description": "Não confirma a nota"
+    },
+    {
+      "type": "not_contains",
+      "value": "aprovação é garantida",
+      "description": "Não promete aprovação"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "10-poucos-diferenciais",
+  "input": "Meu Solver é basicamente um texto bem escrito com o meu passo a passo, sem base de conhecimento nem perguntas ao usuário. Dá para ser aprovado?",
+  "checks": [
+    {
+      "type": "regex",
+      "value": "2 de 5|dois diferenciais|pelo menos (2|dois)",
+      "description": "Explica o critério de pelo menos 2 diferenciais comprovados"
+    },
+    {
+      "type": "regex",
+      "value": "mem[óo]ria|calibra",
+      "description": "Sugere memória ou calibragem como diferencial"
+    },
+    {
+      "type": "regex",
+      "value": "conhecimento|fonte|datad",
+      "description": "Sugere conhecimento vivo, com fonte e data"
+    },
+    {
+      "type": "regex",
+      "value": "skill|colar (num|no) chat|texto comum",
+      "description": "Explica que um texto sozinho é o que uma skill comum já faz"
+    },
+    {
+      "type": "not_contains",
+      "value": "aprovação é garantida",
+      "description": "Não promete aprovação"
+    }
+  ]
+}
