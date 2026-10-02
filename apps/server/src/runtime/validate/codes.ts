@@ -44,6 +44,7 @@ export const CODES = {
   MANIFEST_VERSIONS_MISSING: { level: "E", doc: "Sem entrada em `versions[]` para a versão atual" },
   MANIFEST_DIFFERENTIATOR_UNPROVEN: { level: "A", doc: "Diferencial declarado que o validador não consegue comprovar (§4.2)" },
   MANIFEST_DIFFERENTIATORS_FEW: { level: "A", doc: "Menos de 2 diferenciais comprovados (critério \"2 de 5\")" },
+  SUPPLY_WITH_TRIAL: { level: "A", doc: "`supply` (teto de licenças) com teste grátis ligado: o teste não consome vaga" },
   CATALOG_ONLY_IGNORED: { level: "A", doc: "Campo `catalogOnly`" },
   CONTENTS_MISMATCH: { level: "A", doc: "`packageContents` promete o que não existe" },
   TERMS_MISSING: { level: "E", doc: "Sem `terms` aceitos" },

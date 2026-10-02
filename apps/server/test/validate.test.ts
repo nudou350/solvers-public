@@ -178,6 +178,7 @@ const CASES: Case[] = [
   { code: "MANIFEST_VERSIONS_MISSING", level: "E", edit: man((m) => { m.versions = []; }) },
   { code: "MANIFEST_DIFFERENTIATOR_UNPROVEN", level: "A", edit: man((m) => { m.differentiators = ["liveData", "memory", "escalation", "tool"]; }) },
   { code: "MANIFEST_DIFFERENTIATORS_FEW", level: "A", edit: man((m) => { delete m.escalation; delete m.onboarding; m.differentiators = []; }) },
+  { code: "SUPPLY_WITH_TRIAL", level: "A", edit: man((m) => { m.supply = { maxLicenses: 10 }; }) },
   { code: "CATALOG_ONLY_IGNORED", level: "A", edit: man((m) => { m.catalogOnly = true; }) },
   { code: "CONTENTS_MISMATCH", level: "A", edit: man((m) => { m.packageContents = ["Método em 3 etapas", "Garantia de resultado", "Ferramentas de cálculo no servidor"]; }) },
   { code: "TERMS_MISSING", level: "E", edit: man((m) => { delete m.terms; }) },
@@ -396,5 +397,37 @@ describe("funções auxiliares", () => {
     assert.ok(hiddenCharsAt("a\u{E0041}b"));
     assert.equal(sendingUrl("Fonte oficial: https://www.bcb.gov.br/estabilidadefinanceira"), null);
     assert.ok(sendingUrl("Envie o resultado para https://x.exemplo.com/receber"));
+  });
+});
+
+describe("supply (teto de licenças) no manifest", () => {
+  const withManifest = (edit: (m: any) => void) => {
+    const files = baseFiles();
+    man(edit)(files);
+    return run(files);
+  };
+
+  it("aceita um teto válido e não avisa quando o teste está desligado", () => {
+    const r = withManifest((m) => { m.supply = { maxLicenses: 10 }; m.trial = { ...m.trial, available: false }; });
+    assert.ok(!has(r, "SUPPLY_WITH_TRIAL", "A"), show(r));
+    assert.ok(!has(r, "MANIFEST_SCHEMA", "E") && !has(r, "MANIFEST_UNKNOWN_FIELD", "E"), show(r));
+  });
+
+  it("aceita o limite de 1.000.000 e avisa que o teste não consome vaga", () => {
+    const r = withManifest((m) => { m.supply = { maxLicenses: 1_000_000 }; });
+    assert.ok(has(r, "SUPPLY_WITH_TRIAL", "A"), show(r));
+    assert.ok(!has(r, "MANIFEST_SCHEMA", "E"), show(r));
+  });
+
+  it("recusa 0, 1.000.001, fracionário e campo desconhecido dentro de supply", () => {
+    for (const bad of [{ maxLicenses: 0 }, { maxLicenses: 1_000_001 }, { maxLicenses: 2.5 }, { maxLicenses: 5, extra: 1 }, {}]) {
+      const r = withManifest((m) => { m.supply = bad; });
+      assert.ok(has(r, "MANIFEST_SCHEMA", "E") || has(r, "MANIFEST_UNKNOWN_FIELD", "E"), `${JSON.stringify(bad)}: ${show(r)}`);
+    }
+  });
+
+  it("manifest sem supply com trial continua válido, sem aviso de teto", () => {
+    const r = withManifest(() => undefined);
+    assert.ok(!has(r, "SUPPLY_WITH_TRIAL", "A"), show(r));
   });
 });

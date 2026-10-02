@@ -193,7 +193,8 @@ Todo caminho escrito no manifesto (`steps[].file`, `templates[].path`) precisa: 
 | `differentiators[]` | subconjunto de `tool`, `verifier`, `liveData`, `memory`, `escalation` (§4.2) | `[]` | Núcleo | novo |
 | `guarantee` | como hoje. Terceiros: `available: true` é **erro** no Núcleo (`MANIFEST_GUARANTEE_FORBIDDEN`, §9) | `{available:false}` | Núcleo | existe |
 | `pricing` | `{ priceUsdc, royaltyBps }`; `priceUsdc` ≥ `min_price` da config on-chain (hoje 5); `royaltyBps` 0–1.000 | — | Núcleo | existe |
-| `trial` | como hoje (`available`, `uses`, `steps`, `searches`, `tools`, `summary`, `lockedSummary`), mais `templates[]` (nomes liberados no teste; padrão nenhum) | sem teste | Núcleo | existe/muda |
+| `supply` | `{ maxLicenses }`: inteiro de 1 a 1.000.000; teto de licenças vendidas. O limite ATUAL é imposto e verificável on-chain (`purchase_license` falha com `SoldOut`) e conta licenças emitidas na vida do solver: revender, transferir ou queimar não reabre vaga. O programa só impede **baixar** o teto: o criador pode subi-lo depois (até ilimitado) e um solver sem teto criado é ilimitado, então a promessa ao comprador é "o limite hoje é N e só pode aumentar", nunca "só existirão N". O `cli:publish` cria o teto e só o **sobe** (`maxLicenses` menor que o on-chain é ignorado com aviso). Independe de `trial` | ilimitado | Núcleo | novo |
+| `trial` | como hoje (`available`, `uses`, `steps`, `searches`, `tools`, `summary`, `lockedSummary`), mais `templates[]` (nomes liberados no teste; padrão nenhum). Independe de `supply`: o teste não consome vaga | sem teste | Núcleo | existe/muda |
 | `catalogOnly` | removido do v1 (não tem efeito no código); aviso `CATALOG_ONLY_IGNORED` | — | — | muda |
 
 ### 4.2 Diferenciais declarados **[Núcleo]**
@@ -903,6 +904,7 @@ tags: [das, valores]
 | `MANIFEST_VERSIONS_MISSING` | E | Sem entrada em `versions[]` para a versão atual |
 | `MANIFEST_DIFFERENTIATOR_UNPROVEN` | A | Diferencial declarado que o validador não consegue comprovar (§4.2) |
 | `MANIFEST_DIFFERENTIATORS_FEW` | A | Menos de 2 diferenciais comprovados (critério "2 de 5") |
+| `SUPPLY_WITH_TRIAL` | A | `supply` (teto de licenças) com teste grátis ligado: o teste não consome vaga |
 | `CATALOG_ONLY_IGNORED` | A | Campo `catalogOnly` |
 | `CONTENTS_MISMATCH` | A | `packageContents` promete o que não existe |
 | `TERMS_MISSING` | E | Sem `terms` aceitos |

@@ -47,6 +47,8 @@ export function isSoldOut(supply: AgentSupply): boolean {
   return supply.left === 0;
 }
 
-export function soldOutText(name: string): string {
-  return `${name} está esgotado: todas as licenças já foram vendidas. Quem já tem uma pode revendê-la no mercado, quando a revenda estiver ativa.`;
+/** Texto de "esgotado". `resale`: a revenda está ligada, então dá para sugerir o mercado de licenças usadas. */
+export function soldOutText(name: string, resale = false): string {
+  const base = `${name} está esgotado: o limite atual de licenças já foi vendido (o criador pode aumentá-lo).`;
+  return resale ? `${base} Quem já tem uma pode revendê-la: veja se há licença à venda no mercado de revenda.` : base;
 }

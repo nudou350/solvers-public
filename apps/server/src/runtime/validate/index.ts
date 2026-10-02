@@ -96,7 +96,8 @@ type View = {
   differentiators?: string[];
   guarantee: { available: boolean; milestones?: { verify?: string }[] };
   pricing: { priceUsdc: number; royaltyBps: number };
-  trial?: { summary: string; lockedSummary: string };
+  trial?: { summary: string; lockedSummary: string; available?: boolean };
+  supply?: { maxLicenses: number };
   versions: { version: string; notes: string }[];
 };
 
@@ -308,6 +309,9 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions): Val
   }
   if (!m.versions.some((v) => v.version === m.version)) {
     add(L("E"), "MANIFEST_VERSIONS_MISSING", mp("versions"), `Falta a entrada de versions[] para a versão ${m.version}`, "Acrescente { version, releasedAt, notes } da versão atual.");
+  }
+  if (strict && m.supply && m.trial && m.trial.available !== false) {
+    add("A", "SUPPLY_WITH_TRIAL", mp("supply"), "O produto tem teto de licenças e teste grátis ligado: o teste não consome vaga e é por carteira", "Para exclusividade real desligue o teste (trial.available: false); senão mantenha e avise o revisor.");
   }
   if (m.catalogOnly !== undefined) add("A", "CATALOG_ONLY_IGNORED", mp("catalogOnly"), "catalogOnly não tem efeito no servidor", "Remova o campo.");
   if (strict && !(m.terms?.rightsConfirmed === true && m.terms.sourcesListed === true)) {

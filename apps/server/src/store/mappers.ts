@@ -11,6 +11,7 @@ import type { schema } from "../db/index.js";
 import { env } from "../env.js";
 import { getPackage } from "../runtime/packages.js";
 import { trialLimits } from "../runtime/trial.js";
+import { supplyOfRow } from "./supply-rules.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 type CreatorRow = typeof schema.creators.$inferSelect;
@@ -65,6 +66,8 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     guaranteeAvailable: guaranteeOffered(row),
     resaleFloorUsdc: extras.resaleFloor == null ? null : unitsToUsdc(extras.resaleFloor),
     royaltyBps: row.royaltyBps,
+    // Teto de licenças: espelho do banco (total_sales / max_licenses), sem consulta extra.
+    supply: supplyOfRow(row),
     trend7d: extras.trend7d,
     publishedAt: publishedAt(row),
   };

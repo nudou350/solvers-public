@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { address, listingIsLive, type Address } from "@solvers/chain";
 import * as gen from "@solvers/client";
-import { bytesToHex } from "@solvers/shared";
+import { bytesToHex, normalizeMaxLicenses } from "@solvers/shared";
 import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { bytesToHexStr } from "../lib/crypto.js";
@@ -22,7 +22,14 @@ export async function syncAgent(agentAddr: Address): Promise<string | null> {
   const a = acc.data;
   const id = bytesToHex(a.agentId);
   // Não inclui platformStatus (kill switch da plataforma): ver indexer/mirror.ts.
-  const values = agentMirrorValues(a, agentAddr);
+  const values: ReturnType<typeof agentMirrorValues> & { maxLicenses?: number | null } = agentMirrorValues(a, agentAddr);
+  // Teto de licenças (PDA SupplyCap, só existe se o criador definiu um). Se o RPC falhar a coluna fica como está: o
+  // espelho é só para a vitrine e para o pré-check; quem barra a venda é o programa.
+  try {
+    values.maxLicenses = normalizeMaxLicenses(await chain().fetchSupplyCap(id));
+  } catch (e) {
+    console.warn(`[sync] teto de licenças de ${id} não lido: ${(e as Error).message}`);
+  }
   const updated = await db.update(schema.agents).set(values).where(eq(schema.agents.id, id)).returning({ id: schema.agents.id });
   if (updated.length === 0) {
     // Registrado fora do script de publicação: cria uma entrada mínima para não perder o espelho.

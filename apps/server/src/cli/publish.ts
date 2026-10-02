@@ -21,6 +21,7 @@ import { env } from "../env.js";
 import { embed } from "../knowledge/embeddings.js";
 import { ingestPackage } from "../knowledge/ingest.js";
 import { syncAgent } from "../indexer/sync.js";
+import { nextMaxLicenses } from "../store/supply-rules.js";
 import { packages, type SolverPackage } from "../runtime/packages.js";
 import { hexToBytes } from "../lib/crypto.js";
 
@@ -159,7 +160,37 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
       console.log(`  nota de desempenho: ${pkg.evalReport.scoreBps / 100}%`);
     }
   }
+  await reconcileSupplyCap(pkg, creator);
   await syncAgent(await c.agentPda(m.id));
+}
+
+/**
+ * Teto de licenças (docs/licencas-limitadas.md): leva o `supply.maxLicenses` do manifest para a PDA SupplyCap on-chain,
+ * assinada pelo criador (a plataforma paga o rent). Regra "só sobe" em `nextMaxLicenses`: cria se não existe, sobe se o manifest
+ * é maior, e avisa sem mexer quando o manifest é menor ou some (nunca vira ilimitado por omissão).
+ */
+async function reconcileSupplyCap(pkg: SolverPackage, creator: KeyPairSigner) {
+  const c = chain();
+  const m = pkg.manifest;
+  const requested = m.supply?.maxLicenses ?? null;
+  const onchain = await c.fetchSupplyCap(m.id);
+  const sold = Number((await c.fetchAgent(m.id)).data.totalSales);
+  const plan = nextMaxLicenses(onchain, requested, sold);
+  if (!plan.ok) {
+    console.warn(`  ⚠ teto de licenças: ${plan.message}`);
+    return;
+  }
+  if (plan.action === "none") return;
+  try {
+    const ix = plan.action === "create" ? await c.createSupplyCapIx(creator, m.id, plan.max) : await c.raiseSupplyCapIx(creator, m.id, plan.max);
+    await c.sendAsServer([ix]);
+  } catch (e) {
+    throw new Error(
+      `não foi possível ${plan.action === "create" ? "criar" : "subir"} o teto de licenças on-chain (${(e as Error).message}). ` +
+        "Se o programa da devnet ainda é o antigo, faça o upgrade antes (docs/devnet-upgrade.md).",
+    );
+  }
+  console.log(`  teto de licenças on-chain: ${plan.max}${plan.action === "raise" ? ` (era ${onchain})` : ""}`);
 }
 
 /** Volta à vitrine, a não ser que a nota continue abaixo do mínimo (o job tiraria de novo). Só depois do catálogo completo. */

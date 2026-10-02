@@ -194,6 +194,7 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
     case "StakeWithdrawn": // o cofre foi devolvido: stake zerado
     case "UsageRecorded":
     case "PricingUpdated": // update_pricing agora emite evento: o preço do espelho não fica mais defasado
+    case "SupplyCapSet": // create/raise_supply_cap: o espelho (agents.max_licenses) é lido junto com a conta do agente
       await syncAgent(ev.data.agent);
       return;
     case "ConfigUpdated":

@@ -22,6 +22,7 @@ import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { processSignature } from "../indexer/processor.js";
 import { assertFreshPrice } from "./fresh-price.js";
+import { assertSupplyOpen } from "./supply.js";
 import { brlPerUsd } from "./fx.js";
 import { pixConfig } from "../pix/routes.js";
 import { sodaxConfig } from "../sodax/routes.js";
@@ -360,6 +361,8 @@ storeRouter.post(
     const row = await findAgentRow(body.agentId);
     // Suspenso pela plataforma (platformStatus) também não vende: a coluna `status` é só o espelho da cadeia.
     if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
+    // Teto de licenças atingido: 409 sold_out sem RPC nem montagem (o programa também barra: purchase_license falha com SoldOut).
+    assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
     // update_pricing não emite evento: confere o preço on-chain e, se mudou, espelha e responde 409 price_changed.
     await assertFreshPrice(row);
     const c = chain();
