@@ -3,6 +3,9 @@
 /** Acesso pago: licença vitalícia ou tarefa com garantia aberta (sem limites de teste). */
 export type PaidAccess = { kind: "license"; licenseId: string } | { kind: "guarantee"; escrowId: string };
 
+/** Acesso gratuito a um Solver da plataforma (PLATFORM_AGENTS): sem licença, sem teste grátis e sem contador de usos. */
+export type PlatformAccess = { kind: "platform" };
+
 /** Status de escrow em que a tarefa ainda está em andamento (pending = transação não confirmada). */
 export const OPEN_ESCROW_STATUSES = ["active", "disputed"] as const;
 
@@ -27,7 +30,8 @@ export function blockBeforeTrial(i: { licenseUnknown: boolean; allowTrial: boole
   return null;
 }
 
-/** Linha de acesso do activate_solver para acesso pago. */
-export function paidAccessLine(kind: PaidAccess["kind"]): string {
+/** Linha de acesso do activate_solver para acesso pago (ou gratuito de Solver da plataforma). */
+export function paidAccessLine(kind: PaidAccess["kind"] | PlatformAccess["kind"]): string {
+  if (kind === "platform") return "Acesso: gratuito (Solver da plataforma, sem licença e sem limites de teste).";
   return kind === "license" ? "Acesso: licença vitalícia." : "Acesso: tarefa com garantia (sem limites enquanto a garantia estiver aberta).";
 }

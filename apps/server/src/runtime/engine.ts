@@ -4,9 +4,10 @@ import { db, schema } from "../db/index.js";
 import { forbidden, notFound } from "../lib/http.js";
 import { randomId, sha256Hex } from "../lib/crypto.js";
 import type { SolverPackage } from "./packages.js";
-import { escrowIsOpen, paidAccessById, sessionGrantValid, type PaidAccess } from "./access.js";
+import { escrowIsOpen, paidAccessById, sessionGrantValid, type PaidAccess, type PlatformAccess } from "./access.js";
 import { assertAgentCanServe, servePolicy, type AccessKind } from "./availability.js";
 import { licenseRecheckDue, withSummary } from "./session-rules.js";
+import { declaredTemplates, templatesOverview } from "./templates.js";
 
 // Motor de etapas (INSTRUCTIONS.md 5.4): sessão por ativação, uma etapa por vez, gates,
 // e marca d'água simples por carteira.
@@ -21,8 +22,8 @@ const TRIAL_TTL_MS = 2 * 3600_000;
 const PAID_TTL_MS = 24 * 3600_000;
 export const TRIAL_MAX_CALLS = 60;
 
-/** Acesso da sessão: teste grátis ou pago (licença / tarefa com garantia, cujo escrowId fica no context). */
-export type SessionGrant = { kind: "trial" } | PaidAccess;
+/** Acesso da sessão: teste grátis, pago (licença / tarefa com garantia, cujo escrowId fica no context) ou Solver da plataforma (gratuito). */
+export type SessionGrant = { kind: "trial" } | PaidAccess | PlatformAccess;
 
 export async function createSession(wallet: string, pkg: SolverPackage, grant: SessionGrant): Promise<Session> {
   const ttl = grant.kind === "trial" ? TRIAL_TTL_MS : PAID_TTL_MS;
@@ -188,13 +189,17 @@ const WATERMARKS = [
   "Use o checklist a seguir como condição para passar à próxima etapa.",
 ];
 
-/** Frase de controle escolhida pelo hash da carteira: permite rastrear vazamentos de conteúdo. */
+/**
+ * Frase de controle escolhida pelo hash da carteira (1 entre 8 = 3 bits). Serve como INDÍCIO de origem de um
+ * vazamento, não como prova nem rastreio individual (PACKAGE_SPEC.md 6.5): várias carteiras caem na mesma frase.
+ */
 export function watermark(wallet: string, agentId: string): string {
   const n = createHash("sha256").update(`${wallet}:${agentId}`).digest().readUInt32BE(0);
   return WATERMARKS[n % WATERMARKS.length]!;
 }
 
-export function overview(pkg: SolverPackage): string {
+/** Visão geral do solver. Em sessão de teste, os templates listados são só os de `trial.templates`. */
+export function overview(pkg: SolverPackage, trial: { templates: string[] } | null = null): string {
   const m = pkg.manifest;
   const steps = pkg.steps.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
   const tools = m.tools.length ? m.tools.map((t) => `- ${t.name}: ${t.description}`).join("\n") : "- (nenhuma)";
@@ -207,6 +212,7 @@ export function overview(pkg: SolverPackage): string {
     "",
     "## Ferramentas de servidor disponíveis (use com run_tool)",
     tools,
+    ...templatesOverview(declaredTemplates(m), trial),
   ].join("\n");
 }
 

@@ -5,12 +5,14 @@ import { db, schema } from "../db/index.js";
 import { refreshLicenseOwner, syncLicense } from "../indexer/sync.js";
 import type { SolverPackage } from "./packages.js";
 import { trialLimits, type TrialLimits, type TrialUsage } from "./trial.js";
-import { blockBeforeTrial, escrowGivesAccess, OPEN_ESCROW_STATUSES, type LicenseCheck, type PaidAccess } from "./access-rules.js";
+import { blockBeforeTrial, escrowGivesAccess, OPEN_ESCROW_STATUSES, type LicenseCheck, type PaidAccess, type PlatformAccess } from "./access-rules.js";
+import { isPlatformAgent, isPlatformAgentRow, PLATFORM_AGENT_IDS } from "./platform-agents.js";
 
-export type { PaidAccess } from "./access-rules.js";
+export type { PaidAccess, PlatformAccess } from "./access-rules.js";
 
 export type Access =
   | ({ ok: true } & PaidAccess)
+  | ({ ok: true } & PlatformAccess)
   | { ok: true; kind: "trial"; trial: TrialLimits; used: number; remaining: number; usage: TrialUsage }
   | { ok: false; reason: "no_trial" | "trial_exhausted" | "retired" | "agent_no_trial" | "unverified"; trial: TrialLimits | null };
 
@@ -92,6 +94,8 @@ export async function paidAccessById(wallet: string, agentId: string): Promise<P
  * descartada e a ativação segue o fluxo normal). Sessões de teste sempre valem aqui.
  */
 export async function sessionGrantValid(s: typeof schema.sessions.$inferSelect): Promise<boolean> {
+  // Solver da plataforma: o direito é a própria lista do servidor (nada a revalidar na cadeia).
+  if (s.access === "platform") return isPlatformAgent(s.agentId);
   if (s.access === "license") {
     if (!s.licenseId) return false;
     const [lic] = await db.select({ owner: schema.licenses.ownerWallet }).from(schema.licenses).where(eq(schema.licenses.id, s.licenseId));
@@ -106,8 +110,9 @@ export async function sessionGrantValid(s: typeof schema.sessions.$inferSelect):
 }
 
 /**
- * Decide como a carteira acessa o solver nesta ativação: licença vitalícia > tarefa com garantia
- * aberta > teste grátis (se o especialista tiver; usos por carteira contados off-chain).
+ * Decide como a carteira acessa o solver nesta ativação: Solver da plataforma (gratuito para qualquer carteira logada,
+ * sem licença nem teste) > licença vitalícia > tarefa com garantia aberta > teste grátis (se o especialista tiver;
+ * usos por carteira contados off-chain).
  */
 export async function resolveAccess(
   wallet: string,
@@ -117,6 +122,8 @@ export async function resolveAccess(
   /** `agent: true` (token do login SIWS direto): nunca há teste grátis (a carteira nova custa zero e esgotaria o teste sempre). */
   opts: { consume: boolean; allowTrial?: boolean; agent?: boolean },
 ): Promise<Access> {
+  // A lista PLATFORM_AGENTS é a autoridade (não o campo do manifesto). Sem RPC, sem licença e sem consumir teste.
+  if (isPlatformAgentRow(agent)) return { ok: true, kind: "platform" };
   const paid = await paidAccessState(wallet, agent);
   if (paid && paid !== "unknown") return { ok: true, ...paid };
   const blocked = blockBeforeTrial({ licenseUnknown: paid === "unknown", allowTrial: opts.allowTrial !== false, agent: opts.agent === true });
@@ -210,11 +217,14 @@ export async function ownedLicensedAgents(wallet: string): Promise<Set<string>> 
   return new Set(checked.filter((a): a is string => a !== null));
 }
 
-/** Solvers com licença da carteira (só o banco, sem RPC). */
+/**
+ * Solvers que a carteira já pode usar sem comprar (só o banco, sem RPC): as licenças dela e os Solvers gratuitos da
+ * plataforma, que valem para qualquer carteira logada.
+ */
 export async function ownedAgents(wallet: string): Promise<Set<string>> {
   const lic = await db
     .select({ agentId: schema.licenses.agentId })
     .from(schema.licenses)
     .where(eq(schema.licenses.ownerWallet, wallet));
-  return new Set(lic.map((l) => l.agentId));
+  return new Set([...lic.map((l) => l.agentId), ...PLATFORM_AGENT_IDS]);
 }

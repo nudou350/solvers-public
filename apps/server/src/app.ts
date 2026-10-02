@@ -11,6 +11,7 @@ import { pixRouter, pixWebhookRouter } from "./pix/routes.js";
 import { sodaxRouter } from "./sodax/routes.js";
 import { errorHandler } from "./lib/http.js";
 import { pool } from "./db/index.js";
+import { submissionUploadHandlers } from "./submissions/upload.js";
 
 /** Rotas extras registradas por outros módulos (MCP, OAuth, garantia...) antes do handler de erro. */
 export type Mount = (app: Express) => void;
@@ -66,6 +67,10 @@ export function createApp(mounts: Mount[] = []): Express {
     message: { error: "Muitas requisições. Aguarde um pouco e tente de novo.", code: "rate_limited" },
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
   });
+
+  // Upload do ZIP de um pacote (corpo cru, até SUBMISSION_MAX_ZIP_BYTES, em streaming para o disco): ANTES do express.json,
+  // com login e perfil conferidos antes de ler o corpo (submissions/upload.ts; PACKAGE_SPEC.md 14.4).
+  app.post("/api/creator/submissions", webCors, byIp, ...submissionUploadHandlers);
 
   // Assinatura do Mercado Pago usa só query e headers: o corpo já pode ser JSON parseado.
   app.use("/webhooks", express.json({ limit: "2mb" }), webhookRouter, pixWebhookRouter);

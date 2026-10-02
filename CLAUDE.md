@@ -28,8 +28,8 @@ Also read `AGENTS.md` (Anchor program rules; skills in `.agents/skills/` are NOT
 | Zod data contract + pure rules shared by server and web | `packages/shared/src` |
 | Typed API client used by the web app | `packages/api-client` |
 | Express app and route mounting (single place modules register + jobs) | `apps/server/src/app.ts`, `modules.ts`, `jobs.ts` |
-| MCP connector (13 tools) and OAuth (DCR + PKCE) | `apps/server/src/mcp`, `oauth` |
-| Solver runtime: package loading, access, trial, guarantees | `apps/server/src/runtime` |
+| MCP connector (15 tools, incl. `get_template`) and OAuth (DCR + PKCE) | `apps/server/src/mcp`, `oauth` |
+| Solver runtime: package loading (`AGENTS_DIR` + `PUBLISHED_DIR`, `reloadPackages()`), access (license, guarantee, trial, free `platform` Solvers listed in `runtime/platform-agents.ts`), templates, guarantees | `apps/server/src/runtime` |
 | Indexer (Helius webhook + polling fallback, mirrors chain to DB) | `apps/server/src/indexer` |
 | Store/web API (catalog, resale, escrow, help, images, me) | `apps/server/src/store` (pure rules in `*-rules.ts`, handlers beside them) |
 | Deliverable verification (Docker sandbox) | `apps/server/src/verifier` |

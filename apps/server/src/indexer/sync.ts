@@ -7,6 +7,7 @@ import { db, schema } from "../db/index.js";
 import { bytesToHexStr } from "../lib/crypto.js";
 import { resolvePublishedText } from "../store/review-rules.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, type MilestoneStatusName } from "./escrow-status.js";
+import { withApprovalFlag, type ApprovedVersion } from "./approved-version.js";
 import { agentMirrorValues } from "./mirror.js";
 import { applyListed, closeListingsAt, removeLicenseRow, setLicenseOwner, upsertLicenseRow } from "./resale-mirror.js";
 
@@ -16,23 +17,46 @@ import { applyListed, closeListingsAt, removeLicenseRow, setLicenseOwner, upsert
 const ESCROW_STATUS = { 0: "active", 1: "approved", 2: "disputed", 3: "refunded" } as const;
 const MILESTONE_STATUS = { 0: "pending", 1: "passed", 2: "approved", 3: "disputed", 4: "refunded" } as const;
 
+/** Versões que passaram pela revisão (agent_published_versions): contra elas a cadeia é conferida (PACKAGE_SPEC.md 15.4). */
+export async function loadApprovedVersions(agentId: string): Promise<ApprovedVersion[]> {
+  const rows = await db
+    .select({ version: schema.agentPublishedVersions.version, versionHash: schema.agentPublishedVersions.versionHash, priceUsdc: schema.agentPublishedVersions.priceUsdc })
+    .from(schema.agentPublishedVersions)
+    .where(eq(schema.agentPublishedVersions.agentId, agentId));
+  return rows;
+}
+
 export async function syncAgent(agentAddr: Address): Promise<string | null> {
   const acc = await gen.fetchMaybeAgent(chain().rpc, agentAddr);
   if (!acc.exists) return null;
-  const a = acc.data;
-  const id = bytesToHex(a.agentId);
-  // Não inclui platformStatus (kill switch da plataforma): ver indexer/mirror.ts.
-  const values: ReturnType<typeof agentMirrorValues> & { maxLicenses?: number | null } = agentMirrorValues(a, agentAddr);
+  const id = bytesToHex(acc.data.agentId);
   // Teto de licenças (PDA SupplyCap, só existe se o criador definiu um). Se o RPC falhar a coluna fica como está: o
   // espelho é só para a vitrine e para o pré-check; quem barra a venda é o programa.
+  let maxLicenses: number | null | undefined;
   try {
-    values.maxLicenses = normalizeMaxLicenses(await chain().fetchSupplyCap(id));
+    maxLicenses = normalizeMaxLicenses(await chain().fetchSupplyCap(id));
   } catch (e) {
     console.warn(`[sync] teto de licenças de ${id} não lido: ${(e as Error).message}`);
   }
-  const updated = await db.update(schema.agents).set(values).where(eq(schema.agents.id, id)).returning({ id: schema.agents.id });
+  return mirrorAgentAccount(agentAddr, acc.data, maxLicenses);
+}
+
+/**
+ * Espelha a conta do agente no banco (a parte do `syncAgent` que não faz RPC; testável com uma conta simulada).
+ *
+ * Versão, hash e preço NÃO são copiados às cegas: o criador pode chamar update_version/update_pricing direto na cadeia,
+ * sem revisão. Só entram se baterem com uma versão aprovada (`agent_published_versions`); senão a linha mantém o aprovado
+ * e `sync_flag` vira `unapproved_chain_version` (venda bloqueada; PACKAGE_SPEC.md 15.4). Nunca escreve `platform_status`.
+ */
+export async function mirrorAgentAccount(agentAddr: Address, a: gen.Agent, maxLicenses?: number | null): Promise<string> {
+  const id = bytesToHex(a.agentId);
+  const full = agentMirrorValues(a, agentAddr);
+  const guarded = withApprovalFlag(full, await loadApprovedVersions(id));
+  const set = maxLicenses !== undefined ? { ...guarded, maxLicenses } : guarded;
+  const updated = await db.update(schema.agents).set(set).where(eq(schema.agents.id, id)).returning({ id: schema.agents.id });
   if (updated.length === 0) {
-    // Registrado fora do script de publicação: cria uma entrada mínima para não perder o espelho.
+    // Registrado fora do script de publicação: cria uma entrada mínima para não perder o espelho (com o que a cadeia diz;
+    // se não foi aprovado fica sinalizado, e a vitrine só mostra o que o catálogo listar).
     await db
       .insert(schema.agents)
       .values({
@@ -44,7 +68,9 @@ export async function syncAgent(agentAddr: Address): Promise<string | null> {
         category: "Outros",
         creatorId: a.creator,
         listed: false,
-        ...values,
+        ...full,
+        syncFlag: guarded.syncFlag,
+        ...(maxLicenses !== undefined ? { maxLicenses } : {}),
       })
       .onConflictDoNothing();
   }

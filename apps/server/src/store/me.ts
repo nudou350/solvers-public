@@ -43,7 +43,7 @@ meRouter.get(
       });
     }
     const mems = await readMemories(wallet, key);
-    return mems.map((m) => ({ id: m.id, agentId: m.agentId, summary: m.summary, updatedAt: m.updatedAt.toISOString() }));
+    return mems.map((m) => ({ id: m.id, agentId: m.agentId, summary: m.summary, profile: m.profile, notes: m.notes, updatedAt: m.updatedAt.toISOString() }));
   }),
 );
 

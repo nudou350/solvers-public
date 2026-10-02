@@ -1,20 +1,42 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 import { Manifest } from "./manifest.js";
 import { resolveInsidePackage } from "./package-paths.js";
+import { platformVerdict } from "./platform-agents.js";
+import { ManifestV1 } from "./validate/schema-v1.js";
 
 // Leitura de UM pacote do disco e registro no mapa de pacotes (INSTRUCTIONS.md 5.4 e 6). Sem env/banco:
-// testado em test/packages.test.ts. O cache e a pasta raiz ficam em packages.ts.
+// testado em test/packages.test.ts. O cache e as pastas raiz ficam em packages.ts.
+
+/** Template declarado em `manifest.templates[]` (PACKAGE_SPEC.md 7). */
+export type TemplateDecl = { name: string; path: string; title: string; description: string };
+
+/** Campos do manifesto v1 que o zod v0 não conhece (o carregador usa ManifestV1 quando `specVersion` é 1). */
+export type ManifestExtras = {
+  specVersion?: 1;
+  platform?: boolean;
+  templates?: TemplateDecl[];
+  differentiators?: string[];
+  /** Calibragem do primeiro uso (PACKAGE_SPEC.md 10): perguntas que o get_memory entrega enquanto não há perfil. */
+  onboarding?: { questions: { id: string; ask: string; why: string; options?: string[] }[] };
+};
 
 export type SolverPackage = {
-  manifest: Manifest;
+  manifest: Manifest & ManifestExtras;
   dir: string;
   steps: { title: string; body: string; gate: string[] }[];
+  /** Calculado sob demanda (lê todos os arquivos do pacote): o boot não paga por isso. */
   versionHash: string;
   evalReport: { scoreBps: number; hash: string } | null;
   usesMemory: boolean;
+  /** De onde veio: pasta da plataforma (AGENTS_DIR) ou pacotes publicados de criadores (PUBLISHED_DIR). Padrão: agents. */
+  source?: PackageSource;
+  /** Solver da plataforma: vale a lista PLATFORM_AGENTS do servidor, não o campo do manifesto. */
+  platform?: boolean;
 };
+
+export type PackageSource = "agents" | "published";
 
 function listFiles(dir: string): string[] {
   const out: string[] = [];
@@ -53,8 +75,27 @@ export function packageHash(dir: string): string {
   return h.digest("hex");
 }
 
-export function loadPackage(dir: string): SolverPackage {
-  const manifest = Manifest.parse(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")));
+/** Item de gate: texto ou objeto com evidência (v1); o motor entrega só o texto. */
+const gateText = (g: string | { text: string }): string => (typeof g === "string" ? g : g.text);
+
+/** Manifesto v1 (`specVersion: 1`) usa o schema estrito novo; sem `specVersion` vale o v0 da plataforma (zod remove o que não conhece). */
+function parseManifest(raw: unknown): Manifest & ManifestExtras {
+  if (raw && typeof raw === "object" && (raw as { specVersion?: unknown }).specVersion === 1) {
+    const m = ManifestV1.parse(raw);
+    if (!m.id) throw new Error("manifesto v1 sem id (o servidor atribui o id no envio; um pacote publicado precisa dele)");
+    return { ...m, id: m.id, steps: m.steps.map((s) => ({ ...s, gate: s.gate.map(gateText) })) } as unknown as Manifest & ManifestExtras;
+  }
+  return Manifest.parse(raw);
+}
+
+export function loadPackage(dir: string, opts: { source?: PackageSource } = {}): SolverPackage {
+  const source = opts.source ?? "agents";
+  const manifest = parseManifest(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")));
+  // Autoridade de "plataforma" é a lista do servidor; o campo do manifesto só vale se ela concordar.
+  const verdict = platformVerdict(manifest, source);
+  if (verdict.error) throw new Error(verdict.error);
+  // Pacote publicado vive em PUBLISHED_DIR/<slug>/: a pasta com outro nome indica cópia solta ou troca em andamento.
+  if (source === "published" && basename(dir) !== manifest.slug) throw new Error(`a pasta ${basename(dir)} não é o slug do pacote (${manifest.slug})`);
   const steps = manifest.steps.map((s, i) => {
     // O caminho vem do manifesto: nunca junta direto (../ e links simbólicos escapariam da pasta).
     const body = readFileSync(resolveInsidePackage(dir, s.file, ["steps/"]), "utf8");
@@ -69,7 +110,20 @@ export function loadPackage(dir: string): SolverPackage {
     evalReport = { scoreBps: Number(r.scoreBps ?? 0), hash: createHash("sha256").update(raw).digest("hex") };
   }
   const usesMemory = manifest.usesMemory ?? steps.some((s) => /(save_memory|get_memory)/.test(s.body));
-  return { manifest, dir, steps, versionHash: packageHash(dir), evalReport, usesMemory };
+  // O hash lê TODOS os arquivos (conhecimento incluso): só é calculado quando alguém precisa dele (publish, catálogo).
+  let hash: string | undefined;
+  return {
+    manifest,
+    dir,
+    steps,
+    get versionHash() {
+      return (hash ??= packageHash(dir));
+    },
+    evalReport,
+    usesMemory,
+    source,
+    platform: verdict.platform,
+  };
 }
 
 /**
@@ -87,15 +141,25 @@ export function registerPackage(registry: Map<string, SolverPackage>, pkg: Solve
   registry.set(slug, pkg);
 }
 
-/** Carrega todos os pacotes de uma pasta raiz (um por subpasta com manifest.json). Pacote inválido ou em colisão é pulado e registrado. */
-export function loadAll(root: string, onError: (dir: string, e: Error) => void = () => undefined): Map<string, SolverPackage> {
-  const registry = new Map<string, SolverPackage>();
+/**
+ * Carrega todos os pacotes de uma pasta raiz (um por subpasta com manifest.json). Pacote inválido ou em colisão é pulado
+ * e registrado. `into` mescla várias raízes no MESMO mapa: o que já está nele tem prioridade (a plataforma vem antes dos
+ * criadores) e a colisão de id/slug entre raízes recusa o pacote novo. Raiz inexistente não é erro (PUBLISHED_DIR pode não existir).
+ */
+export function loadAll(
+  root: string,
+  onError: (dir: string, e: Error) => void = () => undefined,
+  opts: { source?: PackageSource; into?: Map<string, SolverPackage> } = {},
+): Map<string, SolverPackage> {
+  const registry = opts.into ?? new Map<string, SolverPackage>();
   if (!existsSync(root)) return registry;
   for (const name of readdirSync(root).sort()) {
+    // `_archive/` (versões antigas), pastas de trabalho (`.tmp`) e `node_modules` nunca são pacotes.
+    if (name.startsWith("_") || name.startsWith(".") || name === "node_modules") continue;
     const dir = join(root, name);
     if (!existsSync(join(dir, "manifest.json"))) continue;
     try {
-      registerPackage(registry, loadPackage(dir));
+      registerPackage(registry, loadPackage(dir, { source: opts.source }));
     } catch (e) {
       onError(dir, e as Error);
     }

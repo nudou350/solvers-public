@@ -1,11 +1,21 @@
 import {
+  AdminSubmissionDetail,
+  AdminSubmissionRow,
   Agent,
   AgentAccess,
   AgentDetail,
   ConnectorStatus,
   Creator,
   CreatorDashboard,
+  CreatorMe,
   CreatorProfile,
+  type CreatorProfileInput,
+  type AdminReviewInput,
+  type SubmissionStatus,
+  SubmissionView,
+  PublicationPlan,
+  PublicationResult,
+  type CreatorSigningStep,
   Escrow,
   EscrowDetail,
   GuaranteeStatus,
@@ -84,6 +94,12 @@ export function createApi(opts: ApiOptions = {}) {
   }
   const post = <S extends ZodTypeAny>(schema: S, path: string, body?: unknown) =>
     req(schema, path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
+
+  /** POST /tx/(register-agent|update-version|update-pricing): garante `meta.{kind, submissionId}` para o /tx/submit. */
+  const buildSubmissionTx = async (kind: string, path: string, submissionId: string): Promise<TxResponse> => {
+    const tx = await post(TxResponse, path, { submissionId });
+    return { ...tx, meta: { ...tx.meta, kind: typeof tx.meta?.kind === "string" ? tx.meta.kind : kind, submissionId } };
+  };
 
   const api = {
     // ----- Loja (público) -----
@@ -213,7 +229,12 @@ export function createApi(opts: ApiOptions = {}) {
     buildCancelUndelivered: (escrowId: string, index: number) => post(TxResponse, `/api/tx/escrow/${escrowId}/cancel-undelivered`, { index }),
     buildDispute: (escrowId: string, index: number, criterion: string, reason: string) =>
       post(TxResponse, `/api/tx/escrow/${escrowId}/dispute`, { index, criterion, reason }),
-    submit: (transaction: string) => post(SubmitResponse.passthrough(), "/api/tx/submit", { transaction }),
+    /**
+     * Envia a transação assinada. `meta` liga a assinatura a uma submissão de pacote (`/tx/register-agent`,
+     * `/tx/update-version`, `/tx/update-pricing`): `{ kind, submissionId }`. Sem ele, o envio é o de sempre.
+     */
+    submit: (transaction: string, meta?: { kind: string; submissionId: string }) =>
+      post(SubmitResponse.passthrough(), "/api/tx/submit", meta ? { transaction, meta } : { transaction }),
     /** Para quem envia pela carteira (signAndSendTransaction): confirma e indexa na hora. */
     confirm: (signature: string) => post(SubmitResponse.passthrough(), "/api/tx/confirm", { signature }),
 
@@ -224,10 +245,102 @@ export function createApi(opts: ApiOptions = {}) {
       post(z.object({ signature: z.string() }).passthrough(), `/api/admin/escrow/${escrowId}/resolve`, { index, refund }),
     adminApprove: (agentId: string) => post(z.object({ signature: z.string() }), `/api/admin/agents/${agentId}/approve`),
 
+    // ----- Criador: cadastro, envio de pacotes e acompanhamento (PACKAGE_SPEC.md 14.4) -----
+    getCreatorMe: () => req(CreatorMe, "/api/creator/me"),
+    saveCreatorProfile: (input: CreatorProfileInput) => post(CreatorMe, "/api/creator/profile", input),
+    /** O servidor devolve o ARRAY de submissões (mais recentes primeiro). `slug` e `version` vêm "" até o worker abrir o ZIP. */
+    listMySubmissions: () => req(z.array(SubmissionView), "/api/creator/submissions"),
+    getMySubmission: (id: string) => req(SubmissionView, `/api/creator/submissions/${encodeURIComponent(id)}`),
+    /**
+     * Envia o ZIP do pacote (corpo cru application/zip; 202 `{ id, status }`). Usa XMLHttpRequest para ter o
+     * progresso do envio (`onProgress` recebe 0..1). `resubmit` = id da submissão com mudanças pedidas (mesma versão).
+     * Erros viram `ApiError` (413 grande demais, 429 limites, 400/409 validação e conflito).
+     */
+    uploadSubmission: (file: Blob, up: { resubmit?: string; onProgress?: (fraction: number) => void; signal?: AbortSignal } = {}) =>
+      new Promise<{ id: string; status: SubmissionStatus }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const qs = up.resubmit ? `?resubmit=${encodeURIComponent(up.resubmit)}` : "";
+        xhr.open("POST", `${base}/api/creator/submissions${qs}`);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader("content-type", "application/zip");
+        if (opts.token) xhr.setRequestHeader("authorization", `Bearer ${opts.token}`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && e.total > 0) up.onProgress?.(Math.min(1, e.loaded / e.total));
+        };
+        xhr.onerror = () => reject(new ApiError(0, "network", "A conexão caiu durante o envio.", {}));
+        xhr.ontimeout = () => reject(new ApiError(0, "timeout", "O envio demorou demais.", {}));
+        xhr.onabort = () => reject(new ApiError(0, "aborted", "Envio cancelado.", {}));
+        xhr.onload = () => {
+          let body: Record<string, unknown> = {};
+          try {
+            body = JSON.parse(xhr.responseText) as Record<string, unknown>;
+          } catch {
+            /* resposta que não é JSON (ex: 413 do nginx) */
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            reject(new ApiError(xhr.status, String(body.code ?? "error"), String(body.error ?? xhr.statusText), body));
+            return;
+          }
+          const parsed = z.object({ id: z.string(), status: z.string() }).safeParse(body);
+          if (!parsed.success) reject(new ApiError(xhr.status, "bad_response", "Resposta inesperada do servidor.", body));
+          else resolve({ id: parsed.data.id, status: parsed.data.status as SubmissionStatus });
+        };
+        if (up.signal) {
+          if (up.signal.aborted) xhr.abort();
+          else up.signal.addEventListener("abort", () => xhr.abort(), { once: true });
+        }
+        xhr.send(file);
+      }),
+
+    /**
+     * Co-assinatura do criador depois da aprovação do revisor (mesmo fluxo do checkout: monta -> carteira assina ->
+     * `submit`). O servidor lê preço, hash e versão do registro aprovado, nunca daqui. O resultado já leva
+     * `meta.{kind, submissionId}`, que `signAndSubmit` repassa ao `/tx/submit`.
+     */
+    buildRegisterAgent: (submissionId: string) => buildSubmissionTx("register_agent", "/api/tx/register-agent", submissionId),
+    buildUpdateVersion: (submissionId: string) => buildSubmissionTx("update_version", "/api/tx/update-version", submissionId),
+    buildUpdatePricing: (submissionId: string) => buildSubmissionTx("update_pricing", "/api/tx/update-pricing", submissionId),
+    /**
+     * O que falta para o Solver ir ao ar (lido da cadeia na hora): `step` diz qual botão mostrar (register-agent, update-version,
+     * update-pricing, await-admin-approval, ready, blocked) e `register` traz depósito e saldo no passo de registro.
+     * Use o `step` em vez de tentar a rota e ignorar o 4xx (o update-pricing só existe depois do update-version, se o preço mudou).
+     */
+    getPublicationPlan: (submissionId: string) => req(PublicationPlan, `/api/tx/publication/${encodeURIComponent(submissionId)}`),
+    /**
+     * Depois do `/tx/submit` (com meta): liga a assinatura à submissão e avança o fluxo. Erros 409: submission_state, not_approved,
+     * wrong_step (`body.expected`), publication_blocked; 400 insufficient_funds.
+     */
+    confirmPublication: (submissionId: string, signature: string, kind?: CreatorSigningStep) =>
+      post(PublicationResult, "/api/tx/publication/confirm", { submissionId, signature, ...(kind ? { kind } : {}) }),
+
+    // ----- Revisão (só carteiras admin; CreatorMe.isAdmin diz se mostra) -----
+    /** O servidor devolve o ARRAY (fila mais antiga primeiro quando `pending_review`). */
+    adminListSubmissions: (status?: SubmissionStatus) =>
+      req(z.array(AdminSubmissionRow), `/api/admin/submissions${status ? `?${new URLSearchParams({ status })}` : ""}`),
+    adminGetSubmission: (id: string) => req(AdminSubmissionDetail, `/api/admin/submissions/${encodeURIComponent(id)}`),
+    /** Conteúdo de um arquivo do pacote como TEXTO (nunca renderize como HTML). */
+    adminGetSubmissionFile: (id: string, path: string) =>
+      req(z.object({ path: z.string(), content: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/file?${new URLSearchParams({ path })}`),
+    /** Busca de teste na ingestão de staging do pacote. */
+    adminSearchSubmissionKnowledge: (id: string, q: string) =>
+      req(
+        z.object({ query: z.string(), hits: z.array(z.object({ source: z.string(), content: z.string(), score: z.number() })) }),
+        `/api/admin/submissions/${encodeURIComponent(id)}/knowledge-search?${new URLSearchParams({ q })}`,
+      ),
+    /** Aprovar congela hash, preço e versão: responde `{ id, status, approved }`. */
+    adminApproveSubmission: (id: string, input: AdminReviewInput) =>
+      post(z.object({ id: z.string(), status: z.string(), approved: z.object({ versionHash: z.string(), priceUsdc: z.string(), royaltyBps: z.number(), name: z.string(), version: z.string() }) }), `/api/admin/submissions/${encodeURIComponent(id)}/approve`, input),
+    adminRequestChanges: (id: string, input: AdminReviewInput) => post(z.object({ id: z.string(), status: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/request-changes`, input),
+    adminRejectSubmission: (id: string, input: AdminReviewInput) => post(z.object({ id: z.string(), status: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/reject`, input),
+    /** Conclui a publicação quando o evento de aprovação on-chain não chegou sozinho (idempotente). */
+    adminFinishSubmission: (id: string) => post(PublicationResult, `/api/admin/submissions/${encodeURIComponent(id)}/finish`),
+
     /** Fluxo completo: monta no servidor -> carteira assina -> servidor envia e indexa. */
     async signAndSubmit(wallet: WalletLike, built: TxResponse) {
       const signed = await wallet.signTransaction(fromB64(built.transaction));
-      return api.submit(toB64(signed));
+      const kind = built.meta?.kind;
+      const submissionId = built.meta?.submissionId;
+      return api.submit(toB64(signed), typeof kind === "string" && typeof submissionId === "string" ? { kind, submissionId } : undefined);
     },
   };
   return api;

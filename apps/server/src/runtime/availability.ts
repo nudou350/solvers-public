@@ -22,7 +22,7 @@ export const RETIRED_TEXT = "Este especialista foi aposentado pelo criador: não
  * ou `platformStatus` suspenso (kill switch) cortam tudo.
  */
 export type ServePolicy = "all" | "paid_only" | "closed";
-export type AccessKind = "license" | "guarantee" | "trial" | "none";
+export type AccessKind = "license" | "guarantee" | "platform" | "trial" | "none";
 
 export function servePolicy(a: AgentAvailabilityFields): ServePolicy {
   if (a.platformStatus !== PLATFORM_ACTIVE) return "closed";
@@ -36,7 +36,8 @@ export const trialAllowed = (a: AgentAvailabilityFields): boolean => servePolicy
 
 export function agentCanServe(a: AgentAvailabilityFields, access: AccessKind): boolean {
   const p = servePolicy(a);
-  return p === "all" || (p === "paid_only" && (access === "license" || access === "guarantee"));
+  // "platform": Solver gratuito da plataforma (sem licença): não é teste, então aposentado ainda serve.
+  return p === "all" || (p === "paid_only" && (access === "license" || access === "guarantee" || access === "platform"));
 }
 
 export function assertAgentCanServe(a: AgentAvailabilityFields, access: AccessKind): void {

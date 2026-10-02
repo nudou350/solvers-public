@@ -50,6 +50,7 @@ import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 import { assertEntriesOpen } from "./pause-gate.js";
 import { assertCanPurchase } from "./purchase-guards.js";
+import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { buildForUserChecked } from "./tx-build.js";
 
 export const storeRouter = Router();
@@ -360,6 +361,7 @@ storeRouter.post(
     // Só licença vitalícia: o pagamento por uso (type "credits") acabou e é recusado com 400.
     const body = parse(z.object({ agentId: z.string(), type: z.literal("permanent").default("permanent") }), req.body);
     const row = await findAgentRow(body.agentId);
+    assertNotPlatformAgent(row); // Solver gratuito da plataforma: 409 platform_agent_not_for_sale (não há licença à venda)
     // Suspenso pela plataforma (platformStatus) também não vende: a coluna `status` é só o espelho da cadeia.
     if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
     // Teto de licenças atingido: 409 sold_out sem RPC nem montagem (o programa também barra: purchase_license falha com SoldOut).

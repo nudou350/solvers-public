@@ -2,7 +2,9 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:cr
 import { and, eq, gt, lt } from "drizzle-orm";
 import { db, schema, type Db } from "../db/index.js";
 import { env } from "../env.js";
+import { HttpError } from "../lib/http.js";
 import { randomId } from "../lib/crypto.js";
+import { EMPTY_MEMORY, MemoryRuleError, applyForget, applySave, readPayload, type MemoryNote, type MemoryPayload, type SaveOp } from "./rules.js";
 
 // Memórias criptografadas (INSTRUCTIONS.md 5.6). Modelo honesto do MVP: cifradas em repouso,
 // abertas só durante uma sessão autorizada pela carteira, nunca gravadas abertas.
@@ -65,22 +67,81 @@ export async function memoryKeyFor(tokenId: string | undefined, wallet: string):
   return row ? unwrapKey(row.wrappedKey) : null;
 }
 
-type MemoryPayload = { summary: string };
+const aadOf = (wallet: string, agentId: string) => `${wallet}|${agentId}`;
 
-export async function saveMemory(wallet: string, agentId: string, key: Buffer, summary: string) {
-  const { iv, tag, ciphertext } = seal(key, Buffer.from(JSON.stringify({ summary } satisfies MemoryPayload)), `${wallet}|${agentId}`);
-  const [row] = await db
-    .insert(schema.memories)
-    .values({ id: `mem_${randomId(10)}`, wallet, agentId, ciphertext, iv, tag, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: [schema.memories.wallet, schema.memories.agentId],
-      set: { ciphertext, iv, tag, updatedAt: new Date() },
-    })
-    .returning();
-  return row!;
+function sealPayload(key: Buffer, wallet: string, agentId: string, payload: MemoryPayload) {
+  return seal(key, Buffer.from(JSON.stringify(payload)), aadOf(wallet, agentId));
 }
 
-export type OpenMemory = { id: string; agentId: string; summary: string; updatedAt: Date };
+/**
+ * Ler, mesclar e gravar a memória de um especialista sem perder dados em chamadas paralelas
+ * (PACKAGE_SPEC.md 11.2). `SELECT … FOR UPDATE` não trava uma linha que ainda não existe, então a primeira
+ * gravação cria a linha com `INSERT … ON CONFLICT DO NOTHING` e só depois a trava; a mesclagem roda com a
+ * linha travada. Se `mutate` lançar (limite estourado), a transação desfaz tudo, inclusive a linha criada.
+ * `create: false` (forget): não cria a linha; sem memória, devolve null.
+ */
+export async function updateMemory<T>(
+  wallet: string,
+  agentId: string,
+  key: Buffer,
+  mutate: (cur: MemoryPayload) => { next: MemoryPayload; result: T },
+  opts: { create?: boolean } = {},
+): Promise<T | null> {
+  const create = opts.create ?? true;
+  return db.transaction(async (tx) => {
+    if (create) {
+      const empty = sealPayload(key, wallet, agentId, EMPTY_MEMORY);
+      await tx
+        .insert(schema.memories)
+        .values({ id: `mem_${randomId(10)}`, wallet, agentId, ciphertext: empty.ciphertext, iv: empty.iv, tag: empty.tag, updatedAt: new Date() })
+        .onConflictDoNothing({ target: [schema.memories.wallet, schema.memories.agentId] });
+    }
+    const [row] = await tx
+      .select()
+      .from(schema.memories)
+      .where(and(eq(schema.memories.wallet, wallet), eq(schema.memories.agentId, agentId)))
+      .for("update");
+    if (!row) return null;
+    let cur: MemoryPayload;
+    try {
+      cur = readPayload(JSON.parse(open(key, row.iv, row.tag, row.ciphertext, aadOf(wallet, agentId)).toString("utf8")));
+    } catch {
+      // Não abre com esta chave: regravar apagaria a memória existente.
+      throw new HttpError(409, "Não consegui abrir a memória já guardada com esta conexão. Peça ao usuário para reconectar o Solvers e confirmar a assinatura da memória.", "memory_key_mismatch");
+    }
+    let applied: { next: MemoryPayload; result: T };
+    try {
+      applied = mutate(cur);
+    } catch (e) {
+      if (e instanceof MemoryRuleError) throw new HttpError(400, e.message, "memory_limit");
+      throw e;
+    }
+    const s = sealPayload(key, wallet, agentId, applied.next);
+    await tx
+      .update(schema.memories)
+      .set({ ciphertext: s.ciphertext, iv: s.iv, tag: s.tag, updatedAt: new Date() })
+      .where(eq(schema.memories.id, row.id));
+    return applied.result;
+  });
+}
+
+/** save_memory: `summary` (substitui o resumo), `note` (acrescenta) ou `profile` (substitui o perfil). */
+export async function saveMemory(wallet: string, agentId: string, key: Buffer, op: SaveOp) {
+  return updateMemory(wallet, agentId, key, (cur) => {
+    const r = applySave(cur, op, new Date(), () => randomId(2));
+    return { next: r.next, result: { note: r.created ?? null, duplicate: r.duplicate === true } };
+  });
+}
+
+/** forget_memory: remove uma nota. null: o especialista não tem memória; found false: a nota não existe. */
+export async function forgetNote(wallet: string, agentId: string, key: Buffer, noteId: string) {
+  return updateMemory(wallet, agentId, key, (cur) => {
+    const r = applyForget(cur, noteId);
+    return { next: r.next, result: r.found };
+  }, { create: false });
+}
+
+export type OpenMemory = { id: string; agentId: string; summary: string; profile: MemoryPayload["profile"]; notes: MemoryNote[]; updatedAt: Date };
 
 export async function readMemories(wallet: string, key: Buffer, agentId?: string): Promise<OpenMemory[]> {
   const rows = await db
@@ -90,8 +151,8 @@ export async function readMemories(wallet: string, key: Buffer, agentId?: string
   const out: OpenMemory[] = [];
   for (const r of rows) {
     try {
-      const payload = JSON.parse(open(key, r.iv, r.tag, r.ciphertext, `${r.wallet}|${r.agentId}`).toString("utf8")) as MemoryPayload;
-      out.push({ id: r.id, agentId: r.agentId, summary: payload.summary, updatedAt: r.updatedAt });
+      const payload = readPayload(JSON.parse(open(key, r.iv, r.tag, r.ciphertext, aadOf(r.wallet, r.agentId)).toString("utf8")));
+      out.push({ id: r.id, agentId: r.agentId, summary: payload.summary, profile: payload.profile, notes: payload.notes, updatedAt: r.updatedAt });
     } catch {
       // Chave diferente (outra carteira/assinatura): não dá para abrir. Nunca devolve bytes crus.
     }

@@ -2,27 +2,33 @@
 // catálogo no banco, registra no programa (register_agent), acerta o preço (update_pricing, sem
 // pagamento por uso), aprova (admin) e grava a nota de desempenho (set_eval). Idempotente: rodar de novo só atualiza o que mudou.
 //
-//   pnpm --filter @solvers/server cli:publish            # todos os pacotes em agents/
+//   pnpm --filter @solvers/server cli:publish            # todos os pacotes de agents/ com conta on-chain
 //   pnpm --filter @solvers/server cli:publish frontend-react ui-design
+//   pnpm --filter @solvers/server cli:publish --no-chain # Solvers da plataforma (PLATFORM_AGENTS, ex.: criador-de-solvers): só o banco
+//
+// `--no-chain`: sem registro on-chain, preço 0, `status = active`, listado. É o caminho dos Solvers da plataforma, que não
+// têm conta no programa nem são vendidos. Os demais continuam on-chain, como sempre; terceiros NÃO passam por aqui
+// (publicam pelo site, PACKAGE_SPEC.md 15). O catálogo é montado por publish/catalog.ts, o mesmo código da finalização do site.
 //
 // Chaves dos criadores: CREATOR_KEYS_DIR/<creator.id>.json (criada se não existir, só fora de mainnet).
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { loadSigner, type KeyPairSigner } from "@solvers/chain";
 import * as gen from "@solvers/client";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
-import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS, usdcToUnits } from "@solvers/shared";
+import { usdcToUnits } from "@solvers/shared";
 import { authorities, chain, initChain } from "../chain/index.js";
 import { db, pool, schema } from "../db/index.js";
 import { runMigrations } from "../db/migrate.js";
 import { env } from "../env.js";
-import { embed } from "../knowledge/embeddings.js";
 import { ingestPackage } from "../knowledge/ingest.js";
 import { syncAgent } from "../indexer/sync.js";
 import { nextMaxLicenses } from "../store/supply-rules.js";
+import { isPlatformPair } from "../runtime/platform-agents.js";
 import { packages, type SolverPackage } from "../runtime/packages.js";
+import { relist, upsertCatalog } from "../publish/catalog.js";
 import { hexToBytes } from "../lib/crypto.js";
 
 const KEYS_DIR = process.env.CREATOR_KEYS_DIR ?? join(process.cwd(), ".keys", "creators");
@@ -42,70 +48,20 @@ async function creatorSigner(creatorId: string): Promise<KeyPairSigner> {
   return createKeyPairSignerFromBytes(secret);
 }
 
-function searchText(pkg: SolverPackage) {
-  const m = pkg.manifest;
-  return [m.name, m.tagline, m.description, m.category, ...m.packageContents, ...m.requirements.map((r) => r.label)].join("\n");
-}
-
-async function upsertCatalog(pkg: SolverPackage, creatorWallet: string) {
-  const m = pkg.manifest;
+/**
+ * O que a revisão "aprovou": no `cli:publish` o admin é quem publica, então registrar a versão aqui ANTES de qualquer
+ * transação é o equivalente da aprovação do site. Sem isso o indexador marcaria a versão recém-registrada como "não
+ * aprovada" (PACKAGE_SPEC.md 15.3, passo 1). Versões antigas ficam (o criador pode reverter para elas).
+ */
+export async function recordApprovedVersion(pkg: SolverPackage, price: bigint, approveTx?: string) {
+  const v = { agentId: pkg.manifest.id, version: pkg.manifest.version, versionHash: pkg.versionHash, priceUsdc: price };
   await db
-    .insert(schema.creators)
-    .values({ id: m.creator.id, wallet: creatorWallet, name: m.creator.name, bio: m.creator.bio, avatarUrl: m.creator.avatarUrl ?? null })
-    .onConflictDoUpdate({ target: schema.creators.id, set: { name: m.creator.name, bio: m.creator.bio, avatarUrl: m.creator.avatarUrl ?? null } });
-
-  const text = searchText(pkg);
-  // Um vetor para o texto todo e um para cada frase curta: pedido vago casa com a frase, não se perde na descrição.
-  const phrases = [`${m.name}: ${m.tagline}`, ...m.searchPhrases];
-  const [vec = null, ...phraseVecs] = (await embed([text, ...phrases], "passage")) ?? [];
-  const details = {
-    beforeAfter: m.beforeAfter,
-    versions: (m.versions.length ? m.versions : [{ version: m.version, releasedAt: new Date().toISOString(), notes: "Primeira versão" }]).map((v) => ({
-      version: v.version,
-      versionHash: v.version === m.version ? pkg.versionHash : "",
-      releasedAt: v.releasedAt,
-      notes: v.notes,
-      evalScore: v.version === m.version && pkg.evalReport ? pkg.evalReport.scoreBps / 100 : null,
-    })),
-    tools: m.tools,
-    guaranteeCriteria: m.guarantee.defaultCriteria,
-    guaranteeTemplate: m.guarantee.available
-      ? {
-          priceUsdc: m.guarantee.priceUsdc ?? m.pricing.priceUsdc,
-          milestones: m.guarantee.milestones ?? [{ title: "Entrega", criteria: m.guarantee.defaultCriteria, sharePct: 100, verify: "tests" as const }],
-        }
-      : undefined,
-    catalogOnly: m.catalogOnly ?? false,
-  };
-  const values = {
-    slug: m.slug,
-    name: m.name,
-    tagline: m.tagline,
-    description: m.description,
-    category: m.category,
-    creatorId: m.creator.id,
-    version: m.version,
-    versionHash: pkg.versionHash,
-    price: usdcToUnits(m.pricing.priceUsdc),
-    // Só licença vitalícia: o pagamento por uso acabou (o programa mantém o campo, sempre 0).
-    pricePerUse: 0n,
-    royaltyBps: m.pricing.royaltyBps,
-    requirements: m.requirements,
-    packageContents: m.packageContents,
-    guaranteeAvailable: m.guarantee.available,
-    details,
-    searchText: text,
-    embedding: vec,
-    updatedAt: new Date(),
-  };
-  await db
-    .insert(schema.agents)
-    .values({ id: m.id, ...values })
-    .onConflictDoUpdate({ target: schema.agents.id, set: values });
-  await db.delete(schema.agentSearchVectors).where(eq(schema.agentSearchVectors.agentId, m.id));
-  if (phraseVecs.length > 0) {
-    await db.insert(schema.agentSearchVectors).values(phraseVecs.map((embedding, i) => ({ agentId: m.id, content: phrases[i]!, embedding })));
-  }
+    .insert(schema.agentPublishedVersions)
+    .values({ ...v, approveTx: approveTx ?? null })
+    .onConflictDoUpdate({
+      target: [schema.agentPublishedVersions.agentId, schema.agentPublishedVersions.version],
+      set: { versionHash: v.versionHash, priceUsdc: v.priceUsdc, ...(approveTx ? { approveTx } : {}) },
+    });
 }
 
 async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
@@ -149,7 +105,8 @@ async function publishOnChain(pkg: SolverPackage, creator: KeyPairSigner) {
   const agent = await c.fetchAgent(m.id);
   if (agent.data.status !== 1) {
     if (!admin) throw new Error("ADMIN_KEYPAIR necessário para aprovar solvers");
-    await c.sendAsServer([await c.approveAgentIx(admin, m.id)]);
+    const { signature } = await c.sendAsServer([await c.approveAgentIx(admin, m.id)]);
+    await recordApprovedVersion(pkg, usdcToUnits(m.pricing.priceUsdc), signature);
     console.log("  aprovado pelo admin");
   }
   if (pkg.evalReport) {
@@ -193,30 +150,72 @@ async function reconcileSupplyCap(pkg: SolverPackage, creator: KeyPairSigner) {
   console.log(`  teto de licenças on-chain: ${plan.max}${plan.action === "raise" ? ` (era ${onchain})` : ""}`);
 }
 
-/** Volta à vitrine, a não ser que a nota continue abaixo do mínimo (o job tiraria de novo). Só depois do catálogo completo. */
-async function relist(agentId: string) {
-  await db
-    .update(schema.agents)
-    .set({ listed: sql`not (${schema.agents.ratingCount} >= ${DELIST_MIN_REVIEWS} and ${schema.agents.ratingSum}::float / nullif(${schema.agents.ratingCount}, 0) < ${DELIST_MAX_RATING})` })
-    .where(eq(schema.agents.id, agentId));
+export type PublishOptions = {
+  /** Só banco: Solvers da plataforma (sem conta on-chain, preço 0, status active). */
+  noChain?: boolean;
+};
+
+/** Pacotes da pasta da plataforma (AGENTS_DIR), sem o espelho duplo id/slug. Os de criadores (PUBLISHED_DIR) nunca entram aqui. */
+function platformFolderPackages(): SolverPackage[] {
+  return [...new Map([...packages().values()].map((p) => [p.manifest.id, p])).values()].filter((p) => (p.source ?? "agents") === "agents");
 }
 
-export async function publish(slugs: string[]) {
+/** Escolhe o que publicar e confere o modo: Solver da plataforma só com `--no-chain`; os demais só com cadeia. */
+export function selectPackages(all: SolverPackage[], slugs: string[], opts: PublishOptions): SolverPackage[] {
+  const wanted = slugs.length ? all.filter((p) => slugs.includes(p.manifest.slug) || slugs.includes(p.manifest.id)) : all;
+  if (slugs.length) {
+    const missing = slugs.filter((x) => !all.some((p) => p.manifest.slug === x || p.manifest.id === x));
+    if (missing.length) throw new Error(`nenhum pacote da plataforma encontrado para: ${missing.join(", ")} (pacotes de criadores publicam pelo site)`);
+    for (const p of wanted) {
+      const platform = isPlatformPair(p.manifest);
+      if (opts.noChain && !platform) throw new Error(`${p.manifest.slug} não é um Solver da plataforma (PLATFORM_AGENTS): --no-chain só vale para eles`);
+      if (!opts.noChain && platform) throw new Error(`${p.manifest.slug} é um Solver da plataforma, sem conta on-chain: publique com --no-chain`);
+    }
+    return wanted;
+  }
+  // Sem nomes: cada modo pega o seu grupo.
+  return wanted.filter((p) => isPlatformPair(p.manifest) === (opts.noChain === true));
+}
+
+/** Solver da plataforma: só o banco. Preço 0, `status = active`, listado; nada on-chain. */
+export async function publishNoChain(pkg: SolverPackage) {
+  const m = pkg.manifest;
+  if (m.pricing.priceUsdc !== 0) console.warn(`  ⚠ o manifesto pede ${m.pricing.priceUsdc} USDC; Solver da plataforma é gratuito (publicado com preço 0)`);
+  const chunks = await ingestPackage(pkg);
+  console.log(`  conhecimento: ${chunks} trechos`);
+  // `creators.wallet` é obrigatória e única: mantém a do perfil se já existe; senão, a carteira da plataforma (fee payer).
+  const [creator] = await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, m.creator.id));
+  const wallet = creator?.wallet ?? authorities().feePayer.address;
+  await recordApprovedVersion(pkg, 0n);
+  // `platform_status` só nasce `active` (default da coluna): republicar não levanta uma suspensão do admin.
+  await upsertCatalog(pkg, wallet, { priceUnits: 0n, status: "active" });
+  await relist(m.id);
+  console.log("  só no banco (sem conta on-chain): preço 0, ativo e listado");
+}
+
+export async function publish(slugs: string[], opts: PublishOptions = {}) {
   // A URL de metadados vai on-chain e não pode ser trocada depois: nunca publicar localhost fora da localnet.
-  if (env.SOLANA_CLUSTER !== "localnet" && /localhost|127\.0\.0\.1/.test(env.PUBLIC_API_URL)) {
+  if (!opts.noChain && env.SOLANA_CLUSTER !== "localnet" && /localhost|127\.0\.0\.1/.test(env.PUBLIC_API_URL)) {
     throw new Error(`PUBLIC_API_URL=${env.PUBLIC_API_URL} não pode ir on-chain na ${env.SOLANA_CLUSTER}; use .env.devnet`);
   }
-  const all = [...new Map([...packages().values()].map((p) => [p.manifest.id, p])).values()];
-  const selected = slugs.length ? all.filter((p) => slugs.includes(p.manifest.slug) || slugs.includes(p.manifest.id)) : all;
-  if (selected.length === 0) throw new Error(`nenhum pacote encontrado para: ${slugs.join(", ")}`);
+  const selected = selectPackages(platformFolderPackages(), slugs, opts);
+  if (selected.length === 0) throw new Error(slugs.length ? `nenhum pacote encontrado para: ${slugs.join(", ")}` : "nenhum pacote para publicar neste modo");
   for (const pkg of selected) {
     const m = pkg.manifest;
-    console.log(`\n▶ ${m.name} (${m.slug}) v${m.version}`);
+    console.log(`
+▶ ${m.name} (${m.slug}) v${m.version}`);
+    if (opts.noChain) {
+      await publishNoChain(pkg);
+      console.log(`  versionHash ${pkg.versionHash.slice(0, 16)}…  ok`);
+      continue;
+    }
     const creator = await creatorSigner(m.creator.id);
     // Ordem: conhecimento, cadeia e só então o catálogo (preço, versão, garantia). Se algo falhar no meio,
     // a vitrine continua mostrando a versão anterior, consistente com a cadeia.
     const chunks = await ingestPackage(pkg);
     console.log(`  conhecimento: ${chunks} trechos`);
+    // Versão aprovada ANTES de qualquer transação (o sync do fim a confere; PACKAGE_SPEC.md 15.3, passo 1).
+    await recordApprovedVersion(pkg, usdcToUnits(m.pricing.priceUsdc));
     await publishOnChain(pkg, creator);
     await upsertCatalog(pkg, creator.address);
     await relist(m.id);
@@ -225,13 +224,14 @@ export async function publish(slugs: string[]) {
 }
 
 if (/cli\/publish\.(ts|js)$/.test(process.argv[1]?.replace(/\\/g, "/") ?? "")) {
+  const args = process.argv.slice(2);
+  const noChain = args.includes("--no-chain");
   await runMigrations();
   await initChain();
   try {
-    await publish(process.argv.slice(2));
+    await publish(args.filter((a) => !a.startsWith("--")), { noChain });
   } finally {
     await pool.end();
   }
   process.exit(0);
 }
-

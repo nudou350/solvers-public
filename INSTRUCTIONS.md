@@ -513,7 +513,7 @@ type Session = {
 * `next_step` devolve `manifest.steps[stepIndex]` renderizado e avança. `result_summary` fica salvo no contexto (útil para a memória e para debug).
 * Etapas podem declarar `gate`: lista de itens que a IA precisa confirmar antes de avançar. A resposta de `next_step` inclui o gate da etapa atual.
 * Entrega fatiada: a resposta nunca inclui o manifesto inteiro, só a etapa corrente.
-* Marca d'água simples (P1): cada resposta inclui uma frase de controle variando por carteira (escolhida por hash da carteira de um conjunto de variações equivalentes) e o servidor registra o hash de cada resposta enviada em `usage_events`. Suficiente para rastrear vazamentos na demo.
+* Marca d'água simples (P1): cada resposta inclui uma frase de controle variando por carteira (escolhida por hash da carteira de um conjunto de variações equivalentes) e o servidor registra o hash de cada resposta enviada em `usage_events`. São 8 frases (3 bits): serve como indício de origem de um vazamento, não como prova nem rastreio individual (PACKAGE_SPEC.md 6.5).
 
 ### 5.5 Base de conhecimento (RAG) (P0)
 

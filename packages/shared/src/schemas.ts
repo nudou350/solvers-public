@@ -120,10 +120,17 @@ export const Escrow = z.object({
   feeBps: z.number().nullable(),
 });
 
+/** Nota da memória do especialista (guardada a pedido do usuário). */
+export const MemoryNote = z.object({ id: z.string(), text: z.string(), at: z.string() });
+
+/** Memória do especialista: cifrada no servidor (não fica na blockchain). `summary` pode ser vazio; perfil e notas são opcionais (PACKAGE_SPEC.md 11). */
 export const Memory = z.object({
   id: z.string(),
   agentId: z.string(),
   summary: z.string(),
+  /** Respostas da calibragem (ou { skipped: true }). */
+  profile: z.record(z.unknown()).nullable().default(null),
+  notes: z.array(MemoryNote).default([]),
   updatedAt: z.string(),
 });
 

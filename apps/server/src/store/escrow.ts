@@ -34,6 +34,7 @@ import { chooseReviewLicense } from "./review-rules.js";
 import { buildForUserChecked } from "./tx-build.js";
 import { notifyCreator } from "../notify/telegram.js";
 import { agentIsAvailable } from "../runtime/availability.js";
+import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { splitCriteria } from "../runtime/guarantee-text.js";
 
 export const escrowRouter = Router();
@@ -127,6 +128,7 @@ escrowRouter.post(
     const body = parse(CreateBody, req.body);
     const deliveryDays = resolveDeliveryDays(body.deliveryDays);
     const agent = await findAgentRow(body.agentId);
+    assertNotPlatformAgent(agent); // Solver gratuito da plataforma: sem garantia (409 platform_agent_not_for_sale)
     // Garantia é uma venda nova: especialista fora da vitrine não abre tarefas.
     if (!agentIsAvailable(agent) || !agent.listed) throw badRequest("Este especialista ainda não está disponível.");
     const offer = guaranteeOffer(agent, 1);

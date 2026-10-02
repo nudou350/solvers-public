@@ -10,6 +10,25 @@ export function hiddenCharsAt(text: string): { index: number; codePoint: string 
   return { index: m.index, codePoint: `U+${m[0].codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}` };
 }
 
+// A mesma classe de caracteres de `HIDDEN`, em versão global, para varrer TODAS as ocorrências (revisor).
+const HIDDEN_G = new RegExp(HIDDEN.source, "gu");
+
+/** Todas as ocorrências (até `max`) de caractere invisível ou de direção: posição, ponto de código e número. */
+export function hiddenCharsAll(text: string, max = 500): { index: number; codePoint: string; cp: number }[] {
+  const out: { index: number; codePoint: string; cp: number }[] = [];
+  HIDDEN_G.lastIndex = 0;
+  for (let m = HIDDEN_G.exec(text); m && out.length < max; m = HIDDEN_G.exec(text)) {
+    const cp = m[0].codePointAt(0)!;
+    out.push({ index: m.index, codePoint: `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`, cp });
+  }
+  return out;
+}
+
+/** Troca os caracteres invisíveis por `[U+XXXX]` visíveis (para mostrar trechos ao revisor sem esconder nada). */
+export function revealHiddenChars(text: string): string {
+  return text.replace(HIDDEN_G, (c) => `[U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}]`);
+}
+
 /** Frases típicas de injeção de prompt (PT e EN). */
 const INJECTION: RegExp[] = [
   /ignor[ea]\s+(?:todas?\s+)?(?:as\s+)?(?:instru(?:ç|c)(?:õ|o)es|regras)\s+(?:anteriores|acima|do\s+sistema)/i,
@@ -57,6 +76,20 @@ export function sendingUrl(text: string): string | null {
     }
   }
   return null;
+}
+
+/** Todas as URLs http(s) do texto, sem pontuação final, marcando as de envio de dados (mesmo critério de `sendingUrl`). */
+export function urlsIn(text: string): { url: string; sending: boolean; line: string }[] {
+  const out: { url: string; sending: boolean; line: string }[] = [];
+  for (const line of text.split("\n")) {
+    const urls = line.match(URL_RE);
+    if (!urls) continue;
+    for (const raw of urls) {
+      const url = raw.replace(/[.,;:!?]+$/, "");
+      out.push({ url, sending: SEND_WORDS.test(line) || /\?[^#\s]*=/.test(url), line: line.trim() });
+    }
+  }
+  return out;
 }
 
 const SENSITIVE_QUESTION = /\b(?:senha|password|cpf|cnpj|cart(?:ã|a)o|cvv|token|chave\s+privada|seed|frase\s+secreta|gov\.?br)\b/i;

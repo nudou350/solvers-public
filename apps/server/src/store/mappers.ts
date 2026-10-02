@@ -9,6 +9,8 @@ import {
 } from "@solvers/shared";
 import type { schema } from "../db/index.js";
 import { env } from "../env.js";
+import { provenDifferentiators } from "../runtime/differentiators.js";
+import { isPlatformAgentRow } from "../runtime/platform-agents.js";
 import { getPackage } from "../runtime/packages.js";
 import { trialLimits } from "../runtime/trial.js";
 import { supplyOfRow } from "./supply-rules.js";
@@ -68,9 +70,10 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     royaltyBps: row.royaltyBps,
     // Teto de licenças: espelho do banco (total_sales / max_licenses), sem consulta extra.
     supply: supplyOfRow(row),
-    // A1 (Criador de Solvers): platform vem da lista PLATFORM_AGENTS e differentiators do validador; até lá, valores neutros.
-    platform: false,
-    differentiators: [],
+    // Solver da plataforma (gratuito, só no banco): vale a lista PLATFORM_AGENTS do servidor, não o manifesto. A vitrine
+    // esconde preço e compra por este campo. Diferenciais: só os comprovados pelo validador (pacote v1); v0 = [].
+    platform: isPlatformAgentRow(row),
+    differentiators: provenDifferentiators(getPackage(row.id)),
     trend7d: extras.trend7d,
     publishedAt: publishedAt(row),
   };

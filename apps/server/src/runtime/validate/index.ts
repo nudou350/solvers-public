@@ -1,10 +1,11 @@
+import { RESERVED_SLUGS, THIRD_PARTY_CATEGORIES } from "@solvers/shared";
 import { chunkMarkdown } from "../../knowledge/chunk.js";
 import { VERSION_RE } from "../agent-ids.js";
 import { Manifest } from "../manifest.js";
 import { relativePathProblem } from "../package-paths.js";
 import { CODES, type Code } from "./codes.js";
 import { isIsoDate, parseFrontMatter } from "./frontmatter.js";
-import { CATEGORIES, ManifestV1, NUCLEO_FORBIDDEN_CATEGORIES, type ManifestV1 as ManifestV1Type } from "./schema-v1.js";
+import { CATEGORIES, ManifestV1, type ManifestV1 as ManifestV1Type } from "./schema-v1.js";
 import { hiddenCharsAt, injectionMatch, sendingUrl, sensitiveAsk, sensitiveQuestion } from "./text-scans.js";
 
 // Validador do pacote (PACKAGE_SPEC.md 13 e Apêndice A): UMA implementação para o upload, o Criador de Solvers
@@ -51,8 +52,12 @@ export const NUCLEO_LIMITS: Limits = {
 };
 
 export type ValidateOptions = {
-  /** Quem envia: terceiros passam pelas regras estritas (v1) e pelas proibições do Núcleo. */
-  origin: "platform" | "third_party";
+  /** Quem envia: terceiros passam pelas regras estritas (v1) e pelas proibições do Núcleo. Padrão: "platform". */
+  origin?: "platform" | "third_party";
+  /** Apelido de `origin` (contrato do fluxo de envio): `mode: "third_party"` liga as regras de terceiros. `origin` vence se vierem os dois. */
+  mode?: "platform" | "third_party";
+  /** Criador logado (id do perfil ou carteira); vale como `existing.creatorId` quando este faltar. */
+  creatorId?: string;
   /** Padrão: "nucleo". Na Abertura entram `http`, PDF/HTML/CSV etc. */
   phase?: "nucleo" | "abertura";
   limits?: Partial<Limits>;
@@ -60,8 +65,21 @@ export type ValidateOptions = {
   /** `min_price` da config on-chain, em USDC (hoje 5). */
   minPriceUsdc?: number;
   reservedSlugs?: readonly string[];
-  /** Quem é o criador logado e de quem já são o `id` e o `slug` (vindo do banco). */
-  existing?: { creatorId?: string; ownerOfId?: (id: string) => string | undefined; ownerOfSlug?: (slug: string) => string | undefined };
+  /**
+   * O que o banco já sabe. Duas formas, que podem ser combinadas:
+   * - por função: `creatorId` + `ownerOfId`/`ownerOfSlug` (devolvem o dono do id/slug);
+   * - por dados: `agentId` (id do Solver do criador que está sendo atualizado; ausente na 1ª versão), `creatorWallet`,
+   *   `publishedVersion` (versão já publicada: a nova precisa ser maior) e `slugs` (slugs que JÁ são de OUTROS criadores).
+   */
+  existing?: {
+    creatorId?: string;
+    ownerOfId?: (id: string) => string | undefined;
+    ownerOfSlug?: (slug: string) => string | undefined;
+    agentId?: string;
+    creatorWallet?: string;
+    publishedVersion?: string;
+    slugs?: readonly string[];
+  };
   /** Versão já publicada deste pacote (a nova precisa ser maior) e o manifesto dela, para o diff de mudanças que exigem MAJOR. */
   previous?: { version: string; manifest?: Record<string, unknown> };
   /** Dados do ZIP que só o extrator conhece. */
@@ -107,6 +125,8 @@ const STEP_MAX_CHARS = 12_000;
 const MAX_GATE_ITEMS = 6;
 const REQUIRED_SECTIONS = ["Objetivo", "Como executar", "Formato do result_summary"] as const;
 const OPTIONAL_SECTIONS = ["O que perguntar ao usuário", "Erros comuns"] as const;
+/** Variações de "saúde" que o criador pode escrever como categoria (não existe na lista; é regulada como Finanças e Jurídico). */
+const HEALTH_CATEGORY = /sa[úu]de|m[ée]dic|health|terapia|nutri/i;
 const LEGACY_RUNNERS = new Set(["docker:solvers-react-test", "node:a11y", "node:contrast", "node:budget"]);
 const SHARED_HOSTING = [".vercel.app", ".github.io", ".workers.dev", ".netlify.app", ".pages.dev", ".herokuapp.com", ".onrender.com", ".fly.dev", ".web.app", ".firebaseapp.com"];
 /** Tools globais do MCP e campos comuns: citados entre crases nas etapas, não são ferramentas do manifesto. */
@@ -141,11 +161,12 @@ const stable = (v: unknown): string => JSON.stringify(v, (_k, val: unknown) => (
 /** Mensagem curta para um caminho de campo do zod. */
 const dotted = (path: (string | number)[]) => path.map(String).join(".");
 
-export function validatePackage(input: PackageInput, opts: ValidateOptions): ValidationResult {
+export function validatePackage(input: PackageInput, opts: ValidateOptions = {}): ValidationResult {
   const limits = { ...NUCLEO_LIMITS, ...opts.limits };
   const phase = opts.phase ?? "nucleo";
   const now = opts.now ?? new Date();
-  const third = opts.origin === "third_party";
+  const origin = opts.origin ?? opts.mode ?? "platform";
+  const third = origin === "third_party";
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
   const add = (level: "E" | "A", code: Code, path: string, message: string, fix: string) => (level === "E" ? errors : warnings).push({ code, path, message, fix });
@@ -291,14 +312,16 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions): Val
     if (Buffer.byteLength(m.name) < 3) add("E", "MANIFEST_SCHEMA", mp("name"), "O nome precisa ter pelo menos 3 caracteres", "Escreva um nome.");
     if (m.tagline.length < 10 || m.tagline.length > 100) add("E", "MANIFEST_SCHEMA", mp("tagline"), `A tagline precisa ter de 10 a 100 caracteres (tem ${m.tagline.length})`, "Reescreva em uma frase de valor.");
     if (m.description.length < 120 || m.description.length > 2000) add("E", "MANIFEST_SCHEMA", mp("description"), `A descrição precisa ter de 120 a 2.000 caracteres (tem ${m.description.length})`, "Explique o que entrega, para quem e o que não faz.");
-    if (!(CATEGORIES as readonly string[]).includes(m.category)) add("E", "MANIFEST_SCHEMA", mp("category"), `Categoria desconhecida: ${m.category}`, `Use uma de: ${CATEGORIES.join(", ")}.`);
+    // Saúde não está na lista: para terceiros no Núcleo vira MANIFEST_CATEGORY_FORBIDDEN (abaixo), não "categoria desconhecida".
+    if (!(CATEGORIES as readonly string[]).includes(m.category) && !(third && phase === "nucleo" && HEALTH_CATEGORY.test(m.category))) add("E", "MANIFEST_SCHEMA", mp("category"), `Categoria desconhecida: ${m.category}`, `Use uma de: ${CATEGORIES.join(", ")}.`);
     if (m.pricing.royaltyBps < 0 || m.pricing.royaltyBps > 1000) add("E", "MANIFEST_SCHEMA", mp("pricing.royaltyBps"), "royaltyBps precisa ficar entre 0 e 1000", "Ajuste o royalty.");
     if (m.packageContents.length < 3 || m.packageContents.length > 8) add("E", "MANIFEST_SCHEMA", mp("packageContents"), "packageContents precisa ter de 3 a 8 itens", "Liste de 3 a 8 itens do que o pacote entrega.");
   }
   if (third) {
     if (m.platform === true) add("E", "MANIFEST_PLATFORM_FORBIDDEN", mp("platform"), "Só pacotes da plataforma podem usar platform: true", "Remova o campo platform.");
-    if (phase === "nucleo" && NUCLEO_FORBIDDEN_CATEGORIES.includes(m.category)) {
-      add("E", "MANIFEST_CATEGORY_FORBIDDEN", mp("category"), `A categoria ${m.category} não é aceita de terceiros nesta fase`, "Use outra categoria (conteúdo regulado espera a revisão jurídica).");
+    // Fora de THIRD_PARTY_CATEGORIES (Finanças, Jurídico, saúde) é proibido no Núcleo; categoria desconhecida e não regulada cai em MANIFEST_SCHEMA.
+    if (phase === "nucleo" && !THIRD_PARTY_CATEGORIES.includes(m.category) && ((CATEGORIES as readonly string[]).includes(m.category) || HEALTH_CATEGORY.test(m.category))) {
+      add("E", "MANIFEST_CATEGORY_FORBIDDEN", mp("category"), `A categoria ${m.category} não é aceita de terceiros nesta fase`, `Use outra categoria (${THIRD_PARTY_CATEGORIES.join(", ")}); conteúdo regulado espera a revisão jurídica.`);
     }
     if (phase === "nucleo" && m.guarantee?.available === true) {
       add("E", "MANIFEST_GUARANTEE_FORBIDDEN", mp("guarantee.available"), "Terceiros ainda não oferecem garantia", "Use guarantee: { available: false, defaultCriteria: [] }.");
@@ -319,15 +342,24 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions): Val
   } else if (!strict) {
     add("A", "TERMS_MISSING", mp("terms"), "Pacote v0 sem terms", "Acrescente terms ao migrar para specVersion 1.");
   }
-  if (opts.reservedSlugs?.includes(m.slug)) add("E", "MANIFEST_SLUG_RESERVED", mp("slug"), `O slug ${m.slug} é reservado`, "Escolha outro slug.");
+  // Terceiros nunca usam os slugs reservados (marcas e plataforma); quem passa `reservedSlugs` troca a lista.
+  const reserved = opts.reservedSlugs ?? (third ? RESERVED_SLUGS : []);
+  if (reserved.includes(m.slug)) add("E", "MANIFEST_SLUG_RESERVED", mp("slug"), `O slug ${m.slug} é reservado`, "Escolha outro slug.");
   const ex = opts.existing;
   if (ex) {
+    const me = ex.creatorId ?? opts.creatorId ?? ex.creatorWallet;
     const idOwner = m.id ? ex.ownerOfId?.(m.id) : undefined;
     const slugOwner = ex.ownerOfSlug?.(m.slug);
-    if (idOwner !== undefined && idOwner !== ex.creatorId) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id já pertence a outro criador", "Remova o id (o servidor atribui um novo) ou use o de um pacote seu.");
-    if (slugOwner !== undefined && slugOwner !== ex.creatorId) add("E", "MANIFEST_ID_OWNER", mp("slug"), "Este slug já pertence a outro criador", "Escolha outro slug.");
+    if (idOwner !== undefined && idOwner !== me) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id já pertence a outro criador", "Remova o id (o servidor atribui um novo) ou use o de um pacote seu.");
+    if ((slugOwner !== undefined && slugOwner !== me) || ex.slugs?.includes(m.slug)) add("E", "MANIFEST_ID_OWNER", mp("slug"), "Este slug já pertence a outro criador", "Escolha outro slug.");
+    // Por dados: o `id` do manifesto precisa ser o do Solver que este criador está atualizando; na 1ª versão ele não existe.
+    const byData = ex.agentId !== undefined || ex.publishedVersion !== undefined || ex.slugs !== undefined || ex.creatorWallet !== undefined;
+    if (m.id && byData) {
+      if (ex.agentId !== undefined && m.id !== ex.agentId) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id não é o do seu Solver", "Use o id do Solver que você está atualizando.");
+      else if (ex.agentId === undefined && ex.publishedVersion === undefined) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id não pertence a você (na 1ª versão o servidor atribui o id)", "Remova o campo id do manifesto.");
+    }
   }
-  const prev = opts.previous;
+  const prev = opts.previous ?? (ex?.publishedVersion ? { version: ex.publishedVersion } : undefined);
   if (prev) {
     if (!semverGreater(m.version, prev.version)) {
       add("E", "MANIFEST_VERSION_NOT_GREATER", mp("version"), `A versão ${m.version} não é maior que a publicada (${prev.version})`, "Suba a versão (MAJOR.MINOR.PATCH).");
@@ -533,7 +565,7 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions): Val
   const joined = stepTexts.join("\n");
   const proven: string[] = [];
   if (m.tools.length >= 1 && m.tools.every((t) => joined.includes(t.name))) proven.push("tool");
-  if (opts.origin === "platform" && m.guarantee?.available && (m.guarantee.milestones ?? []).some((x) => (x.verify ?? "tests") === "tests")) proven.push("verifier");
+  if (origin === "platform" && m.guarantee?.available && (m.guarantee.milestones ?? []).some((x) => (x.verify ?? "tests") === "tests")) proven.push("verifier");
   const k = m.knowledge;
   const fresh = k && isIsoDate(k.updatedAt) ? now.getTime() - new Date(`${k.updatedAt}T00:00:00Z`).getTime() <= k.reviewEveryDays * 86_400_000 : false;
   if ((mdLike > 0 && expired === 0 && withDate / mdLike >= 0.5 && fresh) || m.tools.some((t) => t.runner === "http")) proven.push("liveData");

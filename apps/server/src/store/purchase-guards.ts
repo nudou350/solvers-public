@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { refreshLicenseOwner } from "../indexer/sync.js";
+import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { purchaseBlock } from "./purchase-rules.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
@@ -24,6 +25,7 @@ async function ownedLicenseId(wallet: string, agentId: string): Promise<string |
  * Lança HttpError 409 `already_owned` (com `assetId`) ou 400 `creator_cannot_buy`.
  */
 export async function assertCanPurchase(wallet: string, agent: AgentRow): Promise<void> {
+  assertNotPlatformAgent(agent); // Solver gratuito da plataforma: não há licença para vender (409 platform_agent_not_for_sale)
   const [creator] = await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, agent.creatorId));
   const block = purchaseBlock({ wallet, creatorWallet: creator?.wallet ?? null, ownedAssetId: await ownedLicenseId(wallet, agent.id) });
   if (block) throw block;

@@ -81,6 +81,8 @@ const base = z.object({
   /** Limites por criador: pendentes ao mesmo tempo e envios por dia. */
   SUBMISSION_MAX_PENDING: z.coerce.number().int().min(1).default(3),
   SUBMISSION_MAX_PER_DAY: z.coerce.number().int().min(1).default(5),
+  /** Processa o ZIP dentro do próprio servidor, logo após o upload (QA local sem o worker do PM2). Em produção fica desligado. */
+  SUBMISSIONS_INLINE: bool.default("false"),
   /** Cota diária de search_knowledge por licença (PACKAGE_SPEC.md 6.5, item 2). 0 desliga. */
   SEARCH_DAILY_QUOTA: z.coerce.number().int().min(0).default(300),
   DELIVERABLES_DIR: z.string().default("./deliverables"),

@@ -6,6 +6,7 @@ import { chain } from "../chain/index.js";
 import { env } from "../env.js";
 import { HttpError, badRequest, h, notFound } from "../lib/http.js";
 import { agentIsAvailable } from "../runtime/availability.js";
+import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { findAgentRow } from "../store/catalog.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
 import { assertEntriesOpen } from "../store/pause-gate.js";
@@ -50,6 +51,7 @@ type AgentRow = Awaited<ReturnType<typeof findAgentRow>>;
 /** O agente existe, está à venda e o preço é o on-chain atual (espelha e responde 409 se mudou). */
 async function sellableAgent(idOrSlug: string): Promise<AgentRow> {
   const row = await findAgentRow(idOrSlug);
+  assertNotPlatformAgent(row); // Solver gratuito da plataforma: não se vende por x402 (409 platform_agent_not_for_sale)
   if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
   await assertFreshPrice(row);
   // Teto de licenças atingido: 409 sold_out ANTES de qualquer ordem ou cobrança (o programa também recusaria, mas aí o agente já teria pago).

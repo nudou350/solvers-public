@@ -10,6 +10,7 @@ import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { badRequest, h, HttpError, notFound, parse, unauthorized } from "../lib/http.js";
 import { agentIsAvailable } from "../runtime/availability.js";
+import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { brlPerUsd } from "../store/fx.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
@@ -111,6 +112,7 @@ async function sync(row: Row): Promise<Row> {
 /** Quanto falta (em unidades de USDC) para a compra pretendida, descontando o saldo da carteira. */
 export async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
   const row = await findAgentRow(agentId);
+  assertNotPlatformAgent(row); // Solver gratuito da plataforma: nada a cobrar por Pix/SODAX (409 platform_agent_not_for_sale)
   if (!agentIsAvailable(row)) throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
   if (type === "permanent") {

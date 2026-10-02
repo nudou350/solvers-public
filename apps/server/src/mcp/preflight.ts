@@ -1,3 +1,4 @@
+import { memoryStartInstruction } from "../memory/rules.js";
 import { installGuide, keyAliases, normalizeKey } from "./guides.js";
 
 // Avaliação do preflight_check (pura, sem sessão nem banco): o que está ok, o que falta
@@ -43,12 +44,19 @@ export function evaluatePreflight(requirements: PreflightRequirement[], availabl
   return { ok, missing, warnings, blocked: missing.length > 0 };
 }
 
-export function preflightText(requirements: PreflightRequirement[], availableTools: string[], sessionId: string): string {
+/** `memory`: o pacote usa memória (ou tem calibragem): o texto manda chamar get_memory antes da etapa 1 (PACKAGE_SPEC.md 10.2). */
+export function preflightText(
+  requirements: PreflightRequirement[],
+  availableTools: string[],
+  sessionId: string,
+  memory?: { agentId: string; onboarding: boolean },
+): string {
   const { ok, missing, warnings } = evaluatePreflight(requirements, availableTools);
   const list = (items: string[]) => items.map((m) => `- ${m}`).join("\n");
   const warnText = warnings.length ? `\n\nAvisos (não bloqueiam):\n${list(warnings)}` : "";
   if (missing.length) {
     return `Faltam requisitos:\n${list(missing)}\n\nOriente o usuário a instalar e, quando ele confirmar, rode preflight_check de novo. Não avance para next_step antes disso.${warnText}${ok.length ? `\n\nJá ok:\n${list(ok)}` : ""}`;
   }
-  return `Tudo pronto:\n${list(ok) || "- sem requisitos"}${warnText}\n\nAgora chame next_step com session_id="${sessionId}" para receber a etapa 1.`;
+  const memoryText = memory ? `\n\n${memoryStartInstruction(memory.agentId, memory.onboarding)}` : "";
+  return `Tudo pronto:\n${list(ok) || "- sem requisitos"}${warnText}${memoryText}\n\nAgora chame next_step com session_id="${sessionId}" para receber a etapa 1.`;
 }

@@ -56,31 +56,43 @@ export async function searchAgentRows(need: string, limit = 3): Promise<AgentRow
   return [];
 }
 
-export type KnowledgeHit = { source: string; content: string; score: number };
+export type KnowledgeHit = { source: string; content: string; score: number; meta: Record<string, unknown> | null; validUntil: string | null };
 
-/** Até N trechos da base de conhecimento do solver (versão atual) mais relevantes para a pergunta. */
-export async function searchKnowledge(agentId: string, version: string, query: string, limit = 5): Promise<KnowledgeHit[]> {
-  const base = and(eq(schema.knowledgeChunks.agentId, agentId), eq(schema.knowledgeChunks.version, version));
+/**
+ * Até N trechos da base de conhecimento do solver (versão atual) mais relevantes para a pergunta.
+ * `trialOnly`: só trechos de arquivos com `trial: true` no front-matter (teste grátis de pacote v1).
+ */
+export async function searchKnowledge(agentId: string, version: string, query: string, limit = 5, opts: { trialOnly?: boolean } = {}): Promise<KnowledgeHit[]> {
+  const kc = schema.knowledgeChunks;
+  const base = and(eq(kc.agentId, agentId), eq(kc.version, version), opts.trialOnly ? sql`${kc.meta} ->> 'trial' = 'true'` : undefined);
+  const cols = { source: kc.source, content: kc.content, meta: kc.meta, validUntil: kc.validUntil };
+  const hit = (r: { source: string; content: string; meta: Record<string, unknown> | null; validUntil: string | null }, score: number): KnowledgeHit => ({
+    source: r.source,
+    content: r.content,
+    score,
+    meta: r.meta ?? null,
+    validUntil: r.validUntil ?? null,
+  });
   const vec = embeddingsLoaded() ? (await embed([query], "query"))?.[0] : undefined;
   if (vec) {
-    const dist = sql<number>`${schema.knowledgeChunks.embedding} <=> ${toVectorLiteral(vec)}::vector`;
+    const dist = sql<number>`${kc.embedding} <=> ${toVectorLiteral(vec)}::vector`;
     const rows = await db
-      .select({ source: schema.knowledgeChunks.source, content: schema.knowledgeChunks.content, dist })
-      .from(schema.knowledgeChunks)
-      .where(and(base, sql`${schema.knowledgeChunks.embedding} is not null`))
+      .select({ ...cols, dist })
+      .from(kc)
+      .where(and(base, sql`${kc.embedding} is not null`))
       .orderBy(dist)
       .limit(limit);
-    if (rows.length > 0) return rows.map((r) => ({ source: r.source, content: r.content, score: 1 - Number(r.dist) }));
+    if (rows.length > 0) return rows.map((r) => hit(r, 1 - Number(r.dist)));
   }
-  const rank = sql<number>`ts_rank(to_tsvector('portuguese', ${schema.knowledgeChunks.content}), websearch_to_tsquery('portuguese', ${query}))`;
+  const rank = sql<number>`ts_rank(to_tsvector('portuguese', ${kc.content}), websearch_to_tsquery('portuguese', ${query}))`;
   const rows = await db
-    .select({ source: schema.knowledgeChunks.source, content: schema.knowledgeChunks.content, rank })
-    .from(schema.knowledgeChunks)
-    .where(and(base, sql`to_tsvector('portuguese', ${schema.knowledgeChunks.content}) @@ websearch_to_tsquery('portuguese', ${query})`))
+    .select({ ...cols, rank })
+    .from(kc)
+    .where(and(base, sql`to_tsvector('portuguese', ${kc.content}) @@ websearch_to_tsquery('portuguese', ${query})`))
     .orderBy(desc(rank))
     .limit(limit);
-  if (rows.length > 0) return rows.map((r) => ({ source: r.source, content: r.content, score: Number(r.rank) }));
+  if (rows.length > 0) return rows.map((r) => hit(r, Number(r.rank)));
   // Nada casou: devolve os primeiros trechos (visão geral) para a IA não ficar sem contexto.
-  const first = await db.select().from(schema.knowledgeChunks).where(base).limit(Math.min(limit, 2));
-  return first.map((r) => ({ source: r.source, content: r.content, score: 0 }));
+  const first = await db.select(cols).from(kc).where(base).orderBy(kc.id).limit(Math.min(limit, 2));
+  return first.map((r) => hit(r, 0));
 }

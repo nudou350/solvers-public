@@ -9,7 +9,7 @@ import { bytesToHexStr } from "../lib/crypto.js";
 // Índice = enum `AgentStatus` on-chain (Pending, Active, Suspended, Retired). `Retired` (saída de stake pedida pelo criador)
 // é "retired": sem venda nova, sem teste grátis e fora da vitrine, mas quem tem direito PAGO (licença vitalícia, garantia
 // aberta) continua usando (runtime/availability.ts). `agents.status` é `text` sem CHECK nem enum no banco.
-const AGENT_STATUS = ["pending", "active", "suspended", "retired"] as const;
+export const AGENT_STATUS = ["pending", "active", "suspended", "retired"] as const;
 
 export function agentMirrorValues(a: gen.Agent, agentAddr: Address) {
   return {

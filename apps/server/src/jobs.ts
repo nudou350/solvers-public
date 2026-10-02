@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
+import { PLATFORM_AGENT_IDS } from "./runtime/platform-agents.js";
 import type { Base64EncodedWireTransaction } from "@solana/kit";
 import { address, isDefinitelyNotLanded, type Signature, type SignedTx } from "@solvers/chain";
 import * as gen from "@solvers/client";
@@ -238,12 +239,14 @@ export async function recordUsageBatchOnce(): Promise<number> {
         eq(schema.usageEvents.batched, false),
         isNull(schema.usageEvents.batchId),
         inArray(schema.sessions.access, ["license", "guarantee", "trial"]),
+        // Solver da plataforma não tem conta on-chain: nunca entra em lote (a sessão "platform" já fica de fora; a guarda é dupla).
+        notInArray(schema.usageEvents.agentId, [...PLATFORM_AGENT_IDS]),
         lt(schema.usageEvents.createdAt, sql`now() - interval '10 seconds'`),
       ),
     )
     .limit(1000);
   const byAgent = new Map<string, typeof rows>();
-  for (const r of rows) if (r.agentId) byAgent.set(r.agentId, [...(byAgent.get(r.agentId) ?? []), r]);
+  for (const r of rows) if (r.agentId && !PLATFORM_AGENT_IDS.includes(r.agentId)) byAgent.set(r.agentId, [...(byAgent.get(r.agentId) ?? []), r]);
   const c = chain();
   for (const [agentId, list] of byAgent) {
     const batchId = `batch_${randomId(8)}`;

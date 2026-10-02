@@ -16,6 +16,8 @@ export type TrialLimits = {
   tools: Record<string, number>;
   /** Teto da entrada por execução, só das ferramentas liberadas. */
   toolCaps: Record<string, ToolCap>;
+  /** Templates liberados no teste (nomes de `trial.templates`; padrão nenhum). */
+  templates: string[];
   /** Combinado do tamanho do pedido no teste, repassado à IA. */
   scope: string | null;
   summary: string;
@@ -26,12 +28,12 @@ export type TrialLimits = {
 export type TrialUsage = { searchesUsed: number; toolRuns: Record<string, number> };
 
 /** Limites do teste do especialista, ou null quando ele não oferece teste grátis. */
-export function trialLimits(m: Pick<Manifest, "trial">): TrialLimits | null {
+export function trialLimits(m: Pick<Manifest, "trial"> & { trial?: { templates?: string[] } }): TrialLimits | null {
   const t = m.trial;
   if (!t || !t.available) return null;
   const tools = Object.fromEntries(Object.entries(t.tools).filter(([, n]) => n > 0));
   const toolCaps = Object.fromEntries(Object.entries(t.toolLimits).filter(([name, cap]) => name in tools && (cap.maxFiles || cap.maxBytes)));
-  return { uses: t.uses, steps: t.steps, searches: t.searches, tools, toolCaps, scope: t.scope ?? null, summary: t.summary, lockedSummary: t.lockedSummary };
+  return { uses: t.uses, steps: t.steps, searches: t.searches, tools, toolCaps, templates: t.templates ?? [], scope: t.scope ?? null, summary: t.summary, lockedSummary: t.lockedSummary };
 }
 
 /** Teste do especialista para a vitrine (AgentDetail.trial). */
@@ -159,6 +161,7 @@ export function trialAccessLine(
     usesLeftText(t.uses - ctx.use),
     blocked.length ? `Só com a licença: ${listPt(blocked)}.` : "",
     capped.length ? `Limite de tamanho por execução no teste: ${listPt(capped)}.` : "",
+    t.templates.length ? `Templates liberados no teste (get_template): ${listPt(t.templates)}.` : "",
     `${clause(t.summary)}.`,
     t.scope ? `Escopo do teste: ${clause(t.scope)}.` : "",
     "Avise o usuário desses limites antes de começar.",
