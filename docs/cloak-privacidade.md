@@ -39,9 +39,9 @@ NEXT_PUBLIC_CLOAK_RPC_URL=https://mainnet.helius-rpc.com/?api-key=<chave restrit
 - A carteira precisa de **USDC e ~0,005 SOL na mainnet** no mesmo endereço do criador (o endereço aparece na tela). O USDC de teste do Solvers não vale aqui.
 - Nada disto roda no `master`/produção sem a variável. O push no `master` publica sozinho: ligue só quando decidir.
 
-## Teste manual no navegador (ainda não executado)
+## Teste no navegador (executado em 02/10/2026) e roteiro manual
 
-O módulo foi provado no Node com dinheiro real (abaixo) e a tela compila e passa no typecheck e no `next build`. O teste **no navegador** (prova zk no browser, assinatura do Privy, CORS do RPC e dos circuitos) não foi feito porque a automação do navegador foi bloqueada. Roteiro:
+Executado no Edge, com a carteira de desenvolvimento (a que o app cria quando não há Privy) financiada na mainnet: a prova zk rodou no navegador, o depósito e o saque saíram pela tela e o CORS do RPC e dos circuitos não deu problema. As capturas estão em [`docs/cloak-provas/`](cloak-provas/). **Ainda não testado:** a assinatura pelo Privy (`chain: solana:mainnet`) e o tempo/memória no celular. Roteiro para repetir:
 
 1. `pnpm --filter @solvers/web dev` com as duas variáveis acima e a API local no ar (`API_DEV_URL`).
 2. Entre no painel do criador → aba **Saque privado**. Confira o endereço e o aviso "Rede real".
@@ -60,6 +60,7 @@ Pontos a vigiar no primeiro teste real: erro de CORS ao baixar os circuitos (`st
 |---|---|---|---|
 | Spike (`cloak-spike.ts`), 2 USDC | [3hCHPhbA…](https://solscan.io/tx/3hCHPhbAoXJjQ327HTeR82aSyp2pcSeSHUxBcu9GRDDpTwmT8dnM1grLnNHq4J6kudDCay2yejHoHwwWSkkku25D) | [5TRuDWx1…](https://solscan.io/tx/5TRuDWx1Ep52zLY5Qead9FhxHsMwNrKYwtEjbhf6Cg6pDaUkNuzbg3sTRfhu8nSk9ZZv9ewXdUvyKSCu1pCcqV8u) | destino recebeu 1,544 USDC (taxa 0,456) |
 | Módulo do navegador no Node (`cloak-web-flow.ts`), 1 USDC | [DcFyh9u9…](https://solscan.io/tx/DcFyh9u9b8TmXZBf8gway7DcG4kfCqHcvQpABmrb4bXE6ycQKDNHGJECKSdeZUHg9bhGvF8yqmc56UUzQQLtRyw) | [46ncAqcR…](https://solscan.io/tx/46ncAqcRoFTUgcACT7ptsamwQTJbMuDfvd4hKgL8V9QE3sceoreqGi4eMdHbPz2NkmF3HBvmSZxwKTF4skaFUZqw) | destino recebeu 0,547 USDC (taxa 0,453); depósito + saque em ~56 s; chaves derivadas iguais em duas assinaturas |
+| **Pela tela, no navegador**, 1,5 USDC | [4SsjRq7V…](https://solscan.io/tx/4SsjRq7VWCqnNjMrC3YHizARgkkJLfj3L7hdkxVeW6h6KgkKQHYByj75Dk2Z2pySaEjoUvr3CjWcCR9AP6bqUyG8) | [2uFKzi9t…](https://solscan.io/tx/2uFKzi9tT59dzmZunReyDVkdo9PPUiLH6RjfqAb2swfJMQRY3XEsTeeaJVu2Md746BbWvYHqVjk3eoJCgidYFKU6) | destino recebeu 1,0455 USDC (taxa 0,4545); as 4 etapas da tela viraram ✓; o Solscan mostra o saque assinado pelo relay (`5nNamRwU…`) e o depósito assinado pela carteira (`5tWCPjvj…`), sem ligação entre os dois |
 
 A transação de saque tem como pagador de taxa o relay do Cloak e não contém a carteira de origem (conferido nas contas da tx).
 
