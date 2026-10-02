@@ -138,7 +138,7 @@ EOF
 9. **Republicar especialistas se o hash mudou**: `pnpm --filter @solvers/server cli:publish <slug...>` (ou sem
    argumentos, para todos os pacotes em `agents/`), só dos pacotes cujo conteúdo/hash mudou.
 
-## O que muda neste upgrade (governança do admin e revenda de licenças)
+## O que muda neste upgrade (governança do admin, revenda e teto de licenças)
 
 - **Revenda de licenças: 3 instruções novas** (`programs/solvers/src/instructions/resale.rs`; visão geral em `docs/resale.md`):
   `list_license(price)` (o dono aprova a PDA `market_authority`, seed `market_authority`, como `TransferDelegate` do asset e a
@@ -156,6 +156,7 @@ EOF
   sem royalty); teto royalty + taxa de 5000 bps; preço >= `config.min_price`; o criador não revende a própria licença (MVP); compra
   bloqueada para solver suspenso, retirado ou com stake abaixo do mínimo (anunciar e cancelar não dependem do status); a pausa de
   entradas bloqueia anunciar e comprar, nunca cancelar; revenda não incrementa `UserReputation` nem `Agent.total_sales`.
+- **Teto de licenças por solver, imposto on-chain** (`programs/solvers/src/instructions/supply.rs`; plano em `docs/licencas-limitadas.md`): `create_supply_cap(max)` (o criador assina, a plataforma paga o rent) e `raise_supply_cap(max)` (só sobe; `u32::MAX` = ilimitado), PDA nova `SupplyCap` (`["supply_cap", agent]`, 45 bytes), evento `SupplyCapSet` e erros `SoldOut` 6060, `SupplyCapTooLow` 6061, `SupplyCapCannotDecrease` 6062. **`purchase_license` ganha uma conta nova** (`supply_cap`, entre `reputation` e `mpl_core_program`; o endereço é imposto pelas seeds, então não dá para omiti-la): sem a conta criada o solver é ilimitado; criada, a compra falha com `SoldOut` quando `Agent.total_sales >= max` (a transação inteira volta, nenhum USDC se move). O contador é `total_sales` (licenças emitidas na vida do solver): revender, transferir ou queimar uma licença não reabre vaga. **Nenhuma conta existente muda de layout.** **Janela de compatibilidade:** entre o upgrade e o deploy do servidor novo (que monta a compra com a conta nova), o servidor ANTIGO não consegue comprar licença (falta a conta); créditos, garantias e revenda seguem. Dê o `git push` logo depois do passo 4a. `.so` com o teto: 932.768 bytes (era 909.888; teto da CI 946.244): ~22,9 KB a mais de extensão (~0,12 SOL, não volta) e buffer ~0,16 SOL maior (devolvível).
 - **16 instruções novas (e `slash_stake` removida)**: `propose_admin(new_admin)`, `accept_admin`, `cancel_admin_transfer` (rotação do admin em 2 etapas),
   `set_treasury` (troca a conta de USDC da tesouraria), `top_up_stake(amount)` (o criador repõe stake; reativar o
   solver ainda exige `approve_agent`), `migrate_config` (passo 4a, instrução de transição), `set_pause(flags)` e

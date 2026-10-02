@@ -9,6 +9,7 @@ import { decodeVerifiedSignature, MEMORY_KEY_MESSAGE } from "../auth/siws.js";
 import { h, HttpError, notFound, parse, unauthorized } from "../lib/http.js";
 import { deleteAllMemories, deleteMemory, deriveMemoryKey, memoryKeyFor, readMemories, storeMemoryKey, wrapKey } from "../memory/crypto.js";
 import { getCreator } from "./catalog.js";
+import { supplyOfRow } from "./supply-rules.js";
 import { chain } from "../chain/index.js";
 
 export const meRouter = Router();
@@ -206,6 +207,7 @@ meRouter.get(
       uses: Number(a.verifiedUses),
       revenueUsdc: Math.round((paidBy.get(a.id) ?? 0) * 100) / 100,
       disputes: disputesBy.get(a.id) ?? 0,
+      supply: supplyOfRow(a),
     }));
 
     const daily = await db

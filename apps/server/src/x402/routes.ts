@@ -9,6 +9,8 @@ import { agentIsAvailable } from "../runtime/availability.js";
 import { findAgentRow } from "../store/catalog.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
 import { assertEntriesOpen } from "../store/pause-gate.js";
+import { assertSupplyOpen } from "../store/supply.js";
+import { isRowSoldOut } from "../store/supply-rules.js";
 import { assertCanPurchase } from "../store/purchase-guards.js";
 import { facilitator } from "./facilitator.js";
 import { fulfilOrder } from "./mint.js";
@@ -50,6 +52,8 @@ async function sellableAgent(idOrSlug: string): Promise<AgentRow> {
   const row = await findAgentRow(idOrSlug);
   if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
   await assertFreshPrice(row);
+  // Teto de licenças atingido: 409 sold_out ANTES de qualquer ordem ou cobrança (o programa também recusaria, mas aí o agente já teria pago).
+  assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
   return row;
 }
 
@@ -99,14 +103,15 @@ x402Router.get(
     }
     const b = await bounds();
     const available = agentIsAvailable(row);
+    const soldOut = isRowSoldOut(row);
     const inBounds = priceInBounds(row.price, b);
     return {
       agentId: row.id,
       slug: row.slug,
       name: row.name,
       priceUsdc: String(unitsToUsdc(row.price)),
-      available: available && inBounds,
-      reason: !available ? "agent_unavailable" : !inBounds ? "price_out_of_range" : undefined,
+      available: available && inBounds && !soldOut,
+      reason: !available ? "agent_unavailable" : soldOut ? "sold_out" : !inBounds ? "price_out_of_range" : undefined,
       limitsUsdc: { min: String(unitsToUsdc(b.min)), max: String(unitsToUsdc(b.max)) },
       network: s.network,
       asset: s.usdcMint,
@@ -209,6 +214,8 @@ async function pay(req: Request, res: Response, header: string) {
   }
   const row = await findAgentRow(order.agentId);
   if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
+  // O teto pode ter sido atingido depois de a ordem abrir: barra antes de verify/settle (ninguém paga por uma licença que não sai).
+  assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
 
   // 2) O que o agente aceitou tem de ser EXATAMENTE o que a ordem exige; o facilitator confere contra a nossa versão, não a dele.
   const feePayer = await facilitator().feePayer(s.network);

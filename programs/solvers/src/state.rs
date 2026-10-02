@@ -14,6 +14,8 @@ pub const PENDING_ADMIN_SEED: &[u8] = b"pending_admin";
 pub const STAKE_EXIT_SEED: &[u8] = b"stake_exit";
 pub const SLASH_SEED: &[u8] = b"slash";
 pub const LISTING_SEED: &[u8] = b"listing";
+/// PDA opcional por solver com o teto de licenças. Sem a conta criada (dono = System Program) o solver é ilimitado.
+pub const SUPPLY_CAP_SEED: &[u8] = b"supply_cap";
 /// PDA que o vendedor aprova como `TransferDelegate` do asset ao anunciar; só `buy_listing` assina com ela.
 pub const MARKET_AUTHORITY_SEED: &[u8] = b"market_authority";
 
@@ -150,6 +152,17 @@ pub struct Listing {
     pub listed_at: i64,
     /// Quem pagou o rent (recebe de volta ao fechar).
     pub rent_payer: Pubkey,
+    pub bump: u8,
+}
+
+/// Teto de licenças de um solver (`create_supply_cap`). O limite vale sobre `Agent.total_sales`, que só sobe e só
+/// `purchase_license` incrementa: o teto conta licenças já emitidas na vida do solver (queimar uma não reabre vaga) e a
+/// revenda não consome vaga. Só pode subir (`raise_supply_cap`); `u32::MAX` equivale a ilimitado.
+#[account]
+#[derive(InitSpace)]
+pub struct SupplyCap {
+    pub agent: Pubkey,
+    pub max: u32,
     pub bump: u8,
 }
 

@@ -159,6 +159,7 @@ export default async function AgentPage({ params }: Props) {
               hasGuarantee={!!g}
               rate={rate}
               resaleOn={config.resaleEnabled}
+              supply={a.supply}
               resale={config.resaleEnabled && d.resaleListingId && a.resaleFloorUsdc != null ? { listingId: d.resaleListingId, floorUsdc: a.resaleFloorUsdc } : null}
             />
           </aside>

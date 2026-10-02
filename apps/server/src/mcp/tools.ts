@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { and, eq, gt, ne } from "drizzle-orm";
 import { unitsToUsdc } from "@solvers/shared";
+import { isRowSoldOut, soldOutText, supplyLabel, supplyOfRow } from "../store/supply-rules.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { HttpError } from "../lib/http.js";
@@ -153,17 +154,38 @@ function purchaseLink(slug: string) {
   return webUrl(`/checkout?agent=${encodeURIComponent(slug)}&type=permanent`);
 }
 
+type AgentRow = typeof schema.agents.$inferSelect;
+
 const apiBase = () => env.PUBLIC_API_URL.replace(/\/$/, "");
 
-/** Como comprar: humano recebe o link do checkout; agente recebe o passo a passo do x402 (sem link, sem "mostre ao usuário"). */
-function purchaseInstructions(ctx: McpContext, row: typeof schema.agents.$inferSelect): string {
+/** Sem link de compra quando o teto de licenças foi atingido: o programa recusaria a compra. */
+const SOLD_OUT_LINK = "indisponível (licenças esgotadas, sem link de compra)";
+
+export function purchaseLinkFor(row: AgentRow): string {
+  return isRowSoldOut(row) ? SOLD_OUT_LINK : purchaseLink(row.slug);
+}
+
+async function purchaseLinkBySlug(slug: string): Promise<string> {
+  const row = await findAgentRow(slug).catch(() => null);
+  return row ? purchaseLinkFor(row) : purchaseLink(slug);
+}
+
+/** Texto de "esgotado" para a IA repassar ao usuário (menciona a revenda só com ela ligada). */
+export function soldOutAdvice(row: AgentRow): string {
+  return `${soldOutText(row.name, env.RESALE_ENABLED)} Não ofereça link de compra.`;
+}
+
+/** Como comprar: humano recebe o link do checkout; agente recebe o passo a passo do x402 (sem link, sem "mostre ao usuário"). Esgotado: nenhum dos dois. */
+function purchaseInstructions(ctx: McpContext, row: AgentRow): string {
+  if (isRowSoldOut(row)) return soldOutAdvice(row);
   if (!ctx.isAgent) return `Comprar: ${purchaseLink(row.slug)}`;
   return agentPurchaseText({ apiBase: apiBase(), agentId: row.id, name: row.name, priceUsdc: String(unitsToUsdc(row.price)), network: networkLabel(env.SOLANA_CLUSTER) });
 }
 
-function describeAgent(row: typeof schema.agents.$inferSelect) {
+export function describeAgent(row: AgentRow) {
   const rating = row.ratingCount ? (Number(row.ratingSum) / row.ratingCount).toFixed(1) : "sem avaliações";
-  return `nota ${rating} (${row.ratingCount} avaliações), desempenho verificado ${(row.evalScoreBps / 100).toFixed(0)}%, licença vitalícia por ${unitsToUsdc(row.price)} USDC`;
+  const supply = supplyLabel(supplyOfRow(row));
+  return `nota ${rating} (${row.ratingCount} avaliações), desempenho verificado ${(row.evalScoreBps / 100).toFixed(0)}%, licença vitalícia por ${unitsToUsdc(row.price)} USDC${supply ? ` (${supply})` : ""}`;
 }
 
 /** Uma linha sobre o teste grátis do especialista (find_solver). */
@@ -191,10 +213,10 @@ async function sessionTrial(session: Session, pkg: SolverPackage): Promise<Trial
   const trial = trialLimits(pkg.manifest);
   if (trial) return trial;
   if (await upgraded(session)) return null;
-  throw new HttpError(403, `O teste grátis de ${pkg.manifest.name} não está mais disponível. Comprar: ${purchaseLink(pkg.manifest.slug)}`);
+  throw new HttpError(403, `O teste grátis de ${pkg.manifest.name} não está mais disponível. Comprar: ${await purchaseLinkBySlug(pkg.manifest.slug)}`);
 }
 
-const endText = (pkg: SolverPackage, trial: TrialLimits) => trialEndText(pkg.manifest.name, trial, purchaseLink(pkg.manifest.slug));
+const endText = async (pkg: SolverPackage, trial: TrialLimits) => trialEndText(pkg.manifest.name, trial, await purchaseLinkBySlug(pkg.manifest.slug));
 
 export function buildMcpServer(ctx: McpContext): McpServer {
   const server = new McpServer({ name: "solvers", version: "1.0.0" }, { instructions: ctx.isAgent ? AGENT_SERVER_INSTRUCTIONS : SERVER_INSTRUCTIONS });
@@ -249,7 +271,11 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         const pkg = getPackage(r.id);
         // Agente não tem teste grátis: não oferece o que não vai receber.
         const trial = has || !pkg || ctx.isAgent ? "" : `\n  ${describeTrial(trialLimits(pkg.manifest))}`;
-        const buy = ctx.isAgent ? agentPurchaseLine({ apiBase: apiBase(), agentId: r.id, priceUsdc: String(unitsToUsdc(r.price)) }) : `Comprar: ${purchaseLink(r.slug)}`;
+        const buy = isRowSoldOut(r)
+          ? `Comprar: ${SOLD_OUT_LINK}`
+          : ctx.isAgent
+            ? agentPurchaseLine({ apiBase: apiBase(), agentId: r.id, priceUsdc: String(unitsToUsdc(r.price)) })
+            : `Comprar: ${purchaseLink(r.slug)}`;
         return `- ${r.name} (agent_id: ${r.id})${has}\n  ${r.tagline}\n  ${describeAgent(r)}${trial}\n  ${buy}`;
       });
       if (ctx.isAgent) {
@@ -258,7 +284,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         };
       }
       return {
-        text: `Sugestões:\n${lines.join("\n")}\n\nPara usar o teste grátis (quando o especialista tiver), chame activate_solver com o agent_id. Para comprar a licença vitalícia, mostre o link ao usuário (ele aprova o pagamento na carteira).`,
+        text: `Sugestões:\n${lines.join("\n")}\n\nPara usar o teste grátis (quando o especialista tiver), chame activate_solver com o agent_id. Para comprar a licença vitalícia, mostre o link ao usuário (ele aprova o pagamento na carteira); especialista esgotado não tem link.`,
       };
     }),
   );
@@ -275,6 +301,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     tool(ctx, "get_purchase_link", async ({ agent_id }: { agent_id: string }) => {
       const row = await findAgentRow(agent_id);
       if (!agentIsAvailable(row)) return { text: servePolicy(row) === "paid_only" ? RETIRED_TEXT : UNAVAILABLE_TEXT, agentId: row.id };
+      if (isRowSoldOut(row)) return { text: soldOutAdvice(row), agentId: row.id };
       if (ctx.isAgent) return { text: purchaseInstructions(ctx, row), agentId: row.id };
       return { text: `Link para ${row.name} (licença vitalícia, ${unitsToUsdc(row.price)} USDC): ${purchaseLink(row.slug)}`, agentId: row.id };
     }),
@@ -334,7 +361,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         const step = Math.min(open.stepIndex + 1, pkg.steps.length);
         const trial = await sessionTrial(open, pkg);
         if (trial && trialStepLocked(trial, open.stepIndex, pkg.steps.length)) {
-          return { text: `session_id: ${open.id}\n${endText(pkg, trial)}`, agentId: row.id, sessionId: open.id };
+          return { text: `session_id: ${open.id}\n${await endText(pkg, trial)}`, agentId: row.id, sessionId: open.id };
         }
         const accessNote = open.access === "license" || open.access === "guarantee" ? ` ${paidAccessLine(open.access)}` : "";
         const task = await guaranteeBlock(ctx.wallet, row.id);
@@ -359,6 +386,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           access.reason === "no_trial"
             ? `${row.name} não tem teste grátis: para usar, o usuário precisa da licença vitalícia (${price}).`
             : `O usuário já usou os ${access.trial?.uses ?? 0} testes grátis de ${row.name}. Para continuar, ele precisa da licença vitalícia (${price}).`;
+        if (isRowSoldOut(row)) return { text: `${why} ${soldOutAdvice(row)}`, agentId: row.id };
         return { text: `${why} Comprar: ${purchaseLink(row.slug)}. Mostre o link e explique que o pagamento é aprovado na carteira dele.`, agentId: row.id };
       }
       const session = await createSession(ctx.wallet, pkg, access);
@@ -370,7 +398,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
               totalSteps: pkg.steps.length,
               toolNames: pkg.manifest.tools.map((t) => t.name),
               usage: access.usage,
-            })} Quando o teste acabar, ofereça o link de compra: ${purchaseLink(row.slug)}`;
+            })} Quando o teste acabar, ${isRowSoldOut(row) ? `não há como comprar (${SOLD_OUT_LINK})` : `ofereça o link de compra: ${purchaseLink(row.slug)}`}`;
       const task = await guaranteeBlock(ctx.wallet, row.id);
       const reqs = pkg.manifest.requirements.map((r) => `- [${r.type}] ${r.label}${r.key ? ` (chave: ${r.key})` : ""}${r.optional ? " (opcional)" : ""}`).join("\n") || "- nenhum";
       const memoryHint = pkg.usesMemory ? `\nEste especialista usa memória: chame get_memory com agent_id="${row.id}" antes da etapa 1.` : "";
@@ -435,7 +463,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         let note = "";
         if (trial && trialStepLocked(trial, index, pkg.steps.length)) {
           const up = await upgraded(session);
-          if (!up) return { text: endText(pkg, trial), agentId: session.agentId, sessionId: session.id };
+          if (!up) return { text: await endText(pkg, trial), agentId: session.agentId, sessionId: session.id };
           session = up;
           note = `${UPGRADED_NOTE}\n\n`;
         }
@@ -468,7 +496,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const pkg = requireSessionPackage(session);
       const trial = await sessionTrial(session, pkg);
       if (trial && !(await consumeTrialSearch(ctx.wallet, session.agentId, trial.searches)) && !(await upgraded(session))) {
-        const out = `As consultas à base do teste grátis acabaram (${trial.searches} no total).\n\n${endText(pkg, trial)}`;
+        const out = `As consultas à base do teste grátis acabaram (${trial.searches} no total).\n\n${await endText(pkg, trial)}`;
         return { text: out, agentId: session.agentId, sessionId: session.id };
       }
       const hits = await searchKnowledge(session.agentId, session.version, query, 5);
@@ -500,7 +528,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       if (trial && pkg.manifest.tools.some((t) => t.name === name)) {
         const limit = trial.tools[name] ?? 0;
         // Teto de tamanho da entrada no teste: confere antes de gastar saldo (a licença não tem teto).
-        const capped = limit > 0 ? trialToolCapError(name, trial.toolCaps[name], input, purchaseLink(pkg.manifest.slug)) : null;
+        const capped = limit > 0 ? trialToolCapError(name, trial.toolCaps[name], input, await purchaseLinkBySlug(pkg.manifest.slug)) : null;
         if (capped && !(await upgraded(session))) return { text: capped, agentId: session.agentId, sessionId: session.id };
         if (limit > 0 && (await consumeTrialTool(ctx.wallet, session.agentId, name, limit))) {
           try {
@@ -515,7 +543,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         // Bloqueada ou esgotada no teste: só segue se a carteira já tiver acesso pago.
         if (!(await upgraded(session))) {
           const why = limit > 0 ? `O teste grátis permitia rodar ${name} ${times(limit)} e esse limite acabou.` : `A ferramenta ${name} não faz parte do teste grátis.`;
-          return { text: `${why}\n\n${endText(pkg, trial)}`, agentId: session.agentId, sessionId: session.id };
+          return { text: `${why}\n\n${await endText(pkg, trial)}`, agentId: session.agentId, sessionId: session.id };
         }
       }
       const result = await runServerTool(pkg, name, input);

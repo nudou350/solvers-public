@@ -190,6 +190,20 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx.error, pixError]);
 
+  // Vagas esgotadas durante a compra: relê o especialista para a tela mostrar "Esgotado" já.
+  useEffect(() => {
+    if (tx.error?.code !== "sold_out" && pixError?.code !== "sold_out") return;
+    let alive = true;
+    api.getAgent(detail.agent.slug).then(
+      (d) => alive && setFresh(d),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx.error, pixError]);
+
   // Licença usada: o preço do anúncio mudou ou ele sumiu. Mostra o valor novo, zera o aceite e pede a confirmação de novo.
   useEffect(() => {
     if (!listing) return;
@@ -265,11 +279,15 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
   }
 
   const alreadyOwned = owned && type === "permanent";
+  // Teto de licenças: sem vagas, a licença nova não pode ser comprada (a revenda é outro caminho). Garantia não ocupa vaga.
+  const soldOut = !isR && type === "permanent" && !alreadyOwned && (agent.supply?.left === 0 || tx.error?.code === "sold_out" || pixError?.code === "sold_out");
+  // Pix/SODAX já pagos e creditados: o valor virou saldo em USDC na carteira e continua lá.
+  const paidBeforeSoldOut = soldOut && charge?.status === "credited";
   const myListing = isR && !!meWallet && listing?.sellerWallet === meWallet;
   const listingBlocked = listingGone || myListing;
   // SODAX só segue com uma cotação ao vivo na tela: é ela que a pessoa está aceitando.
   const sodaxReady = effMethod !== "sodax" || (!!sodaxCfg && sodaxQuote != null);
-  const canPay = !!config && agree && !alreadyOwned && !listingBlocked && limitsOk && sodaxReady && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
+  const canPay = !!config && agree && !alreadyOwned && !soldOut && !listingBlocked && limitsOk && sodaxReady && (!isG || (titleOk && descOk)) && !tx.pending && !pixPending;
   function pay() {
     setTouched(true);
     if (!canPay) return;
@@ -374,6 +392,29 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 }
               >
                 A licença permanente já está na sua conta. Não é preciso comprar de novo.
+              </Notice>
+            ) : null}
+
+            {soldOut ? (
+              <Notice
+                tone="warn"
+                role="alert"
+                title="Acabaram as vagas"
+                actions={
+                  config?.resaleEnabled ? (
+                    <Button size="sm" href="/revenda">
+                      Ver licenças usadas
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" href="/especialistas">
+                      Ver outros especialistas
+                    </Button>
+                  )
+                }
+              >
+                {paidBeforeSoldOut
+                  ? "As últimas licenças foram vendidas antes de a sua compra terminar. O valor que você pagou já virou saldo em USDC na sua carteira e não foi gasto: nada se perdeu, e você pode usá-lo em outra compra."
+                  : "Todas as licenças deste especialista já foram vendidas. Nada foi cobrado."}
               </Notice>
             ) : null}
 
@@ -722,7 +763,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                     : tx.error.text}
                 </Notice>
               ) : null}
-              {pixError && pixError.code !== "price_changed" ? (
+              {pixError && pixError.code !== "price_changed" && pixError.code !== "sold_out" ? (
                 <Notice tone="bad" role="alert" title={pixError.title}>
                   {pixError.text}
                 </Notice>
@@ -730,7 +771,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
               <p className={tx.pending ? "small muted center" : "sr-only"} role="status" aria-live="polite">
                 {tx.pending ? "Assinando e registrando a compra na rede…" : ""}
               </p>
-              {tx.error && tx.error.code !== "price_changed" && tx.error.code !== "listing_changed" ? (
+              {tx.error && tx.error.code !== "price_changed" && tx.error.code !== "listing_changed" && tx.error.code !== "sold_out" ? (
                 <Notice
                   tone="bad"
                   role="alert"

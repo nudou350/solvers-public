@@ -93,6 +93,14 @@ pub mod solvers {
         instructions::agent::set_eval(ctx, eval_score_bps, eval_hash)
     }
 
+    // Teto de licenças (opcional, só sobe)
+    pub fn create_supply_cap(ctx: Context<CreateSupplyCap>, max: u32) -> Result<()> {
+        instructions::supply::create_supply_cap(ctx, max)
+    }
+    pub fn raise_supply_cap(ctx: Context<RaiseSupplyCap>, max: u32) -> Result<()> {
+        instructions::supply::raise_supply_cap(ctx, max)
+    }
+
     // Compra e uso
     pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> Result<()> {
         instructions::purchase::purchase_license(ctx, expected_price)

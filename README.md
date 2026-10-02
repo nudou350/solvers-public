@@ -29,6 +29,7 @@ infra/                 PM2, nginx e scripts de deploy no padrão da VPS
 | Garantia | Prazo de liberação automática por etapa (`passed_at + review_window`) | Várias etapas com prazos independentes |
 | Teste grátis | 3 usos por carteira por solver, controlado off-chain | Não existia no programa |
 | Revenda | Licença revendida pelo mercado, sem custódia, com royalty ao criador (`docs/resale.md`) | Devnet; mainnet depende dos termos com o advogado |
+| Licenças limitadas | O criador pode limitar o número de licenças de um solver (padrão: ilimitado). O limite atual é imposto pelo programa e verificável na blockchain; o criador só pode aumentá-lo, nunca reduzi-lo, e revender, transferir ou queimar uma licença não libera vaga (`docs/licencas-limitadas.md`) | Devnet, no mesmo upgrade da revenda |
 | SBPF | Build com `--arch v1` | Devnet/mainnet ainda aceitam deploy v0-v2; o validador de teste 3.x não roda v3 |
 
 ## Rodando localmente

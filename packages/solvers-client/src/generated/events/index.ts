@@ -38,5 +38,6 @@ export * from './stakeExitRequested.js';
 export * from './stakeSlashed.js';
 export * from './stakeToppedUp.js';
 export * from './stakeWithdrawn.js';
+export * from './supplyCapSet.js';
 export * from './treasuryUpdated.js';
 export * from './usageRecorded.js';

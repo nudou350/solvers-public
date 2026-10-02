@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FREE_TRIAL_USES, Requirement } from "@solvers/shared";
+import { FREE_TRIAL_USES, MAX_LICENSES_CAP, Requirement } from "@solvers/shared";
 import { AGENT_ID_RE, slugProblem, versionProblem } from "./agent-ids.js";
 
 // Schema do manifest.json dos pacotes (INSTRUCTIONS.md 6). Sem env/banco: validado também nos testes.
@@ -64,6 +64,11 @@ export const ManifestBase = z.object({
     }),
   /** Só licença vitalícia: pricePerUseUsdc de manifests antigos é ignorado. */
   pricing: z.object({ priceUsdc: z.number(), royaltyBps: z.number().int() }),
+  /**
+   * Teto de licenças (docs/licencas-limitadas.md). Ausente = ilimitado. O teto vive on-chain (PDA SupplyCap, imposto por
+   * `purchase_license`): o `cli:publish` o cria ou sobe a partir daqui, e ele nunca desce. Independe do teste grátis.
+   */
+  supply: z.object({ maxLicenses: z.number().int().min(1).max(MAX_LICENSES_CAP) }).strict().optional(),
   /** Teste grátis com limites aplicados pelo servidor. Ausente ou available=false: sem teste. */
   trial: z
     .object({

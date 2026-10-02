@@ -57,6 +57,10 @@ export const PROGRAM_ERROR_MESSAGES = {
   [gen.SOLVERS_ERROR__SLASH_PENDING]: "Há uma proposta de confisco em andamento para este especialista: o saque do depósito fica travado até ela ser cancelada ou executada.",
   [gen.SOLVERS_ERROR__SLASH_DELAY_NOT_REACHED]: "A espera de 72 horas do confisco ainda não terminou.",
   [gen.SOLVERS_ERROR__SLASH_ALREADY_CONTESTED]: "Esta proposta de confisco já foi contestada pelo criador.",
+  // Teto de licenças. `SoldOut` chega a quem compra: texto para leigo; os outros dois são do criador.
+  [gen.SOLVERS_ERROR__SOLD_OUT]: "Esgotado: todas as licenças deste especialista já foram vendidas.",
+  [gen.SOLVERS_ERROR__SUPPLY_CAP_TOO_LOW]: "O limite de licenças precisa ser de pelo menos 1 e não pode ficar abaixo do que já foi vendido.",
+  [gen.SOLVERS_ERROR__SUPPLY_CAP_CANNOT_DECREASE]: "O limite de licenças só pode aumentar, nunca diminuir.",
   [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENDED]: "O admin estendeu a espera da saída; não dá para cancelar agora.",
   [gen.SOLVERS_ERROR__SLASH_EXPIRED]: "A proposta de confisco venceu (72 horas mais 14 dias) e não pode mais ser executada; ela só pode ser cancelada.",
   [gen.SOLVERS_ERROR__SLASH_NOT_EXPIRED]: "A proposta de confisco ainda não venceu: antes disso só o admin pode cancelá-la.",

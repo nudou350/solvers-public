@@ -142,6 +142,13 @@ pub struct StakeToppedUp {
 }
 
 #[event]
+pub struct SupplyCapSet {
+    pub agent: Pubkey,
+    /// Teto atual (`u32::MAX` = ilimitado).
+    pub max: u32,
+}
+
+#[event]
 pub struct PricingUpdated {
     pub agent: Pubkey,
     pub price: u64,

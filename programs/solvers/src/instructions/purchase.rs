@@ -81,11 +81,27 @@ pub struct PurchaseLicense<'info> {
         bump
     )]
     pub reputation: Box<Account<'info, UserReputation>>,
+    /// CHECK: PDA `supply_cap` do solver (o endereço é imposto pelas seeds, então não dá para omiti-la nem trocá-la).
+    /// Conta nunca criada (dono = System Program) = solver ilimitado; criada, só o programa a escreve (dono e discriminador
+    /// conferidos em `enforce_supply_cap`).
+    #[account(seeds = [SUPPLY_CAP_SEED, agent.key().as_ref()], bump)]
+    pub supply_cap: UncheckedAccount<'info>,
     /// CHECK: verificado pelo endereço.
     #[account(address = mpl_core::ID)]
     pub mpl_core_program: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+}
+
+/// Barra a venda quando o solver tem teto e ele já foi atingido. `total_sales` é o contador de licenças emitidas.
+fn enforce_supply_cap(supply_cap: &AccountInfo, agent: &Agent) -> Result<()> {
+    if supply_cap.owner != &crate::ID || supply_cap.data_is_empty() {
+        return Ok(());
+    }
+    let data = supply_cap.try_borrow_data()?;
+    let cap = SupplyCap::try_deserialize(&mut &data[..])?;
+    require!(agent.total_sales < u64::from(cap.max), SolversError::SoldOut);
+    Ok(())
 }
 
 /// `expected_price` é o preço mostrado ao comprador: se o criador mudar o preço entre a montagem
@@ -98,6 +114,7 @@ pub fn purchase_license(ctx: Context<PurchaseLicense>, expected_price: u64) -> R
     require!(agent.stake >= ctx.accounts.config.min_stake, SolversError::InsufficientStake);
     let price = agent.price;
     require!(price == expected_price, SolversError::PriceChanged);
+    enforce_supply_cap(&ctx.accounts.supply_cap.to_account_info(), agent)?;
 
     pay_split(
         &ctx.accounts.token_program,

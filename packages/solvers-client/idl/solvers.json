@@ -1457,6 +1457,95 @@
       ]
     },
     {
+      "name": "create_supply_cap",
+      "discriminator": [
+        154,
+        190,
+        223,
+        14,
+        174,
+        151,
+        135,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Fee payer da plataforma: paga o rent da conta."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "supply_cap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  112,
+                  112,
+                  108,
+                  121,
+                  95,
+                  99,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "max",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "execute_slash",
       "discriminator": [
         15,
@@ -2443,6 +2532,36 @@
           }
         },
         {
+          "name": "supply_cap",
+          "docs": [
+            "Conta nunca criada (dono = System Program) = solver ilimitado; criada, só o programa a escreve (dono e discriminador",
+            "conferidos em `enforce_supply_cap`)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  112,
+                  112,
+                  108,
+                  121,
+                  95,
+                  99,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
           "name": "mpl_core_program",
           "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
         },
@@ -2459,6 +2578,86 @@
         {
           "name": "expected_price",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "raise_supply_cap",
+      "discriminator": [
+        205,
+        177,
+        176,
+        90,
+        157,
+        88,
+        138,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          },
+          "relations": [
+            "supply_cap"
+          ]
+        },
+        {
+          "name": "supply_cap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  112,
+                  112,
+                  108,
+                  121,
+                  95,
+                  99,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "max",
+          "type": "u32"
         }
       ]
     },
@@ -4443,6 +4642,19 @@
       ]
     },
     {
+      "name": "SupplyCap",
+      "discriminator": [
+        120,
+        76,
+        77,
+        82,
+        129,
+        14,
+        220,
+        207
+      ]
+    },
+    {
       "name": "UserReputation",
       "discriminator": [
         86,
@@ -4874,6 +5086,19 @@
       ]
     },
     {
+      "name": "SupplyCapSet",
+      "discriminator": [
+        168,
+        116,
+        26,
+        113,
+        44,
+        83,
+        244,
+        205
+      ]
+    },
+    {
       "name": "TreasuryUpdated",
       "discriminator": [
         80,
@@ -5200,6 +5425,21 @@
       "code": 6059,
       "name": "CancelPayerMismatch",
       "msg": "Para cancelar com a revogação do delegate, quem paga a transação tem que ser quem abriu o anúncio"
+    },
+    {
+      "code": 6060,
+      "name": "SoldOut",
+      "msg": "Esgotado: todas as licenças deste solver já foram vendidas"
+    },
+    {
+      "code": 6061,
+      "name": "SupplyCapTooLow",
+      "msg": "O teto de licenças precisa ser de pelo menos 1 e não pode ficar abaixo do que já foi vendido"
+    },
+    {
+      "code": 6062,
+      "name": "SupplyCapCannotDecrease",
+      "msg": "O teto de licenças só pode aumentar"
     }
   ],
   "types": [
@@ -6724,6 +6964,50 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupplyCap",
+      "docs": [
+        "Teto de licenças de um solver (`create_supply_cap`). O limite vale sobre `Agent.total_sales`, que só sobe e só",
+        "`purchase_license` incrementa: o teto conta licenças já emitidas na vida do solver (queimar uma não reabre vaga) e a",
+        "revenda não consome vaga. Só pode subir (`raise_supply_cap`); `u32::MAX` equivale a ilimitado."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "max",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupplyCapSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "max",
+            "docs": [
+              "Teto atual (`u32::MAX` = ilimitado)."
+            ],
+            "type": "u32"
           }
         ]
       }

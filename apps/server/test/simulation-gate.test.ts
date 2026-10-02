@@ -32,6 +32,14 @@ describe("assertSimulationOk", () => {
     assert.deepEqual(logs, []);
   });
 
+  it("SoldOut do programa (teto de licenças): 409 sold_out, o mesmo código do pré-check, para a tela mostrar Esgotado", () => {
+    const { thrown } = run({ ok: false, kind: "rejected", code: 6060, name: "SoldOut", message: "Esgotado: todas as licenças deste especialista já foram vendidas.", logs: [] });
+    assert.ok(thrown instanceof HttpError);
+    assert.equal(thrown.status, 409);
+    assert.equal(thrown.code, "sold_out");
+    assert.match(thrown.message, /Esgotado/);
+  });
+
   it("recusa sem código do programa (saldo): também bloqueia, sem campos de código", () => {
     const { thrown } = run({ ok: false, kind: "rejected", code: null, name: null, message: "Saldo de USDC insuficiente.", logs: [] });
     assert.ok(thrown instanceof HttpError && thrown.status === 409);

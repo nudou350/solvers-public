@@ -6,6 +6,7 @@ import { Tile } from "@/components/ui/Tile";
 import { brl0, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref } from "./data";
+import { SupplyTag } from "./SupplyTag";
 import { TrialTag } from "./TrialTag";
 
 /** Cartão de especialista da home ("Mais bem avaliados"). */
@@ -29,6 +30,7 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
           {a.evalScore}% nos testes
         </span>
         {a.trialAvailable ? <TrialTag agentId={a.id} /> : null}
+        <SupplyTag supply={a.supply} />
       </div>
       <div className="row between wrapx" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
         <div>

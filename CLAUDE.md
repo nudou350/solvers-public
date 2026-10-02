@@ -67,6 +67,7 @@ bash infra/deploy.sh                   # deploy current commit to the VPS
 - Program: no `unwrap`/`expect`/`panic`, `checked_*` arithmetic, validate token accounts by address and mint, no new `init_if_needed`, never change existing account layouts (devnet already has them). Review with the `solvers-program-review` skill.
 - **Never `git push` (auto-deploys `master`) before the devnet program upgrade is done** (`docs/devnet-upgrade.md`): a new server against the old program creates unrecoverable escrows. `RESALE_ENABLED` stays off until that upgrade.
 - Every purchase (license, credits, guarantee) must be >= `min_price` (5 USDC) to cover rent paid by the platform.
+- License caps are enforced by the program, not the server: `purchase_license` requires the `supply_cap` PDA (derived from the agent) and fails with `SoldOut` when `Agent.total_sales >= max`; the cap can only be raised and resale/transfer never frees a slot. Never say "only N will exist" (the creator can raise it). Program changes need WSL (`scripts/chain/test-program.sh`).
 - Outside mainnet, `PIX_SIMULATE` and `SODAX_SIMULATE` default to true; the mainnet env rejects simulation and admin shortcuts.
 - Migrations share one DB with the release still running: keep them backward compatible.
 - Keys and `.env*` live outside git (`~/solvers-keys` in WSL, `apps/server/.keys`).

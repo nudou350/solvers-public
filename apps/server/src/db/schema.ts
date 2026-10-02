@@ -69,6 +69,8 @@ export const agents = pgTable(
     /** Kill switch da plataforma: active | suspended. NUNCA escrito pelo indexador (PACKAGE_SPEC.md 15.4). */
     platformStatus: text("platform_status").notNull().default("active"),
     totalSales: u64("total_sales").notNull().default(sql`0`),
+    /** Teto de licenças (espelho da PDA SupplyCap on-chain; ver docs/licencas-limitadas.md). null = ilimitado. */
+    maxLicenses: integer("max_licenses"),
     verifiedUses: u64("verified_uses").notNull().default(sql`0`),
     ratingSum: u64("rating_sum").notNull().default(sql`0`),
     ratingCount: integer("rating_count").notNull().default(0),

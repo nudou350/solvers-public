@@ -178,7 +178,7 @@ export function createApi(opts: ApiOptions = {}) {
     getCreatorDashboard: () => req(CreatorDashboard, "/api/creator/dashboard"),
 
     // ----- Transações: o servidor monta e paga a taxa; a carteira só assina -----
-    /** Compra da licença vitalícia (único tipo de compra). */
+    /** Compra da licença vitalícia (único tipo de compra). Erros extras: `sold_out` 409 (teto de licenças atingido, ver `SUPPLY_ERROR_CODES`), `price_changed` 409. */
     buildPurchase: (agentId: string) => post(TxResponse, "/api/tx/purchase", { agentId }),
     /**
      * Revenda de licenças (licenseId = asset da licença = id do anúncio). Erros (`ApiError.code`, ver `RESALE_ERROR_CODES` em

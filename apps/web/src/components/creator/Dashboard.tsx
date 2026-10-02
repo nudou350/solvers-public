@@ -229,7 +229,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
           <>
             <div className="cr-table cr-head hide-m" aria-hidden>
               <span>Especialista</span>
-              <span>Vendas</span>
+              <span>Vendidas / Teto</span>
               <span>Usos</span>
               <span>Nota</span>
               <span>Desempenho</span>
@@ -255,8 +255,19 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                     </span>
                   </span>
                   <span className="num">
-                    <span className="only-m tiny faint">Vendas </span>
+                    <span className="only-m tiny faint">Vendidas / Teto </span>
                     {int(a.sales)}
+                    {a.supply.max != null ? (
+                      <span className={a.supply.left === 0 ? "warn" : "faint"}>
+                        {" / "}
+                        {int(a.supply.max)}
+                        {a.supply.left === 0 ? " esgotado" : ""}
+                      </span>
+                    ) : (
+                      <span className="faint" title="Sem limite de licenças">
+                        {" / ∞"}
+                      </span>
+                    )}
                   </span>
                   <span className="num">
                     <span className="only-m tiny faint">Usos </span>

@@ -13,6 +13,7 @@ import { agentIsAvailable } from "../runtime/availability.js";
 import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { brlPerUsd } from "../store/fx.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
+import { assertSupplyOpen } from "../store/supply.js";
 import { ensureProfile } from "../store/profile.js";
 import { credit, markApproved } from "./credit.js";
 import { createPixOrder, getOrder, orderPayment, verifyWebhookSignature } from "./mercadopago.js";
@@ -113,6 +114,8 @@ export async function neededUnits(wallet: string, agentId: string, type: "perman
   if (!agentIsAvailable(row)) throw badRequest("Este especialista ainda não está disponível para compra.");
   let total: bigint;
   if (type === "permanent") {
+    // Esgotado: não cobra Pix (nem SODAX, que usa esta função) por uma compra que o programa recusaria.
+    assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
     // O preço pode ter mudado on-chain sem evento: confere antes de cobrar o Pix do valor antigo.
     await assertFreshPrice(row);
     total = row.price;
