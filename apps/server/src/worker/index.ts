@@ -4,10 +4,15 @@ import { db, pool, schema } from "../db/index.js";
 import { warmEmbeddings } from "../knowledge/embeddings.js";
 import { notifyAdmin } from "../submissions/notify.js";
 import { MAX_ATTEMPTS, processSubmission, requestStop, WorkerStopping } from "../submissions/process.js";
+import { botUsername, telegramApi } from "../telegram/client.js";
+import { redeemLinkCode } from "../telegram/link-store.js";
+import { runTelegramPolling } from "../telegram/poller.js";
 
 // Processo PM2 próprio (solvers-worker; PACKAGE_SPEC.md 16): extrai o ZIP, valida, varre e ingere o conhecimento em staging,
 // uma submissão por vez, com checkpoint em ingest_jobs. Fica fora do solvers-api para não competir com o MCP e os pagamentos.
 // Entrada compilada: dist/worker/index.js (infra/worker-run.sh).
+//
+// Também roda o bot de vinculação do Telegram (src/telegram/poller.ts: /vincular e /start com o código do site).
 //
 // Retomada: o deploy do CI reinicia o processo a cada push. `validating` conta como pendente: o que já foi validado não se
 // repete e a ingestão recomeça do último arquivo concluído. Uma submissão que falha por erro de sistema (banco, disco,
@@ -85,7 +90,10 @@ async function main() {
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   warmEmbeddings();
-  await runWorker(() => stop);
+  // O bot de vinculação do Telegram roda aqui, junto da fila: este é o único processo que faz getUpdates.
+  const api = telegramApi();
+  const bot = runTelegramPolling(() => stop, { api, redeem: redeemLinkCode, botUsername: await botUsername(api) });
+  await Promise.all([runWorker(() => stop), bot.catch((e) => console.error("[telegram] o laço do bot caiu:", (e as Error).message))]);
   await pool.end().catch(() => undefined);
   process.exit(0);
 }

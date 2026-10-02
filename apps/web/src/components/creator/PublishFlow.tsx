@@ -17,6 +17,7 @@ import { CREATOR_SOLVER_SLUG, fileSizeText, loadErrorText, MAX_ZIP_BYTES } from 
 import { CreatorHead } from "./CreatorHead";
 import { CreatorProfileForm } from "./CreatorProfileForm";
 import { Timeline } from "./SubmissionParts";
+import { TelegramLinkPanel } from "./TelegramLinkPanel";
 import { ZipUploader } from "./ZipUploader";
 import s from "./creator.module.css";
 
@@ -78,6 +79,15 @@ export function PublishFlow() {
     else if (me) toast({ tone: "info", title: "Ainda não vimos o vínculo", text: "Envie o comando ao bot e tente de novo em alguns segundos." });
   }
 
+  // O painel de vínculo viu o Telegram vinculado (conferência a cada 4 s): atualiza o estado e avisa.
+  const linked = useCallback(
+    (me: CreatorMe) => {
+      setLoad({ kind: "ok", me });
+      toast({ tone: "ok", title: "Telegram vinculado", text: "Seu contato foi confirmado." });
+    },
+    [toast],
+  );
+
   const info = STEPS[step - 1]!;
 
   return (
@@ -128,6 +138,7 @@ export function PublishFlow() {
             creator={creator}
             rechecking={rechecking}
             onRecheck={() => void recheck()}
+            onLinked={linked}
             onSaved={(me) => {
               setLoad({ kind: "ok", me });
               toast({ tone: "ok", title: "Cadastro salvo" });
@@ -142,15 +153,20 @@ export function PublishFlow() {
           creator.canSubmit ? (
             <ZipUploader onDone={(id) => router.push(`/criador/envios/${encodeURIComponent(id)}`)} />
           ) : (
-            <Notice tone="warn" title="Falta completar o cadastro" actions={<Button variant="secondary" size="sm" onClick={() => go(2)}>Voltar ao cadastro</Button>}>
-              {!creator.invited
-                ? "Seu convite ainda não foi confirmado."
-                : !creator.hasProfile || !creator.termsAccepted
-                  ? "Falta salvar o nome, a apresentação e aceitar os termos."
-                  : !creator.contactVerified
-                    ? "Falta vincular o seu Telegram."
-                    : "Seu cadastro ainda não está liberado para enviar."}
-            </Notice>
+            <div className="col" style={gap(16)}>
+              <Notice tone="warn" title="Falta completar o cadastro" actions={<Button variant="secondary" size="sm" onClick={() => go(2)}>Voltar ao cadastro</Button>}>
+                {!creator.invited
+                  ? "Seu convite ainda não foi confirmado."
+                  : !creator.hasProfile || !creator.termsAccepted
+                    ? "Falta salvar o nome, a apresentação e aceitar os termos."
+                    : !creator.contactVerified
+                      ? "Falta vincular o seu Telegram. É por ele que avisamos você sobre os envios."
+                      : "Seu cadastro ainda não está liberado para enviar."}
+              </Notice>
+              {creator.invited && creator.hasProfile && creator.termsAccepted && !creator.contactVerified ? (
+                <TelegramLinkPanel onLinked={linked} onRecheck={() => void recheck()} rechecking={rechecking} />
+              ) : null}
+            </div>
           )
         ) : null}
 

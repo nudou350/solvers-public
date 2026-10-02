@@ -211,8 +211,19 @@ export const CreatorMe = z.object({
   contactVerified: z.boolean(),
   canSubmit: z.boolean(),
   isAdmin: z.boolean(),
+  /** Bot do Telegram que recebe o vínculo (null = não configurado no servidor). Ausente em servidores antigos. */
+  telegramBot: z.object({ username: z.string() }).nullable().optional(),
 });
 export type CreatorMe = z.infer<typeof CreatorMe>;
+
+/** Resposta de POST /creator/telegram-link: código de uso único (15 min) para enviar ao bot, e o link que já o preenche. */
+export const TelegramLink = z.object({
+  code: z.string(),
+  expiresAt: z.string(),
+  botUsername: z.string(),
+  deepLink: z.string(),
+});
+export type TelegramLink = z.infer<typeof TelegramLink>;
 
 /** Regra de slugs que não podem ser pedidos por terceiros (marcas e a plataforma). */
 export const RESERVED_SLUGS: readonly string[] = ["solvers", "criador-de-solvers", "admin", "api", "mcp", "oauth", "wondervelop", "anthropic", "claude", "openai", "chatgpt", "solana", "metaplex", "usdc"];

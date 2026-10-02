@@ -30,6 +30,7 @@ import {
   Review,
   SodaxQuote,
   SubmitResponse,
+  TelegramLink,
   TxResponse,
   UsageSummary,
   UserReputation,
@@ -248,6 +249,8 @@ export function createApi(opts: ApiOptions = {}) {
     // ----- Criador: cadastro, envio de pacotes e acompanhamento (PACKAGE_SPEC.md 14.4) -----
     getCreatorMe: () => req(CreatorMe, "/api/creator/me"),
     saveCreatorProfile: (input: CreatorProfileInput) => post(CreatorMe, "/api/creator/profile", input),
+    /** Gera o código para vincular o Telegram do criador (uso único, 15 min, 5 por hora). 503 `telegram_unavailable` se o bot não está no ar. */
+    createTelegramLink: () => post(TelegramLink, "/api/creator/telegram-link"),
     /** O servidor devolve o ARRAY de submissões (mais recentes primeiro). `slug` e `version` vêm "" até o worker abrir o ZIP. */
     listMySubmissions: () => req(z.array(SubmissionView), "/api/creator/submissions"),
     getMySubmission: (id: string) => req(SubmissionView, `/api/creator/submissions/${encodeURIComponent(id)}`),

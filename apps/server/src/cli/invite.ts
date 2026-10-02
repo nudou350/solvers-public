@@ -3,11 +3,15 @@ import { db, pool, schema } from "../db/index.js";
 import { generateInviteCode, normalizeInviteCode } from "../submissions/rules.js";
 
 // Convites de criador e vínculo do Telegram (PACKAGE_SPEC.md 14.1, D14). Rode no servidor (ou com o túnel do banco).
+// Com pnpm NÃO use o `--` extra: o pnpm o repassa ao script e o comando quebra. Na pasta apps/server:
 //
-//   npm run cli:invite -- create [--email fulano@x.com] [--note "quem é"] [--count 3]   # gera código(s); você envia por e-mail
-//   npm run cli:invite -- list                                                          # todos, com quem usou
-//   npm run cli:invite -- revoke <código>                                               # apaga um convite ainda não usado
-//   npm run cli:invite -- set-chat <carteira> <chatId>                                  # vincula o Telegram do criador (contato verificado)
+//   pnpm cli:invite create [--email fulano@x.com] [--note "quem é"] [--count 3]   # gera código(s); você envia por e-mail
+//   pnpm cli:invite list                                                          # todos, com quem usou
+//   pnpm cli:invite revoke <código>                                               # apaga um convite ainda não usado
+//   pnpm cli:invite set-chat <carteira> <chatId>                                  # atalho do admin: vincula o Telegram do criador
+//
+// Na raiz do repositório: `pnpm --filter @solvers/server cli:invite create ...` (mesma forma, sem `--`).
+// O criador normalmente vincula sozinho pelo site (POST /creator/telegram-link + /vincular no bot); `set-chat` é o atalho.
 
 const [cmd, ...rest] = process.argv.slice(2);
 const opt = (name: string) => {

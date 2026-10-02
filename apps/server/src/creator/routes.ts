@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { desc, eq, sql } from "drizzle-orm";
-import { CreatorProfileInput, type CreatorMe, type SubmissionView } from "@solvers/shared";
+import { CreatorProfileInput, type CreatorMe, type SubmissionView, type TelegramLink } from "@solvers/shared";
 import { requireAuth, requireWallet } from "../auth/jwt.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
@@ -11,9 +11,12 @@ import { adminRouter } from "../submissions/admin-routes.js";
 import { isNewAgent, listColumns, newAgentSet } from "../submissions/lookup.js";
 import { SUBMISSION_ID_RE } from "../submissions/paths.js";
 import { creatorNotReady, isAdminWallet, normalizeInviteCode, toSubmissionView } from "../submissions/rules.js";
+import { botUsername } from "../telegram/client.js";
+import { deepLinkOf, LINK_MAX_PER_WINDOW } from "../telegram/link-rules.js";
+import { issueLinkCode } from "../telegram/link-store.js";
 
 // Dono: agente B1 (envio de pacotes). Rotas do criador e da revisão no site (PACKAGE_SPEC.md 14.4), montadas sob /api:
-//   GET /creator/me, POST /creator/profile, GET /creator/submissions[/:id]
+//   GET /creator/me, POST /creator/profile, POST /creator/telegram-link, GET /creator/submissions[/:id]
 //   GET /admin/submissions[/:id[/file|/knowledge-search]], POST /admin/submissions/:id/(approve|request-changes|reject)  (admin-routes.ts)
 //   GET /spec/manifest.schema.json
 // O upload (POST /creator/submissions, corpo cru em streaming) fica em submissions/upload.ts e é montado em app.ts antes do express.json.
@@ -21,7 +24,7 @@ export const creatorRouter: Router = Router();
 
 type CreatorRow = typeof schema.creators.$inferSelect;
 
-function meOf(wallet: string, c: CreatorRow | undefined): CreatorMe {
+function meOf(wallet: string, c: CreatorRow | undefined, bot: string | null): CreatorMe {
   return {
     wallet,
     hasProfile: !!c,
@@ -29,12 +32,17 @@ function meOf(wallet: string, c: CreatorRow | undefined): CreatorMe {
     termsAccepted: c?.termsAcceptedAt != null,
     name: c?.name ?? null,
     bio: c?.bio ?? null,
-    // Contato de escalonamento verificado = Telegram vinculado (por ora pelo admin: cli:invite set-chat).
+    // Contato de escalonamento verificado = Telegram vinculado (pelo bot, com o código de POST /creator/telegram-link;
+    // o admin também vincula com cli:invite set-chat).
     contactVerified: c?.telegramChatId != null,
     canSubmit: creatorNotReady(c) === null,
     isAdmin: isAdminWallet(wallet, env.ADMIN_WALLETS),
+    telegramBot: bot ? { username: bot } : null,
   };
 }
+
+/** @usuário do bot (em cache), ou null: o GET /creator/me nunca falha por causa do Telegram. */
+const botOf = (): Promise<string | null> => botUsername().catch(() => null);
 
 async function creatorOf(wallet: string): Promise<CreatorRow | undefined> {
   const [c] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
@@ -46,7 +54,28 @@ creatorRouter.get(
   requireAuth,
   h(async (req): Promise<CreatorMe> => {
     const wallet = requireWallet(req);
-    return meOf(wallet, await creatorOf(wallet));
+    return meOf(wallet, await creatorOf(wallet), await botOf());
+  }),
+);
+
+/**
+ * Código para vincular o Telegram (PACKAGE_SPEC.md 14.1): `LINK-` + 8 caracteres, só o hash fica no banco, vale 15 min, uso
+ * único, até 5 por hora por criador. O criador envia `/vincular CODIGO` ao bot (ou abre o deepLink) e o worker grava o chat.
+ * Só para quem já tem perfil de criador. O bot é conferido ANTES de gastar um código do limite.
+ */
+creatorRouter.post(
+  "/creator/telegram-link",
+  requireAuth,
+  h(async (req): Promise<TelegramLink> => {
+    const wallet = requireWallet(req);
+    const bot = await botUsername();
+    if (!bot) throw new HttpError(503, "A vinculação pelo Telegram está indisponível agora. Tente de novo em alguns minutos ou fale com a equipe.", "telegram_unavailable");
+    const r = await issueLinkCode(wallet);
+    if (r.status === "no_profile") throw new HttpError(403, "Salve o seu cadastro de criador antes de vincular o Telegram.", "profile_required");
+    if (r.status === "limited") {
+      throw new HttpError(429, `Você já gerou ${LINK_MAX_PER_WINDOW} códigos na última hora. Tente de novo em ${Math.ceil(r.retryAfterSec / 60)} min.`, "too_many_codes", { retryAfterSec: r.retryAfterSec });
+    }
+    return { code: r.code, expiresAt: r.expiresAt.toISOString(), botUsername: bot, deepLink: deepLinkOf(bot, r.code) };
   }),
 );
 
@@ -90,7 +119,7 @@ creatorRouter.post(
         await tx.insert(schema.creators).values({ id: `cr_${randomId(8)}`, wallet, name: body.name, bio: body.bio, invited: true, termsAcceptedAt: now });
       }
     });
-    return meOf(wallet, await creatorOf(wallet));
+    return meOf(wallet, await creatorOf(wallet), await botOf());
   }),
 );
 

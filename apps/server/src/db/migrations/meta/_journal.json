@@ -134,6 +134,13 @@
       "when": 1790954219489,
       "tag": "0018_package_reviews_no_truncate",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790958767688,
+      "tag": "0019_telegram_link",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Toast";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
+import { TelegramLinkPanel } from "./TelegramLinkPanel";
 
 const NAME_MIN = 2;
 const NAME_MAX = 60;
@@ -33,7 +34,7 @@ function saveErrorText(e: unknown): string {
   return e instanceof Error ? e.message : "Não deu para salvar agora.";
 }
 
-export function CreatorProfileForm({ creator, onSaved, onRecheck, rechecking }: { creator: CreatorMe; onSaved: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
+export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rechecking }: { creator: CreatorMe; onSaved: (me: CreatorMe) => void; onLinked?: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
   const { api } = useSession();
   const [name, setName] = useState(creator.name ?? "");
   const [bio, setBio] = useState(creator.bio ?? "");
@@ -90,7 +91,7 @@ export function CreatorProfileForm({ creator, onSaved, onRecheck, rechecking }: 
         <textarea id="cr-bio" className="textarea" value={bio} onChange={set(setBio)} maxLength={BIO_MAX} aria-invalid={touched && !!errors.bio} />
       </Field>
 
-      <ContactBlock verified={creator.contactVerified} onRecheck={onRecheck} rechecking={rechecking} />
+      <ContactBlock verified={creator.contactVerified} hasProfile={creator.hasProfile} onLinked={onLinked ?? (() => onRecheck())} onRecheck={onRecheck} rechecking={rechecking} />
 
       <details className="card-flat pad-s">
         <summary className="bold" style={{ cursor: "pointer", minHeight: 32, display: "flex", alignItems: "center" }}>
@@ -130,7 +131,7 @@ export function CreatorProfileForm({ creator, onSaved, onRecheck, rechecking }: 
   );
 }
 
-function ContactBlock({ verified, onRecheck, rechecking }: { verified: boolean; onRecheck: () => void; rechecking: boolean }) {
+function ContactBlock({ verified, hasProfile, onLinked, onRecheck, rechecking }: { verified: boolean; hasProfile: boolean; onLinked: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
   return (
     <div className="card-flat pad-s col" style={gap(10)}>
       <div className="row between wrapx" style={gap(10)}>
@@ -150,14 +151,13 @@ function ContactBlock({ verified, onRecheck, rechecking }: { verified: boolean; 
       ) : (
         <>
           <p className="small muted">
-            Antes de enviar um especialista, vincule o seu Telegram. É por ele que avisamos você sobre os envios e que os compradores pedem ajuda, sem ver o seu contato. Na conversa com o bot do Solvers, envie{" "}
-            <span className="mono">/vincular</span> com o código de vinculação que a equipe passou junto com o convite.
+            Antes de enviar um especialista, vincule o seu Telegram. É por ele que avisamos você sobre os envios e que os compradores pedem ajuda, sem ver o seu contato. Clique em <b>Vincular Telegram</b>: o site gera um código e você o envia ao bot do Solvers.
           </p>
-          <div className="row wrapx" style={gap(10)}>
-            <Button variant="secondary" size="sm" icon="refresh" loading={rechecking} onClick={onRecheck}>
-              Já vinculei, verificar
-            </Button>
-          </div>
+          {hasProfile ? (
+            <TelegramLinkPanel onLinked={onLinked} onRecheck={onRecheck} rechecking={rechecking} />
+          ) : (
+            <p className="small muted">Salve o cadastro primeiro (nome, apresentação e termos): o botão para vincular aparece logo depois.</p>
+          )}
           <p className="tiny faint">Você pode salvar o cadastro agora e vincular depois, mas o envio do pacote só abre com o contato vinculado.</p>
         </>
       )}

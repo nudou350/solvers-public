@@ -56,7 +56,8 @@ pnpm --filter @solvers/client generate # regenerate client after the program/IDL
 cd apps/server && node --env-file-if-exists=.env.test --import tsx --test test/trial.test.ts   # one server test
 cd packages/shared && node --import tsx --test src/rules.test.ts                                # one package test
 pnpm --filter @solvers/server worker   # creator-flow worker (compiled; `worker:dev` for watch); in prod it is the separate PM2 process solvers-worker
-pnpm --filter @solvers/server cli:invite create|list|revoke|set-chat   # creator invites, Telegram link (set-chat <wallet> <chatId>)
+pnpm --filter @solvers/server cli:invite create --email x@y.com   # creator invites (also list|revoke|set-chat <wallet> <chatId>); no extra `--` with pnpm. In apps/server: `pnpm cli:invite create --email x@y.com`
+# Creators link their own Telegram: POST /api/creator/telegram-link + /vincular in the bot (polled by solvers-worker); set-chat is the admin shortcut
 pnpm --filter @solvers/server cli:approve <slug|submissionId> [--dry-run]   # on-chain approve_agent with the cold admin wallet, then finishes publication
 pnpm --filter @solvers/server cli:suspend <slug> [--resume] [--reason "..."]   # kill switch: platform_status + suspend_agent on-chain
 pnpm --filter @solvers/server cli:publish --no-chain   # platform Solvers (PLATFORM_AGENTS), DB only

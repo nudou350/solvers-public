@@ -138,7 +138,14 @@ cd /var/www/solvers/app/apps/server && node --env-file=.env -e 'const e=process.
 psql "$(grep -m1 '^DATABASE_URL=' /var/www/solvers/shared/.env | cut -d= -f2-)" -tAc "select (select count(*) from agent_published_versions) as versoes_semeadas, (select count(*) from creators where invited) as convidados"   # 6 versões semeadas
 ```
 
-Teste de ponta a ponta (upload real de um ZIP pequeno por um criador convidado) é do roteiro funcional do líder; não faz parte deste.
+Vinculação do Telegram (migration 0019, aditiva: 4 colunas em `creators` com default e 1 índice parcial; o release antigo as ignora). O bot roda no `solvers-worker` (único com `getUpdates`) e precisa de `TELEGRAM_BOT_TOKEN` no mesmo `.env`; sem ele o log do worker diz "bot de vinculação fica desligado" e `POST /api/creator/telegram-link` responde 503 `telegram_unavailable`. O bot não pode ter webhook (se tiver, o worker o remove uma vez). Conferir:
+
+```bash
+pm2 logs solvers-worker --lines 30 --nostream | grep '\[telegram\]'      # "ouvindo o bot (getUpdates)"
+curl -s -o /dev/null -w 'POST telegram-link sem login -> %{http_code}\n' -X POST https://solvers.wondervelop.com/api/creator/telegram-link   # 401
+```
+
+Teste de ponta a ponta (upload real de um ZIP pequeno por um criador convidado, e vincular o Telegram de verdade com o bot) é do roteiro funcional do líder; não faz parte deste.
 
 ### 8. Rollback de cada peça
 
@@ -146,7 +153,7 @@ Teste de ponta a ponta (upload real de um ZIP pequeno por um criador convidado) 
 |---|---|---|
 | Release (código) | Automático se o health check falhar. Manual: `ln -sfn /var/www/solvers/releases/<anterior> /var/www/solvers/app` e refazer os links `backend`, `frontend`, `agents` (ver `activate` no `deploy.sh`), depois `pm2 reload solvers-api solvers-web` | Volta à API sem as rotas de criação |
 | Worker | `pm2 stop solvers-worker` (parar, não deletar). Envios ficam em `submitted`/`validating` e retomam do checkpoint quando religar | Nada se perde; ZIPs e pastas ficam em `shared/` |
-| Migration 0016 | **Não reverter**: é aditiva e o release antigo a ignora. Só em desastre, restaurar o dump diário (`/home/deploy/backups/daily/`) | Tabelas novas ficam sem uso |
+| Migrations 0016 e 0019 | **Não reverter**: são aditivas e o release antigo a ignora. Só em desastre, restaurar o dump diário (`/home/deploy/backups/daily/`) | Tabelas novas ficam sem uso |
 | nginx | `sudo cp /etc/nginx/sites-available/solvers.bak-<data> /etc/nginx/sites-available/solvers && sudo nginx -t && sudo systemctl reload nginx` | O upload volta a ser limitado a 2m (a rota fica indisponível, o resto não muda) |
 | `.env` | `cp /var/www/solvers/shared/.env.bak-<data> /var/www/solvers/shared/.env` e `pm2 reload solvers-api solvers-worker --update-env` | Variáveis novas somem; o `deploy.sh` voltaria a recusar um release novo |
 | Pastas persistentes | Não apagar. Se for preciso zerar: `rm -rf` só do conteúdo, com a API e o worker parados | Perde ZIPs e pacotes publicados (os pacotes publicados têm backup semanal) |

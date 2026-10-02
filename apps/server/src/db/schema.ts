@@ -29,19 +29,29 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 const u64 = (name: string) => bigint(name, { mode: "bigint" });
 
-export const creators = pgTable("creators", {
-  id: text("id").primaryKey(),
-  wallet: text("wallet").notNull().unique(),
-  name: text("name").notNull(),
-  avatarUrl: text("avatar_url"),
-  bio: text("bio").notNull().default(""),
-  telegramChatId: text("telegram_chat_id"),
-  /** Convidado a enviar pacotes (Núcleo, PACKAGE_SPEC.md 14.1). Criadores antigos (publicados pelo CLI) ficam como true na migration. */
-  invited: boolean("invited").notNull().default(false),
-  /** Aceite dos termos do criador; o envio de pacote exige. */
-  termsAcceptedAt: ts("terms_accepted_at"),
-  createdAt: ts("created_at").notNull().defaultNow(),
-});
+export const creators = pgTable(
+  "creators",
+  {
+    id: text("id").primaryKey(),
+    wallet: text("wallet").notNull().unique(),
+    name: text("name").notNull(),
+    avatarUrl: text("avatar_url"),
+    bio: text("bio").notNull().default(""),
+    telegramChatId: text("telegram_chat_id"),
+    /** Convidado a enviar pacotes (Núcleo, PACKAGE_SPEC.md 14.1). Criadores antigos (publicados pelo CLI) ficam como true na migration. */
+    invited: boolean("invited").notNull().default(false),
+    /** Aceite dos termos do criador; o envio de pacote exige. */
+    termsAcceptedAt: ts("terms_accepted_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Vinculação do Telegram (PACKAGE_SPEC.md 14.1): só o HASH do código `LINK-XXXXXXXX`, de uso único, válido por 15 min. */
+    telegramLinkHash: text("telegram_link_hash"),
+    telegramLinkExpiresAt: ts("telegram_link_expires_at"),
+    /** Janela de 1 h e quantos códigos já saíram nela (limite de 5 por hora por criador). */
+    telegramLinkWindowStart: ts("telegram_link_window_start"),
+    telegramLinkCount: integer("telegram_link_count").notNull().default(0),
+  },
+  (t) => [uniqueIndex("creators_telegram_link_hash_idx").on(t.telegramLinkHash).where(sql`${t.telegramLinkHash} is not null`)],
+);
 
 /** Convites de criador (D14): o código vai por e-mail e a carteira é vinculada no primeiro login. */
 export const creatorInvites = pgTable("creator_invites", {

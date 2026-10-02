@@ -10,7 +10,7 @@ Atualizado em 2026-10-02 (branch `feat/criador-solvers`, ainda sem deploy).
 ### Como funciona
 
 1. **Convite.** A equipe envia um código `SLV-XXXX-XXXX-XXXX` por e-mail. Sem convite não há envio (o convite vale uma vez e fica ligado à sua carteira).
-2. **Perfil.** Entre no site, abra `/criador/publicar`, preencha nome, bio, aceite os termos e informe o código. O contato de escalonamento só passa a "verificado" quando a equipe vincula o seu Telegram.
+2. **Perfil e Telegram.** Entre no site, abra `/criador/publicar`, preencha nome, bio, aceite os termos e informe o código. Salve o cadastro e vincule o seu Telegram (veja "Vincular o Telegram" abaixo): sem isso o contato de escalonamento não fica "verificado" e o envio do ZIP não abre.
 3. **Monte o pacote com o Criador de Solvers.** Na sua IA (Claude ou ChatGPT, com o conector Solvers), ative o Solver gratuito "Criador de Solvers": ele guia as 7 etapas (promessa, diferenciais, etapas, conhecimento, ferramentas, calibragem, evals), consulta o validador do servidor e entrega os arquivos ou o ZIP.
 4. **ZIP.** Uma pasta raiz com o `slug` do Solver dentro do ZIP (detalhes abaixo).
 5. **Envio.** Em `/criador/publicar`, envie o ZIP (corpo `application/zip`). O servidor só guarda o arquivo e responde na hora; a extração e a validação rodam depois, num processo à parte, e o resultado aparece em `/criador/envios/<id>`.
@@ -20,6 +20,17 @@ Atualizado em 2026-10-02 (branch `feat/criador-solvers`, ainda sem deploy).
 
 Se você não assinar ou não reenviar em **30 dias**, o envio expira (vira `rejected`, o slug é liberado) e você envia de novo se quiser.
 
+### Vincular o Telegram
+
+O Telegram é por onde avisamos você (envio recebido, revisão, pedidos de ajuda de compradores). Você vincula sozinho, sem esperar a equipe:
+
+1. Em `/criador/publicar` (cadastro) clique em **Vincular Telegram**. O site mostra um código `LINK-XXXXXXXX` que vale **15 minutos** e serve **uma vez**. Dá para gerar até 5 por hora; um código novo cancela o anterior.
+2. Clique em **Abrir no Telegram** (já preenche o código) e toque em *Começar*. Ou abra o bot do Solvers (o site mostra o @) e envie `/vincular LINK-XXXXXXXX`.
+3. O bot responde "Pronto! Seu Telegram foi vinculado ao Solvers como ...". O site percebe sozinho em alguns segundos (ou clique em **Já vinculei**).
+
+Só conversas privadas com o bot valem. Cada conta do Telegram fica em um criador só. Para trocar de conta do Telegram, gere um código novo e envie de outra conta. Se o bot disser que o código não vale, ele pode estar errado, vencido ou já usado: gere outro.
+Se o site disser que a vinculação está indisponível, o bot do servidor está fora do ar (`TELEGRAM_BOT_TOKEN`); fale com a equipe, que também pode vincular com `cli:invite set-chat`.
+
 ### O que o validador exige (resumo)
 
 O catálogo completo de códigos está no Apêndice A do `PACKAGE_SPEC.md`; erro bloqueia o envio, aviso vai ao revisor. Para conferir antes: `pnpm --filter @solvers/server cli:validate <pasta>` e o schema em `GET /api/spec/manifest.schema.json`.
@@ -27,7 +38,7 @@ O catálogo completo de códigos está no Apêndice A do `PACKAGE_SPEC.md`; erro
 - `manifest.json` com `specVersion: 1`, `terms`, `versions[]` com a versão atual, nome até 32 bytes, versão `X.Y.Z` até 16 bytes e preço mínimo do programa (5 USDC).
 - `slug` fora da lista de reservados e nunca no formato de `id` (32 hex). O `id` e o `creator.id` são do servidor: ele sobrescreve o que você escrever.
 - Etapas em `steps/` (1 a 12 `.md`, 400 a 12.000 caracteres) com as seções `## Objetivo`, `## O que perguntar ao usuário`, `## Como executar`, `## Erros comuns`, `## Formato do result_summary`.
-- Pelo menos **2 dos 5 diferenciais** comprovados pelo próprio pacote. No Núcleo, terceiros só podem provar `memory` (`onboarding` mais etapa que usa o perfil), `liveData` (conhecimento datado, sem `valid_until` vencido, `source_date` em pelo menos metade dos arquivos) e `escalation` (`escalation.enabled` com o seu Telegram vinculado pela equipe). `tool` e `verifier` ficam para a Abertura. Declarar um que o pacote não prova gera aviso e o revisor não aprova com menos de 2 comprovados.
+- Pelo menos **2 dos 5 diferenciais** comprovados pelo próprio pacote. No Núcleo, terceiros só podem provar `memory` (`onboarding` mais etapa que usa o perfil), `liveData` (conhecimento datado, sem `valid_until` vencido, `source_date` em pelo menos metade dos arquivos) e `escalation` (`escalation.enabled` com o seu Telegram vinculado). `tool` e `verifier` ficam para a Abertura. Declarar um que o pacote não prova gera aviso e o revisor não aprova com menos de 2 comprovados.
 - Conhecimento `.md`/`.txt` com `source` e datas `AAAA-MM-DD` (front-matter em `.md`, `nome.txt.meta.json` em `.txt`); até 10.000 trechos.
 - Pelo menos **10 casos** em `evals/cases/` (menos que isso é aviso hoje e erro em pacote v1).
 - Texto em UTF-8, sem caracteres invisíveis ou de direção, sem padrões de injeção (viram aviso para o revisor).
@@ -69,14 +80,17 @@ Os comandos rodam em `apps/server` (ou com `pnpm --filter @solvers/server <scrip
 
 ### Convites e Telegram
 
+Na raiz do repositório (`pnpm --filter @solvers/server ...`) ou, dentro de `apps/server`, só `pnpm cli:invite ...`. **Sem `--` extra:** o pnpm o repassa ao script e o comando quebra.
+
 ```bash
-pnpm --filter @solvers/server cli:invite create [--email fulano@x.com] [--note "quem é"] [--count 3]   # imprime os códigos; você envia por e-mail
-pnpm --filter @solvers/server cli:invite list                                                         # todos, com quem usou
-pnpm --filter @solvers/server cli:invite revoke <código>                                               # só convite ainda não usado
-pnpm --filter @solvers/server cli:invite set-chat <carteira> <chatId>                                  # vincula o Telegram do criador (contato verificado)
+pnpm --filter @solvers/server cli:invite create --email fulano@x.com --note "quem é" --count 3   # imprime os códigos; você envia por e-mail (flags opcionais)
+pnpm --filter @solvers/server cli:invite list                                                    # todos, com quem usou
+pnpm --filter @solvers/server cli:invite revoke <código>                                         # só convite ainda não usado
+pnpm --filter @solvers/server cli:invite set-chat <carteira> <chatId>                            # atalho: vincula o Telegram do criador à mão
+# dentro de apps/server: pnpm cli:invite create --email x@y.com
 ```
 
-`set-chat` exige que o criador já tenha cadastrado o perfil. Não existe vinculação automática pelo bot.
+O criador normalmente vincula sozinho pelo bot (veja "Vincular o Telegram", na parte do criador): `POST /api/creator/telegram-link` gera o código e o processo `solvers-worker` (o único que faz `getUpdates`) trata `/vincular` e `/start` no bot. `set-chat` continua como atalho e exige que o criador já tenha cadastrado o perfil. O bot precisa de `TELEGRAM_BOT_TOKEN` no `.env` do servidor e **não pode ter webhook ativo** (se tiver, o worker o remove uma vez, com log). Os avisos vão ao Telegram do criador; sem vínculo, os de revisão ficam só com o admin.
 
 ### Revisão em `/admin/revisoes`
 
