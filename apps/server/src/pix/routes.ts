@@ -16,6 +16,7 @@ import { assertFreshPrice } from "../store/fresh-price.js";
 import { ensureProfile } from "../store/profile.js";
 import { credit, markApproved } from "./credit.js";
 import { createPixOrder, getOrder, orderPayment, verifyWebhookSignature } from "./mercadopago.js";
+import { simulateBlockReason } from "./rules.js";
 
 // Pix na demo (FRONT_PLAN.md, Fase B): o comprador paga Pix e recebe USDC de TESTE na carteira,
 // emitido pelo servidor (faucet). Não há dinheiro real nem conversão real. Na mainnet fica desativado.
@@ -33,7 +34,8 @@ export function pixConfig(): PixConfig {
   const provider = env.MP_ACCESS_TOKEN ? "mercadopago" : env.PIX_SIMULATE ? "simulated" : null;
   return {
     enabled: !isMainnet() && provider !== null,
-    simulate: env.PIX_SIMULATE,
+    // A simulação só vale para cobranças do provedor simulado; com o Mercado Pago ligado o Pix só vira pago de verdade (DEF-10).
+    simulate: provider === "simulated" && env.PIX_SIMULATE,
     provider: isMainnet() ? null : provider,
     minBrl: MIN_CENTS / 100,
     maxBrl: MAX_CENTS / 100,
@@ -240,6 +242,9 @@ pixRouter.post(
   h(async (req): Promise<PixCharge> => {
     if (isMainnet() || !env.PIX_SIMULATE) throw badRequest("Simulação de pagamento desativada neste servidor.", "pix_simulate_disabled");
     const row = await ownCharge(requireWallet(req), String(req.params.id));
+    if (simulateBlockReason(row.provider)) {
+      throw badRequest("Esta cobrança é do Mercado Pago e só é aprovada quando o Pix for pago de verdade.", "pix_not_simulated");
+    }
     if (row.status === "failed") throw badRequest("Esta cobrança falhou; crie outra.", "pix_failed");
     if (row.status === "expired" || (row.status === "pending" && row.expiresAt.getTime() < Date.now())) {
       throw badRequest("Esta cobrança expirou; crie outra.", "pix_expired");
