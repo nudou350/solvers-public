@@ -41,7 +41,7 @@
 | Solver em etapas dentro do Claude | Humano de reserva (notificação por Telegram ou e-mail) |
 | Avaliação on-chain só com licença | Enclave seguro para memórias (fica no pitch) |
 | Escrow com liberação automática por testes | Construtor sem código (formulário simples ou P2) |
-| Memória criptografada no banco; revenda de licenças (devnet; mainnet depende dos termos com o advogado, ver seção 4.6) | — |
+| Memória criptografada no banco; revenda de licenças (devnet; mainnet depende dos termos com o advogado, ver seção 4.6); teto opcional de licenças por solver, imposto pelo programa (seção 4.6b) | — |
 
 ---
 
@@ -408,6 +408,16 @@ Implementada no programa (`programs/solvers/src/instructions/resale.rs`) e na de
 * O vendedor mantém o acesso até a venda. Depois de qualquer transferência o mpl-core devolve a authority do `TransferDelegate` ao dono (`Owner`), então a PDA nunca transfere duas vezes.
 * Memórias **não** acompanham a licença (são da carteira, não do NFT). As avaliações pessoais ficam com quem as escreveu e a nota é a do solver. Limite aceito no MVP: a avaliação on-chain é uma por licença (`LicenseReview` por asset); se a dona anterior já avaliou com aquele asset, o novo dono não consegue avaliar com ele.
 * Taxa e royalty (exemplo): preço 100 USDC, royalty 5%, taxa 10% → criador 5, plataforma 10, vendedor 85. Royalty e taxa arredondam para baixo; a sobra fica com o vendedor (`resale_split` em `state.rs`).
+
+### 4.6b Teto de licenças (implementado no programa)
+
+Plano e decisões em `docs/licencas-limitadas.md`; o que muda no upgrade da devnet em `docs/devnet-upgrade.md`.
+
+* O criador pode limitar quantas licenças um solver vende (padrão: ilimitado; no manifest, `supply.maxLicenses`). O limite é **imposto pelo programa**: `purchase_license` recebe a PDA `SupplyCap` (`["supply_cap", agent]`, 45 bytes) e falha com `SoldOut` quando `Agent.total_sales >= max`. A transação inteira volta, nenhum USDC se move. Sem a conta criada o solver é ilimitado; o endereço da conta é imposto pelas seeds, então não dá para omiti-la nem trocá-la.
+* `create_supply_cap(max)` (criador assina, plataforma paga o rent; `max >= 1` e `max >= total_sales`) e `raise_supply_cap(max)` (só **sobe**; `u32::MAX` = ilimitado). Evento `SupplyCapSet`; erros `SoldOut` 6060, `SupplyCapTooLow` 6061, `SupplyCapCannotDecrease` 6062. Nenhum layout existente muda.
+* O contador é `total_sales`, que só sobe e só `purchase_license` incrementa: **revender, transferir ou queimar uma licença não libera vaga**, e o teste grátis não ocupa vaga (decisão do criador, independente do teto).
+* O que se pode afirmar: o limite **atual** está na blockchain e o criador só pode aumentá-lo. **Não** se pode prometer que "só existirão N": o criador pode subir o teto, até para ilimitado.
+* O servidor espelha o teto (`agents.max_licenses`) para a vitrine ("restam X de Y", "esgotado") e para barrar a compra antes de montar a transação; a regra de verdade é a do programa.
 
 ### 4.7 Testes e deploy
 

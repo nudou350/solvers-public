@@ -4,7 +4,7 @@
 // os arquivos e as imagens da vitrine ficam só no navegador (prévias locais), a bateria de testes é simulada e
 // "Publicar" só mostra "Enviado para revisão". No fluxo real, as imagens passam pela revisão junto com o pacote.
 // Da API real vêm apenas os limites e regras (getConfig: minPurchaseUsdc, feeBps, guaranteeMinSales/Rating) e a cotação.
-import { MAX_AGENT_IMAGES, MAX_IMAGE_UPLOAD_BYTES, type Requirement } from "@solvers/api-client";
+import { MAX_AGENT_IMAGES, MAX_IMAGE_UPLOAD_BYTES, MAX_LICENSES_CAP, type Requirement } from "@solvers/api-client";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -99,7 +99,10 @@ export function PublishWizard() {
   const { config, me } = useSession();
   const rate = useRate();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ name: "", tagline: "", description: "", price: "" });
+  const [form, setForm] = useState({ name: "", tagline: "", description: "", price: "", maxLicenses: "" });
+  // Teto de licenças (padrão: ilimitado) e teste grátis: no pacote real, `supply.maxLicenses` e `trial.available` do manifest.
+  const [limited, setLimited] = useState(false);
+  const [trialOn, setTrialOn] = useState(true);
   const [touched, setTouched] = useState(false);
   const [clients, setClients] = useState<string[]>(["Claude", "ChatGPT"]);
   const [conns, setConns] = useState<Conn[]>([]);
@@ -141,6 +144,11 @@ export function PublishWizard() {
     tagline: form.tagline.trim().length < 10 ? "Escreva uma frase curta (pelo menos 10 caracteres)." : null,
     price: !Number.isFinite(price) || price <= 0 ? "Informe o preço em USDC." : minPrice != null && price < minPrice ? `O preço mínimo é ${usdc(minPrice)}.` : null,
   };
+  const maxLicenses = parseNum(form.maxLicenses);
+  const supplyError =
+    !limited || (Number.isInteger(maxLicenses) && maxLicenses >= 1 && maxLicenses <= MAX_LICENSES_CAP)
+      ? null
+      : `Informe um número inteiro de 1 a ${int(MAX_LICENSES_CAP)}.`;
   const connErrors = {
     label: connDraft.label.trim().length < 2 ? "Dê um nome ao conector." : null,
     key: !KEY_RE.test(connDraft.key)
@@ -156,7 +164,7 @@ export function PublishWizard() {
     ...conns.map<Requirement>((c) => ({ type: "connector", label: c.label, key: c.key, optional: c.optional, ...(c.howTo ? { howTo: c.howTo } : {}), ...(c.helpUrl ? { helpUrl: c.helpUrl } : {}) })),
     ...(plan === PLANS[1] ? [{ type: "plan", label: PAID_PLAN } satisfies Requirement] : []),
   ];
-  const step1Ok = !errors.name && !errors.tagline && !errors.price;
+  const step1Ok = !errors.name && !errors.tagline && !errors.price && !supplyError;
   const testsOk = result != null && result.score >= MIN_SCORE && result.total >= MIN_CASES;
   const canPublish = step1Ok && clients.length > 0 && testsOk;
 
@@ -321,6 +329,44 @@ export function PublishWizard() {
               >
                 <input id="f-p1" className="input" value={form.price} onChange={set("price")} inputMode="decimal" placeholder={minPrice != null ? String(Math.max(minPrice, 1)) : ""} aria-invalid={touched && !!errors.price} />
               </Field>
+              <div className="col" style={gap(10)} role="group" aria-labelledby="supply-label">
+                <span className="label" id="supply-label">
+                  Licenças à venda
+                </span>
+                <div className="row wrapx" style={gap(10)}>
+                  <button type="button" className={["chip", !limited ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={!limited} onClick={() => setLimited(false)}>
+                    Ilimitadas (padrão)
+                  </button>
+                  <button type="button" className={["chip", limited ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={limited} onClick={() => setLimited(true)}>
+                    Limitada a N
+                  </button>
+                </div>
+                {limited ? (
+                  <Field id="f-max" label="Quantas licenças existirão?" hint="O limite fica registrado na blockchain. Depois de publicado você só pode aumentá-lo, nunca reduzi-lo. Licença revendida ou transferida não libera vaga." error={touched ? supplyError : null}>
+                    <input id="f-max" className="input" value={form.maxLicenses} onChange={set("maxLicenses")} inputMode="numeric" placeholder="Ex: 10" aria-invalid={touched && !!supplyError} />
+                  </Field>
+                ) : (
+                  <span className="hint">Sem limite: qualquer pessoa pode comprar a qualquer momento.</span>
+                )}
+              </div>
+              <div className="col" style={gap(10)} role="group" aria-labelledby="trial-label">
+                <span className="label" id="trial-label">
+                  Teste grátis
+                </span>
+                <div className="row wrapx" style={gap(10)}>
+                  <button type="button" className={["chip", trialOn ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={trialOn} onClick={() => setTrialOn(true)}>
+                    Ligado
+                  </button>
+                  <button type="button" className={["chip", !trialOn ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={!trialOn} onClick={() => setTrialOn(false)}>
+                    Desligado
+                  </button>
+                </div>
+                <span className="hint">
+                  {limited && trialOn
+                    ? "O teste grátis não ocupa vaga: quem testa não leva uma licença. Se quer exclusividade de verdade, desligue o teste."
+                    : "Você escolhe. O teste é independente do limite de licenças."}
+                </span>
+              </div>
             </div>
           ) : null}
 
@@ -672,6 +718,8 @@ export function PublishWizard() {
                 <b>Resumo da publicação</b>
                 <SummaryRow label="Especialista" value={form.name.trim() || "Sem nome"} bad={!!errors.name} />
                 <SummaryRow label="Licença permanente" value={Number.isFinite(price) && price > 0 ? `${money(price)} · ${usdc(price)}` : "Sem preço"} bad={!!errors.price} />
+                <SummaryRow label="Licenças à venda" value={limited ? (supplyError ? "Informe o limite" : `Limitada a ${int(maxLicenses)}`) : "Ilimitadas"} bad={!!supplyError} />
+                <SummaryRow label="Teste grátis" value={trialOn ? "Ligado" : "Desligado"} />
                 <SummaryRow label="IAs" value={clients.join(" e ") || "Nenhuma"} bad={clients.length === 0} />
                 <SummaryRow label="Conectores" value={conns.length ? conns.map((c) => (c.optional ? `${c.label} (opcional)` : c.label)).join(", ") : "Nenhum"} />
                 <SummaryRow label="Plano recomendado" value={requirements.some((r) => r.type === "plan") ? PAID_PLAN : PLANS[0]!} />

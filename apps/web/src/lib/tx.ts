@@ -95,6 +95,14 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
           priceChange: now != null && before != null ? { previousUsdc: before, usdc: now } : undefined,
         };
       }
+      // ----- Teto de licenças (SUPPLY_ERROR_CODES, @solvers/shared) -----
+      case "sold_out":
+        return {
+          code: err.code,
+          title: "Acabaram as vagas",
+          text: "Todas as licenças deste especialista já foram vendidas. Nada foi cobrado. Quem já tem uma licença pode revendê-la no mercado, quando a revenda estiver aberta.",
+          action: null,
+        };
       // ----- Revenda de licenças (códigos em RESALE_ERROR_CODES, @solvers/shared) -----
       case "resale_disabled":
         return { code: err.code, title: "A revenda não está aberta agora", text: "O mercado de revenda está fechado por enquanto. Tente de novo mais tarde.", action: null };

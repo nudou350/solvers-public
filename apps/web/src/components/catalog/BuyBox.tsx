@@ -1,5 +1,5 @@
 "use client";
-import type { TrialInfo } from "@solvers/api-client";
+import type { AgentSupply, TrialInfo } from "@solvers/api-client";
 import Link from "next/link";
 import { type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
@@ -22,6 +22,8 @@ export type BuyBoxProps = {
   resaleOn?: boolean;
   /** Anúncio de revenda mais barato deste especialista (null/ausente: nada à venda). */
   resale?: { listingId: string; floorUsdc: number } | null;
+  /** Teto de licenças (vendidas / máximo). Ausente ou `max: null` = ilimitado. */
+  supply?: AgentSupply;
 };
 
 /** Caixa de compra da página do especialista: licença permanente, teste grátis (se houver) e acesso do usuário logado. */
@@ -33,6 +35,8 @@ export function BuyBox(p: BuyBoxProps) {
   const owned = !!access?.license;
   const usedHref = p.resale ? `/checkout?listing=${encodeURIComponent(p.resale.listingId)}` : null;
   const trialLeft = p.trial && access ? access.trialUsesLeft : null;
+  const soldOut = !owned && p.supply?.left === 0;
+  const limited = p.supply?.max != null && p.supply.left != null && p.supply.left > 0;
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>
@@ -72,9 +76,25 @@ export function BuyBox(p: BuyBoxProps) {
               </div>
               <span className="small faint">{usdc(p.priceUsdc)} · cotação de hoje</span>
             </div>
-            <Button href={checkout} size="lg" block iconRight="arrow-right">
-              Comprar licença
-            </Button>
+            {limited && p.supply ? (
+              <span className="small" role="status">
+                <Icon name="tag" size="s" /> <b>Restam {p.supply.left} de {p.supply.max} licenças.</b> Limite atual verificado na blockchain; o criador só pode aumentá-lo, nunca reduzi-lo.
+              </span>
+            ) : null}
+            {soldOut ? (
+              <div className="col" style={gap("8px")}>
+                <Button size="lg" block disabled>
+                  Esgotado
+                </Button>
+                <p className="small muted" role="status">
+                  Todas as licenças deste especialista já foram vendidas. {p.resaleOn ? "Veja se alguém está vendendo uma usada." : "Quem já tem uma licença pode revendê-la quando o mercado de revenda abrir."}
+                </p>
+              </div>
+            ) : (
+              <Button href={checkout} size="lg" block iconRight="arrow-right">
+                Comprar licença
+              </Button>
+            )}
             {p.resaleOn && usedHref && p.resale ? (
               <Link className="row between card-flat pad-s" href={usedHref} style={gap("12px")}>
                 <span className="col" style={gap("2px")}>
