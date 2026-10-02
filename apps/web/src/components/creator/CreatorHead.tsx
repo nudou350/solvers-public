@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { RepBadge } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Tabs } from "@/components/ui/Tabs";
+import { CLOAK_ENABLED } from "@/lib/cloak/config";
 import { repLevel, short } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
@@ -19,7 +20,7 @@ export function useFirstName(fallback?: string | null): string | null {
 }
 
 /** Cabeçalho do painel do criador: eyebrow, selo de reputação, saudação e as abas (Visão geral / Publicar). */
-export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" | "publish" | "submissions"; reputation?: number | null; title?: ReactNode; name?: string | null }) {
+export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" | "publish" | "submissions" | "private"; reputation?: number | null; title?: ReactNode; name?: string | null }) {
   const first = useFirstName(name);
   const lv = reputation != null ? repLevel(reputation) : null;
   return (
@@ -53,6 +54,20 @@ export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" 
             ),
             href: "/criador/publicar",
           },
+          ...(CLOAK_ENABLED
+            ? [
+                {
+                  id: "private" as const,
+                  label: (
+                    <>
+                      <Icon name="lock" size="s" />
+                      Saque privado
+                    </>
+                  ),
+                  href: "/criador/saque-privado",
+                },
+              ]
+            : []),
         ]}
       />
     </div>
