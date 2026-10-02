@@ -63,11 +63,12 @@ Se a internet, o RPC ou o Cloak falharem na hora, use estas transações reais, 
 
 | Teste | Depósito | Saque |
 |---|---|---|
+| **Demo gravada** (1,5 USDC; destino novo recebeu 1,0455) | [2Nxee79M…](https://solscan.io/tx/2Nxee79MY2QSuRHYyF3Xe6d9cwG7vdWxuLNqvMZXjPaicbHrjVqZwxbPmEtd1frDgYTGP2dLstzTkHzwjBJ6TnAm) | [56oD83Cx…](https://solscan.io/tx/56oD83CxfMYXmYkS4QFSq24Aj1s9bbMi1oWa78FW3izW1M2N1vZU1YpmbUiMtJa71suJ6oSYe5qSFLgtXLqEeTzY) |
 | **Pela tela, no navegador** (1,5 USDC; destino recebeu 1,0455) | [4SsjRq7V…](https://solscan.io/tx/4SsjRq7VWCqnNjMrC3YHizARgkkJLfj3L7hdkxVeW6h6KgkKQHYByj75Dk2Z2pySaEjoUvr3CjWcCR9AP6bqUyG8) | [2uFKzi9t…](https://solscan.io/tx/2uFKzi9tT59dzmZunReyDVkdo9PPUiLH6RjfqAb2swfJMQRY3XEsTeeaJVu2Md746BbWvYHqVjk3eoJCgidYFKU6) |
 | Módulo no Node (1 USDC; destino recebeu 0,547) | [DcFyh9u9…](https://solscan.io/tx/DcFyh9u9b8TmXZBf8gway7DcG4kfCqHcvQpABmrb4bXE6ycQKDNHGJECKSdeZUHg9bhGvF8yqmc56UUzQQLtRyw) | [46ncAqcR…](https://solscan.io/tx/46ncAqcRoFTUgcACT7ptsamwQTJbMuDfvd4hKgL8V9QE3sceoreqGi4eMdHbPz2NkmF3HBvmSZxwKTF4skaFUZqw) |
 | Spike (2 USDC; destino recebeu 1,544) | [3hCHPhbA…](https://solscan.io/tx/3hCHPhbAoXJjQ327HTeR82aSyp2pcSeSHUxBcu9GRDDpTwmT8dnM1grLnNHq4J6kudDCay2yejHoHwwWSkkku25D) | [5TRuDWx1…](https://solscan.io/tx/5TRuDWx1Ep52zLY5Qead9FhxHsMwNrKYwtEjbhf6Cg6pDaUkNuzbg3sTRfhu8nSk9ZZv9ewXdUvyKSCu1pCcqV8u) |
 
-Relatório do contador de exemplo, baixado pela tela: [`cloak-provas/06-relatorio-contador-exemplo.csv`](cloak-provas/06-relatorio-contador-exemplo.csv) (lista também os saques antigos porque o destino foi reaproveitado; com o destino novo da demo, só aparece o da demo). Cada linha tem tipo (depósito/saque), valor, taxa, destinatário e assinatura.
+Relatório da demo gravada (3 linhas: 2 depósitos da carteira e o saque ao destino novo): [`cloak-provas/07-relatorio-contador-demo.csv`](cloak-provas/07-relatorio-contador-demo.csv). Outro exemplo, baixado pela tela: [`cloak-provas/06-relatorio-contador-exemplo.csv`](cloak-provas/06-relatorio-contador-exemplo.csv) (lista também os saques antigos porque o destino foi reaproveitado; com o destino novo da demo, só aparece o da demo). Cada linha tem tipo (depósito/saque), valor, taxa, destinatário e assinatura.
 
 ## 6. Cuidados
 
