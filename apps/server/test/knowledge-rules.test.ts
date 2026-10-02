@@ -108,8 +108,11 @@ describe("aviso de validade e texto dos trechos", () => {
   it("dateBr e isStale (o dia de valid_until ainda vale)", () => {
     assert.equal(dateBr("2026-12-31"), "31/12/2026");
     assert.equal(dateBr(null), "");
-    assert.equal(isStale("2026-10-01", new Date("2026-10-02T00:00:00Z")), true);
+    assert.equal(isStale("2026-10-01", new Date("2026-10-02T12:00:00Z")), true);
     assert.equal(isStale("2026-10-02", new Date("2026-10-02T23:59:00Z")), false);
+    // O dia é o de Brasília: 22h de 02/10 lá já é 03/10 em UTC, e o dia de validade ainda vale.
+    assert.equal(isStale("2026-10-02", new Date("2026-10-03T01:00:00Z")), false);
+    assert.equal(isStale("2026-10-02", new Date("2026-10-03T04:00:00Z")), true);
     assert.equal(isStale(null, new Date()), false);
   });
 

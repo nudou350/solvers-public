@@ -4,6 +4,7 @@
 import type { SubmissionStatus, SubmissionView, ValidationReport } from "@solvers/api-client";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
+import { Untrusted } from "@/components/ui/Untrusted";
 import { CHIP_TONE, STAGES, stageStates, statusInfo, type StageState } from "@/lib/submissions-ui";
 import { gap } from "@/lib/style";
 import s from "./creator.module.css";
@@ -100,20 +101,20 @@ function Issue({ issue, kind }: { issue: ValidationReport["errors"][number]; kin
         <span className={kind === "error" ? "bad" : "warn"} aria-hidden>
           <Icon name="warning" size="s" />
         </span>
-        <span className={s.code}>{issue.code}</span>
+        <span className={s.code}><Untrusted>{issue.code}</Untrusted></span>
         {issue.path ? (
           <span className={s.path}>
             <span className="sr-only" style={srOnly}>
               no arquivo{" "}
             </span>
-            {issue.path}
+            <Untrusted>{issue.path}</Untrusted>
           </span>
         ) : null}
       </div>
-      <span className={s.untrusted}>{issue.message}</span>
+      <span className={s.untrusted}><Untrusted>{issue.message}</Untrusted></span>
       {issue.fix ? (
         <span className="small">
-          <b>Como corrigir:</b> <span className={s.untrusted}>{issue.fix}</span>
+          <b>Como corrigir:</b> <span className={s.untrusted}><Untrusted>{issue.fix}</Untrusted></span>
         </span>
       ) : null}
     </li>

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { env } from "../env.js";
-import { loadAll, type SolverPackage } from "./package-loader.js";
+import { loadAll, packagesStamp, type SolverPackage } from "./package-loader.js";
 import { Manifest } from "./manifest.js";
 
 // Cache dos pacotes dos solvers lidos do disco (INSTRUCTIONS.md 5.4 e 6; PACKAGE_SPEC.md 15.1). O servidor mescla duas
@@ -12,6 +12,11 @@ export { Manifest };
 export { loadPackage, packageHash, registerPackage, type SolverPackage } from "./package-loader.js";
 
 let cache: Map<string, SolverPackage> | null = null;
+/** Carimbo das pastas na hora da última carga e quando foi conferido pela última vez (outro processo pode trocar a pasta). */
+let cacheStamp = "";
+let lastStampCheck = 0;
+/** A API e a CLI/worker são processos diferentes: a conferência do carimbo (só stat) roda no máximo a cada 5 s. */
+const STAMP_CHECK_MS = 5000;
 /** Erros da última carga (pacote inválido, id/slug duplicado, platform sem autorização): para log e diagnóstico. */
 let lastErrors: { dir: string; message: string }[] = [];
 
@@ -30,7 +35,10 @@ export function publishedDir(): string {
  * recusado e reportado (a plataforma vem primeiro e sempre vence).
  */
 export function packages(): Map<string, SolverPackage> {
-  if (cache) return cache;
+  if (cache) {
+    refreshPackagesIfChanged();
+    return cache;
+  }
   const errors: { dir: string; message: string }[] = [];
   const onError = (dir: string, e: Error) => {
     errors.push({ dir, message: e.message });
@@ -41,7 +49,24 @@ export function packages(): Map<string, SolverPackage> {
   loadAll(publishedDir(), onError, { source: "published", into: registry });
   lastErrors = errors;
   cache = registry;
+  cacheStamp = packagesStamp([agentsDir(), publishedDir()]);
+  lastStampCheck = Date.now();
   return cache;
+}
+
+/**
+ * Recarrega o cache se as pastas mudaram desde a última carga (publicação feita por OUTRO processo, p.ex. `cli:approve`:
+ * sem isso a API serviria o manifesto antigo e a versão de conhecimento já apagada até reiniciar). `force` ignora o
+ * intervalo de 5 s. Devolve se recarregou.
+ */
+export function refreshPackagesIfChanged(force = false): boolean {
+  if (!cache) return false;
+  const now = Date.now();
+  if (!force && now - lastStampCheck < STAMP_CHECK_MS) return false;
+  lastStampCheck = now;
+  if (packagesStamp([agentsDir(), publishedDir()]) === cacheStamp) return false;
+  reloadPackages();
+  return true;
 }
 
 export function packageLoadErrors(): readonly { dir: string; message: string }[] {

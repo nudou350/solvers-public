@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { canTransition, type SubmissionStatus } from "@solvers/shared";
 import { db, pool, schema } from "../db/index.js";
 import { env } from "../env.js";
@@ -34,6 +34,8 @@ export type ProcessDeps = {
   notifyCreator: (wallet: string, text: string) => Promise<void>;
   minPriceUnits: () => Promise<bigint>;
   limits: () => ZipLimits;
+  /** Teto de tempo de uma passada (padrão `SUBMISSION_TIMEOUT_MS`); os testes encurtam. */
+  timeoutMs?: number;
 };
 
 export const defaultProcessDeps: ProcessDeps = {
@@ -81,24 +83,72 @@ async function acquireLock(id: string): Promise<(() => Promise<void>) | null> {
   };
 }
 
-/** Marca a submissão como `validating` (de `submitted`) com `FOR UPDATE SKIP LOCKED`; devolve a linha ou null se não é para processar. */
-async function claim(id: string): Promise<Row | null> {
+/** Tentativas do worker por submissão (cada `claim` conta uma): passado o teto, rejeita com erro genérico em vez de repetir para sempre. */
+export const MAX_ATTEMPTS = 3;
+/** Teto de tempo de uma passada por submissão (checado entre as etapas e a cada arquivo ingerido). */
+export const SUBMISSION_TIMEOUT_MS = 15 * 60_000;
+/** Texto que o criador vê quando o sistema (não o pacote) falhou: o detalhe vai só para o log. */
+export const SYSTEM_FAILURE_MESSAGE = "Não consegui processar este envio por um erro interno. Reenvie o pacote; se o erro se repetir, fale com a equipe.";
+
+/** A passada passou do tempo permitido (conta como falha de sistema). */
+export class SubmissionTimeout extends Error {
+  constructor() {
+    super("tempo limite do processamento da submissão");
+    this.name = "SubmissionTimeout";
+  }
+}
+
+/** Regra pura: o worker ainda pode tentar esta submissão? (`attempts` já inclui a passada atual.) */
+export const attemptsExhausted = (attempts: number, max = MAX_ATTEMPTS): boolean => attempts >= max;
+
+/**
+ * Marca a submissão como `validating` (de `submitted`) com `FOR UPDATE SKIP LOCKED` e conta a tentativa; devolve a linha,
+ * null se não é para processar, ou `{ exhausted }` quando já estourou as tentativas (o worker caiu ou falhou N vezes nela).
+ */
+async function claim(id: string): Promise<Row | null | { exhausted: Row }> {
   return db.transaction(async (tx) => {
     const locked = await tx.execute<{ id: string }>(sql`select id from package_submissions where id = ${id} for update skip locked`);
     if (locked.rows.length === 0) return null;
     const [row] = await tx.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
     if (!row) return null;
-    if (row.status === "submitted") {
-      if (!canTransition("submitted", "validating")) return null;
-      const [upd] = await tx
+    if (row.status !== "submitted" && row.status !== "validating") return null;
+    if (row.status === "submitted" && !canTransition("submitted", "validating")) return null;
+    if (row.attempts >= MAX_ATTEMPTS) {
+      // As tentativas anteriores não terminaram (falha ou queda do processo): para aqui, sem laço eterno.
+      await tx
         .update(schema.packageSubmissions)
         .set({ status: "validating", updatedAt: new Date() })
-        .where(and(eq(schema.packageSubmissions.id, id), eq(schema.packageSubmissions.status, "submitted")))
-        .returning();
-      return upd ?? null;
+        .where(and(eq(schema.packageSubmissions.id, id), eq(schema.packageSubmissions.status, "submitted")));
+      return { exhausted: row };
     }
-    return row.status === "validating" ? row : null;
+    const [upd] = await tx
+      .update(schema.packageSubmissions)
+      .set({ status: "validating", attempts: sql`${schema.packageSubmissions.attempts} + 1`, updatedAt: new Date() })
+      .where(and(eq(schema.packageSubmissions.id, id), inArray(schema.packageSubmissions.status, ["submitted", "validating"])))
+      .returning();
+    return upd ?? null;
   });
+}
+
+/** Devolve a tentativa (o worker parou de propósito: deploy ou SIGTERM não é falha da submissão). */
+async function refundAttempt(id: string): Promise<void> {
+  await db
+    .update(schema.packageSubmissions)
+    .set({ attempts: sql`greatest(${schema.packageSubmissions.attempts} - 1, 0)` })
+    .where(eq(schema.packageSubmissions.id, id));
+}
+
+/** Rejeita por falha de sistema repetida: erro genérico ao criador, detalhe só no log. Devolve true se passou a `rejected_validation`. */
+async function rejectExhausted(row: Row, deps: ProcessDeps): Promise<boolean> {
+  const validation = reportFromZip([{ code: "PROCESSING_FAILED", path: "", message: SYSTEM_FAILURE_MESSAGE, fix: "Reenvie o pacote." }]);
+  const moved = await setStatus(row.id, "validating", "rejected_validation", { error: SYSTEM_FAILURE_MESSAGE, validation });
+  if (!moved) return false;
+  await rm(extractedDirOf(row.id), { recursive: true, force: true }).catch(() => undefined);
+  await deps.deleteStaging(row.agentId, stagingVersion(row.id)).catch(() => undefined);
+  const subject = { id: row.id, slug: row.slug, version: row.version, creatorWallet: row.creatorWallet, name: null };
+  await deps.notifyAdmin(adminMessage("rejected_validation", subject, `Falhas de sistema repetidas (${MAX_ATTEMPTS} tentativas); veja o log do worker.`)).catch(() => undefined);
+  await deps.notifyCreator(row.creatorWallet, creatorMessage("rejected_validation", subject)).catch(() => undefined);
+  return true;
 }
 
 const setStatus = async (id: string, from: SubmissionStatus, to: SubmissionStatus, set: Partial<Row> = {}): Promise<boolean> => {
@@ -139,13 +189,33 @@ export async function processSubmission(id: string, deps: ProcessDeps = defaultP
   try {
     const row = await claim(id);
     if (!row) return "skipped";
-    return await run(row, deps);
+    if ("exhausted" in row) {
+      console.error(`[worker] submissão ${id} passou de ${MAX_ATTEMPTS} tentativas: rejeitada por falha de sistema`);
+      return (await rejectExhausted(row.exhausted, deps)) ? "rejected_validation" : "skipped";
+    }
+    const deadline = Date.now() + (deps.timeoutMs ?? SUBMISSION_TIMEOUT_MS);
+    try {
+      return await run(row, deps, deadline);
+    } catch (e) {
+      if (e instanceof WorkerStopping) {
+        await refundAttempt(id).catch(() => undefined);
+        throw e;
+      }
+      console.error(`[worker] falha de sistema em ${id} (tentativa ${row.attempts}/${MAX_ATTEMPTS}):`, e);
+      // Última tentativa: não espera a próxima passada, rejeita já com erro genérico.
+      if (attemptsExhausted(row.attempts) && (await rejectExhausted(row, deps))) return "rejected_validation";
+      throw e;
+    }
   } finally {
     await unlock();
   }
 }
 
-async function run(row: Row, deps: ProcessDeps): Promise<SubmissionStatus> {
+const checkDeadline = (deadline: number): void => {
+  if (Date.now() > deadline) throw new SubmissionTimeout();
+};
+
+async function run(row: Row, deps: ProcessDeps, deadline: number): Promise<SubmissionStatus> {
   const id = row.id;
   const [creator] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, row.creatorWallet));
   if (!creator) {
@@ -168,6 +238,7 @@ async function run(row: Row, deps: ProcessDeps): Promise<SubmissionStatus> {
     reloadPackages();
 
     const outcome = await validateStage(row, creator, dir, deps);
+    checkDeadline(deadline);
     if (!outcome.ok) {
       await setStatus(id, "validating", "rejected_validation", { validation: outcome.validation, manifest: outcome.manifest, slug: outcome.slug, version: outcome.version, agentId: outcome.agentId, error: null });
       const after = { ...row, slug: outcome.slug, version: outcome.version, manifest: outcome.manifest };
@@ -183,7 +254,7 @@ async function run(row: Row, deps: ProcessDeps): Promise<SubmissionStatus> {
     current = { ...row, manifest: outcome.manifest, slug: outcome.slug, version: outcome.version, agentId: outcome.agentId };
   }
 
-  await ingestStage(current, dir, deps);
+  await ingestStage(current, dir, deps, deadline);
 
   const moved = await setStatus(id, "validating", "pending_review", { error: null });
   if (moved) {
@@ -213,7 +284,14 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
   }
 
   const input = packageFromFolder(extracted.root);
-  const text = await readFile(join(extracted.root, "manifest.json"), "utf8");
+  let text: string;
+  try {
+    text = await readFile(join(extracted.root, "manifest.json"), "utf8");
+  } catch {
+    // Sem `manifest.json` com este nome exato: erro de validação (não de sistema), senão a submissão repetiria para sempre.
+    await rm(extracted.root, { recursive: true, force: true });
+    return { ok: false, validation: reportFromZip([{ code: "ZIP_BAD_ROOT", path: "manifest.json", message: "Falta o manifest.json (com este nome exato, em minúsculas) na pasta raiz do pacote.", fix: "Coloque o manifest.json direto na pasta raiz do pacote." }]), manifest: null, ...keep };
+  }
   const raw = parseJson(text);
   const rawObj = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
   const fields = safeManifestFields(raw);
@@ -252,7 +330,8 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
   const base = { slug: fields.slug ?? "", version: fields.version ?? "", agentId };
   if (!validation.ok) {
     await rm(extracted.root, { recursive: true, force: true });
-    return { ok: false, validation, manifest: rawObj, ...base };
+    // Só campos seguros e curtos (nome, slug, versão): o JSON cru (até 10 MB) não vai para a coluna jsonb das listas.
+    return { ok: false, validation, manifest: rawObj ? { ...fields } : null, ...base };
   }
 
   // O servidor é a autoridade do `id` e do `creator.id`: grava no manifesto ANTES de varrer e de calcular o hash.
@@ -284,7 +363,7 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
 }
 
 /** Ingestão do conhecimento em staging, com checkpoint por arquivo em `ingest_jobs`. */
-async function ingestStage(row: Row, dir: string, deps: ProcessDeps): Promise<void> {
+async function ingestStage(row: Row, dir: string, deps: ProcessDeps, deadline: number): Promise<void> {
   const id = row.id;
   await db.insert(schema.ingestJobs).values({ submissionId: id, status: "queued" }).onConflictDoNothing();
   const [job] = await db.select().from(schema.ingestJobs).where(eq(schema.ingestJobs.submissionId, id));
@@ -302,6 +381,7 @@ async function ingestStage(row: Row, dir: string, deps: ProcessDeps): Promise<vo
       onFile: async (done, total, chunks) => {
         await db.update(schema.ingestJobs).set({ filesDone: done, filesTotal: total, chunksDone: chunks }).where(eq(schema.ingestJobs.submissionId, id));
         if (stopping) throw new WorkerStopping();
+        checkDeadline(deadline);
       },
     });
     await db
@@ -313,9 +393,11 @@ async function ingestStage(row: Row, dir: string, deps: ProcessDeps): Promise<vo
       await db.update(schema.ingestJobs).set({ status: "queued" }).where(eq(schema.ingestJobs.submissionId, id));
       throw e;
     }
+    // O detalhe (modelo de embeddings, banco, disco) fica no log e em ingest_jobs; o criador vê só um texto fixo.
     const message = (e as Error).message.slice(0, 500);
+    console.error(`[worker] ingestão de ${id} falhou:`, message);
     await db.update(schema.ingestJobs).set({ status: "failed", error: message }).where(eq(schema.ingestJobs.submissionId, id));
-    await db.update(schema.packageSubmissions).set({ error: `Ingestão do conhecimento falhou: ${message}`, updatedAt: new Date() }).where(eq(schema.packageSubmissions.id, id));
+    await db.update(schema.packageSubmissions).set({ error: "A ingestão do conhecimento falhou; o sistema tenta de novo em instantes.", updatedAt: new Date() }).where(eq(schema.packageSubmissions.id, id));
     throw e;
   }
 }

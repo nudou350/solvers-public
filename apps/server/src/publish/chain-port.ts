@@ -24,8 +24,11 @@ export type PublishChain = {
   buildRegister(wallet: string, agentId: string, approved: ApprovedRecord): Promise<BuiltTx>;
   buildUpdateVersion(wallet: string, agentId: string, approved: ApprovedRecord): Promise<BuiltTx>;
   buildUpdatePricing(wallet: string, agentId: string, approved: ApprovedRecord): Promise<BuiltTx>;
-  /** A assinatura (já confirmada) mexeu na conta deste agente? Impede ligar uma assinatura qualquer à submissão. */
-  signatureTouchesAgent(signature: string, agentId: string): Promise<boolean>;
+  /**
+   * A assinatura (já confirmada) fez, na conta deste agente, o que `kind` diz (registro, versão, preço) e foi assinada por
+   * `creatorWallet`? Impede ligar uma assinatura qualquer (de outro agente, de outro tipo, de outro signatário) à submissão.
+   */
+  signatureTouchesAgent(signature: string, agentId: string, opts?: { kind?: TouchKind; creatorWallet?: string }): Promise<boolean>;
   /** Operações do admin on-chain (carteira fria; só nos CLIs `cli:approve` e `cli:suspend`). */
   adminAddress(): Promise<string | null>;
   onchainAdmin(): Promise<string>;
@@ -35,6 +38,10 @@ export type PublishChain = {
   syncAgent(agentId: string): Promise<void>;
   indexSignature(signature: string): Promise<void>;
 };
+
+/** O que a transação do criador fez na conta do agente (mesmos nomes de `ChainTouch.kind` em reconcile.ts). */
+export type TouchKind = "registered" | "version" | "pricing";
+const EVENT_OF_KIND: Record<TouchKind, string> = { registered: "AgentRegistered", version: "AgentVersionUpdated", pricing: "PricingUpdated" };
 
 export function metadataUri(agentId: string): string {
   return `${env.PUBLIC_API_URL.replace(/\/$/, "")}/api/agents/${agentId}/metadata.json`;
@@ -88,11 +95,18 @@ export function realPublishChain(): PublishChain {
       });
       return buildForUserChecked([ix], { kind: "update-pricing", agentId, priceUnits: approved.priceUsdc });
     },
-    async signatureTouchesAgent(signature, agentId) {
+    async signatureTouchesAgent(signature, agentId, opts = {}) {
       const c = chain();
       const pda = await c.agentPda(agentId);
       const events = await c.eventsOf(signature as Signature);
-      return events.some((e) => "agent" in e.data && (e.data as { agent: string }).agent === pda);
+      const hit = events.filter((e) => "agent" in e.data && (e.data as { agent: string }).agent === pda && (!opts.kind || e.name === EVENT_OF_KIND[opts.kind]));
+      if (hit.length === 0) return false;
+      if (!opts.creatorWallet) return true;
+      // Registro: o evento traz o criador. Versão e preço só valem assinados pelo criador da conta (o programa exige): confere na conta.
+      const registered = hit.find((e) => e.name === "AgentRegistered");
+      if (registered) return (registered.data as { creator: string }).creator === opts.creatorWallet;
+      const acc = await c.fetchMaybeAgent(agentId);
+      return acc.exists && acc.data.creator === opts.creatorWallet;
     },
     async adminAddress() {
       return authorities().admin?.address ?? null;

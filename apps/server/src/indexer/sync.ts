@@ -5,6 +5,7 @@ import { bytesToHex, normalizeMaxLicenses } from "@solvers/shared";
 import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { bytesToHexStr } from "../lib/crypto.js";
+import { PLATFORM_AGENT_IDS } from "../runtime/platform-agents.js";
 import { resolvePublishedText } from "../store/review-rules.js";
 import { canApplyMilestoneStatus, closedEscrowStatus, type MilestoneStatusName } from "./escrow-status.js";
 import { withApprovalFlag, type ApprovedVersion } from "./approved-version.js";
@@ -26,10 +27,30 @@ export async function loadApprovedVersions(agentId: string): Promise<ApprovedVer
   return rows;
 }
 
+/**
+ * Um agente on-chain com o id fixo de um Solver da plataforma (ex.: o Criador de Solvers) NÃO é o da plataforma: o
+ * `register_agent` é público e qualquer carteira pode registrar esse id. O indexador o ignora por inteiro (aviso no log),
+ * senão a linha do banco da plataforma seria sobrescrita (status, endereços, preço).
+ */
+export class PlatformAgentIgnored extends Error {
+  constructor(readonly agentId: string, readonly agentAddr: string) {
+    super(`agente on-chain ${agentAddr} usa o id reservado da plataforma ${agentId}: ignorado`);
+    this.name = "PlatformAgentIgnored";
+  }
+}
+
+function assertNotPlatformAgentId(id: string, agentAddr: string): void {
+  if (PLATFORM_AGENT_IDS.includes(id)) {
+    console.warn(`[indexer] AVISO: ${agentAddr} registrou on-chain o id reservado da plataforma ${id}; ignorado (a linha da plataforma não é espelhada)`);
+    throw new PlatformAgentIgnored(id, agentAddr);
+  }
+}
+
 export async function syncAgent(agentAddr: Address): Promise<string | null> {
   const acc = await gen.fetchMaybeAgent(chain().rpc, agentAddr);
   if (!acc.exists) return null;
   const id = bytesToHex(acc.data.agentId);
+  assertNotPlatformAgentId(id, agentAddr);
   // Teto de licenças (PDA SupplyCap, só existe se o criador definiu um). Se o RPC falhar a coluna fica como está: o
   // espelho é só para a vitrine e para o pré-check; quem barra a venda é o programa.
   let maxLicenses: number | null | undefined;
@@ -50,6 +71,7 @@ export async function syncAgent(agentAddr: Address): Promise<string | null> {
  */
 export async function mirrorAgentAccount(agentAddr: Address, a: gen.Agent, maxLicenses?: number | null): Promise<string> {
   const id = bytesToHex(a.agentId);
+  assertNotPlatformAgentId(id, agentAddr);
   const full = agentMirrorValues(a, agentAddr);
   const guarded = withApprovalFlag(full, await loadApprovedVersions(id));
   const set = maxLicenses !== undefined ? { ...guarded, maxLicenses } : guarded;

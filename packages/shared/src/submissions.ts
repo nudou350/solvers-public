@@ -45,7 +45,8 @@ const TRANSITIONS: Record<SubmissionStatus, readonly SubmissionStatus[]> = {
   // O reenvio com mudanças volta a validar na MESMA submissão (mesma versão ainda não publicada).
   changes_requested: ["validating", "rejected"],
   rejected: [],
-  awaiting_creator_signature: ["awaiting_onchain_approval", "publishing", "publish_failed"],
+  // `changes_requested`: o admin revoga a aprovação (revoke) antes de o criador assinar; `rejected`: a submissão expirou (30 dias sem assinatura).
+  awaiting_creator_signature: ["awaiting_onchain_approval", "publishing", "publish_failed", "changes_requested", "rejected"],
   awaiting_onchain_approval: ["publishing", "publish_failed"],
   publishing: ["published", "publish_failed"],
   publish_failed: ["publishing", "awaiting_creator_signature", "awaiting_onchain_approval"],
@@ -60,7 +61,7 @@ export function canTransition(from: SubmissionStatus, to: SubmissionStatus): boo
 }
 
 /** Tipos de ação do revisor registrados em `package_reviews.action`. */
-export const REVIEW_ACTIONS = ["approve", "request_changes", "reject", "finish", "suspend", "resume"] as const;
+export const REVIEW_ACTIONS = ["approve", "request_changes", "reject", "revoke", "expire", "finish", "suspend", "resume"] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
 /** Checklist do revisor (PACKAGE_SPEC.md 14.5), guardado em `package_reviews.checklist`. */

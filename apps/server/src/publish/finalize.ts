@@ -10,7 +10,8 @@ import { loadPackage, packageHash, reloadPackages, type SolverPackage } from "..
 import { FINALIZABLE_STATUSES, nextPublicationStep, parseApproved, statusAfterChain, type ApprovedRecord, type PublicationStep } from "./approval-rules.js";
 import { prepareCatalog, relist, writeCatalog, type PreparedCatalog } from "./catalog.js";
 import { publishChain, type PublishChain } from "./chain-port.js";
-import { cleanIncoming, findPackageRoot, incomingParent, publishedVersionOf, stagePackage, swapInPublished } from "./fs.js";
+import { cleanIncoming, findPackageRoot, incomingParent, publishedIdentityOf, publishedVersionOf, stagePackage, swapInPublished } from "./fs.js";
+import { versionGreater } from "../submissions/rules.js";
 
 // Finalização da publicação (PACKAGE_SPEC.md 15.3, passo 5): a versão aprovada passa a ser a servida. Idempotente e
 // retomável: cada passo confere o que já foi feito, e uma falha deixa a submissão em `publish_failed` para o admin
@@ -58,6 +59,17 @@ type SubmissionRow = typeof schema.packageSubmissions.$inferSelect;
 
 const short = (e: unknown) => ((e as Error)?.message ?? String(e)).slice(0, 500);
 
+/** Erro de conferência com texto próprio (hash, id, slug, versão): seguro de mostrar ao criador. Qualquer outro erro é interno. */
+export class PublishCheckError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PublishCheckError";
+  }
+}
+
+/** O que o criador vê (coluna `error`, respostas da API) quando a publicação falha por erro interno: o detalhe (caminhos, banco) vai só ao log e ao admin. */
+export const PUBLISH_FAILED_TEXT = "A publicação falhou por um erro interno. A equipe foi avisada e vai tentar de novo.";
+
 /** Troca de estado condicionada ao estado visto (e a `canTransition`): quem perdeu a corrida não sobrescreve. */
 export async function moveSubmission(id: string, from: SubmissionStatus, to: SubmissionStatus, extra: Partial<SubmissionRow> = {}): Promise<boolean> {
   if (from !== to && !canTransition(from, to)) return false;
@@ -83,7 +95,10 @@ export async function finalizePublication(submissionId: string, opts: { actor?: 
     const got = await client.query<{ ok: boolean }>("select pg_try_advisory_lock(hashtextextended($1, 0)) as ok", [key]);
     if (!got.rows[0]?.ok) return { outcome: "busy" };
     try {
-      return await run(submissionId, opts.actor, deps);
+      const result = await run(submissionId, opts.actor, deps);
+      // Outro processo (CLI `cli:approve`, evento da cadeia no worker) pode ter publicado: a API recarrega o cache do disco.
+      if (result.outcome === "already_published" || result.outcome === "busy") deps.reload();
+      return result;
     } finally {
       await client.query("select pg_advisory_unlock(hashtextextended($1, 0))", [key]);
     }
@@ -134,9 +149,12 @@ async function run(id: string, actor: string | undefined, deps: FinalizeDeps): P
     await deps.notifyCreator(sub.agentId, `Solvers: seu Solver ${approved.name} v${version} está no ar.`).catch(() => undefined);
     return { outcome: "published", version };
   } catch (e) {
-    const error = short(e);
+    const detail = short(e);
+    console.error(`[publish] a publicação de ${sub.slug} v${approved.version} falhou:`, e);
+    // Erro de conferência tem texto próprio e seguro; qualquer outro (disco, banco) é interno: o criador vê texto fixo.
+    const error = e instanceof PublishCheckError ? detail : PUBLISH_FAILED_TEXT;
     await moveSubmission(id, "publishing", "publish_failed", { error });
-    await deps.notifyAdmin(`Solvers: a publicação de ${sub.slug} v${approved.version} falhou: ${error}\nTente de novo em /admin/revisoes (Concluir).`).catch(() => undefined);
+    await deps.notifyAdmin(`Solvers: a publicação de ${sub.slug} v${approved.version} falhou: ${detail}\nTente de novo em /admin/revisoes (Concluir).`).catch(() => undefined);
     return { outcome: "failed", error };
   }
 }
@@ -149,11 +167,15 @@ async function publish(sub: SubmissionRow, approved: ApprovedRecord, actor: stri
   // 1. Disco: a pasta publicada vira a aprovada (troca por rename; a anterior vai para _archive/). Já publicada = pula.
   const alreadyThere = existsSync(join(target, "manifest.json")) && publishedVersionOf(target) === approved.version && packageHash(target) === approved.versionHash;
   if (!alreadyThere) {
+    // A pasta que está no ar neste slug é deste Solver? E a versão aprovada não é menor que a ativa (nada de rebaixar)?
+    const current = existsSync(join(target, "manifest.json")) ? publishedIdentityOf(target) : null;
+    if (current?.id && current.id !== sub.agentId) throw new PublishCheckError("a pasta publicada deste slug pertence a outro Solver; nada foi trocado");
+    if (current?.version && versionGreater(current.version, approved.version)) throw new PublishCheckError(`a versão aprovada (${approved.version}) é menor que a publicada (${current.version}); nada foi trocado`);
     const root = findPackageRoot(join(deps.submissionsDir, id, "extracted"));
     const staged = stagePackage(root, incomingParent(deps.publishedDir, id), sub.slug);
     // Confere ANTES de tocar na pasta publicada: o que vai ao ar é byte a byte o que o revisor aprovou.
     checkPackage(loadPackage(staged, { source: "published" }), sub, approved);
-    swapInPublished(deps.publishedDir, sub.slug, staged);
+    swapInPublished(deps.publishedDir, sub.slug, staged, sub.agentId);
   }
   const pkg = loadPackage(target, { source: "published" });
   checkPackage(pkg, sub, approved);
@@ -218,10 +240,10 @@ async function publish(sub: SubmissionRow, approved: ApprovedRecord, actor: stri
 /** O pacote carregado é o aprovado? Hash, id, slug e versão (o hash cobre o conteúdo; o resto, a identidade). */
 function checkPackage(pkg: SolverPackage, sub: SubmissionRow, approved: ApprovedRecord): void {
   const m = pkg.manifest;
-  if (pkg.versionHash !== approved.versionHash) throw new Error(`o conteúdo do pacote mudou depois da aprovação (hash ${pkg.versionHash.slice(0, 12)}… ≠ ${approved.versionHash.slice(0, 12)}…)`);
-  if (m.id !== sub.agentId) throw new Error(`o id do manifesto (${m.id}) não é o do Solver (${sub.agentId})`);
-  if (m.slug !== sub.slug) throw new Error(`o slug do manifesto (${m.slug}) não é o da submissão (${sub.slug})`);
-  if (m.version !== approved.version) throw new Error(`a versão do manifesto (${m.version}) não é a aprovada (${approved.version})`);
+  if (pkg.versionHash !== approved.versionHash) throw new PublishCheckError(`o conteúdo do pacote mudou depois da aprovação (hash ${pkg.versionHash.slice(0, 12)}… ≠ ${approved.versionHash.slice(0, 12)}…)`);
+  if (m.id !== sub.agentId) throw new PublishCheckError(`o id do manifesto (${m.id}) não é o do Solver (${sub.agentId})`);
+  if (m.slug !== sub.slug) throw new PublishCheckError(`o slug do manifesto (${m.slug}) não é o da submissão (${sub.slug})`);
+  if (m.version !== approved.version) throw new PublishCheckError(`a versão do manifesto (${m.version}) não é a aprovada (${approved.version})`);
 }
 
 /** Atalho: a submissão (mais recente) em estado de finalização de um Solver, para o evento da cadeia e o CLI. */

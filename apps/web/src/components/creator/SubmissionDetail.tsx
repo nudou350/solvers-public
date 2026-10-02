@@ -13,6 +13,7 @@ import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
+import { Untrusted } from "@/components/ui/Untrusted";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { canResubmit, fileSizeText, loadErrorText, statusInfo, type Tone } from "@/lib/submissions-ui";
@@ -101,7 +102,7 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
             <StatusChip status={sub.status} nextAction={sub.nextAction} />
           </div>
           <h1 className="display h2s" style={{ overflowWrap: "anywhere" }}>
-            {sub.name || sub.slug}
+            <Untrusted>{sub.name || sub.slug}</Untrusted>
           </h1>
           <p className="small muted">
             <span className="mono" style={{ overflowWrap: "anywhere" }}>{sub.slug}</span> · versão {sub.version} · {fileSizeText(sub.sizeBytes)} · enviado <Ago iso={sub.createdAt} /> · atualizado <Ago iso={sub.updatedAt} />
@@ -119,14 +120,14 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
             </h2>
             {/* Texto do revisor, exibido como texto (nunca como HTML). */}
             <p className={s.untrusted} style={{ whiteSpace: "pre-wrap" }}>
-              {sub.reviewerNotes}
+              <Untrusted>{sub.reviewerNotes}</Untrusted>
             </p>
           </div>
         ) : null}
 
         {sub.error ? (
           <Notice tone="warn" title="Houve um problema técnico" role="status">
-            <span className={s.untrusted}>{sub.error}</span>
+            <span className={s.untrusted}><Untrusted>{sub.error}</Untrusted></span>
           </Notice>
         ) : null}
 

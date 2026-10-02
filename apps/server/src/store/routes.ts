@@ -49,7 +49,7 @@ import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 import { assertEntriesOpen } from "./pause-gate.js";
-import { assertCanPurchase } from "./purchase-guards.js";
+import { assertCanPurchase, assertListedAndLoadable } from "./purchase-guards.js";
 import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { buildForUserChecked } from "./tx-build.js";
 
@@ -366,6 +366,7 @@ storeRouter.post(
     if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
     // Teto de licenças atingido: 409 sold_out sem RPC nem montagem (o programa também barra: purchase_license falha com SoldOut).
     assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
+    assertListedAndLoadable(row); // publicação incompleta (publish_failed): sem catálogo nem pacote não se vende (409 agent_not_listed)
     // update_pricing não emite evento: confere o preço on-chain e, se mudou, espelha e responde 409 price_changed.
     await assertFreshPrice(row);
     await assertCanPurchase(wallet, row); // já tem a licença / criador não compra o próprio solver (evita ATA duplicada)

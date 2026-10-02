@@ -17,10 +17,17 @@ export function dateBr(iso: string | null | undefined): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
 
-/** O trecho passou da validade? O dia de `valid_until` ainda vale; só o dia seguinte já é "desatualizado". */
+const SP_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** Hoje (AAAA-MM-DD) no fuso de Brasília: a data de `valid_until` é a de quem escreveu, não a do UTC (às 21h já seria "amanhã"). */
+export function todayInSaoPaulo(now: Date): string {
+  return SP_DATE.format(now);
+}
+
+/** O trecho passou da validade? O dia de `valid_until` ainda vale (no fuso de Brasília); só o dia seguinte já é "desatualizado". */
 export function isStale(validUntil: string | null, now: Date): boolean {
   if (!validUntil) return false;
-  return validUntil < now.toISOString().slice(0, 10);
+  return validUntil < todayInSaoPaulo(now);
 }
 
 const metaStr = (meta: HitView["meta"], k: string): string => (typeof meta?.[k] === "string" ? (meta[k] as string) : "");

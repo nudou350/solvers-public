@@ -20,6 +20,7 @@ import {
 import { applyCancelled, applyListed, applySold, closeListingsAt, markLicenseAcquired, mirrorListingFlags, resoldOwner } from "./resale-mirror.js";
 import {
   agentIdByAddress,
+  PlatformAgentIgnored,
   recordChainTx,
   syncAgent,
   syncCredits,
@@ -76,7 +77,14 @@ export async function processTransaction(
     // Logs truncados: eventos podem faltar. Relê as contas do programa tocadas pela transação.
     await resyncAccounts(opts.accounts ?? (await ctx.info())?.accounts ?? []);
   }
-  for (const ev of events) await handle(ev, ctx);
+  for (const ev of events) {
+    try {
+      await handle(ev, ctx);
+    } catch (e) {
+      // Agente on-chain com o id reservado de um Solver da plataforma: o evento é registrado como processado, sem espelhar.
+      if (!(e instanceof PlatformAgentIgnored)) throw e;
+    }
+  }
 
   const fresh: SolversEvent[] = [];
   for (const [idx, ev] of events.entries()) {
@@ -411,7 +419,9 @@ async function resyncAccounts(accounts: readonly Address[]) {
     if (value.owner !== c.programId) continue;
     const data = Buffer.from(value.data[0], "base64");
     const kind = DISCRIMINATORS.find(([, d]) => Array.from(d).every((b, i) => data[i] === b))?.[0];
-    if (kind === "agent") await syncAgent(acc);
+    if (kind === "agent") await syncAgent(acc).catch((e) => {
+      if (!(e instanceof PlatformAgentIgnored)) throw e;
+    });
     else if (kind === "escrow") await syncEscrow(acc);
     else if (kind === "reputation") {
       const r = gen.getUserReputationDecoder().decode(data);

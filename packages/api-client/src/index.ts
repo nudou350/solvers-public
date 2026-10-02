@@ -332,6 +332,8 @@ export function createApi(opts: ApiOptions = {}) {
       post(z.object({ id: z.string(), status: z.string(), approved: z.object({ versionHash: z.string(), priceUsdc: z.string(), royaltyBps: z.number(), name: z.string(), version: z.string() }) }), `/api/admin/submissions/${encodeURIComponent(id)}/approve`, input),
     adminRequestChanges: (id: string, input: AdminReviewInput) => post(z.object({ id: z.string(), status: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/request-changes`, input),
     adminRejectSubmission: (id: string, input: AdminReviewInput) => post(z.object({ id: z.string(), status: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/reject`, input),
+    /** Revoga uma aprovação que o criador ainda não assinou (volta a `changes_requested`; nota obrigatória). */
+    adminRevokeSubmission: (id: string, input: AdminReviewInput) => post(z.object({ id: z.string(), status: z.string() }), `/api/admin/submissions/${encodeURIComponent(id)}/revoke`, input),
     /** Conclui a publicação quando o evento de aprovação on-chain não chegou sozinho (idempotente). */
     adminFinishSubmission: (id: string) => post(PublicationResult, `/api/admin/submissions/${encodeURIComponent(id)}/finish`),
 

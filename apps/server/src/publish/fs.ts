@@ -35,6 +35,16 @@ export function publishedVersionOf(dir: string): string | null {
   }
 }
 
+/** `id` e `version` do manifest.json de uma pasta publicada (null se ilegível). */
+export function publishedIdentityOf(dir: string): { id: string | null; version: string | null } | null {
+  try {
+    const m = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { id?: unknown; version?: unknown };
+    return { id: typeof m.id === "string" && m.id ? m.id : null, version: typeof m.version === "string" && m.version ? m.version : null };
+  } catch {
+    return null;
+  }
+}
+
 /** Nome livre dentro do arquivo morto (nunca sobrescreve uma versão já arquivada). */
 function freeArchiveDir(archiveRoot: string, slug: string, version: string): string {
   let dest = join(archiveRoot, slug, version);
@@ -47,10 +57,13 @@ function freeArchiveDir(archiveRoot: string, slug: string, version: string): str
  * Ambos os passos são `rename` no mesmo volume (a pasta de preparo fica dentro de `published`). Devolve onde a versão
  * anterior foi parar (null se não havia). Não confere hash: o chamador já conferiu `staged` antes.
  */
-export function swapInPublished(published: string, slug: string, staged: string): { archivedTo: string | null } {
+export function swapInPublished(published: string, slug: string, staged: string, expectAgentId?: string): { archivedTo: string | null } {
   const target = join(published, slug);
   let archivedTo: string | null = null;
   if (existsSync(target)) {
+    // Última defesa: nunca arquiva (nem substitui) a pasta de OUTRO Solver que ocupa este slug.
+    const current = publishedIdentityOf(target);
+    if (expectAgentId && current?.id && current.id !== expectAgentId) throw new Error("a pasta publicada deste slug pertence a outro Solver");
     const version = publishedVersionOf(target) ?? `desconhecida-${Date.now()}`;
     archivedTo = freeArchiveDir(join(published, "_archive"), slug, version);
     mkdirSync(join(archivedTo, ".."), { recursive: true });

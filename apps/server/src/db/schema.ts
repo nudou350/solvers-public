@@ -83,6 +83,8 @@ export const packageSubmissions = pgTable(
     registerTx: text("register_tx"),
     approveTx: text("approve_tx"),
     error: text("error"),
+    /** Tentativas do worker (cada `claim` conta uma): passado o teto, a submissão é rejeitada com erro genérico (poison pill). */
+    attempts: integer("attempts").notNull().default(0),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

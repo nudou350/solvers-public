@@ -14,6 +14,7 @@ import { randomId, sha256 } from "./lib/crypto.js";
 import { notifyCreator } from "./notify/telegram.js";
 import { reconcilePixCredits } from "./pix/credit.js";
 import { reconcileX402 } from "./x402/reconcile.js";
+import { cleanupSubmissionsOnce } from "./submissions/cleanup.js";
 import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS } from "@solvers/shared";
 
 // Jobs periódicos:
@@ -24,6 +25,7 @@ import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS } from "@solvers/shared";
 // - Pix (a cada 30 s): credita cobranças pagas que ficaram sem crédito e conclui as "crediting".
 // - x402 (a cada 60 s, só com X402_ENABLED): vence ordens, resolve pagamentos incertos, retoma emissões e reembolsos.
 // - vitrine (a cada hora): tira especialistas com nota baixa depois de 10 avaliações.
+// - faxina das submissões (a cada 6 h): expira envios parados há 30 dias, apaga ZIPs de rejeitados, pastas órfãs e `.part`.
 
 export async function autoReleaseOnce(): Promise<number> {
   if (!env.AUTO_RELEASE_ENABLED) return 0;
@@ -351,4 +353,5 @@ export const jobs = [
   every(30_000, "pix: créditos pendentes", reconcilePixCredits),
   every(60_000, "x402: ordens", reconcileX402),
   every(60 * 60_000, "vitrine: nota baixa", delistLowRatedOnce),
+  every(6 * 60 * 60_000, "faxina das submissões", cleanupSubmissionsOnce),
 ];

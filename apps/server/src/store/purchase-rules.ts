@@ -10,3 +10,12 @@ export function purchaseBlock(input: { wallet: string; creatorWallet: string | n
   }
   return null;
 }
+
+/**
+ * Regra pura: só se vende o que a vitrine lista E tem pacote carregável no servidor. Um agente Active na cadeia cuja
+ * publicação falhou (`publish_failed`, `listed = false`, sem pasta em disco) cobraria por algo que não dá para entregar.
+ */
+export function notListedBlock(input: { listed: boolean; hasPackage: boolean }): HttpError | null {
+  if (input.listed && input.hasPackage) return null;
+  return new HttpError(409, "Este especialista ainda não está disponível no catálogo.", "agent_not_listed");
+}

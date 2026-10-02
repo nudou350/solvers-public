@@ -131,6 +131,16 @@ export function safeManifestFields(raw: unknown): { slug?: string; version?: str
 
 export type Approved = { versionHash: string; priceUsdc: string; royaltyBps: number; name: string; version: string };
 
+/** `a` é uma versão X.Y.Z estritamente maior que `b`? Formato inválido nunca é maior. */
+export function versionGreater(a: string, b: string): boolean {
+  const parse = (v: string) => (/^\d+\.\d+\.\d+$/.test(v) ? v.split(".").map(Number) : null);
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) if (x[i]! !== y[i]!) return x[i]! > y[i]!;
+  return false;
+}
+
 /** Preço do manifesto em unidades de 6 casas; recusa NaN, negativo e mais casas que o USDC tem. */
 export function priceToUnits(priceUsdc: unknown): bigint | null {
   if (typeof priceUsdc !== "number" || !Number.isFinite(priceUsdc) || priceUsdc <= 0) return null;
@@ -179,13 +189,15 @@ export const REVIEW_TRANSITIONS = {
   approve: { to: "awaiting_creator_signature", from: ["pending_review"] },
   request_changes: { to: "changes_requested", from: ["pending_review"] },
   reject: { to: "rejected", from: ["pending_review", "changes_requested"] },
+  // O admin desfaz uma aprovação que o criador ainda não assinou: volta a `changes_requested` (nota obrigatória).
+  revoke: { to: "changes_requested", from: ["awaiting_creator_signature"] },
 } as const satisfies Record<string, { to: SubmissionStatus; from: readonly SubmissionStatus[] }>;
 
 export function reviewTransitionProblem(from: string, action: keyof typeof REVIEW_TRANSITIONS): string | null {
   const rule = REVIEW_TRANSITIONS[action];
   const allowed = (rule.from as readonly string[]).includes(from) && canTransition(from as SubmissionStatus, rule.to);
   if (allowed) return null;
-  const what = action === "approve" ? "aprovar" : action === "reject" ? "recusar" : "pedir mudanças em";
+  const what = action === "approve" ? "aprovar" : action === "reject" ? "recusar" : action === "revoke" ? "revogar a aprovação de" : "pedir mudanças em";
   return `Não dá para ${what} uma submissão em "${from}".`;
 }
 
@@ -249,6 +261,28 @@ export function toAdminRow(row: SubmissionRowLike, creator: { wallet: string; na
     isNewAgent,
     errors,
     warnings,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Linha da fila a partir das colunas leves da lista (`listColumns`): nome já truncado e contagens já calculadas no banco. */
+export function toAdminListRow(
+  row: { id: string; slug: string; version: string; status: string; name: string | null; errorCount: number; warningCount: number; createdAt: Date; updatedAt: Date },
+  creator: { wallet: string; name: string | null },
+  isNewAgent: boolean,
+): AdminSubmissionRow {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    version: row.version,
+    creatorWallet: creator.wallet,
+    creatorName: creator.name,
+    status: row.status as SubmissionStatus,
+    isNewAgent,
+    errors: row.errorCount,
+    warnings: row.warningCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -1,9 +1,9 @@
 import { pathToFileURL } from "node:url";
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, inArray, notInArray } from "drizzle-orm";
 import { db, pool, schema } from "../db/index.js";
 import { warmEmbeddings } from "../knowledge/embeddings.js";
 import { notifyAdmin } from "../submissions/notify.js";
-import { processSubmission, requestStop, WorkerStopping } from "../submissions/process.js";
+import { MAX_ATTEMPTS, processSubmission, requestStop, WorkerStopping } from "../submissions/process.js";
 
 // Processo PM2 próprio (solvers-worker; PACKAGE_SPEC.md 16): extrai o ZIP, valida, varre e ingere o conhecimento em staging,
 // uma submissão por vez, com checkpoint em ingest_jobs. Fica fora do solvers-api para não competir com o MCP e os pagamentos.
@@ -30,21 +30,20 @@ const sleep = (ms: number, stopped: () => boolean) =>
     setTimeout(() => clearInterval(tick), ms + 300).unref();
   });
 
-/** Ids pendentes, os mais antigos primeiro. */
-export async function pendingSubmissionIds(limit = 20): Promise<string[]> {
-  const rows = await db
-    .select({ id: schema.packageSubmissions.id })
-    .from(schema.packageSubmissions)
-    .where(inArray(schema.packageSubmissions.status, ["submitted", "validating"]))
-    .orderBy(asc(schema.packageSubmissions.createdAt))
-    .limit(limit);
+/** Ids pendentes, os mais antigos primeiro, sem os de `skip` (as que estão em backoff não ocupam as vagas da fila). */
+export async function pendingSubmissionIds(limit = 20, skip: readonly string[] = []): Promise<string[]> {
+  const where = skip.length
+    ? and(inArray(schema.packageSubmissions.status, ["submitted", "validating"]), notInArray(schema.packageSubmissions.id, [...skip]))
+    : inArray(schema.packageSubmissions.status, ["submitted", "validating"]);
+  const rows = await db.select({ id: schema.packageSubmissions.id }).from(schema.packageSubmissions).where(where).orderBy(asc(schema.packageSubmissions.createdAt)).limit(limit);
   return rows.map((r) => r.id);
 }
 
 /** Uma passada: processa cada pendente (fora do backoff). Devolve quantos foram processados. */
 export async function workOnce(failedAt: Map<string, number> = new Map(), now: () => number = Date.now): Promise<number> {
   let done = 0;
-  for (const id of await pendingSubmissionIds()) {
+  const inBackoff = [...failedAt].filter(([, at]) => now() - at < RETRY_AFTER_MS).map(([id]) => id);
+  for (const id of await pendingSubmissionIds(20, inBackoff)) {
     const failed = failedAt.get(id);
     if (failed !== undefined && now() - failed < RETRY_AFTER_MS) continue;
     try {
@@ -55,7 +54,7 @@ export async function workOnce(failedAt: Map<string, number> = new Map(), now: (
       if (e instanceof WorkerStopping) return done;
       console.error(`[worker] falha ao processar ${id}:`, e);
       // Avisa o admin só na primeira falha (as seguintes só entram no log).
-      if (failedAt.get(id) === undefined) await notifyAdmin(`Solvers: o worker falhou ao processar a submissão ${id}: ${(e as Error).message.slice(0, 300)}. Vai tentar de novo em 1 minuto.`);
+      if (failedAt.get(id) === undefined) await notifyAdmin(`Solvers: o worker falhou ao processar a submissão ${id}: ${(e as Error).message.slice(0, 300)}. Vai tentar de novo em 1 minuto (no máximo ${MAX_ATTEMPTS} tentativas).`);
       failedAt.set(id, now());
     }
   }

@@ -22,3 +22,6 @@ design/Solver.bundle.html
 .pnpm-install-worktree.log
 .codex/pitch-solvers-build-20261001/*
 output/*
+
+# QA local do Criador de Solvers
+.qa-data/

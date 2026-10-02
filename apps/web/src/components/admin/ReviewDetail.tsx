@@ -23,6 +23,7 @@ import { short } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { fileSizeText, loadErrorText, prettyJson, revealHidden, statusInfo } from "@/lib/submissions-ui";
+import { Untrusted } from "@/components/ui/Untrusted";
 import { AdminGate } from "./AdminGate";
 
 const CHECKLIST_LABEL: Record<(typeof REVIEW_CHECKLIST_KEYS)[number], string> = {
@@ -152,7 +153,7 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
             <StatusChip status={sub.status} nextAction={sub.nextAction} />
           </div>
           <h1 className="display h2s" style={{ overflowWrap: "anywhere" }}>
-            {sub.name || sub.slug}
+            <Untrusted>{sub.name || sub.slug}</Untrusted>
           </h1>
           <p className="small muted" style={{ overflowWrap: "anywhere" }}>
             <span className="mono">{sub.slug}</span> · v{sub.version} · {fileSizeText(sub.sizeBytes)} · enviado <Ago iso={sub.createdAt} />
@@ -162,7 +163,7 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
         <Section id="rv-resumo" title="Resumo">
           <dl className="col" style={gap(10)}>
             <Row label="Criador">
-              <span style={{ overflowWrap: "anywhere" }}>{d.creator.name || "Sem nome"}</span>{" "}
+              <span style={{ overflowWrap: "anywhere" }}><Untrusted>{d.creator.name || "Sem nome"}</Untrusted></span>{" "}
               <Chip tone={d.creator.contactVerified ? "ok" : "warn"}>{d.creator.contactVerified ? "Contato verificado" : "Contato não verificado"}</Chip>
             </Row>
             <Row label="Carteira">
@@ -172,13 +173,13 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
             </Row>
             {d.creator.bio ? (
               <Row label="Bio">
-                <span style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>{d.creator.bio}</span>
+                <span style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}><Untrusted>{d.creator.bio}</Untrusted></span>
               </Row>
             ) : null}
-            {text("category") ? <Row label="Categoria">{text("category")}</Row> : null}
+            {text("category") ? <Row label="Categoria"><Untrusted>{text("category")}</Untrusted></Row> : null}
             {text("tagline") ? (
               <Row label="Frase curta">
-                <span style={{ overflowWrap: "anywhere" }}>{text("tagline")}</span>
+                <span style={{ overflowWrap: "anywhere" }}><Untrusted>{text("tagline")}</Untrusted></span>
               </Row>
             ) : null}
             {price !== null ? <Row label="Preço">{price} USDC</Row> : null}
@@ -241,7 +242,7 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
                         <Ago iso={r.createdAt} /> · <span className="mono">{short(r.reviewerWallet)}</span>
                       </span>
                     </div>
-                    {r.notes ? <p className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{r.notes}</p> : null}
+                    {r.notes ? <p className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}><Untrusted>{r.notes}</Untrusted></p> : null}
                     <span className="tiny faint">
                       Checklist: {done} de {REVIEW_CHECKLIST_KEYS.length} itens marcados
                     </span>
@@ -517,7 +518,7 @@ function Knowledge({ id, k }: { id: string; k: AdminSubmissionDetail["knowledge"
   );
 }
 
-type Pending = "approve" | "request_changes" | "reject" | "finish" | null;
+type Pending = "approve" | "request_changes" | "reject" | "revoke" | "finish" | null;
 
 function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise<void> }) {
   const { api } = useSession();
@@ -532,6 +533,7 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
 
   const inReview = sub.status === "pending_review";
   const canReject = inReview || sub.status === "changes_requested";
+  const canRevoke = sub.status === "awaiting_creator_signature";
   const canFinish = sub.status === "awaiting_onchain_approval" || sub.status === "publishing" || sub.status === "publish_failed";
   const complete = reviewChecklistComplete(checklist);
   const notesOk = notes.trim().length >= 3;
@@ -545,11 +547,12 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
       if (action === "approve") await api.adminApproveSubmission(sub.id, input);
       else if (action === "request_changes") await api.adminRequestChanges(sub.id, input);
       else if (action === "reject") await api.adminRejectSubmission(sub.id, input);
+      else if (action === "revoke") await api.adminRevokeSubmission(sub.id, input);
       else await api.adminFinishSubmission(sub.id);
       setConfirm(null);
       toast({
         tone: "ok",
-        title: { approve: "Aprovado", request_changes: "Mudanças pedidas", reject: "Envio recusado", finish: "Publicação concluída" }[action],
+        title: { approve: "Aprovado", request_changes: "Mudanças pedidas", reject: "Envio recusado", revoke: "Aprovação revogada", finish: "Publicação concluída" }[action],
         text: action === "approve" ? "O criador já pode confirmar com a conta dele. Nada foi assinado na cadeia." : undefined,
       });
       setNotes("");
@@ -576,13 +579,13 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
     <div className="card pad col" style={gap(16)}>
       <h2 className="h3">Decisão</h2>
 
-      {!inReview && !canReject && !canFinish ? (
+      {!inReview && !canReject && !canRevoke && !canFinish ? (
         <Notice tone="info" role="note">
           Este envio está em “{statusInfo(sub.status).label}”. Não há decisão para tomar agora.
         </Notice>
       ) : null}
 
-      {inReview || canReject ? (
+      {inReview || canReject || canRevoke ? (
         <>
           <div className="col" style={gap(8)} role="group" aria-label="Checklist da revisão">
             <span className="label">Checklist</span>
@@ -636,6 +639,14 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
             Recusar
           </Button>
         ) : null}
+        {canRevoke ? (
+          <>
+            <p className="small muted">O criador ainda não assinou: revogar volta o envio para “mudanças pedidas” (a nota é obrigatória) e libera a correção na mesma versão.</p>
+            <Button block variant="danger" icon="x" onClick={() => ask("revoke")}>
+              Revogar aprovação
+            </Button>
+          </>
+        ) : null}
         {canFinish ? (
           <>
             <p className="small muted">Use só se o evento de aprovação na cadeia não chegou sozinho: conclui o catálogo e coloca o especialista no ar.</p>
@@ -656,6 +667,7 @@ const CONFIRM: Record<Exclude<Pending, null>, { title: string; text: string; lab
   approve: { title: "Aprovar este envio?", text: "A versão aprovada (conteúdo, preço e versão) fica gravada e o criador passa a poder confirmar o cadastro. Depois disso, o conteúdo não pode mais ser trocado.", label: "Aprovar", variant: "ok" },
   request_changes: { title: "Pedir mudanças?", text: "O criador recebe a sua nota e envia o pacote corrigido na mesma versão.", label: "Pedir mudanças", variant: "primary" },
   reject: { title: "Recusar este envio?", text: "A recusa é definitiva para este envio: o criador vê a sua nota e só pode mandar um pacote novo.", label: "Recusar", variant: "danger" },
+  revoke: { title: "Revogar a aprovação?", text: "O criador ainda não assinou: o envio volta para “mudanças pedidas” com a sua nota, e a versão aprovada deixa de valer.", label: "Revogar", variant: "danger" },
   finish: { title: "Concluir a publicação?", text: "O especialista entra na vitrine agora. Confira se a aprovação na cadeia já aconteceu.", label: "Concluir", variant: "primary" },
 };
 

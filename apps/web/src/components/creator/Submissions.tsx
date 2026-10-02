@@ -10,6 +10,7 @@ import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
+import { Untrusted } from "@/components/ui/Untrusted";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { fileSizeText, loadErrorText, REVIEW_SLA_TEXT, statusInfo } from "@/lib/submissions-ui";
@@ -103,7 +104,7 @@ function List({ items }: { items: SubmissionView[] }) {
                 <div className="grow col" style={gap(6, { minWidth: 220 })}>
                   <div className="row wrapx" style={gap(10)}>
                     <Link className="bold" href={`/criador/envios/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                      {it.name || it.slug}
+                      <Untrusted>{it.name || it.slug}</Untrusted>
                     </Link>
                     <span className="tiny faint">v{it.version}</span>
                     <StatusChip status={it.status} nextAction={it.nextAction} />
@@ -114,7 +115,7 @@ function List({ items }: { items: SubmissionView[] }) {
                     {errors ? ` · ${errors} ${errors === 1 ? "erro" : "erros"}` : ""}
                   </span>
                 </div>
-                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/criador/envios/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={`${act ?? "Ver detalhes"}: ${it.name || it.slug}`}>
+                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/criador/envios/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={`${act ?? "Ver detalhes"}: $<Untrusted>{it.name || it.slug}</Untrusted>`}>
                   {act ?? "Ver detalhes"}
                 </Button>
               </li>

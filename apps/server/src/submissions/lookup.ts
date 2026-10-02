@@ -1,5 +1,7 @@
-import { and, eq, inArray, notInArray, or, ne } from "drizzle-orm";
+import { and, eq, inArray, notInArray, or, ne, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { RESERVED_SLUGS } from "@solvers/shared";
+import { PLATFORM_AGENT_IDS } from "../runtime/platform-agents.js";
 import { getPackage, reloadPackages, type SolverPackage } from "../runtime/packages.js";
 import { chain } from "../chain/index.js";
 import { DEFAULT_MIN_PRICE_UNITS } from "./rules.js";
@@ -81,6 +83,27 @@ export async function loadOwnership(args: { submissionId: string; creatorId: str
   return { idOwner, slugOwner, ownAgentId, published };
 }
 
+/**
+ * Colunas leves das listas (criador e fila do admin): sem o manifesto inteiro (jsonb de até 10 MB), sem `scans` nem `approved`.
+ * O nome sai truncado do próprio banco e as contagens do validador são calculadas lá.
+ */
+export const listColumns = {
+  id: schema.packageSubmissions.id,
+  creatorWallet: schema.packageSubmissions.creatorWallet,
+  agentId: schema.packageSubmissions.agentId,
+  slug: schema.packageSubmissions.slug,
+  version: schema.packageSubmissions.version,
+  status: schema.packageSubmissions.status,
+  sizeBytes: schema.packageSubmissions.sizeBytes,
+  reviewerNotes: schema.packageSubmissions.reviewerNotes,
+  error: schema.packageSubmissions.error,
+  createdAt: schema.packageSubmissions.createdAt,
+  updatedAt: schema.packageSubmissions.updatedAt,
+  name: sql<string | null>`left(${schema.packageSubmissions.manifest}->>'name', 80)`,
+  errorCount: sql<number>`case when jsonb_typeof(${schema.packageSubmissions.validation}->'errors') = 'array' then jsonb_array_length(${schema.packageSubmissions.validation}->'errors') else 0 end`,
+  warningCount: sql<number>`case when jsonb_typeof(${schema.packageSubmissions.validation}->'warnings') = 'array' then jsonb_array_length(${schema.packageSubmissions.validation}->'warnings') else 0 end`,
+};
+
 /** O Solver ainda não existe no catálogo (o registro on-chain será o `register_agent`, não o `update_version`). */
 export async function isNewAgent(agentId: string): Promise<boolean> {
   const [a] = await db.select({ id: schema.agents.id }).from(schema.agents).where(eq(schema.agents.id, agentId));
@@ -109,6 +132,44 @@ export async function duplicateVersion(args: { submissionId: string; wallet: str
       ),
     );
   return rows.length > 0;
+}
+
+/** Estados em que outro envio já "segura" o slug e o id (aprovado, em publicação ou no ar): bloqueiam a aprovação de outro criador. */
+const HOLDING_STATUSES = ["awaiting_creator_signature", "awaiting_onchain_approval", "publishing", "publish_failed", "published", "suspended", "withdrawn"];
+
+/**
+ * Conferência da aprovação (roda dentro da transação do revisor): o id e o slug da submissão ainda são do criador dela?
+ * Devolve o motivo em português ou null. O catálogo, os Solvers da plataforma, os slugs reservados e os envios de OUTRO
+ * criador já aprovados valem; envios apenas pendentes de outro criador não (o primeiro a ser aprovado leva).
+ */
+export async function ownershipConflict(args: { submissionId: string; wallet: string; agentId: string; slug: string }): Promise<string | null> {
+  const { agentId, slug } = args;
+  if (RESERVED_SLUGS.includes(slug)) return `O slug ${slug} é reservado.`;
+  if (PLATFORM_AGENT_IDS.includes(agentId)) return "O id deste Solver é reservado à plataforma.";
+  const [creator] = await db.select({ id: schema.creators.id }).from(schema.creators).where(eq(schema.creators.wallet, args.wallet));
+  if (!creator) return "O perfil de criador desta submissão não existe mais.";
+
+  const agents = await db.select({ id: schema.agents.id, slug: schema.agents.slug, creatorId: schema.agents.creatorId }).from(schema.agents).where(or(eq(schema.agents.id, agentId), eq(schema.agents.slug, slug)));
+  for (const a of agents) {
+    if (a.id !== agentId) return `O slug ${slug} já é de outro Solver no catálogo (${a.id}).`;
+    // A linha mínima do indexador (agente registrado antes do catálogo) guarda a carteira como dono e o id como slug.
+    if (a.creatorId !== creator.id && a.creatorId !== args.wallet) return "O id deste Solver já pertence a outro criador no catálogo.";
+    if (a.slug !== slug && a.slug !== a.id) return `Este Solver já existe no catálogo com outro slug (${a.slug}).`;
+  }
+
+  // Pacotes em disco: o da plataforma (pasta agents/) nunca é de criador.
+  for (const key of [agentId, slug]) {
+    const pkg = getPackage(key);
+    if (pkg && (pkg.platform || pkg.source === "agents")) return "O id ou o slug pertence a um Solver da plataforma.";
+  }
+
+  const holders = await db
+    .select({ wallet: schema.packageSubmissions.creatorWallet })
+    .from(schema.packageSubmissions)
+    .where(and(ne(schema.packageSubmissions.id, args.submissionId), ne(schema.packageSubmissions.creatorWallet, args.wallet), or(eq(schema.packageSubmissions.agentId, agentId), eq(schema.packageSubmissions.slug, slug)), inArray(schema.packageSubmissions.status, HOLDING_STATUSES)))
+    .limit(1);
+  if (holders.length > 0) return "Outro criador já tem uma versão aprovada com este id ou slug.";
+  return null;
 }
 
 /** Pacotes em disco (plataforma + publicados), um por id, relidos do disco: o worker é outro processo e não vê as trocas da API. */

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Ago } from "@/components/ui/Ago";
 import { Button } from "@/components/ui/Button";
+import { Untrusted } from "@/components/ui/Untrusted";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { statusInfo } from "@/lib/submissions-ui";
@@ -45,7 +46,7 @@ export function OpenSubmissions() {
             <div className="grow col" style={gap(4, { minWidth: 200 })}>
               <div className="row wrapx" style={gap(10)}>
                 <Link href={`/criador/envios/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                  {it.name || it.slug}
+                  <Untrusted>{it.name || it.slug}</Untrusted>
                 </Link>
                 <span className="tiny faint">v{it.version}</span>
                 <StatusChip status={it.status} nextAction={it.nextAction} />

@@ -8,7 +8,7 @@ import { randomId } from "../lib/crypto.js";
 import { h, HttpError, notFound, parse } from "../lib/http.js";
 import { manifestJsonSchema } from "../runtime/validate/json-schema.js";
 import { adminRouter } from "../submissions/admin-routes.js";
-import { isNewAgent, newAgentSet } from "../submissions/lookup.js";
+import { isNewAgent, listColumns, newAgentSet } from "../submissions/lookup.js";
 import { SUBMISSION_ID_RE } from "../submissions/paths.js";
 import { creatorNotReady, isAdminWallet, normalizeInviteCode, toSubmissionView } from "../submissions/rules.js";
 
@@ -99,9 +99,15 @@ creatorRouter.get(
   requireAuth,
   h(async (req): Promise<SubmissionView[]> => {
     const wallet = requireWallet(req);
-    const rows = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.creatorWallet, wallet)).orderBy(desc(schema.packageSubmissions.createdAt)).limit(100);
+    // Colunas leves: nada do manifesto inteiro (só o nome, truncado no banco), de `scans` ou de `approved`.
+    const rows = await db
+      .select({ ...listColumns, validation: schema.packageSubmissions.validation })
+      .from(schema.packageSubmissions)
+      .where(eq(schema.packageSubmissions.creatorWallet, wallet))
+      .orderBy(desc(schema.packageSubmissions.createdAt))
+      .limit(100);
     const fresh = await newAgentSet([...new Set(rows.map((r) => r.agentId))]);
-    return rows.map((r) => toSubmissionView(r, fresh.has(r.agentId)));
+    return rows.map((r) => toSubmissionView({ ...r, manifest: r.name ? { name: r.name } : null }, fresh.has(r.agentId)));
   }),
 );
 

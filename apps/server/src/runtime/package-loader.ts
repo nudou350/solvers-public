@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { Manifest } from "./manifest.js";
 import { resolveInsidePackage } from "./package-paths.js";
@@ -73,6 +73,32 @@ export function packageHash(dir: string): string {
     h.update(createHash("sha256").update(content).digest());
   }
   return h.digest("hex");
+}
+
+/**
+ * Carimbo barato das pastas de pacotes (nome, inode, mtime e tamanho do `manifest.json` de cada pacote): muda quando outro
+ * processo (a CLI `cli:approve`, o worker) troca uma pasta ou publica uma versão nova. Só stat, sem ler conteúdo.
+ */
+export function packagesStamp(roots: readonly string[]): string {
+  const parts: string[] = [];
+  for (const root of roots) {
+    let names: string[];
+    try {
+      names = readdirSync(root).sort();
+    } catch {
+      continue; // pasta inexistente (nenhum criador publicou ainda)
+    }
+    for (const name of names) {
+      if (name.startsWith(".") || name.startsWith("_")) continue;
+      try {
+        const st = statSync(join(root, name, "manifest.json"));
+        parts.push(`${root}|${name}|${st.ino}|${Math.trunc(st.mtimeMs)}|${st.size}`);
+      } catch {
+        // sem manifest.json (pasta solta ou troca em andamento): não entra
+      }
+    }
+  }
+  return parts.join("\n");
 }
 
 /** Item de gate: texto ou objeto com evidência (v1); o motor entrega só o texto. */

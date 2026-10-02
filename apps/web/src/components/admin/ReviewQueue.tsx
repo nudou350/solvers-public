@@ -9,6 +9,7 @@ import { Ago } from "@/components/ui/Ago";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Empty } from "@/components/ui/Empty";
+import { Untrusted, untrusted } from "@/components/ui/Untrusted";
 import { Loading } from "@/components/ui/Spinner";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
@@ -103,10 +104,10 @@ function Queue() {
                 <li key={r.id} className={creator.queueRow}>
                   <div className="col" style={gap(4, { minWidth: 0 })}>
                     <Link href={`/admin/revisoes/${encodeURIComponent(r.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
-                      {r.name || r.slug}
+                      <Untrusted>{r.name || r.slug}</Untrusted>
                     </Link>
                     <span className="tiny faint" style={{ overflowWrap: "anywhere" }}>
-                      {r.slug} · v{r.version}
+                      <Untrusted>{r.slug}</Untrusted> · v{r.version}
                     </span>
                     <span className="row wrapx" style={gap(6)}>
                       <Chip tone={r.isNewAgent ? "brand" : "default"}>{r.isNewAgent ? "Especialista novo" : "Nova versão"}</Chip>
@@ -116,7 +117,7 @@ function Queue() {
                   </div>
                   <div className="col" style={gap(2, { minWidth: 0 })}>
                     <span className="small" style={{ overflowWrap: "anywhere" }}>
-                      {r.creatorName || "Sem nome"}
+                      <Untrusted>{r.creatorName || "Sem nome"}</Untrusted>
                     </span>
                     <span className="tiny faint mono" style={{ overflowWrap: "anywhere" }}>
                       {r.creatorWallet}
@@ -135,7 +136,7 @@ function Queue() {
                       </span>
                     ) : null}
                   </div>
-                  <Button variant="secondary" size="sm" href={`/admin/revisoes/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={`Revisar ${r.name || r.slug}`}>
+                  <Button variant="secondary" size="sm" href={`/admin/revisoes/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={`Revisar ${untrusted(r.name || r.slug)}`}>
                     Revisar
                   </Button>
                 </li>

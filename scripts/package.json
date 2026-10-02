@@ -6,6 +6,7 @@
   "scripts": {
     "bootstrap": "tsx src/bootstrap-chain.ts",
     "e2e:purchase": "tsx src/e2e-purchase.ts",
+    "e2e:creator": "tsx --env-file=../apps/server/.env.qa src/e2e-creator.ts",
     "e2e:resale": "tsx src/e2e-resale.ts",
     "eval": "tsx src/eval.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

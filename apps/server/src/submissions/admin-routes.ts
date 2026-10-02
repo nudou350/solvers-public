@@ -11,10 +11,10 @@ import { searchKnowledgeInVersion } from "../knowledge/ingest.js";
 import { badRequest, forbidden, h, HttpError, notFound, parse } from "../lib/http.js";
 import { PackagePathError, resolveInsidePackage } from "../runtime/package-paths.js";
 import { packageFromFolder } from "../runtime/validate/input.js";
-import { isNewAgent, newAgentSet } from "./lookup.js";
+import { isNewAgent, listColumns, newAgentSet } from "./lookup.js";
 import { extractedDirOf, stagingVersion, SUBMISSION_ID_RE } from "./paths.js";
-import { approveSubmission, rejectSubmission, requestChanges } from "./review.js";
-import { differentiatorsOf, isAdminWallet, reviewPathProblem, toAdminRow, toSubmissionView } from "./rules.js";
+import { approveSubmission, rejectSubmission, requestChanges, revokeApproval } from "./review.js";
+import { differentiatorsOf, isAdminWallet, reviewPathProblem, toAdminListRow, toSubmissionView } from "./rules.js";
 
 // Revisão no site (PACKAGE_SPEC.md 14.4 e 14.5). Admin = carteira em ADMIN_WALLETS, confirmada pelo login.
 // A tela de revisão é o alvo mais valioso (quem aprova publica): toda resposta é JSON de TEXTO, sem HTML, com
@@ -56,7 +56,7 @@ adminRouter.get(
     const raw = typeof req.query.status === "string" ? req.query.status : undefined;
     const status = raw === undefined ? undefined : parse(SubmissionStatus, raw);
     const rows = await db
-      .select({ s: schema.packageSubmissions, wallet: schema.creators.wallet, creatorName: schema.creators.name })
+      .select({ s: listColumns, wallet: schema.creators.wallet, creatorName: schema.creators.name })
       .from(schema.packageSubmissions)
       .leftJoin(schema.creators, eq(schema.creators.wallet, schema.packageSubmissions.creatorWallet))
       .where(status ? eq(schema.packageSubmissions.status, status) : undefined)
@@ -64,7 +64,7 @@ adminRouter.get(
       .orderBy(status === "pending_review" ? schema.packageSubmissions.createdAt : desc(schema.packageSubmissions.createdAt))
       .limit(200);
     const fresh = await newAgentSet([...new Set(rows.map((r) => r.s.agentId))]);
-    return rows.map((r) => toAdminRow(r.s, { wallet: r.wallet ?? r.s.creatorWallet, name: r.creatorName ?? null }, fresh.has(r.s.agentId)));
+    return rows.map((r) => toAdminListRow(r.s, { wallet: r.wallet ?? r.s.creatorWallet, name: r.creatorName ?? null }, fresh.has(r.s.agentId)));
   }),
 );
 
@@ -78,7 +78,7 @@ async function knowledgeSummary(agentId: string, submissionId: string): Promise<
     .select({
       files: sql<number>`count(distinct ${k.source})::int`,
       chunks: sql<number>`count(*)::int`,
-      expired: sql<number>`count(*) filter (where ${k.validUntil} is not null and ${k.validUntil} < current_date)::int`,
+      expired: sql<number>`count(*) filter (where ${k.validUntil} is not null and ${k.validUntil} < (now() at time zone 'America/Sao_Paulo')::date)::int`,
     })
     .from(k)
     .where(and(eq(k.agentId, agentId), eq(k.version, version)));
@@ -159,3 +159,5 @@ const ctxOf = (req: Request) => ({ id: idParam(req), reviewerWallet: req.wallet!
 adminRouter.post("/admin/submissions/:id/approve", h((req) => approveSubmission(ctxOf(req))));
 adminRouter.post("/admin/submissions/:id/request-changes", h((req) => requestChanges(ctxOf(req))));
 adminRouter.post("/admin/submissions/:id/reject", h((req) => rejectSubmission(ctxOf(req))));
+/** Desfaz uma aprovação ainda não assinada pelo criador (volta a `changes_requested`; motivo obrigatório). */
+adminRouter.post("/admin/submissions/:id/revoke", h((req) => revokeApproval(ctxOf(req))));

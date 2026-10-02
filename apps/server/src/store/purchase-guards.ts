@@ -2,7 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { refreshLicenseOwner } from "../indexer/sync.js";
 import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
-import { purchaseBlock } from "./purchase-rules.js";
+import { getPackage } from "../runtime/packages.js";
+import { notListedBlock, purchaseBlock } from "./purchase-rules.js";
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
@@ -28,5 +29,11 @@ export async function assertCanPurchase(wallet: string, agent: AgentRow): Promis
   assertNotPlatformAgent(agent); // Solver gratuito da plataforma: não há licença para vender (409 platform_agent_not_for_sale)
   const [creator] = await db.select({ wallet: schema.creators.wallet }).from(schema.creators).where(eq(schema.creators.id, agent.creatorId));
   const block = purchaseBlock({ wallet, creatorWallet: creator?.wallet ?? null, ownedAssetId: await ownedLicenseId(wallet, agent.id) });
+  if (block) throw block;
+}
+
+/** Compra (licença, Pix, x402): o agente precisa estar listado e ter pacote em disco (409 `agent_not_listed`). */
+export function assertListedAndLoadable(agent: Pick<AgentRow, "id" | "listed">): void {
+  const block = notListedBlock({ listed: agent.listed, hasPackage: getPackage(agent.id) !== undefined });
   if (block) throw block;
 }

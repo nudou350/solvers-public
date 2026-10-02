@@ -136,10 +136,12 @@ export async function publicationResult(submissionId: string, result: FinalizeRe
  */
 export async function confirmPublication(input: PublicationConfirmInput, wallet: string, port: PublishChain): Promise<PublicationResult> {
   const sub = await loadOwnedSubmission(input.submissionId, wallet);
-  if (!(await port.signatureTouchesAgent(input.signature, sub.agentId))) {
+  const kind = input.kind ? KIND_TO_TOUCH[input.kind] : undefined;
+  // O tipo de evento (quando o cliente diz qual passo foi) e o signatário (a carteira do criador) precisam bater.
+  if (!(await port.signatureTouchesAgent(input.signature, sub.agentId, { kind, creatorWallet: sub.creatorWallet }))) {
     throw badRequest("Esta transação não é deste Solver.", "signature_not_for_agent");
   }
   await port.indexSignature(input.signature).catch(() => undefined);
-  const { result } = await reconcileAgent(sub.agentId, { signature: input.signature, kind: input.kind ? KIND_TO_TOUCH[input.kind] : "pricing" });
+  const { result } = await reconcileAgent(sub.agentId, { signature: input.signature, kind: kind ?? "pricing" });
   return publicationResult(sub.id, result, port);
 }

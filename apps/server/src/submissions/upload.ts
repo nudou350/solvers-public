@@ -129,14 +129,14 @@ const handler: RequestHandler = async (req, res) => {
   const id = existing?.id ?? randomId(12);
   const dir = submissionDir(id);
   await mkdir(dir, { recursive: true, mode: 0o750 });
-  const part = `${zipPathOf(id)}.part`;
+  // Nome único por requisição: reenvios simultâneos da mesma submissão não escrevem no mesmo arquivo (a faxina apaga `.part` antigo).
+  const part = `${zipPathOf(id)}.${randomId(6)}.part`;
   const cleanup = async () => {
     await rm(part, { force: true });
     if (!existing) await rm(dir, { recursive: true, force: true });
   };
   let size: number;
   try {
-    await rm(part, { force: true });
     size = await receiveBody(req, part, max);
     if (size === 0) throw err(400, "O corpo da requisição está vazio.", "empty_body");
     if (!looksLikeZip(part)) throw err(400, "O arquivo enviado não é um ZIP.", "not_a_zip");
@@ -145,15 +145,30 @@ const handler: RequestHandler = async (req, res) => {
     throw e;
   }
 
-  // Resubmissão: o ZIP novo substitui o antigo (rename atômico) e só então a linha volta a `validating`.
+  // Resubmissão: com a linha travada e ainda em `changes_requested`, o ZIP novo substitui o antigo (rename atômico) e a linha
+  // volta a `validating` na mesma transação. Dois reenvios simultâneos (cada um com o seu `.part`) não se atropelam: o segundo
+  // espera a trava, vê o estado novo e recebe 409 sem ter tocado em `package.zip`.
   if (existing) {
-    await rename(part, zipPathOf(id));
-    const upd = await db
-      .update(schema.packageSubmissions)
-      .set({ status: "validating", sizeBytes: size, zipPath: zipRelPath(id), manifest: null, validation: null, scans: null, error: null, updatedAt: new Date() })
-      .where(and(eq(schema.packageSubmissions.id, id), eq(schema.packageSubmissions.status, "changes_requested")))
-      .returning({ id: schema.packageSubmissions.id });
-    if (upd.length === 0) throw err(409, "Este envio não aceita mais um ZIP novo.", "not_resubmittable");
+    let replaced: boolean;
+    try {
+      replaced = await db.transaction(async (tx) => {
+        const locked = await tx.execute<{ status: string }>(sql`select status from package_submissions where id = ${id} for update`);
+        if (locked.rows[0]?.status !== "changes_requested") return false;
+        await rename(part, zipPathOf(id));
+        await tx
+          .update(schema.packageSubmissions)
+          .set({ status: "validating", sizeBytes: size, zipPath: zipRelPath(id), manifest: null, validation: null, scans: null, error: null, attempts: 0, updatedAt: new Date() })
+          .where(and(eq(schema.packageSubmissions.id, id), eq(schema.packageSubmissions.status, "changes_requested")));
+        return true;
+      });
+    } catch (e) {
+      await rm(part, { force: true });
+      throw e;
+    }
+    if (!replaced) {
+      await rm(part, { force: true });
+      throw err(409, "Este envio não aceita mais um ZIP novo.", "not_resubmittable");
+    }
     await notifyAdmin(adminMessage("resubmitted", { id, slug: existing.slug, version: existing.version, creatorWallet: wallet, name: (existing.manifest?.name as string | undefined) ?? null }));
     void kick(id);
     res.status(202).json({ id, status: "validating" });

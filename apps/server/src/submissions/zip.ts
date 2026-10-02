@@ -206,9 +206,22 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
   const rootName = [...roots][0] ?? "";
   if (staged.length === 0 || roots.size !== 1 || flat.length > 0) {
     problems.push(issue("ZIP_BAD_ROOT", "", `O ZIP precisa ter exatamente 1 pasta raiz com o manifest.json (achei ${flat.length ? "arquivos soltos na raiz" : `${roots.size} raízes`})`, "Coloque tudo dentro de uma única pasta com o manifest.json."));
-  } else if (!seen.has(`${rootName}/manifest.json`.toLowerCase())) {
-    problems.push(issue("ZIP_BAD_ROOT", `${rootName}/manifest.json`, "Falta o manifest.json dentro da pasta raiz", "Coloque o manifest.json direto na pasta raiz do pacote."));
+  } else if (!staged.some((s) => s.name === `${rootName}/manifest.json`)) {
+    // Nome exato: `MANIFEST.JSON` passaria numa comparação sem caixa, mas o resto do sistema lê `manifest.json`.
+    problems.push(issue("ZIP_BAD_ROOT", `${rootName}/manifest.json`, "Falta o manifest.json (com este nome exato, em minúsculas) dentro da pasta raiz", "Coloque o manifest.json direto na pasta raiz do pacote."));
   }
+
+  // Um caminho que é arquivo e pasta ao mesmo tempo (`a/b` e `a/b/c.md`) não existe em disco: erro limpo, não EISDIR/ENOTDIR.
+  const fileKeys = new Set(staged.map((s) => s.name.toLowerCase()));
+  const clash = new Set<string>();
+  for (const s of staged) {
+    const segs = s.name.split("/");
+    for (let i = 1; i < segs.length; i++) {
+      const prefix = segs.slice(0, i).join("/");
+      if (fileKeys.has(prefix.toLowerCase())) clash.add(prefix);
+    }
+  }
+  for (const p of clash) problems.push(issue("ZIP_BAD_PATH", p, "O mesmo caminho aparece como arquivo e como pasta", "Renomeie o arquivo ou a pasta para que não colidam."));
 
   const items: Item[] = [];
   for (const s of staged) {
@@ -273,7 +286,9 @@ async function extractItems(zf: yauzl.ZipFile, items: Item[], root: string, limi
       await pipeline(src, counter, createWriteStream(dest, { flags: "wx", mode: 0o640 }));
     } catch (e) {
       if (e instanceof ZipError) throw e;
-      throw new ZipError([issue("ZIP_UNREADABLE", it.rel, `Não consegui extrair o arquivo: ${(e as Error).message}`, "Gere o ZIP de novo.")]);
+      // O detalhe (pode trazer caminho de disco) fica no log; o criador recebe texto fixo.
+      console.error(`[zip] falha ao extrair ${it.rel}:`, (e as Error).message);
+      throw new ZipError([issue("ZIP_UNREADABLE", it.rel, "Não consegui extrair este arquivo do ZIP.", "Gere o ZIP de novo.")]);
     }
     if (size !== it.declared) {
       // O cabeçalho mentiu sobre o tamanho: ZIP adulterado ou corrompido.

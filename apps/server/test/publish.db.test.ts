@@ -494,8 +494,12 @@ describe("publicação com banco e cadeia simulada", { skip: url ? false : "defi
       const first = await finalizePublication(S4, {
         deps: { renameKnowledge: async () => Promise.reject(new Error("banco caiu")), reload: () => void reloads++ },
       });
-      assert.deepEqual(first, { outcome: "failed", error: "banco caiu" });
+      // Erro interno (banco): o criador vê texto fixo, o detalhe ("banco caiu") fica no log e no aviso do admin.
+      assert.equal(first.outcome, "failed");
+      assert.match(String((first as { error?: string }).error), /erro interno/);
+      assert.doesNotMatch(String((first as { error?: string }).error), /banco caiu/);
       assert.equal((await sub(S4)).status, "publish_failed");
+      assert.doesNotMatch((await sub(S4)).error ?? "", /banco caiu/);
       assert.equal(reloads, 0);
       assert.equal(publishedVersionOf(join(PUBLISHED, SLUG)), "1.3.0", "o disco já tinha sido trocado");
       assert.equal(publishedVersionOf(join(PUBLISHED, "_archive", SLUG, "1.2.0")), "1.2.0");

@@ -12,7 +12,7 @@ import { assertFreshPrice } from "../store/fresh-price.js";
 import { assertEntriesOpen } from "../store/pause-gate.js";
 import { assertSupplyOpen } from "../store/supply.js";
 import { isRowSoldOut } from "../store/supply-rules.js";
-import { assertCanPurchase } from "../store/purchase-guards.js";
+import { assertCanPurchase, assertListedAndLoadable } from "../store/purchase-guards.js";
 import { facilitator } from "./facilitator.js";
 import { fulfilOrder } from "./mint.js";
 import { countOpenOrders, createOrder, getOrder, move, type OrderRow } from "./orders.js";
@@ -53,6 +53,7 @@ async function sellableAgent(idOrSlug: string): Promise<AgentRow> {
   const row = await findAgentRow(idOrSlug);
   assertNotPlatformAgent(row); // Solver gratuito da plataforma: não se vende por x402 (409 platform_agent_not_for_sale)
   if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
+  assertListedAndLoadable(row); // sem catálogo nem pacote não se vende (409 agent_not_listed)
   await assertFreshPrice(row);
   // Teto de licenças atingido: 409 sold_out ANTES de qualquer ordem ou cobrança (o programa também recusaria, mas aí o agente já teria pago).
   assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });

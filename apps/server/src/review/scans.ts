@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { chunkMarkdown } from "../knowledge/chunk.js";
+import { todayInSaoPaulo } from "../knowledge/search-rules.js";
 import { isIsoDate, parseFrontMatter } from "../runtime/validate/frontmatter.js";
 import type { PackageInput } from "../runtime/validate/index.js";
 import { hiddenCharsAll, injectionMatch, revealHiddenChars, sensitiveAsk, sensitiveQuestion, urlsIn } from "../runtime/validate/text-scans.js";
@@ -124,7 +125,8 @@ const DANGEROUS_TAG = /<\s*(script|iframe|object|embed|meta|base|link)\b/gi;
 const STYLE_TAG = /<\s*style\b/gi;
 const ANY_TAG = /<[a-z][a-z0-9]*\b[^>]{0,500}>/gi;
 const MD_COMMENT = /^[ \t]*\[\/\/\]:\s*#\s*[("']/gm;
-const BAD_LINK = /(?:\]\(|href\s*=\s*["']?)\s*(?:javascript|vbscript|data)\s*:/gi;
+// Repetições com teto ({0,20}): `\s*=\s*["']?\s*` seguido de falha era quadrático (href= + 80 mil espaços).
+const BAD_LINK = /(?:\]\(|href\s{0,20}=\s{0,20}["']?)\s{0,20}(?:javascript|vbscript|data)\s{0,20}:/gi;
 const REMOTE_IMAGE = /!\[[^\]\n]{0,200}\]\(\s*(https?:\/\/[^)\s]+)/gi;
 
 type HtmlHit = { kind: "hidden_html" | "remote_image"; severity: ScanSeverity; index: number; length: number; detail: string };
@@ -402,7 +404,7 @@ export function scanPackage(input: PackageInput, ctx: ScanContext = {}): ScanRep
             if (v !== undefined) corpus.push(Array.isArray(v) ? v.join(" ") : v);
           }
           const vu = fm.data.valid_until;
-          const expired = typeof vu === "string" && isIsoDate(vu) && new Date(`${vu}T23:59:59Z`) < now;
+          const expired = typeof vu === "string" && isIsoDate(vu) && vu < todayInSaoPaulo(now);
           if (expired) {
             const n = chunkMarkdown(body).length;
             counts.expiredFiles += 1;

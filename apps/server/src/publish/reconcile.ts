@@ -53,8 +53,9 @@ async function recordSignature(submissionId: string, version: string | null, age
     return;
   }
   if (touch.kind === "registered" || touch.kind === "version") {
-    // O registro/versão é "a" transação da publicação: vale a mais recente dela (a do preço não a sobrescreve).
-    await db.update(t).set({ registerTx: touch.signature, updatedAt: new Date() }).where(eq(t.id, submissionId));
+    // O registro/versão é "a" transação da publicação: só grava quando está vazio (uma assinatura posterior, de outra
+    // transação, não troca a que já foi ligada à submissão).
+    await db.update(t).set({ registerTx: touch.signature, updatedAt: new Date() }).where(and(eq(t.id, submissionId), isNull(t.registerTx)));
     return;
   }
   await db.update(t).set({ registerTx: touch.signature, updatedAt: new Date() }).where(and(eq(t.id, submissionId), isNull(t.registerTx)));

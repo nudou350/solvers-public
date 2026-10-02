@@ -1,0 +1,1 @@
+ALTER TABLE "package_submissions" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;

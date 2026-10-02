@@ -40,7 +40,7 @@ const INJECTION: RegExp[] = [
   /do\s+not\s+(?:tell|reveal|show)\s+(?:this\s+)?(?:to\s+)?the\s+user/i,
   /(?:envie|copie|encaminhe|exfiltre)\s+(?:todo\s+)?(?:o\s+)?(?:conte(?:ú|u)do|hist(?:ó|o)rico|dados|mem(?:ó|o)ria|arquivos?)\s+(?:do\s+usu(?:á|a)rio\s+)?para\s+(?:https?:\/\/|um\s+(?:site|servidor|endere(?:ç|c)o))/i,
   /(?:act|aja)\s+(?:as|como)\s+(?:the\s+)?(?:system|sistema|administrador)/i,
-  /<\s*\/?\s*(?:system|instructions?)\s*>/i,
+  /<\s{0,20}\/?\s{0,20}(?:system|instructions?)\s{0,20}>/i,
 ];
 
 export function injectionMatch(text: string): string | null {
@@ -51,28 +51,56 @@ export function injectionMatch(text: string): string | null {
   return null;
 }
 
+/** Teto de tamanho do trecho que recebe regex: linhas e URLs maiores são cortadas (defesa contra backtracking). */
+const MAX_SEGMENT = 2000;
+
+/** Linhas do texto, com as maiores que `MAX_SEGMENT` partidas em pedaços (nenhuma regex roda em trecho gigante). */
+function* segments(text: string): Generator<string> {
+  for (const line of text.split("\n")) {
+    if (line.length <= MAX_SEGMENT) yield line;
+    else for (let i = 0; i < line.length; i += MAX_SEGMENT) yield line.slice(i, i + MAX_SEGMENT);
+  }
+}
+
 const ASK_VERBS = /\b(?:pe(?:ç|c)a|solicite|pergunte|informe|envie|forne(?:ç|c)a|cole|digite|ask|request|provide|send)\b/i;
 const SENSITIVE = /\b(?:senha|password|cpf|cnpj|n(?:ú|u)mero\s+do\s+cart(?:ã|a)o|cart(?:ã|a)o\s+de\s+cr(?:é|e)dito|cvv|c(?:ó|o)digo\s+de\s+seguran(?:ç|c)a|token\s+de\s+acesso|chave\s+privada|frase\s+secreta|seed\s+phrase|login\s+do\s+gov\.?br)\b/i;
 const NEGATION = /\b(?:nunca|jamais|n(?:ã|a)o|sem|evite|never|don'?t|do\s+not)\b/i;
 
 /** Linha que manda pedir dado sensível ao usuário (ignora as que dizem "nunca peça ..."). */
 export function sensitiveAsk(text: string): string | null {
-  for (const line of text.split("\n")) {
+  for (const line of segments(text)) {
     if (ASK_VERBS.test(line) && SENSITIVE.test(line) && !NEGATION.test(line)) return line.trim().slice(0, 160);
   }
   return null;
 }
 
-const URL_RE = /https?:\/\/[^\s)>\]"'`]+/gi;
+const URL_RE = /https?:\/\/[^\s)>\]"'`]{1,2000}/gi;
 const SEND_WORDS = /\b(?:envie|enviar|poste|post|upload|webhook|encaminhe|submeta|submit|send|grave\s+em)\b/i;
+
+/** Tem `?` seguido (antes de qualquer `#`) de `=`: parâmetros na consulta. Linear (a regex `\?[^#\s]*=` era quadrática). */
+function hasQueryParams(u: string): boolean {
+  const q = u.indexOf("?");
+  if (q === -1) return false;
+  const eq = u.indexOf("=", q + 1);
+  if (eq === -1) return false;
+  const hash = u.indexOf("#", q + 1);
+  return hash === -1 || eq < hash;
+}
+
+/** Tira a pontuação do fim da URL (linear). */
+function trimTrailingPunct(u: string): string {
+  let end = u.length;
+  while (end > 0 && ".,;:!?".includes(u[end - 1]!)) end -= 1;
+  return u.slice(0, end);
+}
 
 /** URL de envio de dados: na mesma linha de um verbo de envio, ou com parâmetros na consulta (?a=b). */
 export function sendingUrl(text: string): string | null {
-  for (const line of text.split("\n")) {
+  for (const line of segments(text)) {
     const urls = line.match(URL_RE);
     if (!urls) continue;
     for (const u of urls) {
-      if (SEND_WORDS.test(line) || /\?[^#\s]*=/.test(u)) return u;
+      if (SEND_WORDS.test(line) || hasQueryParams(u)) return u;
     }
   }
   return null;
@@ -81,12 +109,12 @@ export function sendingUrl(text: string): string | null {
 /** Todas as URLs http(s) do texto, sem pontuação final, marcando as de envio de dados (mesmo critério de `sendingUrl`). */
 export function urlsIn(text: string): { url: string; sending: boolean; line: string }[] {
   const out: { url: string; sending: boolean; line: string }[] = [];
-  for (const line of text.split("\n")) {
+  for (const line of segments(text)) {
     const urls = line.match(URL_RE);
     if (!urls) continue;
     for (const raw of urls) {
-      const url = raw.replace(/[.,;:!?]+$/, "");
-      out.push({ url, sending: SEND_WORDS.test(line) || /\?[^#\s]*=/.test(url), line: line.trim() });
+      const url = trimTrailingPunct(raw);
+      out.push({ url, sending: SEND_WORDS.test(line) || hasQueryParams(url), line: line.trim() });
     }
   }
   return out;

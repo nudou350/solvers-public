@@ -14,6 +14,7 @@ import { assertNotPlatformAgent } from "../runtime/platform-agents.js";
 import { findAgentRow, guaranteeOffer } from "../store/catalog.js";
 import { brlPerUsd } from "../store/fx.js";
 import { assertFreshPrice } from "../store/fresh-price.js";
+import { assertListedAndLoadable } from "../store/purchase-guards.js";
 import { assertSupplyOpen } from "../store/supply.js";
 import { ensureProfile } from "../store/profile.js";
 import { credit, markApproved } from "./credit.js";
@@ -118,11 +119,13 @@ export async function neededUnits(wallet: string, agentId: string, type: "perman
   if (type === "permanent") {
     // Esgotado: não cobra Pix (nem SODAX, que usa esta função) por uma compra que o programa recusaria.
     assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
+    assertListedAndLoadable(row); // sem catálogo nem pacote não se cobra (409 agent_not_listed)
     // O preço pode ter mudado on-chain sem evento: confere antes de cobrar o Pix do valor antigo.
     await assertFreshPrice(row);
     total = row.price;
   }
   else {
+    assertListedAndLoadable(row);
     const offer = guaranteeOffer(row, 1);
     if (!offer) throw badRequest("Este especialista não oferece tarefa com garantia.");
     total = usdcToUnits(offer.priceUsdc);

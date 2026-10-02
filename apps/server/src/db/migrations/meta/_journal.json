@@ -120,6 +120,20 @@
       "when": 1790950411409,
       "tag": "0016_creator_submissions",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790953574336,
+      "tag": "0017_submission_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790954219489,
+      "tag": "0018_package_reviews_no_truncate",
+      "breakpoints": true
     }
   ]
 }

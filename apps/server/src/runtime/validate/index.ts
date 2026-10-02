@@ -1,5 +1,6 @@
 import { RESERVED_SLUGS, THIRD_PARTY_CATEGORIES } from "@solvers/shared";
 import { chunkMarkdown } from "../../knowledge/chunk.js";
+import { todayInSaoPaulo } from "../../knowledge/search-rules.js";
 import { VERSION_RE } from "../agent-ids.js";
 import { Manifest } from "../manifest.js";
 import { relativePathProblem } from "../package-paths.js";
@@ -522,7 +523,7 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
           withDate += 1;
         }
         const vu = fm.data.valid_until;
-        if (typeof vu === "string" && isIsoDate(vu) && new Date(`${vu}T23:59:59Z`) < now) {
+        if (typeof vu === "string" && isIsoDate(vu) && vu < todayInSaoPaulo(now)) {
           expired += 1;
           add("A", "KNOWLEDGE_EXPIRED", p, `O conteúdo venceu em ${vu}`, "Atualize o arquivo ou remova-o.");
         }

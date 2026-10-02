@@ -404,7 +404,9 @@ describe("envio de pacotes com banco", { skip: url ? false : "defina TEST_DATABA
       await assert.rejects(proc.processSubmission(id, deps), /modelo caiu/);
       let s = await row(id);
       assert.equal(s.status, "validating");
-      assert.match(s.error ?? "", /modelo caiu/);
+      // O criador vê texto fixo; o detalhe ("modelo caiu") fica no log e em ingest_jobs.
+      assert.match(s.error ?? "", /ingestão do conhecimento falhou/i);
+      assert.doesNotMatch(s.error ?? "", /modelo caiu/);
       const [job] = await db.select().from(schema.ingestJobs).where(eq(schema.ingestJobs.submissionId, id));
       assert.deepEqual([job!.status, job!.filesDone], ["failed", 1]);
 
@@ -641,9 +643,11 @@ describe("envio de pacotes com banco", { skip: url ? false : "defina TEST_DATABA
       assert.equal((await db.select().from(schema.agentPublishedVersions).where(eq(schema.agentPublishedVersions.agentId, (await row(id)).agentId))).length, 0);
     });
 
-    it("package_reviews é somente-inserção: UPDATE e DELETE falham no banco", async () => {
+    it("package_reviews é somente-inserção: UPDATE, DELETE e TRUNCATE falham no banco", async () => {
       await assert.rejects(pool.query("update package_reviews set notes = 'adulterado' where submission_id = $1", [pending]), /somente-inserção/);
       await assert.rejects(pool.query("delete from package_reviews where submission_id = $1", [pending]), /somente-inserção/);
+      // O gatilho por linha não cobre TRUNCATE: a migration 0018 acrescenta um gatilho de comando.
+      await assert.rejects(pool.query("truncate package_reviews"), /somente-inserção/);
       const [rv] = await db.select().from(schema.packageReviews).where(eq(schema.packageReviews.submissionId, pending));
       assert.equal(rv!.notes, "Revisei tudo: ok");
     });

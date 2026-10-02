@@ -63,7 +63,8 @@ try {
     process.exitCode = 2;
   } else {
     const msg = e instanceof TxError ? friendlyError(e, e.logs) : e instanceof ApproveError || e instanceof NetworkError ? e.message : ((e as Error)?.message ?? String(e));
-    console.error(`Falhou: ${msg}`);
+    const cause = (e as { cause?: { message?: string } })?.cause?.message;
+    console.error(`Falhou: ${msg}${cause ? ` (causa: ${cause})` : ""}`);
     process.exitCode = 1;
   }
 } finally {
