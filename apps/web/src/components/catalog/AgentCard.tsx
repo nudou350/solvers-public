@@ -6,6 +6,7 @@ import { Tile } from "@/components/ui/Tile";
 import { brl0, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref } from "./data";
+import { DifferentiatorBadges, FreeTag } from "./PlatformBits";
 import { SupplyTag } from "./SupplyTag";
 import { TrialTag } from "./TrialTag";
 
@@ -32,13 +33,18 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
         {a.trialAvailable ? <TrialTag agentId={a.id} /> : null}
         <SupplyTag supply={a.supply} />
       </div>
+      <DifferentiatorBadges keys={a.differentiators} max={3} />
       <div className="row between wrapx" style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-        <div>
-          <div className="bold num" style={{ fontSize: 20 }}>
-            {brl0(a.priceUsdc, rate)}
+        {a.platform ? (
+          <FreeTag />
+        ) : (
+          <div>
+            <div className="bold num" style={{ fontSize: 20 }}>
+              {brl0(a.priceUsdc, rate)}
+            </div>
+            <div className="tiny faint">ou {usdc(a.priceUsdc)}</div>
           </div>
-          <div className="tiny faint">ou {usdc(a.priceUsdc)}</div>
-        </div>
+        )}
         <span className="btn btn-secondary" style={{ minHeight: 44 }}>
           Ver detalhes
         </span>

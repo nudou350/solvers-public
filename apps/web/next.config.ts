@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     // A tela de consentimento do conector nunca pode ser embutida (clickjacking).
+    // O mesmo vale para a revisão de pacotes (/admin) e o acompanhamento do criador (/criador): mostram conteúdo
+    // enviado por terceiros e ações com poder (aprovar, co-assinar). Só se ACRESCENTAM travas: nada aqui afrouxa
+    // um cabeçalho que a aplicação já mande. A CSP completa (script-src com nonce) fica fora porque o Next injeta scripts
+    // inline; o conteúdo do criador é sempre texto escapado, nunca HTML (ver components/admin/ReviewDetail.tsx).
+    const guarded = [
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+    ];
     return [
       {
         source: "/conectar",
@@ -19,6 +29,8 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      { source: "/admin/:path*", headers: [...guarded, { key: "Cache-Control", value: "no-store" }] },
+      { source: "/criador/:path*", headers: guarded },
     ];
   },
   async rewrites() {

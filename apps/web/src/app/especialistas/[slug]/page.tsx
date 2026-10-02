@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { cache, type CSSProperties } from "react";
 import { BeforeAfterBlock, Reviews, Scores, Versions } from "@/components/catalog/AgentSections";
 import { BuyBox } from "@/components/catalog/BuyBox";
+import { DifferentiatorBadges } from "@/components/catalog/PlatformBits";
 import { Gallery } from "@/components/catalog/Gallery";
 import { ClampedText } from "@/components/ui/ClampedText";
 import { TrialBlock } from "@/components/catalog/TrialBlock";
@@ -17,6 +18,7 @@ import { Tile } from "@/components/ui/Tile";
 import { ApiError, serverApi } from "@/lib/api";
 import { clusterName, explorerLink } from "@/lib/explorer";
 import { brl, brlValue, categoryLabel, connectorName, durationText, initials, repLevel, usdc } from "@/lib/format";
+import { DIFFERENTIATORS, knownDifferentiators } from "@/lib/differentiators";
 import { gap } from "@/lib/style";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +81,7 @@ export default async function AgentPage({ params }: Props) {
   const connectors = req("connector");
   const plan = req("plan")[0]?.label ?? null;
   const g = d.guarantee;
+  const diffs = knownDifferentiators(a.differentiators);
 
   return (
     <>
@@ -106,6 +109,7 @@ export default async function AgentPage({ params }: Props) {
                 </div>
                 <h1 className="display h1s">{a.name}</h1>
                 <p className="lead">{a.tagline}</p>
+                <DifferentiatorBadges keys={a.differentiators} />
               </div>
             </div>
             <div className="row wrapx card pad-s" style={gap("14px", { padding: "14px 18px" })}>
@@ -149,8 +153,9 @@ export default async function AgentPage({ params }: Props) {
             </div>
           </div>
 
-          <aside className="sticky" aria-label="Comprar">
+          <aside className="sticky" aria-label={a.platform ? "Instalar" : "Comprar"}>
             <BuyBox
+              platform={a.platform}
               slug={a.slug}
               name={a.name}
               priceUsdc={a.priceUsdc}
@@ -251,11 +256,35 @@ export default async function AgentPage({ params }: Props) {
 
       <BeforeAfterBlock items={d.beforeAfter} name={a.name} />
 
+      {diffs.length ? (
+        <section className="wrap" style={{ paddingBottom: 64 }} aria-labelledby="diferenciais">
+          <div className="col" style={gap("8px", { marginBottom: 26 })}>
+            <h2 className="display h2s" id="diferenciais">
+              O que torna este especialista diferente
+            </h2>
+            <p className="muted" style={{ maxWidth: 620 }}>
+              Estes pontos foram conferidos pela equipe do Solvers antes de o especialista entrar na vitrine.
+            </p>
+          </div>
+          <ul className={`g${Math.min(3, Math.max(2, diffs.length))} m1`} style={gap("16px")}>
+            {diffs.map((k) => (
+              <li key={k} className="card pad-s col" style={gap("10px")}>
+                <span className="tile tile-s" style={{ "--h": 250 } as CSSProperties} aria-hidden>
+                  <Icon name={DIFFERENTIATORS[k]?.icon ?? "check"} />
+                </span>
+                <b>{DIFFERENTIATORS[k]?.label}</b>
+                <span className="small muted">{DIFFERENTIATORS[k]?.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="wrap" style={{ paddingBottom: 64 }}>
         <div className="col" style={gap("8px", { marginBottom: 26 })}>
           <h2 className="display h2s">O que você precisa para usar</h2>
           <p className="muted" style={{ maxWidth: 620 }}>
-            Confira antes de comprar. Na instalação guiada, cada item vira uma verificação com status.
+            Confira antes de {a.platform ? "instalar" : "comprar"}. Na instalação guiada, cada item vira uma verificação com status.
           </p>
         </div>
         <div className="g3" style={gap("22px")}>

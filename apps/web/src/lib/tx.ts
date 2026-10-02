@@ -181,6 +181,15 @@ export function txErrorMessage(err: unknown): TxErrorInfo {
         };
       case "guarantee_limit":
         return { code: err.code, title: "Limite de garantias atingido", text: err.message, action: null };
+      // ----- Publicação de pacote (co-assinatura do criador) -----
+      case "submission_state":
+        return { code: err.code, title: "Este envio não espera a sua confirmação agora", text: "Atualize a página para ver em que passo ele está.", action: null };
+      case "not_approved":
+        return { code: err.code, title: "Esta versão ainda não foi aprovada", text: "A confirmação só abre depois da aprovação da equipe.", action: null };
+      case "wrong_step":
+        return { code: err.code, title: "Este não é o passo certo agora", text: "Atualize a página: ela mostra o passo que falta.", action: null };
+      case "publication_blocked":
+        return { code: err.code, title: "Este especialista está bloqueado na rede", text: "Ele está suspenso ou registrado por outra conta. Fale com a equipe.", action: null };
       case "rate_limited":
         return { code: err.code, title: "Muitas tentativas", text: "Aguarde um minuto e tente de novo.", action: "retry" };
       case "unauthorized":

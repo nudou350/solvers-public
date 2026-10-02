@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { brl0 } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref, type CreatorMap } from "./data";
+import { DifferentiatorBadges, FreeInline } from "./PlatformBits";
 import { TrialTag } from "./TrialTag";
 
 const EXAMPLES = ["Criar as telas do meu app no Figma", "Revisar um contrato de prestação de serviço", "Planejar 10 dias na Itália", "Organizar as minhas finanças do mês"];
@@ -155,6 +156,7 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                       </div>
                     </div>
                     <p className="small muted clamp3">{a.tagline}</p>
+                    <DifferentiatorBadges keys={a.differentiators} max={3} />
                     {a.trialAvailable ? (
                       <div>
                         <TrialTag agentId={a.id} />
@@ -162,7 +164,7 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                     ) : null}
                     <div className="row between wrapx" style={{ marginTop: "auto" }}>
                       {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue /> : <span className="tiny faint">Ainda sem avaliações</span>}
-                      <b className="num">{brl0(a.priceUsdc, rate)}</b>
+                      {a.platform ? <FreeInline /> : <b className="num">{brl0(a.priceUsdc, rate)}</b>}
                     </div>
                   </Link>
                 ))}

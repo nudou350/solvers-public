@@ -19,7 +19,7 @@ export function useFirstName(fallback?: string | null): string | null {
 }
 
 /** Cabeçalho do painel do criador: eyebrow, selo de reputação, saudação e as abas (Visão geral / Publicar). */
-export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" | "publish"; reputation?: number | null; title?: ReactNode; name?: string | null }) {
+export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" | "publish" | "submissions"; reputation?: number | null; title?: ReactNode; name?: string | null }) {
   const first = useFirstName(name);
   const lv = reputation != null ? repLevel(reputation) : null;
   return (
@@ -42,6 +42,7 @@ export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" 
         value={tab}
         tabs={[
           { id: "overview", label: "Visão geral", href: "/criador" },
+          { id: "submissions", label: "Meus envios", href: "/criador/envios" },
           {
             id: "publish",
             label: (

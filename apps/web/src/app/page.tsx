@@ -40,7 +40,8 @@ export default async function Home() {
     );
   const { config, categories, creators, top, trending, fresh } = data;
   const rate = config.brlPerUsd;
-  const hero = top[0];
+  // O cartão "Sua licença" mostra um pagamento: só serve a especialista pago (os da plataforma são gratuitos e sem licença).
+  const hero = top.find((a) => !a.platform);
 
   return (
     <>

@@ -15,6 +15,7 @@ import { useRate, useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { CreatorHead } from "./CreatorHead";
 import { DailyChart } from "./DailyChart";
+import { OpenSubmissions } from "./OpenSubmissions";
 
 type Dash = CreatorDashboard;
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; data: Dash };
@@ -78,12 +79,14 @@ export function CreatorDashboardView() {
     return (
       <Section>
         <CreatorHead tab="overview" />
+        <OpenSubmissions />
         <NotCreator sharePct={data.creatorSharePct} />
       </Section>
     );
   return (
     <Section>
       <CreatorHead tab="overview" reputation={data.creator.reputationScore} name={data.creator.name} />
+      <OpenSubmissions />
       <Overview data={data} creator={data.creator} />
     </Section>
   );
@@ -99,9 +102,9 @@ function Section({ children }: { children: ReactNode }) {
 
 function NotCreator({ sharePct }: { sharePct: number }) {
   const points = [
-    { icon: "gift" as const, title: "Publicar é grátis", text: "Sem depósito e sem mensalidade. Você só precisa do pacote do especialista e de uma bateria de testes." },
+    { icon: "gift" as const, title: "Publicar é grátis", text: "Sem depósito e sem mensalidade. Você monta o pacote com o Criador de Solvers, envia o ZIP e a equipe revisa antes de ir ao ar." },
     { icon: "coin" as const, title: `Você recebe ${dec1(sharePct).replace(",0", "")}% de cada venda`, text: "O valor cai na sua carteira a cada licença vendida. A taxa da plataforma já está descontada." },
-    { icon: "shield-check" as const, title: "Qualidade pela bateria de testes", text: "Cada especialista passa por pelo menos 30 casos de teste. A nota aparece para os compradores." },
+    { icon: "shield-check" as const, title: "Qualidade pela bateria de testes", text: "Cada pacote passa por uma conferência automática e pela revisão da equipe. A nota de desempenho aparece para os compradores." },
   ];
   return (
     <div className="card pad-l col" style={gap(28)}>
@@ -124,6 +127,9 @@ function NotCreator({ sharePct }: { sharePct: number }) {
       <div className="row wrapx" style={gap(12)}>
         <Button href="/criador/publicar" size="lg" iconRight="arrow-right">
           Publicar especialista
+        </Button>
+        <Button href="/criador/envios" size="lg" variant="secondary">
+          Meus envios
         </Button>
       </div>
     </div>

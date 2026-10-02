@@ -24,10 +24,59 @@ export type BuyBoxProps = {
   resale?: { listingId: string; floorUsdc: number } | null;
   /** Teto de licenças (vendidas / máximo). Ausente ou `max: null` = ilimitado. */
   supply?: AgentSupply;
+  /** Especialista da plataforma: gratuito, sem licença nem compra. Esconde preço e botão de compra. */
+  platform?: boolean;
 };
+
+/** Caixa da página de um especialista da plataforma: sem preço nem compra, só como instalar. */
+function PlatformBox({ slug }: { slug: string }) {
+  const install = `/instalar?agent=${encodeURIComponent(slug)}`;
+  return (
+    <div className="card" style={{ overflow: "hidden" }}>
+      <div className="sol-line" style={{ borderRadius: 0, height: 4 }} />
+      <div className="pad col" style={gap("18px")}>
+        <div className="col" style={gap("4px")}>
+          <span className="eyebrow">Incluído na plataforma</span>
+          <span className="display big num" style={{ fontSize: 56, whiteSpace: "nowrap" }}>
+            Gratuito
+          </span>
+          <span className="small faint">Sem compra, sem licença e sem pagamento.</span>
+        </div>
+        <Button href={install} size="lg" block iconRight="arrow-right">
+          Instalar na minha IA
+        </Button>
+        <ol className="col small" style={gap("10px")}>
+          <Step n={1}>Copie o endereço do conector do Solvers.</Step>
+          <Step n={2}>Cole no Claude ou no ChatGPT e autorize com a sua conta.</Step>
+          <Step n={3}>Peça o que você precisa e cite o especialista pelo nome.</Step>
+        </ol>
+        <ul className="col small" style={gap("10px")}>
+          <Check>O mesmo conector serve para todos os especialistas que você tiver.</Check>
+          <Check>Você só precisa entrar na sua conta do Solvers.</Check>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function Step({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <li className="row start" style={gap("10px")}>
+      <span className="dot dot-now" aria-hidden style={{ width: 24, height: 24, fontSize: 12, borderWidth: 1.5 }}>
+        {n}
+      </span>
+      <span className="grow">{children}</span>
+    </li>
+  );
+}
 
 /** Caixa de compra da página do especialista: licença permanente, teste grátis (se houver) e acesso do usuário logado. */
 export function BuyBox(p: BuyBoxProps) {
+  if (p.platform) return <PlatformBox slug={p.slug} />;
+  return <PaidBox {...p} />;
+}
+
+function PaidBox(p: BuyBoxProps) {
   const access = useMyAccess(p.slug);
   const price = p.priceBrl != null ? brlValue(p.priceBrl) : brlValue(p.priceUsdc * p.rate);
   const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=permanent`;

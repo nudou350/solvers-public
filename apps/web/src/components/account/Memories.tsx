@@ -16,6 +16,15 @@ import { useLibrary } from "./LibraryShell";
 import { useAgentsIndex } from "@/lib/hooks";
 import { LoadError } from "./shared";
 
+/** Perfil da calibragem em uma linha ("" se não há): `pergunta: resposta` ou "calibragem pulada". */
+function profileLine(profile: Memory["profile"]): string {
+  if (!profile || Object.keys(profile).length === 0) return "";
+  if (profile.skipped === true) return "calibragem pulada";
+  return Object.entries(profile)
+    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join("; ");
+}
+
 type State = { kind: "loading" } | { kind: "locked" } | { kind: "error" } | { kind: "ok"; items: Memory[] };
 
 /** Botão com confirmação inline (sem window.confirm). */
@@ -139,7 +148,7 @@ export function Memories() {
       <div className="col grow" style={{ "--gap": "4px" } as React.CSSProperties}>
         <b style={{ fontSize: 17 }}>Suas memórias são criptografadas e pertencem a você</b>
         <p className="muted">
-          Elas ficam guardadas com criptografia e só são abertas quando você usa o especialista na sua IA. O criador não tem acesso a elas. Você pode ver e apagar tudo quando quiser.
+          A memória do especialista (resumo, perfil e notas) fica guardada com criptografia no servidor, não na blockchain, e só é aberta quando você usa o especialista na sua IA. O criador não tem acesso a ela. Você pode ver e apagar tudo quando quiser.
         </p>
       </div>
       {items.length > 0 ? (
@@ -209,7 +218,19 @@ export function Memories() {
                 {g.items.map((m) => (
                   <div key={m.id} className="rowline start m-col-x">
                     <div className="grow">
-                      <p style={{ whiteSpace: "pre-line" }}>{m.summary}</p>
+                      {m.summary ? <p style={{ whiteSpace: "pre-line" }}>{m.summary}</p> : null}
+                      {profileLine(m.profile) ? (
+                        <p className="small" style={{ whiteSpace: "pre-line", marginTop: m.summary ? 6 : 0 }}>
+                          <b>Perfil:</b> {profileLine(m.profile)}
+                        </p>
+                      ) : null}
+                      {m.notes.length ? (
+                        <ul className="small" style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                          {m.notes.map((n) => (
+                            <li key={n.id}>{n.text}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                       <div className="tiny faint" style={{ marginTop: 2 }}>
                         Atualizada {ago(m.updatedAt)}
                       </div>

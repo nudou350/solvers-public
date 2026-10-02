@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PublishWizard } from "@/components/creator/PublishWizard";
+import { PublishFlow } from "@/components/creator/PublishFlow";
 
 export const metadata: Metadata = { title: "Publicar especialista" };
 
 export default function PublishPage() {
-  return <PublishWizard />;
+  return <PublishFlow />;
 }
