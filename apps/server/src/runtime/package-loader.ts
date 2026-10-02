@@ -122,6 +122,8 @@ export function loadPackage(dir: string, opts: { source?: PackageSource } = {}):
   if (verdict.error) throw new Error(verdict.error);
   // Pacote publicado vive em PUBLISHED_DIR/<slug>/: a pasta com outro nome indica cópia solta ou troca em andamento.
   if (source === "published" && basename(dir) !== manifest.slug) throw new Error(`a pasta ${basename(dir)} não é o slug do pacote (${manifest.slug})`);
+  // Link simbólico nunca é aceito no pacote (só lstat, sem ler conteúdo): o hash é preguiçoso, então a recusa não pode depender dele.
+  listFiles(dir);
   const steps = manifest.steps.map((s, i) => {
     // O caminho vem do manifesto: nunca junta direto (../ e links simbólicos escapariam da pasta).
     const body = readFileSync(resolveInsidePackage(dir, s.file, ["steps/"]), "utf8");
