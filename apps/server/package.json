@@ -23,6 +23,8 @@
     "cli:images:devnet": "tsx --env-file=.env.devnet src/cli/images.ts",
     "cli:admin": "tsx --env-file-if-exists=.env src/cli/admin.ts",
     "cli:admin:devnet": "tsx --env-file=.env.devnet src/cli/admin.ts",
+    "cli:x402-setup": "tsx --env-file-if-exists=.env src/cli/x402-setup.ts",
+    "cli:x402-setup:devnet": "tsx --env-file=.env.devnet src/cli/x402-setup.ts",
     "cli:publish:devnet": "tsx --env-file=.env.devnet src/cli/publish.ts"
   },
   "dependencies": {
@@ -32,6 +34,7 @@
     "@solvers/chain": "workspace:*",
     "@solvers/client": "workspace:*",
     "@solvers/shared": "workspace:*",
+    "@x402/core": "^2.28.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.45.3",

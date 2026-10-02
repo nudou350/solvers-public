@@ -12,6 +12,7 @@ import { DISPUTE_SLA_SECS } from "./store/delivery-rules.js";
 import { randomId, sha256 } from "./lib/crypto.js";
 import { notifyCreator } from "./notify/telegram.js";
 import { reconcilePixCredits } from "./pix/credit.js";
+import { reconcileX402 } from "./x402/reconcile.js";
 import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS } from "@solvers/shared";
 
 // Jobs periódicos:
@@ -20,6 +21,7 @@ import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS } from "@solvers/shared";
 // - lote de usos verificados (a cada 10 min): record_usage_batch com raiz Merkle dos recibos.
 // - disputas paradas (a cada 60 s): resolve_stale_dispute devolve ao comprador depois de 7 dias sem julgamento.
 // - Pix (a cada 30 s): credita cobranças pagas que ficaram sem crédito e conclui as "crediting".
+// - x402 (a cada 60 s, só com X402_ENABLED): vence ordens, resolve pagamentos incertos, retoma emissões e reembolsos.
 // - vitrine (a cada hora): tira especialistas com nota baixa depois de 10 avaliações.
 
 export async function autoReleaseOnce(): Promise<number> {
@@ -344,5 +346,6 @@ export const jobs = [
   every(60_000, "disputas paradas", resolveStaleDisputesOnce),
   every(10 * 60_000, "lote de usos", recordUsageBatchOnce),
   every(30_000, "pix: créditos pendentes", reconcilePixCredits),
+  every(60_000, "x402: ordens", reconcileX402),
   every(60 * 60_000, "vitrine: nota baixa", delistLowRatedOnce),
 ];

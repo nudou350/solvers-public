@@ -238,10 +238,14 @@ async function handle(ev: SolversEvent, ctx: TxContext) {
     case "LicensePurchased": {
       const agentId = await syncAgent(ev.data.agent);
       if (!agentId) throw agentMissing(ev.data.agent);
-      await syncLicense(ev.data.asset, agentId, signature, ctx.blockTime);
-      await syncReputation(ev.data.buyer);
+      const owner = await syncLicense(ev.data.asset, agentId, signature, ctx.blockTime);
+      // Compra por x402: a custódia é a `buyer` do evento, mas a licença (TransferV1 na mesma transação) é do agente que pagou.
+      // O histórico fica na carteira do dono e a reputação da custódia não é espelhada (docs/x402-agentes.md, 6.9).
+      const viaCustody = ev.data.buyer === chain().custodyAddress;
+      if (!viaCustody) await syncReputation(ev.data.buyer);
+      // O split de taxa sai dos saldos da carteira que PAGOU o programa (a custódia, no x402).
       const fin = await financial(ctx, ev.data.buyer, await creatorWalletOfAgent(agentId), ev.data.price);
-      await recordChainTx(signature, "purchase", ev.data.buyer, agentId, fin.amount, fin.extra);
+      await recordChainTx(signature, "purchase", viaCustody ? owner : ev.data.buyer, agentId, fin.amount, fin.extra);
       return;
     }
     case "LicenseListed": {

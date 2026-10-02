@@ -1,4 +1,5 @@
 import {
+  AccountRole,
   address,
   appendTransactionMessageInstructions,
   assertAccountExists,
@@ -40,6 +41,7 @@ import {
   getInitializeMint2Instruction,
   getMintSize,
   getMintToCheckedInstruction,
+  getTransferCheckedInstruction,
   fetchMaybeToken,
 } from "@solana-program/token";
 import { getCreateAccountInstruction, getTransferSolInstruction } from "@solana-program/system";
@@ -60,6 +62,8 @@ export type ChainOptions = {
   feePayer: KeyPairSigner;
   /** Micro-lamports por CU (0 na devnet). */
   priorityFee?: bigint;
+  /** Carteira de custódia do x402 (recebe o USDC do agente, compra a licença e a repassa). Ausente = x402 desligado. */
+  custody?: KeyPairSigner;
 };
 
 /** Transação montada pelo servidor, já assinada pelo fee payer, aguardando a assinatura do usuário. */
@@ -207,6 +211,36 @@ export const ESCROW_ACCOUNT_SIZE: number = (() => {
 
 export type EscrowLayout = { kind: "missing" } | { kind: "legacy"; size: number } | { kind: "ok"; data: gen.Escrow };
 
+/** Discriminador do `TransferV1` do mpl-core (instruction 14), seguido de `compression_proof: Option<_> = None`. */
+export const CORE_TRANSFER_V1_DATA = Uint8Array.of(14, 0);
+
+/**
+ * `TransferV1` do mpl-core montado à mão (não há builder em TS no repositório). Contas, na ordem do mpl-core:
+ * asset (w), collection (w), payer (signer, w), authority (signer), new_owner, system_program, log_wrapper (opcional: o próprio
+ * programa no lugar, como o builder do crate faz).
+ */
+export function transferCoreIx(input: {
+  asset: Address;
+  collection: Address;
+  payer: TransactionSigner;
+  authority: TransactionSigner;
+  newOwner: Address;
+}): Instruction {
+  return {
+    programAddress: MPL_CORE_PROGRAM_ADDRESS,
+    accounts: [
+      { address: input.asset, role: AccountRole.WRITABLE },
+      { address: input.collection, role: AccountRole.WRITABLE },
+      { address: input.payer.address, role: AccountRole.WRITABLE_SIGNER, signer: input.payer },
+      { address: input.authority.address, role: AccountRole.READONLY_SIGNER, signer: input.authority },
+      { address: input.newOwner, role: AccountRole.READONLY },
+      { address: address("11111111111111111111111111111111"), role: AccountRole.READONLY },
+      { address: MPL_CORE_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: CORE_TRANSFER_V1_DATA,
+  } as Instruction;
+}
+
 const COMPUTE_UNITS = 400_000;
 
 export class SolversChain {
@@ -223,6 +257,17 @@ export class SolversChain {
 
   get usdcMint() {
     return this.opts.usdcMint;
+  }
+
+  /** Custódia do x402. Sem `custody` nas opções lança: nada usa a custódia por engano. */
+  get custody(): KeyPairSigner {
+    if (!this.opts.custody) throw new TxError("Custódia do x402 não configurada");
+    return this.opts.custody;
+  }
+
+  /** Endereço da custódia, ou `null` com o x402 desligado. */
+  get custodyAddress(): Address | null {
+    return this.opts.custody?.address ?? null;
   }
 
   // ---------- PDAs e contas ----------
@@ -300,9 +345,9 @@ export class SolversChain {
 
   // ---------- Envio ----------
 
-  /** O fee payer (também mint authority do USDC de teste) nunca pode ser a carteira do usuário. */
+  /** O fee payer (também mint authority do USDC de teste) e a custódia do x402 nunca podem ser a carteira do usuário. */
   private assertNotFeePayer(user: Address) {
-    if (user === this.feePayer.address) throw new TxError("Carteira reservada da plataforma");
+    if (user === this.feePayer.address || user === this.opts.custody?.address) throw new TxError("Carteira reservada da plataforma");
   }
 
   private budget(): Instruction[] {
@@ -742,13 +787,21 @@ export class SolversChain {
     return gen.getUpdateVersionInstruction({ creator, agent: await this.agentPda(agentIdHex), version, versionHash });
   }
 
-  /** `expectedPrice` = preço mostrado ao comprador; se mudar antes da execução, a compra falha. */
+  /**
+   * `expectedPrice` = preço mostrado ao comprador; se mudar antes da execução, a compra falha.
+   * `buyerSigner` (só a custódia do x402): assina de verdade em vez de deixar a assinatura para o usuário.
+   */
   async purchaseLicenseIxs(
     buyer: Address,
     agentIdHex: string,
     expectedPrice?: bigint,
+    buyerSigner?: KeyPairSigner,
   ): Promise<{ instructions: Instruction[]; asset: KeyPairSigner; price: bigint }> {
-    this.assertNotFeePayer(buyer);
+    if (buyerSigner) {
+      if (buyerSigner.address !== buyer || buyer === this.feePayer.address) throw new TxError("Carteira reservada da plataforma");
+    } else {
+      this.assertNotFeePayer(buyer);
+    }
     const agentAddr = await this.agentPda(agentIdHex);
     const agent = await gen.fetchAgent(this.rpc, agentAddr);
     const price = expectedPrice ?? agent.data.price;
@@ -756,7 +809,7 @@ export class SolversChain {
     const asset = await generateKeyPairSigner();
     const ix = await gen.getPurchaseLicenseInstructionAsync({
       payer: this.feePayer,
-      buyer: createNoopSigner(buyer),
+      buyer: buyerSigner ?? createNoopSigner(buyer),
       agent: agentAddr,
       collection: agent.data.collection,
       asset,
@@ -767,6 +820,47 @@ export class SolversChain {
       expectedPrice: price,
     });
     return { instructions: [ix], asset, price };
+  }
+
+  // ---------- Custódia do x402 (docs/x402-agentes.md, 6.5) ----------
+
+  /**
+   * Compra a licença com a custódia (que já recebeu o USDC do agente) e transfere o NFT ao pagador, tudo numa
+   * transação só: ou o agente fica com a licença, ou nada acontece. Devolve assinada, sem enviar (a assinatura é
+   * conhecida antes do envio, para persistir e poder retomar). Não simula: use `simulate(signed.wire)` antes de enviar.
+   */
+  async custodyMintFor(payer: Address, agentIdHex: string, expectedPrice: bigint): Promise<{ asset: Address; signed: SignedTx }> {
+    const custody = this.custody;
+    if (payer === custody.address || payer === this.feePayer.address) throw new TxError("Carteira reservada da plataforma");
+    const have = await this.usdcBalance(custody.address);
+    if (have < expectedPrice) throw new TxError("A custódia não tem USDC suficiente para esta compra");
+    const { instructions, asset } = await this.purchaseLicenseIxs(custody.address, agentIdHex, expectedPrice, custody);
+    const agent = await this.fetchAgent(agentIdHex);
+    const transfer = transferCoreIx({
+      asset: asset.address,
+      collection: agent.data.collection,
+      payer: this.feePayer,
+      authority: custody,
+      newOwner: payer,
+    });
+    return { asset: asset.address, signed: await this.signServerTx([...instructions, transfer]) };
+  }
+
+  /** Devolve USDC da custódia ao pagador (a ATA dele existe: ele pagou dela). Assinada, sem enviar. */
+  async refundUsdcTx(payer: Address, units: bigint): Promise<SignedTx> {
+    const custody = this.custody;
+    if (payer === custody.address || payer === this.feePayer.address) throw new TxError("Carteira reservada da plataforma");
+    if (units <= 0n) throw new TxError("Valor de reembolso inválido");
+    return this.signServerTx([
+      getTransferCheckedInstruction({
+        source: await this.ata(custody.address),
+        mint: this.usdcMint,
+        destination: await this.ata(payer),
+        authority: custody,
+        amount: units,
+        decimals: 6,
+      }),
+    ]);
   }
 
   // ---------- Revenda de licenças ----------

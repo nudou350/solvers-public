@@ -71,8 +71,9 @@ export function createApp(mounts: Mount[] = []): Express {
   app.use("/webhooks", express.json({ limit: "2mb" }), webhookRouter, pixWebhookRouter);
   app.use("/api", webCors, express.json({ limit: "256kb" }), cookieParser(), byIp, optionalAuth, byWallet);
   app.use(["/api/search", "/api/tx", "/api/faucet"], costly);
-  // Criar/simular Pix tem o mesmo limite do faucet; a consulta (polling do front) não.
-  app.use(["/api/pix", "/api/sodax"], (req, res, next) => (req.method === "POST" ? costly(req, res, next) : next()));
+  // Criar/simular Pix tem o mesmo limite do faucet; a consulta (polling do front) não. O mesmo vale para o x402 (cada POST sem
+  // pagamento abre uma ordem no banco; a cotação e a consulta de estado ficam livres).
+  app.use(["/api/pix", "/api/sodax", "/api/x402"], (req, res, next) => (req.method === "POST" ? costly(req, res, next) : next()));
   app.use("/api/auth", authRouter);
   app.use("/api", storeRouter);
   app.use("/api", pixRouter);

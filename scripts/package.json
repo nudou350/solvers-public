@@ -11,9 +11,17 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@solana/kit": "^8.4.0",
     "@solvers/chain": "workspace:*",
+    "@solvers/client": "workspace:*",
     "@solvers/shared": "workspace:*",
-    "@solana/kit": "^8.4.0"
+    "@x402/core": "^2.28.0",
+    "@x402/fetch": "^2.28.0",
+    "@x402/svm": "^2.28.0"
   },
-  "devDependencies": { "tsx": "^4.20.0", "typescript": "^5.9.0", "@types/node": "^22.0.0" }
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
 }

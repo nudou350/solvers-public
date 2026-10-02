@@ -554,3 +554,40 @@ export const pixCharges = pgTable(
   },
   (t) => [index("pix_charges_wallet_idx").on(t.wallet, t.status), uniqueIndex("pix_charges_order_idx").on(t.providerOrderId)],
 );
+
+/**
+ * Ordens de compra por x402 (agentes de IA): preço travado na criação e `id` usado como memo do pagamento.
+ * Fluxo: created -> settling -> paid -> minting -> minted; falha na emissão: refunding -> refunded (docs/x402-agentes.md, 6.2).
+ */
+export const x402Orders = pgTable(
+  "x402_orders",
+  {
+    id: text("id").primaryKey(), // ord_<hex>: é o `extra.memo` do pagamento
+    agentId: text("agent_id").notNull(),
+    price: u64("price").notNull(), // USDC (6 casas), travado na criação
+    status: text("status").notNull().default("created"), // created | settling | paid | minting | minted | refunding | refunded | failed | expired
+    payer: text("payer"),
+    paySignature: text("pay_signature"),
+    mintSignature: text("mint_signature"),
+    /** Transação de emissão já assinada, gravada antes do envio (reenviar a mesma nunca emite duas licenças). */
+    mintWire: text("mint_wire"),
+    mintLastValidHeight: u64("mint_last_valid_height"),
+    asset: text("asset"),
+    refundSignature: text("refund_signature"),
+    refundWire: text("refund_wire"),
+    refundLastValidHeight: u64("refund_last_valid_height"),
+    error: text("error"),
+    /** IP que abriu a ordem (limite de ordens abertas por IP). Não é exposto pela API. */
+    clientIp: text("client_ip"),
+    expiresAt: ts("expires_at").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("x402_orders_status_idx").on(t.status),
+    index("x402_orders_payer_idx").on(t.payer),
+    index("x402_orders_ip_idx").on(t.clientIp, t.status),
+    // Um pagamento liquidado vale para uma única ordem: a mesma assinatura nunca emite duas licenças.
+    uniqueIndex("x402_orders_pay_signature_idx").on(t.paySignature).where(sql`${t.paySignature} is not null`),
+  ],
+);

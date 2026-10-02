@@ -93,6 +93,24 @@ const base = z.object({
   SODAX_SIMULATE: optBool,
   /** API pública de swaps do SODAX (sem chave). Sobrescreva só para testes. */
   SODAX_API_URL: z.string().url().default("https://api.sodax.com/v1/swaps"),
+
+  /** Agentes de IA comprando licenças por x402 (docs/x402-agentes.md). Desligado por padrão; recusado na mainnet (custódia sem parecer jurídico). */
+  X402_ENABLED: bool.default("false"),
+  /** Facilitator que confere e liquida o pagamento (a spike 0.2 mostrou que o público aceita o nosso USDC da devnet). */
+  X402_FACILITATOR_URL: z.string().url().default("https://x402.org/facilitator"),
+  /** Rede do `accepts` (CAIP-2). Padrão: devnet. */
+  X402_NETWORK: z.string().min(3).default("solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"),
+  /** Carteira de custódia: recebe o USDC do agente, compra a licença e a repassa. JSON, base58 ou caminho de arquivo. Obrigatória com X402_ENABLED. */
+  CUSTODY_KEYPAIR: blankToUndefined,
+  /** Piso da rota em USDC. Nunca abaixo do `min_price` do programa (a rota usa o maior dos dois). */
+  X402_MIN_PRICE_USDC: z.coerce.number().positive().default(5),
+  /** Teto por compra em USDC (limita a exposição da custódia). */
+  X402_MAX_PRICE_USDC: z.coerce.number().positive().default(100),
+  X402_ORDER_TTL_SECS: z.coerce.number().int().min(60).default(900),
+  /** Ordens abertas (sem pagamento) por IP; a rota sem pagamento escreve no banco. */
+  X402_MAX_OPEN_ORDERS_PER_IP: z.coerce.number().int().min(1).default(20),
+  /** SÓ para o e2e (scripts/src/e2e-agent.ts): faz toda emissão falhar logo depois do pagamento, para provar o reembolso automático. Nunca ligar de verdade. */
+  X402_TEST_FAIL_MINT: bool.default("false"),
 });
 
 const schema = base.transform((e) => {
@@ -119,12 +137,35 @@ export function forbiddenMainnetKeys(source: NodeJS.ProcessEnv): string[] {
   return MAINNET_FORBIDDEN_KEYS.filter((k) => (source[k] ?? "").trim() !== "");
 }
 
+/**
+ * Regras do x402 que dependem de mais de uma variável (puras, testáveis). Devolve a mensagem de recusa ou `null`.
+ * Custódia na mainnet fica bloqueada até o parecer jurídico (docs/x402-agentes.md, seção 9).
+ */
+export function x402ConfigProblem(e: Pick<Env, "X402_ENABLED" | "SOLANA_CLUSTER" | "CUSTODY_KEYPAIR" | "X402_MIN_PRICE_USDC" | "X402_MAX_PRICE_USDC">, others: Record<string, string | undefined>): string | null {
+  if (!e.X402_ENABLED) return null;
+  if (e.SOLANA_CLUSTER === "mainnet-beta") {
+    return "X402_ENABLED não pode ser ligado com SOLANA_CLUSTER=mainnet-beta: a custódia de USDC de terceiros espera o parecer jurídico (docs/x402-agentes.md, seção 9).";
+  }
+  if (!e.CUSTODY_KEYPAIR) return "X402_ENABLED exige CUSTODY_KEYPAIR (rode cli:x402-setup).";
+  if (e.X402_MIN_PRICE_USDC > e.X402_MAX_PRICE_USDC) return "X402_MIN_PRICE_USDC não pode ser maior que X402_MAX_PRICE_USDC.";
+  const same = Object.entries(others).find(([, v]) => v && v.trim() === e.CUSTODY_KEYPAIR);
+  if (same) return `CUSTODY_KEYPAIR não pode ser a mesma chave de ${same[0]}: a custódia é uma carteira só dela.`;
+  return null;
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Variáveis de ambiente inválidas:\n${issues}`);
   }
+  const x402Problem = x402ConfigProblem(parsed.data, {
+    FEE_PAYER_KEYPAIR: parsed.data.FEE_PAYER_KEYPAIR,
+    VERIFIER_KEYPAIR: parsed.data.VERIFIER_KEYPAIR,
+    USAGE_AUTHORITY_KEYPAIR: parsed.data.USAGE_AUTHORITY_KEYPAIR,
+    ADMIN_KEYPAIR: parsed.data.ADMIN_KEYPAIR,
+  });
+  if (x402Problem) throw new Error(`Configuração recusada: ${x402Problem}`);
   if (parsed.data.SOLANA_CLUSTER === "mainnet-beta") {
     const found = forbiddenMainnetKeys(source);
     if (found.length > 0) {
