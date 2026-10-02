@@ -136,6 +136,59 @@ export function nextActionFor(status: SubmissionStatus, isNewAgent: boolean): Su
   }
 }
 
+/** Linha da fila de revisão (GET /api/admin/submissions?status=). */
+export const AdminSubmissionRow = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string().nullable(),
+  version: z.string(),
+  creatorWallet: z.string(),
+  creatorName: z.string().nullable(),
+  status: SubmissionStatus,
+  isNewAgent: z.boolean(),
+  errors: z.number(),
+  warnings: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type AdminSubmissionRow = z.infer<typeof AdminSubmissionRow>;
+
+/** Um arquivo do pacote na prévia do revisor. O conteúdo vem escapado (texto), nunca como HTML. */
+export const SubmissionFileEntry = z.object({
+  path: z.string(),
+  size: z.number(),
+  /** added | removed | changed | same, contra a versão publicada (tudo "added" na 1ª versão). */
+  diff: z.enum(["added", "removed", "changed", "same"]),
+});
+export type SubmissionFileEntry = z.infer<typeof SubmissionFileEntry>;
+
+/** GET /api/admin/submissions/:id */
+export const AdminSubmissionDetail = z.object({
+  submission: SubmissionView,
+  creator: z.object({ wallet: z.string(), name: z.string().nullable(), bio: z.string().nullable(), contactVerified: z.boolean() }),
+  isNewAgent: z.boolean(),
+  /** Manifesto como enviado (texto para exibir, nunca renderizado como HTML). */
+  manifest: z.record(z.unknown()).nullable(),
+  validation: ValidationReport.nullable(),
+  /** Varreduras automáticas: Unicode oculto, injeção, URLs, duplicados, searchPhrases fora do assunto. */
+  scans: z.record(z.unknown()).nullable(),
+  files: z.array(SubmissionFileEntry),
+  knowledge: z.object({ files: z.number(), chunks: z.number(), expiredChunks: z.number(), ingest: z.enum(["queued", "running", "done", "failed", "none"]) }),
+  /** Diferenciais declarados e o que o validador conseguiu comprovar. */
+  differentiators: z.object({ declared: z.array(z.string()), proven: z.array(z.string()) }),
+  reviews: z.array(
+    z.object({ id: z.number(), reviewerWallet: z.string(), action: z.string(), notes: z.string(), checklist: z.record(z.boolean()), createdAt: z.string() }),
+  ),
+});
+export type AdminSubmissionDetail = z.infer<typeof AdminSubmissionDetail>;
+
+/** POST /api/admin/submissions/:id/(approve|request-changes|reject) */
+export const AdminReviewInput = z.object({
+  notes: z.string().trim().min(3).max(4000),
+  checklist: z.record(z.boolean()).default({}),
+});
+export type AdminReviewInput = z.infer<typeof AdminReviewInput>;
+
 /** Perfil do criador (POST /api/creator/profile). */
 export const CreatorProfileInput = z.object({
   name: z.string().trim().min(2).max(60),
