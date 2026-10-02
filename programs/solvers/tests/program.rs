@@ -6412,3 +6412,38 @@ fn transferring_a_license_does_not_free_a_slot() {
     let err = purchase(&mut env, &agent, &late).unwrap_err();
     assert!(err.contains("SoldOut"), "{err}");
 }
+
+#[test]
+fn a_third_party_prefunding_the_cap_pda_changes_nothing() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    // Alguém deposita lamports no endereço da PDA antes de o teto existir: a conta fica System, sem dados.
+    let cap = supply_cap_pda(&agent.key);
+    env.svm.airdrop(&cap, 5_000_000).unwrap();
+    // A compra segue ilimitada (conta sem dados), e o criador ainda consegue criar o teto por cima.
+    let (b1, _) = new_buyer(&mut env, 50 * USDC);
+    purchase(&mut env, &agent, &b1).unwrap();
+    create_cap(&mut env, &agent, 2).unwrap();
+    assert_eq!(env.account::<SupplyCap>(&cap).max, 2);
+    let (b2, _) = new_buyer(&mut env, 50 * USDC);
+    purchase(&mut env, &agent, &b2).unwrap();
+    let (b3, _) = new_buyer(&mut env, 50 * USDC);
+    let err = purchase(&mut env, &agent, &b3).unwrap_err();
+    assert!(err.contains("SoldOut"), "{err}");
+}
+
+#[test]
+fn a_cap_created_at_u32_max_is_effectively_unlimited() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    create_cap(&mut env, &agent, u32::MAX).unwrap();
+    for _ in 0..3 {
+        let (buyer, _) = new_buyer(&mut env, 50 * USDC);
+        purchase(&mut env, &agent, &buyer).unwrap();
+    }
+    assert_eq!(env.account::<Agent>(&agent.key).total_sales, 3);
+    let err = raise_cap(&mut env, &agent, u32::MAX).unwrap_err();
+    assert!(err.contains("SupplyCapCannotDecrease"), "{err}");
+}
