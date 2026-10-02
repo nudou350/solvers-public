@@ -41,6 +41,10 @@ export const Agent = z.object({
   royaltyBps: z.number().default(0),
   /** Teto de licenças (docs/licencas-limitadas.md). O padrão mantém clientes e dados antigos parseando: ilimitado. */
   supply: AgentSupply.default({ max: null, sold: 0, left: null }),
+  /** Solver da plataforma (ex.: Criador de Solvers): gratuito, sem licença nem compra, só no banco. */
+  platform: z.boolean().default(false),
+  /** Diferenciais comprovados (PACKAGE_SPEC.md 4.2): tool, verifier, liveData, memory, escalation. Vazio em pacotes v0. */
+  differentiators: z.array(z.string()).default([]),
   trend7d: z.number(),
   /** Data da primeira versão publicada (ISO). */
   publishedAt: z.string(),
