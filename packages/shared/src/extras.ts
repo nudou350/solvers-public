@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentSupply } from "./supply.js";
 import { RESALE_MAX_CUT_BPS } from "./rules.js";
 import { Agent, Creator, Escrow, GuaranteeLevel, ImageRef, License, Review, UserReputation } from "./schemas.js";
 
@@ -114,6 +115,8 @@ export const CreatorDashboard = z.object({
       uses: z.number(),
       revenueUsdc: z.number(),
       disputes: z.number(),
+      /** Teto de licenças deste solver (vendidas / máximo). */
+      supply: AgentSupply.default({ max: null, sold: 0, left: null }),
     }),
   ),
   daily: z.array(z.object({ date: z.string(), sales: z.number(), uses: z.number(), revenueUsdc: z.number() })),
