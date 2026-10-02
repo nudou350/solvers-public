@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -35,8 +36,111 @@ export const creators = pgTable("creators", {
   avatarUrl: text("avatar_url"),
   bio: text("bio").notNull().default(""),
   telegramChatId: text("telegram_chat_id"),
+  /** Convidado a enviar pacotes (Núcleo, PACKAGE_SPEC.md 14.1). Criadores antigos (publicados pelo CLI) ficam como true na migration. */
+  invited: boolean("invited").notNull().default(false),
+  /** Aceite dos termos do criador; o envio de pacote exige. */
+  termsAcceptedAt: ts("terms_accepted_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+/** Convites de criador (D14): o código vai por e-mail e a carteira é vinculada no primeiro login. */
+export const creatorInvites = pgTable("creator_invites", {
+  code: text("code").primaryKey(),
+  email: text("email"),
+  note: text("note"),
+  /** Carteira que usou o convite (null enquanto não usado). */
+  wallet: text("wallet"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  usedAt: ts("used_at"),
+});
+
+/**
+ * Estados da submissão (PACKAGE_SPEC.md 14.2). Fonte única em `@solvers/shared` (SUBMISSION_STATUSES).
+ * Tamanhos e caminhos: o ZIP original fica em SUBMISSIONS_DIR/<id>/package.zip, a pasta extraída em .../extracted.
+ */
+export const packageSubmissions = pgTable(
+  "package_submissions",
+  {
+    id: text("id").primaryKey(),
+    creatorWallet: text("creator_wallet").notNull(),
+    /** id do agente (32 hex): atribuído pelo servidor na 1ª versão de um slug; igual ao da cadeia/catálogo nas seguintes. */
+    agentId: text("agent_id").notNull(),
+    slug: text("slug").notNull(),
+    version: text("version").notNull(),
+    status: text("status").notNull().default("submitted"),
+    zipPath: text("zip_path"),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    manifest: jsonb("manifest").$type<Record<string, unknown>>(),
+    /** Saída do validador: { ok, errors, warnings, stats }. */
+    validation: jsonb("validation").$type<Record<string, unknown>>(),
+    /** Varreduras automáticas do revisor (Unicode oculto, injeção, URLs, duplicados). */
+    scans: jsonb("scans").$type<Record<string, unknown>>(),
+    /** Preço/hash aprovados congelados na aprovação (a transação on-chain lê daqui, nunca do cliente). */
+    approved: jsonb("approved").$type<{ versionHash: string; priceUsdc: string; royaltyBps: number; name: string; version: string } | null>(),
+    /** Último motivo do revisor (mudanças pedidas, recusa). */
+    reviewerNotes: text("reviewer_notes"),
+    /** Assinatura da transação de registro/atualização confirmada e da aprovação on-chain. */
+    registerTx: text("register_tx"),
+    approveTx: text("approve_tx"),
+    error: text("error"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("package_submissions_creator_idx").on(t.creatorWallet, t.createdAt),
+    index("package_submissions_status_idx").on(t.status),
+    index("package_submissions_slug_idx").on(t.slug),
+  ],
+);
+
+/** Trilha de auditoria da revisão: SOMENTE INSERT (PACKAGE_SPEC.md 17, item 8). */
+export const packageReviews = pgTable(
+  "package_reviews",
+  {
+    id: serial("id").primaryKey(),
+    submissionId: text("submission_id").notNull(),
+    reviewerWallet: text("reviewer_wallet").notNull(),
+    action: text("action").notNull(), // approve | request_changes | reject | suspend | resume | finish
+    notes: text("notes").notNull().default(""),
+    checklist: jsonb("checklist").$type<Record<string, boolean>>().notNull().default({}),
+    versionHash: text("version_hash"),
+    diffSnapshot: jsonb("diff_snapshot").$type<Record<string, unknown>>(),
+    ip: text("ip"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("package_reviews_submission_idx").on(t.submissionId)],
+);
+
+/** Fila de ingestão do conhecimento no worker, com checkpoint por arquivo (PACKAGE_SPEC.md 16). */
+export const ingestJobs = pgTable(
+  "ingest_jobs",
+  {
+    id: serial("id").primaryKey(),
+    submissionId: text("submission_id").notNull(),
+    status: text("status").notNull().default("queued"), // queued | running | done | failed
+    filesTotal: integer("files_total").notNull().default(0),
+    filesDone: integer("files_done").notNull().default(0),
+    chunksDone: integer("chunks_done").notNull().default(0),
+    error: text("error"),
+    startedAt: ts("started_at"),
+    finishedAt: ts("finished_at"),
+  },
+  (t) => [uniqueIndex("ingest_jobs_submission_idx").on(t.submissionId)],
+);
+
+/** Versão aprovada pela revisão. O indexador compara a cadeia com esta tabela (PACKAGE_SPEC.md 15.4). Gravada ANTES de qualquer transação. */
+export const agentPublishedVersions = pgTable(
+  "agent_published_versions",
+  {
+    agentId: text("agent_id").notNull(),
+    version: text("version").notNull(),
+    versionHash: text("version_hash").notNull(),
+    priceUsdc: u64("price_usdc").notNull(),
+    approvedAt: ts("approved_at").notNull().defaultNow(),
+    approveTx: text("approve_tx"),
+  },
+  (t) => [primaryKey({ columns: [t.agentId, t.version] })],
+);
 
 export type AgentDetails = {
   beforeAfter?: BeforeAfter[];
@@ -68,6 +172,8 @@ export const agents = pgTable(
     status: text("status").notNull().default("pending"), // pending | active | suspended (espelho da conta on-chain: o indexador reescreve)
     /** Kill switch da plataforma: active | suspended. NUNCA escrito pelo indexador (PACKAGE_SPEC.md 15.4). */
     platformStatus: text("platform_status").notNull().default("active"),
+    /** ok | unapproved_chain_version: a cadeia divergiu da versão aprovada (venda bloqueada). Escrito só pelo indexador (PACKAGE_SPEC.md 15.4). */
+    syncFlag: text("sync_flag").notNull().default("ok"),
     totalSales: u64("total_sales").notNull().default(sql`0`),
     /** Teto de licenças (espelho da PDA SupplyCap on-chain; ver docs/licencas-limitadas.md). null = ilimitado. */
     maxLicenses: integer("max_licenses"),
@@ -396,6 +502,10 @@ export const knowledgeChunks = pgTable(
     version: text("version").notNull(),
     source: text("source").notNull(),
     content: text("content").notNull(),
+    /** Front-matter do arquivo (title, source, source_url, source_date, tags, trial); PACKAGE_SPEC.md 6.2. */
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    /** Fim da validade do trecho (valid_until do front-matter): depois dela a busca avisa "pode estar desatualizado". */
+    validUntil: date("valid_until"),
     embedding: vector("embedding", { dimensions: 384 }),
   },
   (t) => [

@@ -68,6 +68,21 @@ const base = z.object({
   SEARCH_MODE: z.enum(["local", "fts"]).default("local"),
 
   AGENTS_DIR: z.string().default("../../agents"),
+  /** ZIPs enviados e pastas extraídas (fora do release; sobrevive ao deploy). PACKAGE_SPEC.md 15.1. */
+  SUBMISSIONS_DIR: z.string().default("./data/submissions"),
+  /** Pacotes de criadores publicados (um ativo por slug, versões antigas em _archive/). Mesclados com AGENTS_DIR no carregador. */
+  PUBLISHED_DIR: z.string().default("./data/packages"),
+  /** Carteiras (separadas por vírgula) que revisam submissões no site. Aprovar no site não assina nada on-chain. */
+  ADMIN_WALLETS: z.string().default(""),
+  /** Tetos do envio de pacote no Núcleo (PACKAGE_SPEC.md 3.2). */
+  SUBMISSION_MAX_ZIP_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
+  SUBMISSION_MAX_UNZIPPED_BYTES: z.coerce.number().int().positive().default(150 * 1024 * 1024),
+  SUBMISSION_MAX_FILES: z.coerce.number().int().positive().default(2000),
+  /** Limites por criador: pendentes ao mesmo tempo e envios por dia. */
+  SUBMISSION_MAX_PENDING: z.coerce.number().int().min(1).default(3),
+  SUBMISSION_MAX_PER_DAY: z.coerce.number().int().min(1).default(5),
+  /** Cota diária de search_knowledge por licença (PACKAGE_SPEC.md 6.5, item 2). 0 desliga. */
+  SEARCH_DAILY_QUOTA: z.coerce.number().int().min(0).default(300),
   DELIVERABLES_DIR: z.string().default("./deliverables"),
   /** Imagem Docker do verificador (vazio desativa o sandbox e usa execução simulada). */
   VERIFIER_IMAGE: z.string().default("solvers-react-test"),
