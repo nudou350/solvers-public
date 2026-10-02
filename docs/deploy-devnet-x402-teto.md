@@ -1,6 +1,6 @@
 # Roteiro de deploy: upgrade único da devnet + VPS (resale/v2 + teto de licenças + x402)
 
-Status: **escrito em 02/10/2026, nada disto foi executado.** Vale para a branch `integration/x402-licencas` (junta `feat/x402-agentes` e
+Status: **executado em 02/10/2026** (ver "Execução" no fim). Os passos abaixo ficam como referência para repetir em outro ambiente. Vale para a branch `integration/x402-licencas` (junta `feat/x402-agentes` e
 `feat/licencas-limitadas`, ambas a partir da `master` 433dd82). Escopo: **devnet**. Mainnet continua bloqueada (x402: seção 9 de `docs/x402-agentes.md`).
 
 ## O que sobe, e o que exige o quê
@@ -40,7 +40,7 @@ Se a `master` andou (o outro agente comitou), faça `git merge integration/x402-
 3. Pré-check de Config e dry-run: `bash scripts/chain/upgrade-devnet.sh` (só lê). Conferir saldo do admin/fee-payer contra o plano
    (o `.so` com revenda + teto pede ~6,4 SOL de buffer, devolvíveis, mais ~0,6 SOL de extensão que não volta; o dry-run imprime os números reais).
 4. `bash scripts/chain/upgrade-devnet.sh --yes`.
-5. **Logo em seguida**, sem outra instrução no meio (janela em que a Config v1 não deserializa):
+5. **Só se a Config da devnet ainda for v1 (187 bytes)**: confira antes com o trecho de `docs/devnet-upgrade.md`. Em 02/10/2026 ela já era v2 (285 bytes), então este passo foi **pulado** (`migrate-config` recusa a segunda vez). Se for v1, rode **logo em seguida**, sem outra instrução no meio (janela em que a Config v1 não deserializa):
    `pnpm --filter @solvers/server cli:admin:devnet migrate-config --keypair ~/solvers-keys/admin.json` (dry-run) e depois com `--yes`.
 
 Conferir: `solana program show DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW --url devnet` (Last Deployed Slot novo).
@@ -109,3 +109,20 @@ on-chain com a chave do criador e só **sobe** depois). Validar: `GET /api/agent
 3. Decisão O1 (uma licença por carteira nos produtos limitados): o guarda `already_owned` do x402 já vale para todos os produtos nas compras por x402 e
    na vitrine (`/tx/purchase`); não há regra on-chain.
 4. Parecer jurídico da custódia antes de qualquer mainnet; `X402_ENABLED` é recusado na mainnet por código.
+
+## Execução (02/10/2026)
+
+| Passo | Resultado |
+|---|---|
+| Build do `.so` da árvore integrada | 932.768 bytes, sha256 `61fabaf8afa45d1e…` |
+| Pré-check de Config | já **v2** (285 bytes), `fee_bps = 1000`: `migrate-config` não foi necessário |
+| Upgrade da devnet | slot 506377922 -> 506657364; ProgramData 920.776 -> 941.256 bytes; admin gastou ~0,11 SOL (extensão); backup do `.so` anterior em `~/solvers-build/backup/solvers-slot506377922-20261002-105018.so` (sha256 `a3b4e0d05f54e1f9…`) |
+| Compra na devnet com o programa novo (custódia + `TransferV1`) | 895 bytes, 73.420 CU, licença no pagador, reembolso ok |
+| `git push origin integration/x402-licencas:master` | `433dd82..2c468c6`; Deploy to Production e Program (Anchor) verdes |
+| Migrations na VPS | 0014 (`x402_orders`) e 0015 (`agents.max_licenses`) aplicadas; `/health` ok; `/api/agents` devolve `supply` |
+| x402 na VPS | custódia `CUFLLduZ9tzBJuPcgW6cdywzwUMufzb7AcHuTzZ7Cwkz` gerada em `/var/www/solvers/keys/custody.json` (600), ATA de USDC criada, `X402_ENABLED=true`, `pm2 reload solvers-api --update-env`; backup do `.env` em `shared/.env.bak-x402-*` |
+| `e2e-agent.ts` contra https://solvers.wondervelop.com | 9/9 (o passo de reembolso foi pulado: precisa de servidor com `X402_TEST_FAIL_MINT`) |
+| `e2e-supply.ts` na devnet | OK: teto 1, A compra, B recebe `SoldOut` sem mover USDC, teto sobe para 2, B compra |
+
+Restos de teste na devnet: um solver só on-chain do `e2e-supply` (`92aa89c1332fa0098c4fd2c354c6dc97`, sem catálogo) e uma licença do `e2e-agent` em
+`financas-pessoais` (carteira descartável). Nenhum teto foi definido em solver real ainda (passo 4).
