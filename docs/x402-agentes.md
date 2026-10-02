@@ -513,7 +513,7 @@ e os da fase 1. Suíte do servidor: 541 testes, 0 falhas (os `*.db.test.ts` com 
 6. A `UserReputation` da custódia é criada pelo programa (ela é a `buyer`); o indexador não a espelha.
 
 **Pendente:**
-1. Deploy na devnet (6.12): gerar a `CUSTODY_KEYPAIR` da VPS, `cli:x402-setup:devnet`, variáveis no `.env.devnet`, migration 0014 antes do processo novo. **Ler o `VPS_GUIDE.md` antes.**
+1. Deploy na devnet (6.12; roteiro completo e ordem com o upgrade do programa em `docs/deploy-devnet-x402-teto.md`): gerar a `CUSTODY_KEYPAIR` da VPS, `cli:x402-setup:devnet`, variáveis no `.env.devnet`, migration 0014 antes do processo novo. **Ler o `VPS_GUIDE.md` antes.**
 2. E2E do cenário `price_changed` (exige a chave do criador para `update_pricing`); hoje só há cobertura por leitura de código.
 3. Teste de rota com facilitator falso (o fluxo completo só roda no e2e da devnet).
 4. Parecer jurídico da custódia antes de qualquer mainnet (seção 9); o código recusa `X402_ENABLED` na mainnet.
