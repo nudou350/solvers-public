@@ -2,6 +2,16 @@
 # Um domínio só: a vitrine (Next.js) em / e o servidor Node em /api, /mcp, /oauth, /.well-known,
 # /webhooks, /preview e /health. Assim não há CORS e o cookie de sessão é do mesmo site.
 
+# Upload de pacotes (POST /api/creator/submissions). Este arquivo é incluído dentro de http{}, então map e limit_req_zone
+# podem ficar aqui (sem editar o nginx.conf compartilhado). Os nomes são globais no nginx: o prefixo solvers_ evita colisão
+# com outros sites. A chave só existe para POST (chave vazia não é contada), então GET de consulta de status não entra na zona.
+# 6 envios/min por IP já é folga: o app limita a 5 por dia e 3 pendentes por criador.
+map $request_method $solvers_upload_key {
+    POST    $binary_remote_addr;
+    default "";
+}
+limit_req_zone $solvers_upload_key zone=solvers_upload:10m rate=6r/m;
+
 upstream solvers_api {
     server 127.0.0.1:3017;
     keepalive 64;
@@ -54,6 +64,30 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Upload do ZIP do criador (até 50 MB; teto do nginx 60m). Corpo em streaming: o nginx repassa à API conforme recebe, sem
+    # gravar o corpo no disco do sistema (compartilhado com outros projetos). A autenticação é conferida pela API antes de ler o corpo.
+    # Rota exata: só esta URL. GET /api/creator/submissions (lista) cai aqui também, mas sem a zona de upload (chave vazia);
+    # /api/creator/submissions/<id> e o resto de /api seguem em "location /api" com o limite de 2m de corpo.
+    location = /api/creator/submissions {
+        limit_req zone=api burst=20 nodelay;
+        limit_req zone=solvers_upload burst=3 nodelay;
+        limit_req_status 429;
+        client_max_body_size 60m;
+        client_body_buffer_size 256k;
+        client_body_timeout 120s;     # tempo máximo SEM receber bytes do cliente (reinicia a cada leitura), não do upload todo
+        proxy_request_buffering off;
+        proxy_pass http://solvers_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 300s;      # entre escritas ao upstream; a API grava em disco, então só estoura se ela travar
+        proxy_read_timeout 300s;      # a API responde 202 depois de gravar o ZIP
     }
 
     location /api/auth {

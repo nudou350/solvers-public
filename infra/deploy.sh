@@ -29,6 +29,15 @@ command -v pnpm >/dev/null || corepack enable pnpm
 cd "$REL"
 # O .env e as chaves ficam fora do release.
 ln -sfn "$APP/shared/.env" apps/server/.env
+# Dados de criadores (ZIPs enviados e pacotes publicados) vivem em shared/, fora do release: sobrevivem à limpeza abaixo.
+# Só o usuário do deploy lê (o nginx não precisa). Nunca apagados por este script.
+mkdir -p "$APP/shared/submissions" "$APP/shared/packages"
+chmod 700 "$APP/shared/submissions" "$APP/shared/packages"
+# Sem estas variáveis o servidor gravaria em ./data dentro do release, que o deploy apaga. Falha aqui, antes de trocar qualquer coisa.
+for V in SUBMISSIONS_DIR PUBLISHED_DIR; do
+  grep -q "^$V=." "$APP/shared/.env" || { echo "✖ $V não está definida em $APP/shared/.env (veja infra/.env.example)" >&2; exit 1; }
+done
+grep -q "^ADMIN_WALLETS=." "$APP/shared/.env" || echo "⚠ ADMIN_WALLETS vazia em $APP/shared/.env: ninguém consegue revisar submissões no site" >&2
 pnpm install --frozen-lockfile --prod=false >/dev/null
 pnpm --filter @solvers/shared --filter @solvers/client --filter @solvers/chain --filter @solvers/server build
 # Vitrine: as variáveis NEXT_PUBLIC_* (ex: NEXT_PUBLIC_PRIVY_APP_ID) entram no build; ficam em shared/web.env.
@@ -63,10 +72,30 @@ activate() { # activate <release>
   swap_link agents "$APP/app/agents"
 }
 
+# O worker só existe a partir do release que traz dist/worker/index.js. Num rollback para um release sem ele, o processo é
+# parado (não removido) em vez de entrar em crash loop.
+has_worker() { [ -f "$APP/app/apps/server/dist/worker/index.js" ]; }
+
 reload_all() {
   cd "$APP"
-  for P in solvers-api solvers-web; do
-    if pm2 describe "$P" >/dev/null 2>&1; then pm2 reload "$P" --update-env; else pm2 start app/infra/ecosystem.config.cjs --only "$P"; fi
+  local PROCS=(solvers-api solvers-web)
+  has_worker && PROCS+=(solvers-worker)
+  for P in "${PROCS[@]}"; do
+    if [ "$P" = solvers-worker ] && [ -n "$(pm2_info "$P" status)" ] && [ "$(pm2_info "$P" status)" != online ]; then
+      pm2 restart "$P" --update-env   # worker parado por um rollback anterior: reload não garante religar
+    elif pm2 describe "$P" >/dev/null 2>&1; then pm2 reload "$P" --update-env; else pm2 start app/infra/ecosystem.config.cjs --only "$P"; fi
+  done
+  if ! has_worker; then pm2 stop solvers-worker >/dev/null 2>&1 || true; fi
+}
+
+# O reload do solvers-api derruba as conexões abertas, inclusive um upload de ZIP em andamento (o criador reenvia).
+# Antes de recarregar, espera (até UPLOAD_WAIT s) enquanto algum SUBMISSIONS_DIR/<id>/package.zip* estiver sendo gravado
+# (mtime dos últimos 10 s); depois segue de qualquer jeito. Um upload mais longo que isso ainda é cortado.
+wait_for_uploads() {
+  local waited=0 dir="$APP/shared/submissions"
+  while [ "$waited" -lt "${UPLOAD_WAIT:-120}" ] && [ -n "$(find "$dir" -type f -name 'package.zip*' -newermt '10 seconds ago' 2>/dev/null | head -n 1)" ]; do
+    [ "$waited" -eq 0 ] && echo "… upload em andamento em $dir; aguardando até ${UPLOAD_WAIT:-120}s antes de recarregar"
+    sleep 5; waited=$((waited + 5))
   done
 }
 
@@ -95,16 +124,19 @@ on_exit() {
 }
 trap on_exit EXIT
 
+wait_for_uploads
 SWITCHED=1
 activate "$REL"
 reload_all
 
 # ---- 3. Health check (~30 s): responde, não reinicia sozinho e fica online ----
-BASE_API=$(pm2_info solvers-api restart_time); BASE_WEB=$(pm2_info solvers-web restart_time)
+# O worker não serve HTTP: só se confere que ficou online e não entrou em crash loop (como api e web).
+BASE_API=$(pm2_info solvers-api restart_time); BASE_WEB=$(pm2_info solvers-web restart_time); BASE_WORKER=$(pm2_info solvers-worker restart_time)
 streak=0
 for _ in $(seq 1 "$HEALTH_TRIES"); do
   sleep "$HEALTH_INTERVAL"
-  if [ "$(pm2_info solvers-api restart_time)" != "$BASE_API" ] || [ "$(pm2_info solvers-web restart_time)" != "$BASE_WEB" ]; then
+  if [ "$(pm2_info solvers-api restart_time)" != "$BASE_API" ] || [ "$(pm2_info solvers-web restart_time)" != "$BASE_WEB" ] \
+    || [ "$(pm2_info solvers-worker restart_time)" != "$BASE_WORKER" ]; then
     echo "✖ um processo do PM2 reiniciou sozinho depois do reload (crash loop)" >&2; exit 1
   fi
   if curl -fsS --max-time 5 http://127.0.0.1:3017/health >/dev/null 2>&1 && curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:4017/ >/dev/null 2>&1; then
@@ -114,10 +146,10 @@ for _ in $(seq 1 "$HEALTH_TRIES"); do
   fi
 done
 if [ "$streak" -lt 3 ]; then echo "✖ health check não ficou estável (ok consecutivos: $streak)" >&2; exit 1; fi
-for P in solvers-api solvers-web; do
+for P in solvers-api solvers-web $(has_worker && echo solvers-worker); do
   [ "$(pm2_info "$P" status)" = "online" ] || { echo "✖ $P não está online" >&2; exit 1; }
 done
-echo "✔ solvers-api e solvers-web no ar ($SHA)"
+echo "✔ solvers-api e solvers-web$(has_worker && echo ' e solvers-worker') no ar ($SHA)"
 
 DONE=1
 pm2 save >/dev/null

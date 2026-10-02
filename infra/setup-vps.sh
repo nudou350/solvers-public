@@ -5,9 +5,9 @@ set -euo pipefail
 APP=/var/www/solvers
 DOMAIN=${DOMAIN:-solvers.wondervelop.com}
 
-sudo mkdir -p $APP/{releases,shared,keys,logs,deliverables}
+sudo mkdir -p $APP/{releases,shared,keys,logs,deliverables,shared/submissions,shared/packages}
 sudo chown -R deploy:deploy $APP
-chmod 700 $APP/keys
+chmod 700 $APP/keys $APP/shared/submissions $APP/shared/packages
 
 # Banco: PG16 na porta 5433 com pgvector.
 sudo apt-get install -y postgresql-16-pgvector >/dev/null
@@ -45,6 +45,9 @@ GUARANTEE_MIN_SALES=0
 GUARANTEE_MIN_RATING=0
 AGENTS_DIR=$APP/agents
 DELIVERABLES_DIR=$APP/deliverables
+SUBMISSIONS_DIR=$APP/shared/submissions
+PUBLISHED_DIR=$APP/shared/packages
+ADMIN_WALLETS=
 VERIFIER_MODE=docker
 VERIFIER_IMAGE=solvers-react-test
 ENV
