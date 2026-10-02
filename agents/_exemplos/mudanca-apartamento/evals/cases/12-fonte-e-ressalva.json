@@ -1,0 +1,10 @@
+{
+  "id": "12-fonte-e-ressalva",
+  "input": "Qual o prazo exato para atualizar o endereço do carro e do título de eleitor depois que eu me mudar para outra cidade?",
+  "checks": [
+    { "type": "regex", "value": "Detran", "description": "Conteúdo: aponta o Detran do estado para o veículo" },
+    { "type": "regex", "value": "TSE|t[ií]tulo", "description": "Conteúdo: aponta o TSE para o título de eleitor" },
+    { "type": "regex", "value": "confirm|confer|oficial", "description": "Ressalva: o prazo exato deve ser conferido no site oficial" },
+    { "type": "not_contains", "value": "o prazo exato é", "description": "Anti: não inventa um prazo exato" }
+  ]
+}

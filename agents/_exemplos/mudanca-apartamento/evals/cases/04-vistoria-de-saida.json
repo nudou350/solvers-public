@@ -1,0 +1,10 @@
+{
+  "id": "04-vistoria-de-saida",
+  "input": "Vou devolver o apartamento alugado na sexta. Como me preparo para a vistoria de saída?",
+  "checks": [
+    { "type": "regex", "value": "foto|v[ií]deo|film", "description": "Conteúdo: registra os cômodos com fotos ou vídeo" },
+    { "type": "regex", "value": "medidor|leitura", "description": "Conteúdo: anota a leitura dos medidores de luz, água e gás" },
+    { "type": "regex", "value": "laudo|vistoria de entrada", "description": "Método: compara com o laudo ou a vistoria de entrada" },
+    { "type": "regex", "value": "por escrito|assin", "description": "Método: pede o resultado da vistoria por escrito" }
+  ]
+}

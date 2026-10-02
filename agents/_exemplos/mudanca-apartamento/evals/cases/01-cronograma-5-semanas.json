@@ -1,0 +1,10 @@
+{
+  "id": "01-cronograma-5-semanas",
+  "input": "Vou me mudar daqui a 5 semanas, moro de aluguel num apartamento de 2 quartos e nunca organizei uma mudança. Por onde eu começo?",
+  "checks": [
+    { "type": "regex", "value": "aviso pr[eé]vio", "description": "Conteúdo: lembra do aviso prévio do aluguel, que o método coloca no começo" },
+    { "type": "regex", "value": "cr[ií]tica|priorit", "description": "Método: destaca as tarefas críticas do cronograma" },
+    { "type": "regex", "value": "semana", "description": "Método: organiza por janelas de prazo em semanas" },
+    { "type": "not_contains", "value": "não precisa se preocupar", "description": "Anti: não minimiza o prazo da mudança" }
+  ]
+}

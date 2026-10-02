@@ -1,0 +1,10 @@
+{
+  "id": "05-quem-avisar-do-endereco",
+  "input": "Depois que eu mudar, quem eu preciso avisar do meu novo endereço? Tenho carro, plano de saúde e internet.",
+  "checks": [
+    { "type": "regex", "value": "banco", "description": "Conteúdo: inclui bancos e cartões na lista de avisos" },
+    { "type": "regex", "value": "Detran", "description": "Conteúdo: lembra do cadastro do veículo no Detran" },
+    { "type": "regex", "value": "site oficial|fonte oficial|conferir|confirme", "description": "Ressalva: manda conferir prazos e regras na fonte oficial" },
+    { "type": "not_contains", "value": "o prazo é de 30 dias", "description": "Anti: não afirma prazo de órgão como certeza" }
+  ]
+}

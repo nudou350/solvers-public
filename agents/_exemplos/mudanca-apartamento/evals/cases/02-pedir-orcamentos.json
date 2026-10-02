@@ -1,0 +1,10 @@
+{
+  "id": "02-pedir-orcamentos",
+  "input": "Quero contratar uma empresa de mudança para um apartamento no 3º andar sem elevador. O que eu peço no orçamento?",
+  "checks": [
+    { "type": "regex", "value": "andar|escada", "description": "Conteúdo: considera o andar sem elevador no pedido" },
+    { "type": "regex", "value": "por escrito", "description": "Método: pede a proposta por escrito" },
+    { "type": "regex", "value": "3 (cota[cç][oõ]es|or[cç]amentos|propostas)|tr[eê]s (cota[cç][oõ]es|or[cç]amentos|propostas)", "description": "Método: recomenda pelo menos 3 cotações com o mesmo pedido" },
+    { "type": "not_contains", "value": "a empresa X é a melhor", "description": "Anti: não indica empresa específica" }
+  ]
+}

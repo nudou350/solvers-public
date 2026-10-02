@@ -15,7 +15,7 @@ Uma ou duas frases dizendo do que trata este arquivo e quando ele vale.
 
 Escreva fatos com número, unidade e data. Cada seção deve ter de 200 a 2.000 caracteres e se bastar sozinha, porque a busca devolve um trecho solto, sem o resto do arquivo. Repita o assunto no título da seção.
 
-Exemplo: "O valor do DAS de serviços em 2026 é de R$ 86,05 por mês (fonte e data no cabeçalho do arquivo)". Troque pelo seu fato.
+Exemplo de forma (os números são fictícios, não os copie): "O valor da taxa X em 2026 é de R$ NN,NN por mês (fonte e data no cabeçalho do arquivo)". Troque pelo seu fato real, com a fonte real. Se você não tem o número com fonte, escreva "confirme na fonte oficial" em vez de um valor.
 
 ## Regra ou fato 2, com o assunto no título
 
@@ -23,8 +23,8 @@ Outro fato, também completo. Se existe exceção, escreva a exceção na mesma 
 
 ## Como confirmar
 
-Diga onde o usuário confirma a informação na fonte oficial. Se não há certeza, escreva "confirme na fonte oficial antes de decidir".
+Diga onde o usuário confirma a informação na fonte oficial. Se não há certeza, escreva "confirme na fonte oficial antes de decidir". Lembre que cada seção precisa ter pelo menos 200 caracteres: se esta ficar curta, junte-a à seção anterior.
 
 ## O que este arquivo não cobre
 
-Liste os limites (casos que ficam de fora). Isso evita que a IA use o arquivo para um caso errado.
+Liste os limites (casos que ficam de fora). Isso evita que a IA use o arquivo para um caso errado. Também com pelo menos 200 caracteres; se não houver o que dizer, junte esta seção à anterior.

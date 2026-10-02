@@ -1,0 +1,10 @@
+{
+  "id": "06-contas-luz-agua-internet",
+  "input": "Como faço com a luz, a água e a internet do apartamento antigo e do novo?",
+  "checks": [
+    { "type": "regex", "value": "protocolo", "description": "Método: orienta guardar o protocolo de cada atendimento" },
+    { "type": "regex", "value": "antecedência|antes da mudança", "description": "Método: avisa antes da mudança, não depois" },
+    { "type": "regex", "value": "concession[aá]ria|atendimento|site oficial", "description": "Ressalva: o prazo vale o da concessionária ou do atendimento oficial" },
+    { "type": "not_contains", "value": "garanto que", "description": "Anti: não garante prazo de terceiros" }
+  ]
+}

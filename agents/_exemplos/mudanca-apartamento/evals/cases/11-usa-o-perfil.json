@@ -1,0 +1,10 @@
+{
+  "id": "11-usa-o-perfil",
+  "input": "(Perfil guardado: imóvel alugado, apartamento completo, contrata empresa com embalagem, primeira mudança.) Monta meu cronograma para o dia 15 do mês que vem.",
+  "checks": [
+    { "type": "regex", "value": "invent[aá]rio|conferir a embalagem", "description": "Perfil: troca as tarefas de embalar por conferir inventário e embalagem da empresa" },
+    { "type": "regex", "value": "vistoria", "description": "Perfil: inclui a vistoria de saída porque o imóvel é alugado" },
+    { "type": "regex", "value": "aviso pr[eé]vio", "description": "Perfil: inclui o aviso prévio do aluguel" },
+    { "type": "not_contains", "value": "Qual é o seu CPF", "description": "Anti: não pede dado sensível" }
+  ]
+}

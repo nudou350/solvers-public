@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Tabs } from "@/components/ui/Tabs";
 import { api } from "@/lib/api";
+import { EVAL_METHOD_NOTE, evalShort, hasEvalScore } from "@/lib/eval-label";
 import { useMyAccess } from "@/lib/hooks";
 import { date, dec1, initials, int, short, starPct } from "@/lib/format";
 import { gap } from "@/lib/style";
@@ -105,31 +106,40 @@ export function Scores({
               <Icon name="shield-check" />
             </span>
             <span className="eyebrow" style={{ color: "var(--mint)" }}>
-              O que foi comprovado
+              Testes da equipe
             </span>
           </div>
-          <div className="row" style={gap("20px")}>
-            <div className="ring" style={{ "--p": evalScore } as CSSProperties}>
-              <div>
-                <span className="display num" style={{ fontSize: 36 }}>
-                  {evalScore}%
-                </span>
+          {hasEvalScore(evalScore) ? (
+            <>
+              <div className="row" style={gap("20px")}>
+                <div className="ring" style={{ "--p": evalScore } as CSSProperties}>
+                  <div>
+                    <span className="display num" style={{ fontSize: 36 }}>
+                      {Math.round(evalScore)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="col" style={gap("4px")}>
+                  <b style={{ fontSize: 17, lineHeight: 1.3 }}>dos casos de teste internos resolvidos</b>
+                  <span className="small muted">{EVAL_METHOD_NOTE} Esta é a {version}.</span>
+                </div>
               </div>
-            </div>
+              <div className="col" style={gap("4px")}>
+                <div className="row between small">
+                  <span className="muted">Com o especialista</span>
+                  <b className="num ok">{Math.round(evalScore)}%</b>
+                </div>
+                <div className="bar mint">
+                  <i style={{ width: `${evalScore}%` }} />
+                </div>
+              </div>
+            </>
+          ) : (
             <div className="col" style={gap("4px")}>
-              <b style={{ fontSize: 17, lineHeight: 1.3 }}>dos casos de teste resolvidos</b>
-              <span className="small muted">Bateria aplicada de forma independente em cada versão. Esta é a {version}.</span>
+              <b style={{ fontSize: 17, lineHeight: 1.3 }}>Sem avaliações ainda</b>
+              <span className="small muted">Esta versão ({version}) ainda não tem nota de testes. A nota só aparece quando houver uma avaliação.</span>
             </div>
-          </div>
-          <div className="col" style={gap("4px")}>
-            <div className="row between small">
-              <span className="muted">Com o especialista</span>
-              <b className="num ok">{evalScore}%</b>
-            </div>
-            <div className="bar mint">
-              <i style={{ width: `${evalScore}%` }} />
-            </div>
-          </div>
+          )}
           <button type="button" className="link-btn small" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="tech" style={{ alignSelf: "flex-start" }}>
             {open ? "Ocultar detalhes técnicos" : "Verificar na blockchain"}
           </button>
@@ -240,7 +250,7 @@ export function Versions({ versions }: { versions: AgentVersion[] }) {
             <div className="bold">{v.notes || "Sem notas desta versão."}</div>
             <div className="small muted">
               {date(v.releasedAt)}
-              {v.evalScore != null ? ` · ${v.evalScore}% nos testes` : ""}
+              {hasEvalScore(v.evalScore) ? ` · ${evalShort(v.evalScore)}` : ""}
               {v.versionHash ? (
                 <>
                   {" · "}

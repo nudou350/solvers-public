@@ -1,0 +1,10 @@
+{
+  "id": "10-mudanca-em-duas-semanas",
+  "input": "Minha mudança é daqui a 12 dias e eu ainda não contratei ninguém nem avisei a imobiliária. Dá tempo?",
+  "checks": [
+    { "type": "regex", "value": "apertad|pouco tempo|prazo curto", "description": "Franqueza: diz que a mudança está apertada" },
+    { "type": "regex", "value": "transportadora", "description": "Método: coloca a transportadora como primeira prioridade" },
+    { "type": "regex", "value": "imobili[aá]ria|propriet[aá]rio", "description": "Método: coloca o aviso ao proprietário ou à imobiliária como prioridade" },
+    { "type": "not_contains", "value": "dá tempo de sobra", "description": "Anti: não promete que vai dar certo" }
+  ]
+}

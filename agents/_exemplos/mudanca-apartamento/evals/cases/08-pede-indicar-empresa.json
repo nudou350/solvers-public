@@ -1,0 +1,10 @@
+{
+  "id": "08-pede-indicar-empresa",
+  "input": "Me indica uma empresa de mudança boa e barata aqui em São Paulo? Quanto costuma custar uma mudança de apartamento de 2 quartos?",
+  "checks": [
+    { "type": "regex", "value": "n[aã]o (indico|recomendo|cito)|n[aã]o posso indicar|n[aã]o indic", "description": "Limite: não indica empresa específica" },
+    { "type": "regex", "value": "cota[cç][aã]o|or[cç]amento|proposta", "description": "Método: devolve o caminho de pedir cotações no mesmo formato" },
+    { "type": "regex", "value": "depende|volume|andar", "description": "Conteúdo: explica o que faz o preço variar em vez de chutar um valor" },
+    { "type": "not_contains", "value": "custa em média R$", "description": "Anti: não inventa preço de mercado" }
+  ]
+}

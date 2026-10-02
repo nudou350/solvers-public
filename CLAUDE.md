@@ -30,14 +30,15 @@ Also read `AGENTS.md` (Anchor program rules; skills in `.agents/skills/` are NOT
 | Express app and route mounting (single place modules register + jobs) | `apps/server/src/app.ts`, `modules.ts`, `jobs.ts` |
 | MCP connector (15 tools, incl. `get_template`) and OAuth (DCR + PKCE) | `apps/server/src/mcp`, `oauth` |
 | Solver runtime: package loading (`AGENTS_DIR` + `PUBLISHED_DIR`, `reloadPackages()`), access (license, guarantee, trial, free `platform` Solvers listed in `runtime/platform-agents.ts`), templates, guarantees | `apps/server/src/runtime` |
+| Creator flow (invite/profile routes, ZIP upload, worker validation, review queue + scans/diff, co-signed publication, kill switch; guide `docs/criador-solvers.md`) | `apps/server/src/creator/`, `submissions/`, `review/`, `publish/`, `worker/` (own PM2 process) |
 | Indexer (Helius webhook + polling fallback, mirrors chain to DB) | `apps/server/src/indexer` |
 | Store/web API (catalog, resale, escrow, help, images, me) | `apps/server/src/store` (pure rules in `*-rules.ts`, handlers beside them) |
 | Deliverable verification (Docker sandbox) | `apps/server/src/verifier` |
 | Auth (Privy/SIWS/JWT), payments, RAG, memory, images | `auth/`, `pix/`, `sodax/`, `knowledge/`, `memory/`, `images/` |
 | DB schema and migrations | `apps/server/src/db/schema.ts`, `db/migrations` |
 | Env validation (source of truth for config) | `apps/server/src/env.ts`, template `infra/.env.example` |
-| Server CLIs (publish, seed, validate, admin, reindex) | `apps/server/src/cli` |
-| Web pages (Portuguese routes: `especialistas`, `biblioteca`, `criador`, `garantias`, `revenda`, `checkout`, `instalar`, `perfil`) | `apps/web/src/app`, components in `src/components`, wallet/tx in `src/lib` |
+| Server CLIs (publish, seed, validate, admin, reindex, invite, approve, suspend) | `apps/server/src/cli` |
+| Web pages (Portuguese routes: `especialistas`, `biblioteca`, `criador` incl. `criador/publicar` and `criador/envios/[id]`, `admin/revisoes`, `garantias`, `revenda`, `checkout`, `instalar`, `perfil`) | `apps/web/src/app`, components in `src/components` (`creator/`, `admin/`), wallet/tx in `src/lib` |
 | Solver packages (data) | `agents/<slug>` (`manifest.json`, `steps/`, `knowledge/`, `templates/`, `evals/`) |
 | Chain bootstrap, e2e scripts, evals | `scripts/` |
 | Deploy, PM2, nginx | `infra/`, `.github/workflows` (`deploy.yml` on every push to `master`, `program.yml`) |
@@ -54,6 +55,12 @@ pnpm --filter @solvers/server db:generate | db:migrate
 pnpm --filter @solvers/client generate # regenerate client after the program/IDL changes
 cd apps/server && node --env-file-if-exists=.env.test --import tsx --test test/trial.test.ts   # one server test
 cd packages/shared && node --import tsx --test src/rules.test.ts                                # one package test
+pnpm --filter @solvers/server worker   # creator-flow worker (compiled; `worker:dev` for watch); in prod it is the separate PM2 process solvers-worker
+pnpm --filter @solvers/server cli:invite create|list|revoke|set-chat   # creator invites, Telegram link (set-chat <wallet> <chatId>)
+pnpm --filter @solvers/server cli:approve <slug|submissionId> [--dry-run]   # on-chain approve_agent with the cold admin wallet, then finishes publication
+pnpm --filter @solvers/server cli:suspend <slug> [--resume] [--reason "..."]   # kill switch: platform_status + suspend_agent on-chain
+pnpm --filter @solvers/server cli:publish --no-chain   # platform Solvers (PLATFORM_AGENTS), DB only
+cd scripts && npm run e2e:creator      # creator-flow QA against a local server on .env.qa; recreate its disposable DB with scripts/qa-reset.ps1
 bash scripts/chain/build-program.sh | test-program.sh   # WSL only; BUILD=1 rebuilds the .so before testing
 bash infra/deploy.sh                   # deploy current commit to the VPS
 ```
@@ -69,5 +76,9 @@ bash infra/deploy.sh                   # deploy current commit to the VPS
 - Every purchase (license, credits, guarantee) must be >= `min_price` (5 USDC) to cover rent paid by the platform.
 - License caps are enforced by the program, not the server: `purchase_license` requires the `supply_cap` PDA (derived from the agent) and fails with `SoldOut` when `Agent.total_sales >= max`; the cap can only be raised and resale/transfer never frees a slot. Never say "only N will exist" (the creator can raise it). Program changes need WSL (`scripts/chain/test-program.sh`).
 - Outside mainnet, `PIX_SIMULATE` and `SODAX_SIMULATE` default to true; the mainnet env rejects simulation and admin shortcuts.
-- Migrations share one DB with the release still running: keep them backward compatible.
+- Migrations share one DB with the release still running: keep them backward compatible. Creator-flow migrations 0016 to 0018 are additive; keep it that way.
+- Creator flow: `ADMIN_WALLETS` (env) only grants review access on the site. **Approving on the site signs nothing on-chain**: new Solvers need `cli:approve` with the cold `ADMIN_KEYPAIR`, and suspending needs `cli:suspend` (DB plus chain).
+- The worker is another process (PM2 `solvers-worker`): ZIP extraction, validation and ingestion never run in `solvers-api`; a stopped worker leaves submissions in `submitted`/`validating`.
+- `PLATFORM_AGENTS` (`runtime/platform-agents.ts`) is the only authority for platform Solvers; a manifest `platform: true` alone is rejected. They are free, DB only, no license.
+- Never republish packages that have an on-chain account on devnet without deciding about the rating first: `update_version` zeroes the on-chain score. A rating label is "teste interno da equipe", never "verificado" (see `apps/web/src/lib/eval-label.ts`, `evalLabel` in `mcp/agent-text.ts`).
 - Keys and `.env*` live outside git (`~/solvers-keys` in WSL, `apps/server/.keys`).

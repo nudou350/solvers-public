@@ -9,6 +9,7 @@ import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
 import { serverApi } from "@/lib/api";
+import { evalShort, hasEvalScore } from "@/lib/eval-label";
 import { ago, brl, categoryLabel, int, pct, trendCls } from "@/lib/format";
 import { gap } from "@/lib/style";
 
@@ -72,7 +73,7 @@ export default async function Home() {
             <div className="col" style={gap("8px", { marginBottom: 28 })}>
               <h2 className="display h2s">Novos por aqui</h2>
               <p className="muted" style={{ maxWidth: 560 }}>
-                Publicados nas últimas semanas, já com nota de desempenho verificada.
+                Publicados nas últimas semanas, já passados pela revisão da equipe.
               </p>
             </div>
             <div className="col" style={gap("14px")}>
@@ -84,7 +85,7 @@ export default async function Home() {
                       {a.name}
                     </b>
                     <div className="small muted trunc">
-                      publicado {ago(a.publishedAt)} · {a.evalScore}% nos testes{a.trialAvailable ? " · teste grátis" : ""}
+                      publicado {ago(a.publishedAt)} · {evalShort(a.evalScore)}{a.trialAvailable ? " · teste grátis" : ""}
                     </div>
                   </div>
                   <span className="chip chip-brand flex-none">Novo</span>
@@ -103,7 +104,7 @@ export default async function Home() {
           </div>
           <div className="g3" style={gap("40px")}>
             <Step n={1} title="Escolha um especialista">
-              Compare notas de usuários, desempenho comprovado e o antes e depois. Muitos têm teste grátis para você experimentar antes de decidir.
+              Compare notas de usuários, os testes da equipe e o antes e depois. Muitos têm teste grátis para você experimentar antes de decidir.
             </Step>
             <Step n={2} title="Pague uma vez">
               Você recebe uma licença só sua. Se a tarefa tiver garantia, o pagamento fica guardado e só é liberado quando o resultado passa nos critérios.
@@ -209,8 +210,8 @@ function HeroTicket({ agent: a, rate }: { agent: Agent; rate: number }) {
           <Icon name="check" />
         </span>
         <div>
-          <div className="bold small">Testado de forma independente</div>
-          <div className="tiny muted">{a.evalScore}% dos casos de teste resolvidos</div>
+          <div className="bold small">Testado pela equipe</div>
+          <div className="tiny muted">{hasEvalScore(a.evalScore) ? `${Math.round(a.evalScore)}% dos casos de teste internos resolvidos` : "Sem avaliações ainda"}</div>
         </div>
       </div>
     </div>

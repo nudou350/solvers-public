@@ -32,11 +32,11 @@ dados saem do servidor da plataforma? sim/não (precisaria de consentimento do u
 4. **Defina a verificação substituta** que o pacote terá hoje:
    - **Gates objetivos** em cada etapa (etapa 3): itens que a IA e o usuário conseguem marcar.
    - **Conferência cruzada no texto da etapa**: "refaça a conta por outro caminho e compare", "liste as fontes citadas e a data de cada uma", "releia o resultado contra o checklist".
-   - **Modelos** (`templates/`) com a estrutura exata da entrega, para o resultado sair padronizado.
+   - **Modelos** (`templates/`) com a estrutura exata da entrega, para o resultado sair padronizado. **Escreva agora o arquivo de cada modelo declarado em `templates` no manifesto** (`templates/<name>.md`, em Markdown, com campos para preencher e nenhum "TROQUE" sobrando): o `get_template` do pacote só entrega o que existe, e arquivo faltando é o erro `TEMPLATE_MISSING`. Os modelos do Criador (`get_template`) servem de inspiração, não de cópia.
    - **Casos de teste** (etapa 7) com checagens de texto e de números.
 5. **Limpe o manifesto**: sem `tools` (ou `tools: []`), `guarantee: { "available": false, "defaultCriteria": [] }`, sem `platform`, sem pasta `verifier/`. Terceiros com ferramenta recebem `TOOL_FORBIDDEN_RUNNER`; com garantia, `MANIFEST_GUARANTEE_FORBIDDEN`; com `platform` ou `verifier/`, `MANIFEST_PLATFORM_FORBIDDEN`.
 6. **Confira `differentiators`**: sem `tool` e sem `verifier`. Se constavam, retire e veja se ainda restam 2 comprovados (etapa 2).
-7. **Ajuste a vitrine ao que existe.** Revise `description`, `packageContents` e `beforeAfter` para não prometer cálculo no servidor, verificação automática, testes rodando ou garantia. O validador avisa quando `packageContents` fala de ferramenta ou garantia que o pacote não tem (`CONTENTS_MISMATCH`).
+7. **Ajuste a vitrine ao que existe.** Revise `description`, `packageContents` e `beforeAfter` (opcional: até 5 exemplos `{ prompt, withoutSolver, withSolver }`; se não houver, deixe fora do manifesto) para não prometer cálculo no servidor, verificação automática, testes rodando ou garantia. O validador avisa quando `packageContents` fala de ferramenta ou garantia que o pacote não tem (`CONTENTS_MISMATCH`).
 8. Mostre ao usuário o resumo "Hoje / Depois" e peça um ok.
 
 ## Erros comuns

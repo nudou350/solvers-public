@@ -7,6 +7,7 @@ import { Chip, RepBadge } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Stars } from "@/components/ui/Stars";
 import { Tile } from "@/components/ui/Tile";
+import { EVAL_METHOD_NOTE, evalShort, hasEvalScore } from "@/lib/eval-label";
 import { brl, pct, repLevel, short, trendCls, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 
@@ -40,12 +41,14 @@ export function ResaleRow({ listing, rate, mine }: { listing: ResaleListing; rat
 
       <div className="col" style={gap(6)}>
         {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue count={a.reviewsCount} /> : <span className="tiny faint">Ainda sem avaliações</span>}
-        {a.evalScore > 0 ? (
-          <span className="verified" title="Casos de teste resolvidos">
+        {hasEvalScore(a.evalScore) ? (
+          <span className="verified" title={EVAL_METHOD_NOTE}>
             <Icon name="shield-check" size="s" />
-            {a.evalScore}% nos testes
+            {evalShort(a.evalScore)}
           </span>
-        ) : null}
+        ) : (
+          <span className="tiny faint">{evalShort(a.evalScore)}</span>
+        )}
       </div>
 
       <div className="row" style={gap(12)}>

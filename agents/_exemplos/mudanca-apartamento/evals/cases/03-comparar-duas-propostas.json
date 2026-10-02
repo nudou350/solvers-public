@@ -1,0 +1,10 @@
+{
+  "id": "03-comparar-duas-propostas",
+  "input": "Recebi duas propostas: a A é mais barata mas não falou de embalagem; a B custa um pouco mais e inclui montagem dos móveis. Qual eu escolho?",
+  "checks": [
+    { "type": "regex", "value": "inclui|n[aã]o inclui|ficou de fora", "description": "Conteúdo: compara o que cada proposta inclui e não inclui" },
+    { "type": "regex", "value": "seguro", "description": "Método: pergunta sobre o seguro antes de decidir" },
+    { "type": "regex", "value": "perguntar|confirm", "description": "Comportamento: manda confirmar com a empresa o que não foi informado" },
+    { "type": "not_contains", "value": "fique com a mais barata", "description": "Anti: não decide só pelo menor preço" }
+  ]
+}

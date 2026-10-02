@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/Icon";
 import { TechCard } from "@/components/ui/TechCard";
 import { Tile } from "@/components/ui/Tile";
 import { ApiError, serverApi } from "@/lib/api";
+import { EVAL_METHOD_NOTE, hasEvalScore } from "@/lib/eval-label";
 import { clusterName, explorerWallet } from "@/lib/explorer";
 import { dec1, initials, int, REP_LEVELS, repLevel, starPct } from "@/lib/format";
 import { gap } from "@/lib/style";
@@ -139,10 +140,14 @@ export default async function CreatorPage({ params }: Props) {
                   <b className="small num">{dec1(a.userRating)}</b>
                 </span>
               ) : null}
-              <span className="verified hide-m" title="Casos de teste resolvidos">
-                <Icon name="shield-check" size="s" />
-                {a.evalScore}%
-              </span>
+              {hasEvalScore(a.evalScore) ? (
+                <span className="verified hide-m" title={EVAL_METHOD_NOTE}>
+                  <Icon name="shield-check" size="s" />
+                  {Math.round(a.evalScore)}%
+                </span>
+              ) : (
+                <span className="tiny faint hide-m">Sem avaliações ainda</span>
+              )}
               <Icon name="chevron-right" size="s" />
             </Link>
           ))

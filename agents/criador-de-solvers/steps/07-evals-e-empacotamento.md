@@ -49,7 +49,7 @@ Combine com o cliente do usuário (perfil `onde_roda`) como o ZIP será entregue
 
 ### Parte C: validar
 
-9. Rode `run_tool` com `tool` igual a `validate_package` e a entrada completa: `manifest`, `steps` (conteúdo de cada etapa), `files` (todos os arquivos com o tamanho em bytes), `knowledge` (`path` e `head` de cada arquivo), `templates` e `evals` (`path` e `content`). A chamada tem teto de cerca de 1 MB: em pacotes grandes, mande só o começo dos arquivos de conhecimento.
+9. Rode `run_tool` com `tool` igual a `validate_package` e a entrada completa: `manifest`, `steps` (conteúdo de cada etapa), `files` (todos os arquivos com o tamanho em bytes), `knowledge` (`path` e `head` de cada arquivo), `templates` e `evals` (`path` e `content`). Em todos, o `path` é o caminho completo dentro da pasta (`templates/modelo.md`, `evals/cases/01-nome.json`): com outro caminho, o caso de teste ou o modelo não é contado. Antes, confira que cada modelo declarado em `templates` tem o arquivo escrito (`TEMPLATE_MISSING`). A chamada tem teto de cerca de 1 MB: em pacotes grandes, mande só o começo dos arquivos de conhecimento.
 10. **Zere os erros** e examine os avisos um a um: conserte ou justifique no README. Códigos e correções: busque na base por "código de erro". `stats.differentiators` mostra os diferenciais comprovados: precisam ser **pelo menos 2**.
 11. Confira com o usuário o **checklist de pré-envio** (modelo `checklist-pre-envio`). Itens principais: todos os arquivos existem, só `.json`, `.md` e `.txt`, nenhum dado pessoal, fontes com data, nenhuma promessa de nota, aprovação ou resultado.
 

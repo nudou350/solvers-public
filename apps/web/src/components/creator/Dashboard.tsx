@@ -10,6 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Tile } from "@/components/ui/Tile";
 import { ApiError } from "@/lib/api";
+import { EVAL_METHOD_NOTE, hasEvalScore } from "@/lib/eval-label";
 import { brl, brl0, date, dec1, int, usdc } from "@/lib/format";
 import { useRate, useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
@@ -104,7 +105,7 @@ function NotCreator({ sharePct }: { sharePct: number }) {
   const points = [
     { icon: "gift" as const, title: "Publicar é grátis", text: "Sem depósito e sem mensalidade. Você monta o pacote com o Criador de Solvers, envia o ZIP e a equipe revisa antes de ir ao ar." },
     { icon: "coin" as const, title: `Você recebe ${dec1(sharePct).replace(",0", "")}% de cada venda`, text: "O valor cai na sua carteira a cada licença vendida. A taxa da plataforma já está descontada." },
-    { icon: "shield-check" as const, title: "Qualidade pela bateria de testes", text: "Cada pacote passa por uma conferência automática e pela revisão da equipe. A nota de desempenho aparece para os compradores." },
+    { icon: "shield-check" as const, title: "Qualidade pela bateria de testes", text: "Cada pacote passa por uma conferência automática e pela revisão da equipe. Quando houver nota dos testes internos da equipe, ela aparece para os compradores." },
   ];
   return (
     <div className="card pad-l col" style={gap(28)}>
@@ -283,9 +284,9 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                     <span className="only-m tiny faint">Nota </span>
                     {a.userRating > 0 ? dec1(a.userRating) : "—"}
                   </span>
-                  <span className={["num", a.evalScore >= 80 ? "ok" : "warn"].join(" ")}>
+                  <span className={["num", !hasEvalScore(a.evalScore) ? "faint" : a.evalScore >= 80 ? "ok" : "warn"].join(" ")} title={hasEvalScore(a.evalScore) ? EVAL_METHOD_NOTE : undefined}>
                     <span className="only-m tiny faint">Desempenho </span>
-                    {Math.round(a.evalScore)}%
+                    {hasEvalScore(a.evalScore) ? `${Math.round(a.evalScore)}%` : "Sem avaliações ainda"}
                   </span>
                   <b className="num">
                     <span className="only-m tiny faint">Receita </span>

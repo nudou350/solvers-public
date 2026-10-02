@@ -48,7 +48,7 @@ import { searchQuotaBlock } from "../knowledge/quota.js";
 import { hitsText, trialFilesOnly, TRIAL_NO_FILES_TEXT } from "../knowledge/search-rules.js";
 import { escalate } from "../notify/telegram.js";
 import { submitDeliverable } from "../verifier/deliverables.js";
-import { AGENT_SERVER_INSTRUCTIONS, AGENT_STEP_NOTE, agentPurchaseLine, agentPurchaseText, networkLabel } from "./agent-text.js";
+import { AGENT_SERVER_INSTRUCTIONS, AGENT_STEP_NOTE, agentPurchaseLine, agentPurchaseText, evalLabel, networkLabel } from "./agent-text.js";
 import { preflightText } from "./preflight.js";
 import { CONTENT_SAFETY_INSTRUCTIONS } from "./guides.js";
 import { isPlatformAgentRow, PLATFORM_AGENT_IDS, PLATFORM_NOT_FOR_SALE_TEXT } from "../runtime/platform-agents.js";
@@ -195,7 +195,7 @@ export function describeAgent(row: AgentRow) {
   if (isPlatformAgentRow(row)) return "Solver gratuito da plataforma (sem licença e sem preço; vale para qualquer carteira logada)";
   const rating = row.ratingCount ? (Number(row.ratingSum) / row.ratingCount).toFixed(1) : "sem avaliações";
   const supply = supplyLabel(supplyOfRow(row));
-  return `nota ${rating} (${row.ratingCount} avaliações), desempenho verificado ${(row.evalScoreBps / 100).toFixed(0)}%, licença vitalícia por ${unitsToUsdc(row.price)} USDC${supply ? ` (${supply})` : ""}`;
+  return `nota ${rating} (${row.ratingCount} avaliações), ${evalLabel(row.evalScoreBps)}, licença vitalícia por ${unitsToUsdc(row.price)} USDC${supply ? ` (${supply})` : ""}`;
 }
 
 /** Uma linha sobre o teste grátis do especialista (find_solver). */

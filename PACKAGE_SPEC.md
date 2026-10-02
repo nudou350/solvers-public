@@ -1,6 +1,6 @@
 # Pacote Solver v1 — Especificação
 
-Status: **aprovada pelo dono em 2026-09-30** (D1–D14 confirmadas; revisão em 5 dias úteis). Revisada em duas rodadas por revisores independentes (consistência com o código; segurança, operação e produto). **P0 e P1 implementadas** na branch `worktree-spec-p0-p1` (ver §22); o resto segue só como especificação.
+Status: **aprovada pelo dono em 2026-09-30** (D1–D14 confirmadas; revisão em 5 dias úteis). Revisada em duas rodadas por revisores independentes (consistência com o código; segurança, operação e produto). **Implementado em 2026-10-02 na branch `feat/criador-solvers` (commitada, ainda sem deploy): P0 a P4, P5 parcial (só os rótulos honestos da nota) e P8** (ver §22 e o bloco "Desvios da implementação"). Seguem pendentes a **P6** (pré-abertura) e a **P7** (Abertura). Guia operacional: `docs/criador-solvers.md`.
 Escopo: formato do pacote, validação, submissão, revisão manual, publicação, entrega ao usuário e o "Criador de Solvers".
 Base: o código atual (`apps/server/src/runtime/*`, `mcp/*`, `knowledge/*`, `memory/*`, `cli/publish.ts`, `programs/solvers`) e o INSTRUCTIONS.md §6.
 
@@ -480,7 +480,7 @@ Limites: `summary` ≤ 4.000 caracteres (como hoje), `profile` ≤ 2.000, até 3
 
 **Regra de ouro**: `scoreBps` on-chain só é gravado a partir de `platform_run` ou `verified`. O `judge` sobre respostas escritas pelo criador **não existe**: quem escreve a resposta ideal passaria, e o juiz pode ser instruído pelo próprio texto. O custo de LLM da plataforma tem orçamento por criador.
 
-**Notas atuais** (os 6 publicados): foram geradas pela equipe (respostas de um agente com o especialista ativo, sem ver as checagens) e corrigidas por regex. A vitrine e o `find_solver` hoje dizem "desempenho verificado"; passam a dizer "teste interno da equipe (checagens automáticas)" até serem refeitos com `platform_run`. Nenhuma nota nova é gravada sem método válido.
+**Notas atuais** (os 6 publicados): foram geradas pela equipe (respostas de um agente com o especialista ativo, sem ver as checagens) e corrigidas por regex. A vitrine e o `find_solver` diziam "desempenho verificado"; **desde 2026-10-02 (P5 parcial, branch `feat/criador-solvers`)** dizem "teste interno da equipe (checagens automáticas)" e, sem nota (`evalScoreBps = 0`), "Sem avaliações ainda", até serem refeitos com `platform_run`. "Verificado" só vale para `evalMethod: verified`, que ainda não existe (o campo `evalMethod` também não: o contrato segue com `Agent.evalScore` numérico). Nenhuma nota nova é gravada sem método válido.
 
 ### 12.3 `report.json` **[muda]**
 
@@ -732,7 +732,7 @@ Depende do cliente: no **Claude Code** a IA escreve a pasta e roda o script `sol
 | Informação | De onde vem | Onde aparece |
 |---|---|---|
 | Diferenciais do Solver | `differentiators` conferido pelo revisor | Vitrine, `find_solver` |
-| Método da nota | `evalMethod` (§12.2) | Vitrine, `find_solver`, `describeAgent` (hoje dizem "desempenho verificado" para qualquer nota, inclusive "0%" quando `evalScoreBps = 0`; sem nota passa a mostrar "sem avaliações ainda") |
+| Método da nota | `evalMethod` (§12.2) | Vitrine, `find_solver`, `describeAgent` (**feito em 2026-10-02**: sem nota mostra "sem avaliações ainda"; com nota, "teste interno da equipe (checagens automáticas)"; nunca "verificado". Código: `evalLabel` em `mcp/agent-text.ts` e `apps/web/src/lib/eval-label.ts`. O campo `evalMethod` em si segue pendente) |
 | Fontes e atualização do conhecimento | `knowledge.sources`, `updatedAt` | Página do especialista |
 | Envio de dados a terceiros (`egress`) | `tools[].egress` | Vitrine e preflight (Abertura) |
 | Templates e calibragem | `templates[]`, `onboarding` | Página do especialista |
@@ -771,6 +771,34 @@ Tamanho é **relativo** (P, M, G), não estimativa de prazo. Uma fase só começ
 | **P8** | Wizard real do site apontado para as APIs | P4 | M | O wizard publica o mesmo que o script |
 
 **Status (2026-09-30):** P0 e P1 implementadas na branch `worktree-spec-p0-p1` (sem commit, sem deploy). P0: contenção de caminhos (`runtime/package-paths.ts`, `package-loader.ts`), formato de `slug`/`version` (`agent-ids.ts`), colisão de `id`/`slug`, `agents.platform_status` (migration `0010`) conferida em todas as tools, em `/tx/purchase` e nas garantias e nunca escrita pelo indexador (`indexer/mirror.ts`), memória só com licença ou sessão, falha de log sem silêncio. P1: `runtime/validate/*` (validador único, 67 códigos, JSON Schema), `npm run cli:validate` e `cli:schema`. Testes: `test/packages.test.ts`, `platform-status.test.ts`, `platform-status.db.test.ts` (com `TEST_DATABASE_URL`) e `validate.test.ts`. O deploy aplica a migration `0010` sozinho (`infra/deploy.sh` roda `db:migrate`). Leitura de ZIP no `cli:validate` chega com o extrator da P4 (hoje o script lê pastas).
+
+**Status (2026-10-02):** implementado na branch `feat/criador-solvers` (commits `3189fcb`, `f1cdad7`, `fac5c2e`, `0efe6bf`, `18ddc5d`; **sem deploy**).
+
+| Fase | Estado | Onde está |
+|---|---|---|
+| P0, P1 | Feitas (ver o status de 2026-09-30 acima) | `runtime/validate/*`, `cli:validate`, `cli:schema` |
+| P2 | Feita | `runtime/platform-agents.ts`, acesso `platform`, `builtin:validate-package`, `get_template`, `cli:publish --no-chain`, `agents/criador-de-solvers` |
+| P3 | Feita | memória v2, calibragem, `.md`/`.txt` com metadados e `valid_until` no RAG |
+| P4 | Feita | `creator/`, `submissions/`, `publish/`, `review/`, `worker/`, `cli/invite.ts`, `cli/approve.ts`, `cli/suspend.ts`, migrations 0016 a 0018, `infra/` (worker PM2, nginx, deploy); telas `/criador/publicar`, `/criador/envios/[id]`, `/admin/revisoes` |
+| P5 | **Parcial**: só os rótulos honestos da nota (§12.2 e §20). Pendentes: `evalMethod` no contrato, mínimos de casos conferidos pelo servidor, textos de privacidade, retenção e exclusão de `sessions.context` e `escalations`, consentimento antes de `escalate_to_creator` | `mcp/agent-text.ts` (`evalLabel`), `apps/web/src/lib/eval-label.ts` |
+| P6 | Pendente (pré-abertura, §2.2) | |
+| P7 | Pendente (Abertura) | |
+| P8 | Feita, com desvio: o site tem o fluxo real (perfil, upload do ZIP, acompanhamento, co-assinatura), mas **não** o wizard que monta o pacote; quem monta é o Criador de Solvers. O wizard falso foi removido (DEF-18) | `apps/web/src/components/creator/*` |
+
+**Desvios da implementação** (o código é a verdade; a spec acima descreve a intenção original):
+
+* **Acesso `platform`**: o tipo de acesso novo é `platform` e a autoridade é a lista `PLATFORM_AGENTS` do servidor (dupla `slug` + `id`), nunca o campo `platform` do manifesto. A lista só é aceita se o pacote vier de `AGENTS_DIR`; o mesmo `id` ou `slug` num pacote publicado de criador derruba o carregamento.
+* **Worker como processo PM2** (`solvers-worker`, `infra/ecosystem.config.cjs`): extrai, valida, varre e ingere. Tentativas em `package_submissions.attempts` (máximo 3; esgotadas, o envio vira `rejected_validation` e o admin é avisado). `SUBMISSIONS_INLINE=true` processa dentro da API (só QA).
+* **Ações de revisão a mais**: `revoke` (o admin desfaz uma aprovação não assinada; volta a `changes_requested`, rota `POST /api/admin/submissions/:id/revoke`), `expire` (o sistema, como `system`), `finish`, `suspend` e `resume`. Transições a mais em §14.2: `awaiting_creator_signature` pode ir a `changes_requested` (revogar) ou `rejected` (expirar).
+* **Expiração e limpeza**: job `faxina das submissões` a cada 6 h: `changes_requested` e `awaiting_creator_signature` paradas há mais de 30 dias viram `rejected` e liberam o slug; ZIPs e pastas de rejeitadas somem em 30 dias; pastas órfãs e `.part` em 1 dia (`submissions/cleanup.ts`).
+* **Migrations 0016 a 0018**, todas aditivas: 0016 (tabelas, colunas, gatilho de somente-inserção em `package_reviews`, backfill de `creators.invited` e das 6 versões publicadas), 0017 (`attempts`) e 0018 (gatilho contra `TRUNCATE` em `package_reviews`).
+* **Rotas a mais**: `GET /api/creator/me`, `POST /api/creator/profile`, `GET /api/tx/publication/:submissionId`, `POST /api/tx/publication/confirm`, `GET /api/admin/submissions/:id/file` e `/knowledge-search`, `POST /api/creator/submissions?resubmit=<id>`. O corpo do upload é `application/zip` cru (não multipart).
+* **Telegram vinculado pelo admin**: não há `/vincular <código>` no bot; o admin roda `cli:invite set-chat <carteira> <chatId>` (§14.1 previa o fluxo pelo bot).
+* **nginx**: a `limit_req_zone` do upload ficou no arquivo do site (`infra/nginx/solvers`, zona `solvers_upload`), não no `nginx.conf` global (§14.4).
+* **Sem `container` e sem `http`**: `container` não existe no v1; `http` e `mcp` são aceitos pelo schema do manifesto mas **recusados a terceiros** (`TOOL_FORBIDDEN_RUNNER`) e não executados. Terceiros no Núcleo não têm ferramenta nem garantia.
+* **Nota**: o contrato continua `Agent.evalScore` numérico; só os rótulos mudaram (P5 parcial). Não existe `evalMethod` nem `platform_run`.
+* **Kill switch com CLI**: `cli:suspend <slug> [--resume]` faz `platform_status` e `suspend_agent` on-chain (fecha DEF-22).
+* **Publicação**: `update_version` zera a nota on-chain; republicar pacotes antigos na devnet pede decisão sobre a nota (§15.3, passo 3).
 
 O Criador de Solvers (P2) pode ser usado antes da P4: o criador envia o ZIP para você e você publica com o `cli:publish` de hoje (na devnet, com as chaves do `creatorSigner`). Esse atalho **não vale para terceiros na mainnet** (§15.2).
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { Stars } from "@/components/ui/Stars";
 import { Tile } from "@/components/ui/Tile";
+import { EVAL_METHOD_NOTE, evalShort, hasEvalScore } from "@/lib/eval-label";
 import { brl0, usdc } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref } from "./data";
@@ -26,10 +27,14 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
       </p>
       <div className="row wrapx" style={gap("6px 14px")}>
         {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue count={a.reviewsCount} /> : <span className="tiny faint">Ainda sem avaliações</span>}
-        <span className="verified" title="Casos de teste resolvidos">
-          <Icon name="shield-check" size="s" />
-          {a.evalScore}% nos testes
-        </span>
+        {hasEvalScore(a.evalScore) ? (
+          <span className="verified" title={EVAL_METHOD_NOTE}>
+            <Icon name="shield-check" size="s" />
+            {evalShort(a.evalScore)}
+          </span>
+        ) : (
+          <span className="tiny faint">{evalShort(a.evalScore)}</span>
+        )}
         {a.trialAvailable ? <TrialTag agentId={a.id} /> : null}
         <SupplyTag supply={a.supply} />
       </div>

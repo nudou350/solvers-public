@@ -118,5 +118,8 @@ export function validatePackageTool(raw: unknown): ValidatePackageOutput {
   const notes: string[] = [];
   if (!has.knowledge) notes.push("O conhecimento não foi enviado, então não foi conferido.");
   if (!has.evals) notes.push("Os casos de eval não foram enviados, então não foram conferidos.");
+  // Caminho curto (sem a pasta) é o erro mais comum de quem monta a entrada à mão: o arquivo entra, mas não conta como caso nem como conhecimento.
+  if (input.evals?.length && !input.evals.some((e) => /^evals\/cases\/[^/]+\.json$/.test(e.path))) notes.push("Nenhum eval veio com o caminho completo evals/cases/NN-nome.json, e só assim ele conta como caso de teste.");
+  if (input.knowledge?.length && !input.knowledge.some((k) => k.path.startsWith("knowledge/"))) notes.push("Nenhum arquivo de conhecimento veio com o caminho completo knowledge/nome.md, e só assim ele é conferido como conhecimento.");
   return { ok: errors.length === 0, errors, warnings, stats: result.stats, summary: summarize(errors, warnings, notes) };
 }

@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { blockBeforeTrial } from "../src/runtime/access-rules.js";
 import { AGENT_CLIENT_ID, isAgentClient } from "../src/oauth/rules.js";
-import { AGENT_SERVER_INSTRUCTIONS, AGENT_STEP_NOTE, agentPurchaseLine, agentPurchaseText, networkLabel } from "../src/mcp/agent-text.js";
+import { AGENT_SERVER_INSTRUCTIONS, AGENT_STEP_NOTE, agentPurchaseLine, agentPurchaseText, evalLabel, networkLabel } from "../src/mcp/agent-text.js";
 
 // Token de agente: o que o distingue (isAgentClient), por que não há teste grátis (blockBeforeTrial) e os textos
 // próprios (sem "mostre ao usuário" nem link de checkout). Regras puras, sem banco; o fluxo completo está em agent-auth.db.test.ts.
@@ -36,6 +36,17 @@ describe("blockBeforeTrial", () => {
   it("licença não confirmada tem prioridade: nunca manda comprar nem gasta teste por falha de RPC", () => {
     assert.equal(blockBeforeTrial({ licenseUnknown: true, allowTrial: true, agent: false }), "unverified");
     assert.equal(blockBeforeTrial({ licenseUnknown: true, allowTrial: false, agent: true }), "unverified");
+  });
+});
+
+describe("rótulo da nota de desempenho (P5)", () => {
+  it("sem nota: sem avaliações ainda, nunca 0% nem verificado", () => {
+    assert.equal(evalLabel(0), "desempenho: sem avaliações ainda");
+    assert.doesNotMatch(evalLabel(0), /0%|verificad/i);
+  });
+  it("com nota: teste interno da equipe, nunca verificado", () => {
+    assert.equal(evalLabel(8250), "teste interno da equipe (checagens automáticas): 83%");
+    assert.doesNotMatch(evalLabel(8250), /verificad/i);
   });
 });
 

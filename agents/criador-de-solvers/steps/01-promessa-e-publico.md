@@ -12,8 +12,9 @@ Comece pelo perfil. Chame `get_memory` (se ainda não chamou nesta sessão). Ele
 
 - **Se o perfil existe**, não repita as perguntas: confirme numa frase ("Pelo que lembro, você já fez um curso online, quer um Solver consultivo e vai montar tudo no Claude Code. Continua assim?") e siga.
 - **Se o perfil foi pulado ou não há memória**, pergunte só o essencial, em uma mensagem: se é a primeira vez, em que IA vai montar o pacote (Claude Code, Claude ou ChatGPT) e se já tem material (PDFs, planilhas, anotações).
+- **Se o perfil existe mas falta uma chave** (a pessoa pulou uma das perguntas, por exemplo `material_fonte`), use as que existem e pergunte só a que falta, na hora em que ela fizer diferença (o material, por exemplo, na etapa 4). Não repita as que ela já respondeu.
 
-Depois, sobre a ideia (no máximo 5 perguntas por mensagem, agrupadas):
+Depois, sobre a ideia (no máximo 5 perguntas por mensagem, agrupadas; são 6 ao todo, então divida em duas mensagens, começando por 1 a 3):
 
 1. **Que problema concreto o Solver resolve?** Peça um exemplo real de alguém que o procuraria ("uma dentista que não sabe fechar o mês do consultório").
 2. **Quem compra?** Nível de conhecimento, profissão, situação. Um público só.

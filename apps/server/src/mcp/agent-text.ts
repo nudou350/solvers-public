@@ -46,3 +46,12 @@ export function agentPurchaseLine(p: Pick<AgentPurchaseInput, "apiBase" | "agent
 export function networkLabel(cluster: string): string {
   return `solana-${cluster === "mainnet-beta" ? "mainnet" : cluster}`;
 }
+
+/**
+ * Rótulo honesto da nota de desempenho (PACKAGE_SPEC.md §12.2, fase P5): sem nota (0 bps) = "sem avaliações ainda";
+ * nota existente = teste interno da equipe. "Verificado" só valeria para evalMethod "verified", que ainda não existe.
+ */
+export function evalLabel(evalScoreBps: number): string {
+  if (!Number.isFinite(evalScoreBps) || evalScoreBps <= 0) return "desempenho: sem avaliações ainda";
+  return `teste interno da equipe (checagens automáticas): ${(evalScoreBps / 100).toFixed(0)}%`;
+}

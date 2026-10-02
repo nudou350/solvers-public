@@ -151,6 +151,15 @@ describe("validatePackageTool: arquivos, conhecimento, templates e evals", () =>
     assert.ok(bad.errors.some((e) => e.code === "EVAL_TOO_FEW_CASES"), "com evals na entrada o mínimo vale");
   });
 
+  it("eval ou conhecimento sem a pasta no caminho: o resumo avisa que não contam (e com o caminho certo, não avisa)", () => {
+    const caseJson = JSON.stringify({ id: "a", input: "pedido", checks: [{ type: "contains", value: "x", description: "d" }] });
+    const short = validatePackageTool(input({ evals: [{ path: "a.json", content: caseJson }], knowledge: [{ path: "tema.md", head: knowledge }] }));
+    assert.match(short.summary, /evals\/cases\/NN-nome\.json/);
+    assert.match(short.summary, /knowledge\/nome\.md/);
+    const full = validatePackageTool(input({ evals: [{ path: "evals/cases/a.json", content: caseJson }], knowledge: [{ path: "knowledge/tema.md", head: knowledge }] }));
+    assert.doesNotMatch(full.summary, /caminho completo/);
+  });
+
   it("tipo de arquivo fora do Núcleo na lista de arquivos: FILE_TYPE_NOT_ALLOWED", () => {
     const out = validatePackageTool(input({ files: [{ path: "manifest.json", size: 10 }, { path: "knowledge/livro.pdf", size: 1000 }] }));
     assert.ok(out.errors.some((e) => e.code === "FILE_TYPE_NOT_ALLOWED" && e.path === "knowledge/livro.pdf"));

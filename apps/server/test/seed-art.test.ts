@@ -48,7 +48,8 @@ describe("gallerySvgs", () => {
 
   it("os 8 especialistas do repositório geram de 3 a 5 cartões que viram PNG do tamanho certo", async () => {
     const dir = join(import.meta.dirname, "..", "..", "..", "agents");
-    const slugs = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    // Pastas começadas por "_" (ex.: _exemplos) não são pacotes do catálogo.
+    const slugs = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_")).map((d) => d.name);
     assert.ok(slugs.length >= 8, `achou ${slugs.length} pacotes`);
     for (const slug of slugs) {
       const m = JSON.parse(readFileSync(join(dir, slug, "manifest.json"), "utf8"));
