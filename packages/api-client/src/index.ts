@@ -64,8 +64,11 @@ export type ApiOptions = {
 export type WalletLike = {
   address: string;
   signMessage(message: Uint8Array): Promise<Uint8Array>;
-  /** Assina a transação serializada (bytes) e devolve os bytes assinados. */
-  signTransaction(tx: Uint8Array): Promise<Uint8Array>;
+  /**
+   * Assina a transação serializada (bytes) e devolve os bytes assinados. `opts.network = "mainnet"` pede a assinatura na
+   * rede real (o saque privado do Cloak roda na mainnet mesmo com a vitrine na devnet); sem ela vale a rede da config.
+   */
+  signTransaction(tx: Uint8Array, opts?: { network?: "mainnet" }): Promise<Uint8Array>;
 };
 
 const toB64 = (b: Uint8Array) => {

@@ -86,8 +86,9 @@ function Bridge({ onAdapter, chain }: { onAdapter: (a: WalletAdapter) => void; c
         const { signature } = await fns.current.signMessage({ message, wallet: current(), options: { uiOptions: { title: "Entrar no Solvers" } } });
         return signature;
       },
-      async signTransaction(transaction) {
-        const { signedTransaction } = await fns.current.signTransaction({ transaction, wallet: current(), chain: chainRef.current });
+      async signTransaction(transaction, opts) {
+        const chain = opts?.network === "mainnet" ? "solana:mainnet" : chainRef.current;
+        const { signedTransaction } = await fns.current.signTransaction({ transaction, wallet: current(), chain });
         return signedTransaction;
       },
     };

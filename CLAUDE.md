@@ -41,6 +41,7 @@ Also read `AGENTS.md` (Anchor program rules; skills in `.agents/skills/` are NOT
 | Web pages (Portuguese routes: `especialistas`, `biblioteca`, `criador` incl. `criador/publicar` and `criador/envios/[id]`, `admin/revisoes`, `garantias`, `revenda`, `checkout`, `instalar`, `perfil`) | `apps/web/src/app`, components in `src/components` (`creator/`, `admin/`), wallet/tx in `src/lib` |
 | Solver packages (data) | `agents/<slug>` (`manifest.json`, `steps/`, `knowledge/`, `templates/`, `evals/`) |
 | Chain bootstrap, e2e scripts, evals | `scripts/` |
+| Private creator withdrawal (Cloak, mainnet only, opt-in `NEXT_PUBLIC_CLOAK_ENABLED=1`; guide `docs/cloak-privacidade.md`) | `packages/shared/src/cloak.ts`, `apps/web/src/lib/cloak`, `components/creator/PrivateWithdraw.tsx`, `scripts/src/cloak-*.ts` |
 | Deploy, PM2, nginx | `infra/`, `.github/workflows` (`deploy.yml` on every push to `master`, `program.yml`) |
 
 ## Commands

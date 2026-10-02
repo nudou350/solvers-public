@@ -25,3 +25,6 @@ output/*
 
 # QA local do Criador de Solvers
 .qa-data/
+
+# spike do Cloak: chaves, notas e logs (nunca versionar)
+scripts/.cloak/
