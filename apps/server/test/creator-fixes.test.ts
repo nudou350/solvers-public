@@ -1,3 +1,4 @@
+import "./helpers/fake-env.js";
 import { strict as assert } from "node:assert";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
