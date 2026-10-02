@@ -20,4 +20,5 @@ export * from './slashProposal.js';
 export * from './stakeExit.js';
 export * from './stakeVault.js';
 export * from './submitReviewWithCreditsCredits.js';
+export * from './supplyCap.js';
 export * from './vault.js';

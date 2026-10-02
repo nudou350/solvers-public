@@ -122,4 +122,10 @@ pub enum SolversError {
     ListingNotAuthorized,
     #[msg("Para cancelar com a revogação do delegate, quem paga a transação tem que ser quem abriu o anúncio")]
     CancelPayerMismatch,
+    #[msg("Esgotado: todas as licenças deste solver já foram vendidas")]
+    SoldOut,
+    #[msg("O teto de licenças precisa ser de pelo menos 1 e não pode ficar abaixo do que já foi vendido")]
+    SupplyCapTooLow,
+    #[msg("O teto de licenças só pode aumentar")]
+    SupplyCapCannotDecrease,
 }

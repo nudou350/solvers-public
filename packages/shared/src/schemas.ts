@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentSupply } from "./supply.js";
 
 // Contrato de dados compartilhado com o frontend (INSTRUCTIONS.md seção 3).
 // Os nomes de campos destes schemas não podem mudar: o front usa os mesmos nos mocks.
@@ -38,6 +39,8 @@ export const Agent = z.object({
   resaleFloorUsdc: z.number().nullable(),
   /** Royalty do criador nas revendas pelo mercado, em pontos-base (`Agent.royalty_bps` on-chain). 0 em dados antigos. */
   royaltyBps: z.number().default(0),
+  /** Teto de licenças (docs/licencas-limitadas.md). O padrão mantém clientes e dados antigos parseando: ilimitado. */
+  supply: AgentSupply.default({ max: null, sold: 0, left: null }),
   trend7d: z.number(),
   /** Data da primeira versão publicada (ISO). */
   publishedAt: z.string(),

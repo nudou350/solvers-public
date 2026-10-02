@@ -16,4 +16,5 @@ export * from './pendingAdmin.js';
 export * from './review.js';
 export * from './slashProposal.js';
 export * from './stakeExit.js';
+export * from './supplyCap.js';
 export * from './userReputation.js';

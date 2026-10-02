@@ -87,6 +87,8 @@ const CU_CEILINGS: &[(&str, u64)] = &[
     ("UpdateVersion", 8_000),
     ("UpdatePricing", 9_500),
     ("SetEval", 10_000),
+    ("CreateSupplyCap", 25_500),
+    ("RaiseSupplyCap", 7_500),
     ("PurchaseLicense", 88_500),
     ("BuyCredits", 53_500),
     ("ConsumeCredit", 13_500),
@@ -139,6 +141,8 @@ const IX_DISCRIMINATORS: &[(&str, &[u8])] = ix_discriminators![
     UpdateVersion,
     UpdatePricing,
     SetEval,
+    CreateSupplyCap,
+    RaiseSupplyCap,
     PurchaseLicense,
     BuyCredits,
     ConsumeCredit,
@@ -499,6 +503,7 @@ fn purchase_at(env: &mut Env, agent: &TestAgent, buyer: &Keypair, expected_price
             treasury: env.treasury,
             usdc_mint: env.mint,
             reputation: rep_pda(&buyer.pubkey()),
+            supply_cap: supply_cap_pda(&agent.key),
             mpl_core_program: mpl_core::ID,
             token_program: spl_token::ID,
             system_program: system_program::ID,
@@ -2219,6 +2224,7 @@ fn purchase_ix(env: &Env, agent: &TestAgent, buyer: &Pubkey, asset: &Pubkey, exp
             treasury: env.treasury,
             usdc_mint: env.mint,
             reputation: rep_pda(buyer),
+            supply_cap: supply_cap_pda(&agent.key),
             mpl_core_program: mpl_core::ID,
             token_program: spl_token::ID,
             system_program: system_program::ID,
@@ -4780,7 +4786,7 @@ fn program_errors() -> Vec<String> {
 #[test]
 fn cu_ceilings_cover_every_instruction() {
     let instructions = program_instructions();
-    assert!(instructions.len() >= 41, "lib.rs mudou de forma: {instructions:?}");
+    assert!(instructions.len() >= 43, "lib.rs mudou de forma: {instructions:?}");
     for name in &instructions {
         let row = CU_CEILINGS.iter().find(|(n, _)| n == name);
         let (_, ceiling) = row.unwrap_or_else(|| panic!("{name} sem teto em CU_CEILINGS"));
@@ -6206,4 +6212,203 @@ mod resale {
         let acc = w.env.svm.get_account(&asset).unwrap();
         assert_eq!((acc.owner, acc.data), (mpl_core::ID, vec![0u8]));
     }
+}
+
+// ---------- Teto de licenças (SupplyCap) ----------
+
+fn supply_cap_pda(agent: &Pubkey) -> Pubkey {
+    pda(&[SUPPLY_CAP_SEED, agent.as_ref()])
+}
+
+fn create_cap_ix(env: &Env, agent: &TestAgent, creator: &Pubkey, max: u32) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::CreateSupplyCap {
+            payer: env.payer.pubkey(),
+            creator: *creator,
+            agent: agent.key,
+            supply_cap: supply_cap_pda(&agent.key),
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: solvers::instruction::CreateSupplyCap { max }.data(),
+    }
+}
+
+fn raise_cap_ix(agent: &TestAgent, creator: &Pubkey, max: u32) -> Instruction {
+    Instruction {
+        program_id: solvers::ID,
+        accounts: solvers::accounts::RaiseSupplyCap { creator: *creator, agent: agent.key, supply_cap: supply_cap_pda(&agent.key) }
+            .to_account_metas(None),
+        data: solvers::instruction::RaiseSupplyCap { max }.data(),
+    }
+}
+
+fn create_cap(env: &mut Env, agent: &TestAgent, max: u32) -> Result<Vec<String>, String> {
+    let creator = agent.creator.insecure_clone();
+    let ix = create_cap_ix(env, agent, &creator.pubkey(), max);
+    env.send_logs(ix, &[&creator])
+}
+
+fn raise_cap(env: &mut Env, agent: &TestAgent, max: u32) -> Result<Vec<String>, String> {
+    let creator = agent.creator.insecure_clone();
+    env.send_logs(raise_cap_ix(agent, &creator.pubkey(), max), &[&creator])
+}
+
+#[test]
+fn supply_cap_stops_the_sale_at_max_and_moves_nothing() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    let logs = create_cap(&mut env, &agent, 2).unwrap();
+    let evs = events::<solvers::events::SupplyCapSet>(&logs);
+    assert_eq!((evs.len(), evs[0].agent, evs[0].max), (1, agent.key, 2));
+    let cap: SupplyCap = env.account(&supply_cap_pda(&agent.key));
+    assert_eq!((cap.agent, cap.max), (agent.key, 2));
+
+    let (b1, _) = new_buyer(&mut env, 50 * USDC);
+    let (b2, _) = new_buyer(&mut env, 50 * USDC);
+    let (b3, b3_usdc) = new_buyer(&mut env, 50 * USDC);
+    purchase(&mut env, &agent, &b1).unwrap();
+    purchase(&mut env, &agent, &b2).unwrap();
+    let creator_before = env.balance(&agent.creator_usdc);
+    let treasury = env.treasury;
+    let treasury_before = env.balance(&treasury);
+
+    let err = purchase(&mut env, &agent, &b3).unwrap_err();
+    assert!(err.contains("SoldOut"), "{err}");
+    // Atômico: nenhum USDC se moveu e nenhuma venda foi contada.
+    assert_eq!(env.balance(&b3_usdc), 50 * USDC);
+    assert_eq!(env.balance(&agent.creator_usdc), creator_before);
+    assert_eq!(env.balance(&treasury), treasury_before);
+    assert_eq!(env.account::<Agent>(&agent.key).total_sales, 2);
+}
+
+#[test]
+fn solver_without_a_cap_account_is_unlimited() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    assert!(env.svm.get_account(&supply_cap_pda(&agent.key)).is_none());
+    for _ in 0..4 {
+        let (buyer, _) = new_buyer(&mut env, 50 * USDC);
+        purchase(&mut env, &agent, &buyer).unwrap();
+    }
+    assert_eq!(env.account::<Agent>(&agent.key).total_sales, 4);
+}
+
+#[test]
+fn supply_cap_counts_sales_made_before_it_exists() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    for _ in 0..3 {
+        let (buyer, _) = new_buyer(&mut env, 50 * USDC);
+        purchase(&mut env, &agent, &buyer).unwrap();
+    }
+    // Zero e abaixo do que já foi vendido (3): recusado, e a conta não nasce.
+    for bad in [0u32, 1, 2] {
+        let err = create_cap(&mut env, &agent, bad).unwrap_err();
+        assert!(err.contains("SupplyCapTooLow"), "{bad}: {err}");
+    }
+    assert!(env.svm.get_account(&supply_cap_pda(&agent.key)).is_none());
+    // Igual ao vendido: vale e o solver já nasce esgotado.
+    create_cap(&mut env, &agent, 3).unwrap();
+    let (buyer, _) = new_buyer(&mut env, 50 * USDC);
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("SoldOut"), "{err}");
+    // Subir reabre a venda.
+    raise_cap(&mut env, &agent, 4).unwrap();
+    purchase(&mut env, &agent, &buyer).unwrap();
+    let err = purchase(&mut env, &agent, &buyer).unwrap_err();
+    assert!(err.contains("SoldOut"), "{err}");
+}
+
+#[test]
+fn only_the_creator_creates_or_raises_the_cap_and_only_once() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    let stranger = new_keypair();
+    let err = env.send(create_cap_ix(&env, &agent, &stranger.pubkey(), 10), &[&stranger]).unwrap_err();
+    assert!(err.contains("NotCreator"), "{err}");
+    // Antes de criar, subir falha (conta inexistente).
+    assert!(raise_cap(&mut env, &agent, 10).is_err());
+
+    create_cap(&mut env, &agent, 5).unwrap();
+    // Criar de novo falha (`init`): o teto existente não é sobrescrito.
+    assert!(create_cap(&mut env, &agent, 50).is_err());
+    assert_eq!(env.account::<SupplyCap>(&supply_cap_pda(&agent.key)).max, 5);
+    let err = env.send(raise_cap_ix(&agent, &stranger.pubkey(), 10), &[&stranger]).unwrap_err();
+    assert!(err.contains("NotCreator"), "{err}");
+    assert_eq!(env.account::<SupplyCap>(&supply_cap_pda(&agent.key)).max, 5);
+}
+
+#[test]
+fn supply_cap_only_goes_up() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    create_cap(&mut env, &agent, 5).unwrap();
+    for same_or_lower in [5u32, 4, 1] {
+        let err = raise_cap(&mut env, &agent, same_or_lower).unwrap_err();
+        assert!(err.contains("SupplyCapCannotDecrease"), "{same_or_lower}: {err}");
+    }
+    let logs = raise_cap(&mut env, &agent, 9).unwrap();
+    let evs = events::<solvers::events::SupplyCapSet>(&logs);
+    assert_eq!((evs[0].agent, evs[0].max), (agent.key, 9));
+    // `u32::MAX` = ilimitado.
+    raise_cap(&mut env, &agent, u32::MAX).unwrap();
+    assert_eq!(env.account::<SupplyCap>(&supply_cap_pda(&agent.key)).max, u32::MAX);
+    let err = raise_cap(&mut env, &agent, u32::MAX).unwrap_err();
+    assert!(err.contains("SupplyCapCannotDecrease"), "{err}");
+}
+
+#[test]
+fn purchase_cannot_dodge_the_cap_by_passing_another_account() {
+    let mut env = Env::new();
+    let capped = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &capped);
+    create_cap(&mut env, &capped, 1).unwrap();
+    let (b1, _) = new_buyer(&mut env, 50 * USDC);
+    purchase(&mut env, &capped, &b1).unwrap();
+
+    // Um segundo solver com teto grande: a PDA dele não pode ser usada na compra do esgotado.
+    let other = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &other);
+    create_cap(&mut env, &other, 100).unwrap();
+
+    let (b2, b2_usdc) = new_buyer(&mut env, 50 * USDC);
+    let asset = new_keypair();
+    let real = supply_cap_pda(&capped.key);
+    let decoys = [supply_cap_pda(&other.key), unique_key(), system_program::ID, b2.pubkey()];
+    for decoy in decoys {
+        let mut ix = purchase_ix(&env, &capped, &b2.pubkey(), &asset.pubkey(), 12 * USDC);
+        for meta in ix.accounts.iter_mut().filter(|m| m.pubkey == real) {
+            meta.pubkey = decoy;
+        }
+        let err = env.send(ix, &[&b2, &asset]).unwrap_err();
+        assert!(err.contains("ConstraintSeeds"), "{decoy}: {err}");
+    }
+    // Omitir a conta (lista curta) também falha, e nada se moveu.
+    let mut ix = purchase_ix(&env, &capped, &b2.pubkey(), &asset.pubkey(), 12 * USDC);
+    ix.accounts.retain(|m| m.pubkey != real);
+    assert!(env.send(ix, &[&b2, &asset]).is_err());
+    assert_eq!(env.balance(&b2_usdc), 50 * USDC);
+    assert_eq!(env.account::<Agent>(&capped.key).total_sales, 1);
+}
+
+#[test]
+fn transferring_a_license_does_not_free_a_slot() {
+    let mut env = Env::new();
+    let agent = register(&mut env, 12 * USDC, 0).unwrap();
+    approve(&mut env, &agent);
+    create_cap(&mut env, &agent, 1).unwrap();
+    let (seller, _) = new_buyer(&mut env, 50 * USDC);
+    let asset = purchase(&mut env, &agent, &seller).unwrap();
+    // Revenda ou presente não muda o contador: a vaga continua ocupada e o solver segue esgotado.
+    let to = new_keypair();
+    transfer_asset(&mut env, asset, agent.collection, &seller, to.pubkey());
+    assert_eq!(env.account::<Agent>(&agent.key).total_sales, 1);
+    let (late, _) = new_buyer(&mut env, 50 * USDC);
+    let err = purchase(&mut env, &agent, &late).unwrap_err();
+    assert!(err.contains("SoldOut"), "{err}");
 }

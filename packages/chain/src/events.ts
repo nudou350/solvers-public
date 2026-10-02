@@ -19,6 +19,7 @@ export type SolversEvent =
   | { name: "ConfigUpdated"; data: gen.ConfigUpdatedEvent }
   | { name: "EscrowClosed"; data: gen.EscrowClosedEvent }
   | { name: "PricingUpdated"; data: gen.PricingUpdatedEvent }
+  | { name: "SupplyCapSet"; data: gen.SupplyCapSetEvent }
   | { name: "AdminTransferProposed"; data: gen.AdminTransferProposedEvent }
   | { name: "AdminTransferCancelled"; data: gen.AdminTransferCancelledEvent }
   | { name: "AdminTransferred"; data: gen.AdminTransferredEvent }
@@ -55,6 +56,7 @@ const DECODERS: Array<[string, Uint8Array | ReadonlyUint8Array, (d: Uint8Array) 
   ["ConfigUpdated", gen.CONFIG_UPDATED_EVENT_DISCRIMINATOR, gen.parseConfigUpdatedEvent],
   ["EscrowClosed", gen.ESCROW_CLOSED_EVENT_DISCRIMINATOR, gen.parseEscrowClosedEvent],
   ["PricingUpdated", gen.PRICING_UPDATED_EVENT_DISCRIMINATOR, gen.parsePricingUpdatedEvent],
+  ["SupplyCapSet", gen.SUPPLY_CAP_SET_EVENT_DISCRIMINATOR, gen.parseSupplyCapSetEvent],
   ["AdminTransferProposed", gen.ADMIN_TRANSFER_PROPOSED_EVENT_DISCRIMINATOR, gen.parseAdminTransferProposedEvent],
   ["AdminTransferCancelled", gen.ADMIN_TRANSFER_CANCELLED_EVENT_DISCRIMINATOR, gen.parseAdminTransferCancelledEvent],
   ["AdminTransferred", gen.ADMIN_TRANSFERRED_EVENT_DISCRIMINATOR, gen.parseAdminTransferredEvent],

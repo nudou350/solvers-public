@@ -44,11 +44,13 @@ import {
 } from "@solana-program/token";
 import { getCreateAccountInstruction, getTransferSolInstruction } from "@solana-program/system";
 import * as gen from "@solvers/client";
-import { agentIdToBytes, RESALE_ERROR_CODES, RESALE_MAX_CUT_BPS, resaleSplit, type ResaleErrorCode } from "@solvers/shared";
+import { agentIdToBytes, RESALE_ERROR_CODES, RESALE_MAX_CUT_BPS, resaleSplit, SUPPLY_UNLIMITED, type ResaleErrorCode } from "@solvers/shared";
 import { classifyConfigData, ConfigNotMigratedError, CONFIG_V1_SIZE, type ConfigState } from "./config-state.js";
 import { parseEvents, type SolversEvent } from "./events.js";
 import { describeFailure } from "./program-errors.js";
 
+export { SUPPLY_UNLIMITED };
+export const isUnlimitedSupply = (max: number | null): boolean => max === null || max >= SUPPLY_UNLIMITED;
 export const MPL_CORE_PROGRAM_ADDRESS = address("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
 export const PROGRAM_ID = gen.SOLVERS_PROGRAM_ADDRESS as Address;
 export { TOKEN_PROGRAM_ADDRESS, ASSOCIATED_TOKEN_PROGRAM_ADDRESS };
@@ -245,6 +247,19 @@ export class SolversChain {
       seeds: [new TextEncoder().encode("agent"), agentIdToBytes(agentIdHex)],
     });
     return pda;
+  }
+
+  async supplyCapPda(agentIdHex: string) {
+    return (await gen.findSupplyCapPda({ agent: await this.agentPda(agentIdHex) }))[0];
+  }
+
+  /**
+   * Teto de licenças do solver, lido em `confirmed`: `null` = ilimitado (a conta nunca foi criada). `u32::MAX`
+   * (`SUPPLY_UNLIMITED`) também significa ilimitado: use `isUnlimitedSupply`.
+   */
+  async fetchSupplyCap(agentIdHex: string): Promise<number | null> {
+    const acc = await gen.fetchMaybeSupplyCap(this.rpc, await this.supplyCapPda(agentIdHex), { commitment: "confirmed" });
+    return acc.exists ? acc.data.max : null;
   }
 
   async reputationPda(wallet: Address) {
@@ -740,6 +755,16 @@ export class SolversChain {
 
   async updateVersionIx(creator: TransactionSigner, agentIdHex: string, version: string, versionHash: Uint8Array) {
     return gen.getUpdateVersionInstruction({ creator, agent: await this.agentPda(agentIdHex), version, versionHash });
+  }
+
+  /** Cria o teto de licenças (o criador assina; a plataforma paga o rent). Falha on-chain se já existe ou se `max` < vendidas. */
+  async createSupplyCapIx(creator: TransactionSigner, agentIdHex: string, max: number) {
+    return gen.getCreateSupplyCapInstructionAsync({ payer: this.feePayer, creator, agent: await this.agentPda(agentIdHex), max });
+  }
+
+  /** Sobe o teto de licenças (só aumenta; `SUPPLY_UNLIMITED` = ilimitado). */
+  async raiseSupplyCapIx(creator: TransactionSigner, agentIdHex: string, max: number) {
+    return gen.getRaiseSupplyCapInstructionAsync({ creator, agent: await this.agentPda(agentIdHex), max });
   }
 
   /** `expectedPrice` = preço mostrado ao comprador; se mudar antes da execução, a compra falha. */
