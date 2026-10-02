@@ -12,7 +12,7 @@ import { mcpAudience, signAccessToken, verifyToken } from "../auth/jwt.js";
 import { createNonce, decodeVerifiedSignature, MEMORY_KEY_MESSAGE, verifySiws } from "../auth/siws.js";
 import { deriveMemoryKey, storeMemoryKey, wrapKey, type DbExecutor } from "../memory/crypto.js";
 import { authorizePage } from "./page.js";
-import { refreshRejection } from "./rules.js";
+import { AGENT_CLIENT_ID, AGENT_SIWS_STATEMENT, refreshRejection } from "./rules.js";
 
 // Autorização do conector MCP (INSTRUCTIONS.md 5.2): o /mcp é um resource server e este app
 // também é o authorization server (OAuth 2.1 + PKCE S256 + registro dinâmico de cliente).
@@ -50,6 +50,9 @@ export function authorizationServerMetadata() {
     revocation_endpoint: `${base()}/oauth/revoke`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
+    // Extensão não padrão: login direto de agentes com carteira (duas chamadas, sem navegador). Ver docs/agentes-login.md.
+    agent_nonce_endpoint: `${base()}/oauth/agent/nonce`,
+    agent_token_endpoint: `${base()}/oauth/agent/token`,
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     revocation_endpoint_auth_methods_supported: ["none"],
@@ -142,6 +145,18 @@ async function issueTokens(clientId: string, wallet: string, wrappedMemoryKey: B
 
 export const oauthRouter = Router();
 const open = cors({ origin: true });
+
+/** Nonce do agente: 10 por minuto POR CARTEIRA (a tabela de nonces é escrita sem autenticação). */
+const agentNonceLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) => (typeof req.query.wallet === "string" ? req.query.wallet.slice(0, 64) : "anon"),
+  validate: { keyGeneratorIpFallback: false },
+  message: { error: "too_many_requests", error_description: "Muitas tentativas para esta carteira. Aguarde um minuto." },
+});
+
 oauthRouter.use(
   rateLimit({
     windowMs: 60_000,
@@ -294,6 +309,45 @@ oauthRouter.post(
     url.searchParams.set("code", code);
     if (ar.state) url.searchParams.set("state", ar.state);
     return { redirectTo: url.toString() };
+  }),
+);
+
+// Login direto do agente (docs/agentes-login.md): duas chamadas, sem navegador nem registro de cliente.
+// Nonce com purpose "agent": não vale no fluxo do navegador ("oauth") nem no login da vitrine ("login"), e vice-versa.
+oauthRouter.get(
+  "/agent/nonce",
+  open,
+  agentNonceLimit,
+  h(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const { wallet } = parse(z.object({ wallet: z.string().min(32).max(44) }), req.query);
+    return createNonce(wallet, "agent", AGENT_SIWS_STATEMENT);
+  }),
+);
+
+oauthRouter.post(
+  "/agent/token",
+  open,
+  express.json(),
+  h(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const body = parse(
+      z.object({
+        wallet: z.string(),
+        message: z.string().max(2000),
+        signature: z.union([z.string(), z.array(z.number())]),
+        memorySignature: z.union([z.string(), z.array(z.number())]).optional(),
+      }),
+      req.body,
+    );
+    const wallet = await verifySiws({ wallet: body.wallet, message: body.message, signature: body.signature }, "agent");
+    let wrapped: Buffer | null = null;
+    if (body.memorySignature) {
+      const sig = decodeVerifiedSignature(wallet, MEMORY_KEY_MESSAGE, body.memorySignature);
+      if (!sig) throw new OAuthError("access_denied", "Assinatura da chave de memória inválida", 401);
+      wrapped = wrapKey(deriveMemoryKey(sig, wallet));
+    }
+    return issueTokens(AGENT_CLIENT_ID, wallet, wrapped);
   }),
 );
 

@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { mcpAudience, verifyToken } from "../auth/jwt.js";
+import { isAgentClient } from "../oauth/rules.js";
 import { buildMcpServer } from "./tools.js";
 
 const resourceMetadataUrl = () => `${env.PUBLIC_API_URL.replace(/\/$/, "")}/.well-known/oauth-protected-resource/mcp`;
@@ -25,12 +26,14 @@ async function bearer(req: Request, res: Response, next: NextFunction) {
     const claims = await verifyToken(auth.slice(7), mcpAudience());
     if (!claims.jti) return challenge(res, "invalid_token");
     const [tok] = await db
-      .select({ id: schema.oauthTokens.id })
+      .select({ id: schema.oauthTokens.id, clientId: schema.oauthTokens.clientId })
       .from(schema.oauthTokens)
       .where(and(eq(schema.oauthTokens.id, claims.jti), eq(schema.oauthTokens.revoked, false), gt(schema.oauthTokens.expiresAt, new Date())));
     if (!tok) return challenge(res, "invalid_token");
     req.wallet = claims.sub;
     req.tokenId = claims.jti;
+    // client_id vem da linha do token (fonte da verdade), não do claim: só o login SIWS do agente emite "agent".
+    res.locals.isAgent = isAgentClient(tok.clientId);
     next();
   } catch {
     challenge(res, "invalid_token");
@@ -49,7 +52,7 @@ export function mountMcp(app: Express) {
 
   const handler = async (req: Request, res: Response) => {
     // Modo stateless: um servidor MCP por requisição, amarrado à carteira do token.
-    const server = buildMcpServer({ wallet: req.wallet!, tokenId: req.tokenId });
+    const server = buildMcpServer({ wallet: req.wallet!, tokenId: req.tokenId, isAgent: res.locals.isAgent === true });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();

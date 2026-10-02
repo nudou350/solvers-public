@@ -5,19 +5,19 @@ import { db, schema } from "../db/index.js";
 import { refreshLicenseOwner, syncLicense } from "../indexer/sync.js";
 import type { SolverPackage } from "./packages.js";
 import { trialLimits, type TrialLimits, type TrialUsage } from "./trial.js";
-import { escrowGivesAccess, OPEN_ESCROW_STATUSES, type PaidAccess } from "./access-rules.js";
+import { blockBeforeTrial, escrowGivesAccess, OPEN_ESCROW_STATUSES, type LicenseCheck, type PaidAccess } from "./access-rules.js";
 
 export type { PaidAccess } from "./access-rules.js";
 
 export type Access =
   | ({ ok: true } & PaidAccess)
   | { ok: true; kind: "trial"; trial: TrialLimits; used: number; remaining: number; usage: TrialUsage }
-  | { ok: false; reason: "no_trial" | "trial_exhausted" | "retired"; trial: TrialLimits | null };
+  | { ok: false; reason: "no_trial" | "trial_exhausted" | "retired" | "agent_no_trial" | "unverified"; trial: TrialLimits | null };
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
 /** Licença permanente válida? Confere o dono atual on-chain (a licença pode ter sido revendida). */
-async function licenseOf(wallet: string, agent: AgentRow): Promise<string | null> {
+async function licenseCheck(wallet: string, agent: AgentRow): Promise<LicenseCheck> {
   const rows = await db
     .select()
     .from(schema.licenses)
@@ -25,20 +25,22 @@ async function licenseOf(wallet: string, agent: AgentRow): Promise<string | null
   for (const r of rows) {
     // Se o RPC falhar, vale o dono registrado no banco (nunca "assume" a carteira que pediu).
     const owner = await refreshLicenseOwner(r.id).catch(() => r.ownerWallet);
-    if (owner === wallet) return r.id;
+    if (owner === wallet) return { state: "owned", id: r.id };
   }
   // Fallback on-chain: comprou e o indexador ainda não gravou (INSTRUCTIONS.md 5.11).
   if (agent.collectionAddress) {
+    // RPC lento ou com erro NÃO é "sem licença": quem acabou de pagar não pode ser mandado comprar de novo.
     const found = await Promise.race([
       chain().findLicenses(address(wallet), address(agent.collectionAddress)),
-      new Promise<never[]>((r) => setTimeout(() => r([]), 3000)),
-    ]).catch(() => []);
+      new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+    ]).catch(() => null);
+    if (found === null) return { state: "unknown" };
     for (const asset of found) {
       await syncLicense(asset, agent.id);
-      return asset;
+      return { state: "owned", id: asset };
     }
   }
-  return null;
+  return { state: "none" };
 }
 
 /** Tarefa com garantia aberta desta carteira para o solver (dá acesso sem limites enquanto durar). */
@@ -65,12 +67,19 @@ export async function escrowIsOpen(escrowId: string): Promise<boolean> {
   return !!row && escrowGivesAccess(row);
 }
 
+/** Acesso pago sem consumir nada (licença vitalícia > garantia aberta); "unknown" quando a licença não pôde ser confirmada. */
+async function paidAccessState(wallet: string, agent: AgentRow): Promise<PaidAccess | null | "unknown"> {
+  const lic = await licenseCheck(wallet, agent);
+  if (lic.state === "owned") return { kind: "license", licenseId: lic.id };
+  const escrowId = await openEscrowOf(wallet, agent.id);
+  if (escrowId) return { kind: "guarantee", escrowId };
+  return lic.state === "unknown" ? "unknown" : null;
+}
+
 /** Acesso pago sem consumir nada: licença vitalícia > tarefa com garantia aberta. */
 export async function paidAccess(wallet: string, agent: AgentRow): Promise<PaidAccess | null> {
-  const licenseId = await licenseOf(wallet, agent);
-  if (licenseId) return { kind: "license", licenseId };
-  const escrowId = await openEscrowOf(wallet, agent.id);
-  return escrowId ? { kind: "guarantee", escrowId } : null;
+  const s = await paidAccessState(wallet, agent);
+  return s === "unknown" ? null : s;
 }
 
 export async function paidAccessById(wallet: string, agentId: string): Promise<PaidAccess | null> {
@@ -105,11 +114,13 @@ export async function resolveAccess(
   agent: AgentRow,
   pkg: SolverPackage,
   /** `allowTrial: false` (solver aposentado): só o direito pago vale, nunca o teste grátis. */
-  opts: { consume: boolean; allowTrial?: boolean },
+  /** `agent: true` (token do login SIWS direto): nunca há teste grátis (a carteira nova custa zero e esgotaria o teste sempre). */
+  opts: { consume: boolean; allowTrial?: boolean; agent?: boolean },
 ): Promise<Access> {
-  const paid = await paidAccess(wallet, agent);
-  if (paid) return { ok: true, ...paid };
-  if (opts.allowTrial === false) return { ok: false, reason: "retired", trial: null };
+  const paid = await paidAccessState(wallet, agent);
+  if (paid && paid !== "unknown") return { ok: true, ...paid };
+  const blocked = blockBeforeTrial({ licenseUnknown: paid === "unknown", allowTrial: opts.allowTrial !== false, agent: opts.agent === true });
+  if (blocked) return { ok: false, reason: blocked, trial: null };
 
   const trial = trialLimits(pkg.manifest);
   if (!trial) return { ok: false, reason: "no_trial", trial: null };
@@ -182,7 +193,24 @@ export async function refundTrialTool(wallet: string, agentId: string, tool: str
     .where(and(trialKey(wallet, agentId), sql`${runsOf(tool)} > 0`));
 }
 
-/** Solvers com licença da carteira, para list_my_solvers. */
+/** Quantas licenças revalidamos on-chain por chamada de list_my_solvers (limita o RPC). */
+const OWNED_REFRESH_LIMIT = 20;
+
+/**
+ * Solvers com licença da carteira, conferindo o dono on-chain (licença revendida ou transferida some da lista).
+ * RPC com erro: vale o banco (nunca esconde uma licença por falha de rede).
+ */
+export async function ownedLicensedAgents(wallet: string): Promise<Set<string>> {
+  const lic = await db
+    .select({ id: schema.licenses.id, agentId: schema.licenses.agentId })
+    .from(schema.licenses)
+    .where(eq(schema.licenses.ownerWallet, wallet))
+    .limit(OWNED_REFRESH_LIMIT);
+  const checked = await Promise.all(lic.map(async (l) => ((await refreshLicenseOwner(l.id).catch(() => wallet)) === wallet ? l.agentId : null)));
+  return new Set(checked.filter((a): a is string => a !== null));
+}
+
+/** Solvers com licença da carteira (só o banco, sem RPC). */
 export async function ownedAgents(wallet: string): Promise<Set<string>> {
   const lic = await db
     .select({ agentId: schema.licenses.agentId })

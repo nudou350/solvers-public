@@ -48,6 +48,7 @@ import { getPackage } from "../runtime/packages.js";
 import { myTrial, trialLeft, trialLimits } from "../runtime/trial.js";
 import { ensureProfile } from "./profile.js";
 import { assertEntriesOpen } from "./pause-gate.js";
+import { assertCanPurchase } from "./purchase-guards.js";
 import { buildForUserChecked } from "./tx-build.js";
 
 export const storeRouter = Router();
@@ -362,6 +363,7 @@ storeRouter.post(
     if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
     // update_pricing não emite evento: confere o preço on-chain e, se mudou, espelha e responde 409 price_changed.
     await assertFreshPrice(row);
+    await assertCanPurchase(wallet, row); // já tem a licença / criador não compra o próprio solver (evita ATA duplicada)
     const c = chain();
     await assertBalance(wallet, row.price);
     const { instructions, asset, price } = await c.purchaseLicenseIxs(wallet, row.id, row.price);
