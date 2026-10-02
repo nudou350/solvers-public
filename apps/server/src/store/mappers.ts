@@ -68,6 +68,9 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     royaltyBps: row.royaltyBps,
     // Teto de licenças: espelho do banco (total_sales / max_licenses), sem consulta extra.
     supply: supplyOfRow(row),
+    // A1 (Criador de Solvers): platform vem da lista PLATFORM_AGENTS e differentiators do validador; até lá, valores neutros.
+    platform: false,
+    differentiators: [],
     trend7d: extras.trend7d,
     publishedAt: publishedAt(row),
   };
