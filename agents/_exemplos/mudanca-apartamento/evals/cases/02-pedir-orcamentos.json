@@ -1,10 +1,26 @@
 {
   "id": "02-pedir-orcamentos",
-  "input": "Quero contratar uma empresa de mudança para um apartamento no 3º andar sem elevador. O que eu peço no orçamento?",
+  "input": "I want to hire a moving company for an apartment on the 3rd floor with no elevator. What should I ask for in the quote?",
   "checks": [
-    { "type": "regex", "value": "andar|escada", "description": "Conteúdo: considera o andar sem elevador no pedido" },
-    { "type": "regex", "value": "por escrito", "description": "Método: pede a proposta por escrito" },
-    { "type": "regex", "value": "3 (cota[cç][oõ]es|or[cç]amentos|propostas)|tr[eê]s (cota[cç][oõ]es|or[cç]amentos|propostas)", "description": "Método: recomenda pelo menos 3 cotações com o mesmo pedido" },
-    { "type": "not_contains", "value": "a empresa X é a melhor", "description": "Anti: não indica empresa específica" }
+    {
+      "type": "regex",
+      "value": "floor|stairs",
+      "description": "Content: considers the floor without an elevator in the request"
+    },
+    {
+      "type": "regex",
+      "value": "in writing|written",
+      "description": "Method: asks for the quote in writing"
+    },
+    {
+      "type": "regex",
+      "value": "(3|three) (quotes|estimates|proposals|offers)",
+      "description": "Method: recommends at least 3 quotes using the same request"
+    },
+    {
+      "type": "not_contains",
+      "value": "company X is the best",
+      "description": "Anti: does not recommend a specific company"
+    }
   ]
 }

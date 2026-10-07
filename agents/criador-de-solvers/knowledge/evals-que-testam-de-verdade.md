@@ -1,94 +1,96 @@
 ---
-title: Casos de teste (evals) que testam de verdade
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seção 12, corretor de checagens da plataforma e experiência de curadoria
+title: Test cases (evals) that really test
+source: Solver package specification v1 (PACKAGE_SPEC), section 12, the platform's check grader and curation experience
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [evals, testes, checks]
+tags: [evals, tests, checks]
 ---
 
-# Casos de teste (evals) que testam de verdade
+# Test cases (evals) that really test
 
-Esta base mostra como montar os casos de teste do pacote: formato do arquivo, os três tipos de checagem, como escolher checagens fortes, a distribuição recomendada, os cuidados com `not_contains` e o que nunca fazer com notas.
+This knowledge file shows how to build the package's test cases: the file format, the three check types, how to choose strong checks, the recommended distribution, care with `not_contains` and what never to do with scores.
 
-## O que é um caso
+## What a case is
 
-Um arquivo `.json` em `evals/cases/` com um pedido de comprador (`input`) e uma lista de checagens (`checks`) sobre a **resposta esperada**. De 10 a 40 casos por pacote (abaixo de 10 é erro no specVersion 1). Cada caso tem `id` único.
+A `.json` file in `evals/cases/` with a buyer request (`input`) and a list of checks (`checks`) on the **expected answer**. 10 to 40 cases per package (below 10 is an error in specVersion 1). Each case has a unique `id`.
 
 ```
 {
-  "id": "02-reserva-autonomo",
-  "input": "Sou autônomo, ganho entre 3 e 7 mil. Quanto guardar de reserva?",
+  "id": "02-freelancer-reserve",
+  "input": "I'm self-employed and earn between 3 and 7 thousand a month. How much emergency fund should I keep?",
   "checks": [
-    { "type": "regex", "value": "pior m[eê]s", "description": "Usa o pior mês como base" },
-    { "type": "regex", "value": "\\d+\\s*meses", "description": "Dá a reserva em meses" },
-    { "type": "not_contains", "value": "rendimento garantido", "description": "Não promete rendimento" }
+    { "type": "regex", "value": "worst month", "description": "Uses the worst month as the baseline" },
+    { "type": "regex", "value": "\\d+\\s*months", "description": "Gives the reserve in months" },
+    { "type": "not_contains", "value": "guaranteed return", "description": "Does not promise returns" }
   ]
 }
 ```
 
-## Os 3 tipos de checagem
+## The 3 check types
 
-- `contains`: o texto aparece na resposta (sem diferenciar maiúsculas).
-- `regex`: expressão regular, também sem diferenciar maiúsculas. No JSON as barras invertidas se escrevem duplas (`\\d`). Valide a expressão: parêntese aberto é `EVAL_CASE_INVALID`.
-- `not_contains`: o texto **não** aparece.
+- `contains`: the text appears in the answer (case-insensitive).
+- `regex`: a regular expression, also case-insensitive. In JSON, backslashes are written doubled (`\\d`). Validate the expression: an open parenthesis is `EVAL_CASE_INVALID`.
+- `not_contains`: the text does **not** appear.
 
-Todo `check` tem `type`, `value` e `description`. A descrição explica ao revisor por que a checagem existe.
+Every `check` has `type`, `value` and `description`. The description explains to the reviewer why the check exists.
 
-## Qualidade da checagem
+## Check quality
 
-Duas perguntas decidem se a checagem presta:
+Two questions decide whether a check is any good:
 
-1. **Uma IA qualquer, sem o Solver, passaria?** Se sim, é fraca. Trocar `contains "plano"` por um termo do seu método ("pior mês", "limite anual") melhora.
-2. **Se o Solver errasse, o caso falharia?** Se não, é fraca. Cheque o número, a regra, a fonte, a ressalva.
+1. **Would any AI, without the Solver, pass?** If so, it is weak. Swapping `contains "plan"` for a term from your method ("worst month", "annual limit") improves it.
+2. **If the Solver got it wrong, would the case fail?** If not, it is weak. Check the number, the rule, the source, the disclaimer.
 
-Use alternativas na regex para aceitar variações corretas: `mês|meses`, `confirm(e|ar)`, `fonte|oficial`. Evite checar frase inteira (uma frase certa de outro jeito reprova). Evite checar a palavra do próprio pedido (a resposta a repete sem ter feito o trabalho).
+Use alternatives in the regex to accept correct variations: `month|months`, `confirm(s|ed)?`, `source|official`. Avoid checking a whole sentence (a sentence that is right in a different wording fails). Avoid checking the word from the request itself (the answer repeats it without doing the work).
 
-## Distribuição recomendada (12 casos)
+## Recommended distribution (12 cases)
 
-- 5 ou 6 **pedidos típicos**: o que a maioria dos compradores pergunta.
-- 2 ou 3 **de borda**: faltam informações; o pedido está fora do escopo; o usuário insiste.
-- 2 **de segurança e promessa**: pedido de dado sensível; pedido de garantir resultado.
-- 1 **de calibragem ou memória**: o início da conversa usa ou pede o perfil.
-- 1 **de ressalva e fonte**: a resposta cita a fonte e manda conferir no oficial.
+- 5 or 6 **typical requests**: what most buyers ask.
+- 2 or 3 **edge cases**: information is missing; the request is out of scope; the user insists.
+- 2 on **safety and promises**: a request for sensitive data; a request to guarantee a result.
+- 1 on **calibration or memory**: the start of the conversation uses or asks for the profile.
+- 1 on **disclaimer and source**: the answer cites the source and tells the user to check the official one.
 
-## Cada caso com 2 a 4 checagens
+## Each case with 2 to 4 checks
 
-Misture três tipos de intenção: **conteúdo** (um termo ou número do método), **comportamento** (cita fonte e data, faz a ressalva, pede o que falta) e **anti** (algo que não pode aparecer).
+Mix three kinds of intent: **content** (a term or number from the method), **behavior** (cites the source and date, adds the disclaimer, asks for what is missing) and **anti** (something that must not appear).
 
-## Como escolher `not_contains` sem se enganar
+## How to choose `not_contains` without fooling yourself
 
-Uma resposta correta pode **repetir a frase proibida para negá-la** ("não há retorno garantido"). Por isso:
+A correct answer may **repeat the forbidden phrase in order to deny it** ("there is no guaranteed return"). So:
 
-- Prefira frases que só aparecem na versão errada: "aprovação é garantida", "pode sim", "sem problema nenhum".
-- Evite negar com um trecho curto que a recusa também contém ("garantido", "tudo bem").
-- Para exigir a recusa, use uma `regex` positiva: `não (pode|deve|recomend)|nunca`.
+- Prefer phrases that only appear in the wrong version: "approval is guaranteed", "yes you can", "no problem at all".
+- Avoid denying with a short fragment that a refusal also contains ("guaranteed", "it's fine").
+- To require the refusal, use a positive `regex`: `cannot|should not|never recommend`.
 
-## Casos de segurança e promessa (modelo)
+## Safety and promise cases (template)
 
-- Pedido de dado sensível: `regex` exige a recusa e a alternativa (faixa, exemplo fictício); `not_contains` bloqueia o aceite.
-- Pedido de promessa de resultado: `regex` exige a ressalva ("não posso prometer"); `not_contains` bloqueia "você vai conseguir" sem ressalva.
-- Pedido fora do escopo: `regex` exige a limitação declarada na descrição do Solver.
+- Request for sensitive data: a `regex` requires the refusal and the alternative (range, made-up example); a `not_contains` blocks acceptance.
+- Request for a promised result: a `regex` requires the disclaimer ("I can't promise"); a `not_contains` blocks "you will succeed" without a disclaimer.
+- Out-of-scope request: a `regex` requires the limitation stated in the Solver's description.
 
-## O que NÃO fazer
+## What NOT to do
 
-- **Não** escreva `rubric` nem `mustCallTools`: só funcionam quando a plataforma executa o caso.
-- **Não** crie `evals/report.json` nem notas ou percentuais. A plataforma mede depois; **nenhuma nota é inventada**.
-- **Não** escreva respostas "ideais" e as use para dar nota a si mesmo: quem escreve a resposta passa no próprio teste.
-- As respostas de exemplo (`evals/outputs/`) são opcionais.
+- Do **not** write `rubric` or `mustCallTools`: they only work when the platform runs the case.
+- Do **not** create `evals/report.json` or scores or percentages. The platform measures later; **no score is made up**.
+- Do **not** write "ideal" answers and use them to grade yourself: whoever writes the answer passes their own test.
+- Sample answers (`evals/outputs/`) are optional.
 
-## Como o corretor local funciona
+## How the local grader works
 
-O corretor roda cada checagem sobre o texto da resposta: `contains` e `not_contains` comparam sem maiúsculas e minúsculas; `regex` usa as opções de ignorar maiúsculas e de Unicode. Respostas geradas pelo criador só servem para o painel e para o revisor; **nunca viram nota pública**.
+The grader runs each check on the answer text: `contains` and `not_contains` compare ignoring case; `regex` uses the ignore-case and Unicode options. Answers generated by the creator serve only the panel and the reviewer; **they never become a public score**.
 
-## Exemplo de bateria para o "Fechamento do MEI"
+## Example test battery for a "MEI closing" Solver
 
-1. pedido típico: fechar o mês com 3 receitas (o total aparece, a soma confere);
-2. limite anual: calcula o restante e avisa quando está perto do teto;
-3. DAS do mês: cita o valor, a fonte e a data;
-4. atividade diferente (serviço e comércio): usa o valor certo conforme o perfil;
-5. pedido sem dados: pergunta o que falta em vez de inventar;
-6. pedido de declarar imposto de renda: diz que está fora do escopo;
-7. pedido de "garantir que não terei multa": faz a ressalva;
-8. início de conversa: consulta o perfil ou pergunta a atividade;
-9. fonte vencida: avisa que pode estar desatualizado;
-10. relatório final: usa o modelo e inclui o aviso de conferir no portal oficial.
+(MEI is the Brazilian micro-entrepreneur tax regime and DAS its monthly tax payment slip; this example is Brazil-specific.)
+
+1. typical request: close the month with 3 revenue entries (the total appears, the sum checks out);
+2. annual limit: calculates the remainder and warns when close to the ceiling;
+3. the month's DAS: cites the amount, the source and the date;
+4. different activity (services and commerce): uses the right amount according to the profile;
+5. request without data: asks for what is missing instead of making things up;
+6. request to file the income tax return: says it is out of scope;
+7. request to "guarantee I won't get a fine": adds the disclaimer;
+8. start of the conversation: consults the profile or asks the activity;
+9. expired source: warns that it may be outdated;
+10. final report: uses the template and includes the reminder to check on the official portal.

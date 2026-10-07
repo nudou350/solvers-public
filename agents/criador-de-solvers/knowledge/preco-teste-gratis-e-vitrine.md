@@ -1,60 +1,60 @@
 ---
-title: Preço, teste grátis e vitrine coerentes
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 4.1, 14.5 e 20, e regras do validador
+title: Consistent price, free trial and storefront
+source: Solver package specification v1 (PACKAGE_SPEC), sections 4.1, 14.5 and 20, and the validator rules
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [preco, teste-gratis, vitrine, searchPhrases, beforeAfter]
+tags: [price, free-trial, storefront, searchPhrases, beforeAfter]
 ---
 
-# Preço, teste grátis e vitrine coerentes
+# Consistent price, free trial and storefront
 
-Esta base ajuda a decidir o preço da licença, o teste grátis e os textos da vitrine (tagline, descrição, frases de busca e comparações antes e depois), e lista o que o revisor confere para ver se tudo é coerente.
+This knowledge file helps decide the license price, the free trial and the storefront texts (tagline, description, search phrases and before-and-after comparisons), and lists what the reviewer checks to see whether everything is consistent.
 
-## Preço
+## Price
 
-- `pricing.priceUsdc`: o preço da licença, em dólares. O mínimo da plataforma hoje é **5** (`MANIFEST_PRICE_BELOW_MIN` abaixo disso). O mínimo existe porque a compra precisa cobrir custos de registro.
-- É licença vitalícia do Solver: o comprador usa quando quiser. Não existe cobrança por uso.
-- `royaltyBps`: de 0 a 1.000 (300 = 3%): a parte do criador quando a licença é revendida pelo comprador no mercado do Solver. Um valor alto torna a revenda menos atraente para quem compra usado.
-- Como orientar o preço: quanto tempo ou dinheiro o método economiza? Compare com a alternativa (uma hora de consultoria, um modelo pronto). Conteúdo pesado de manutenção (regras que mudam) justifica preço maior, porque você precisa atualizar.
-- O criador não deve prometer valor futuro do Solver nem retorno.
+- `pricing.priceUsdc`: the license price, in dollars. The platform minimum today is **5** (`MANIFEST_PRICE_BELOW_MIN` below that). The minimum exists because the purchase must cover registration costs.
+- It is a lifetime license to the Solver: the buyer uses it whenever they want. There is no per-use charge.
+- `royaltyBps`: 0 to 1,000 (300 = 3%): the creator's share when the buyer resells the license in the Solver's market. A high value makes resale less attractive for whoever buys second-hand.
+- How to set the price: how much time or money does the method save? Compare with the alternative (an hour of consulting, a ready-made template). Maintenance-heavy content (rules that change) justifies a higher price, because you have to keep it updated.
+- The creator must not promise the Solver's future value or returns.
 
-## Teste grátis (`trial`)
+## Free trial (`trial`)
 
-O teste existe para mostrar valor **sem entregar tudo**. Se omitido, não há teste. Campos:
+The trial exists to show value **without giving everything away**. If omitted, there is no trial. Fields:
 
-- `uses`: quantos usos de teste por pessoa (1 a 10; o padrão da plataforma costuma ser 3).
-- `steps`: quantas etapas iniciais ficam liberadas. Não pode passar do total (`TRIAL_STEPS_EXCEED`).
-- `searches`: quantas consultas à base no teste inteiro.
-- `tools`: use `{}` (criador novo não tem ferramentas).
-- `templates`: nomes dos modelos liberados no teste (padrão: nenhum).
-- `summary` e `lockedSummary`: o que o teste dá e o que fica só na versão completa (de 3 a 400 e de 3 a 300 caracteres).
+- `uses`: how many trial uses per person (1 to 10; the platform default is usually 3).
+- `steps`: how many initial steps are unlocked. It cannot exceed the total (`TRIAL_STEPS_EXCEED`).
+- `searches`: how many knowledge queries across the whole trial.
+- `tools`: use `{}` (new creators have no tools).
+- `templates`: names of the templates unlocked in the trial (default: none).
+- `summary` and `lockedSummary`: what the trial gives and what is left to the full version (3 to 400 and 3 to 300 characters).
 
-Regra de ouro: libere as **etapas que mostram o raciocínio** (perfil, diagnóstico) e deixe para a licença a **entrega final** (o relatório pronto, o plano, o modelo). Teste que entrega tudo não vende; teste que não entrega nada não convence.
+Golden rule: unlock the **steps that show the reasoning** (profile, diagnosis) and leave the **final deliverable** (the finished report, the plan, the template) to the license. A trial that delivers everything does not sell; a trial that delivers nothing does not convince.
 
-## Limite de licenças (`supply`)
+## License cap (`supply`)
 
-`supply.maxLicenses` define um teto de licenças vendidas (1 a 1.000.000). A promessa correta ao comprador é "o limite hoje é N e só pode aumentar", nunca "só existirão N". Com teste grátis ligado, o validador avisa (`SUPPLY_WITH_TRIAL`): o teste não consome vaga.
+`supply.maxLicenses` sets a cap on licenses sold (1 to 1,000,000). The correct promise to the buyer is "the cap today is N and it can only go up", never "only N will exist". With the free trial on, the validator warns (`SUPPLY_WITH_TRIAL`): the trial does not consume a slot.
 
-## Textos de vitrine
+## Storefront texts
 
-- `tagline`: uma frase de valor (resultado + público). "Feche o mês do seu MEI sem erro: limite, DAS e relatório".
-- `description`: o que entrega, para quem e o que **não** faz. Sem promessa de resultado.
-- `packageContents`: de 3 a 8 itens, só o que existe (conferido pelo validador).
-- `searchPhrases`: as frases que o comprador digitaria ("estou perto do limite do MEI"), todas ligadas ao conteúdo real. Até 20.
-- `beforeAfter`: até 5 comparações reais: o pedido, a resposta de uma IA sem o Solver e com o Solver. Mostre o ganho concreto (um prazo lembrado, uma conta certa, uma fonte citada). Não invente números que a base não sustenta.
+- `tagline`: a one-sentence statement of value (result + audience). "Close the month for your Brazilian MEI without mistakes: limit, DAS and report".
+- `description`: what it delivers, for whom and what it does **not** do. No promise of results.
+- `packageContents`: 3 to 8 items, only what exists (checked by the validator).
+- `searchPhrases`: the phrases the buyer would type ("I'm close to the MEI limit"), all tied to the real content. Up to 20.
+- `beforeAfter`: up to 5 real comparisons: the request, an AI's answer without the Solver and with the Solver. Show the concrete gain (a deadline remembered, a correct calculation, a source cited). Do not make up numbers the base does not support.
 
-## Coerência (o que o revisor confere)
+## Consistency (what the reviewer checks)
 
-- O preço combina com o que a entrega vale e com o teste (teste forte justifica preço maior).
-- O teste mostra valor sem entregar tudo.
-- A vitrine só promete o que as etapas entregam.
-- Nenhum texto promete ferramenta, verificação automática, garantia, nota ou aprovação.
-- Se há conteúdo fiscal ou regulatório, a ressalva aparece na descrição e na etapa final.
+- The price fits what the deliverable is worth and the trial (a strong trial justifies a higher price).
+- The trial shows value without giving everything away.
+- The storefront only promises what the steps deliver.
+- No text promises a tool, automatic verification, a guarantee, a rating or approval.
+- If there is tax or regulatory content, the disclaimer appears in the description and in the final step.
 
-## O que a vitrine mostra ao comprador
+## What the storefront shows the buyer
 
-Os diferenciais comprovados, as fontes e a data de atualização da base, os modelos e a calibragem. O desempenho só aparece depois que a plataforma o mede; até lá o Solver aparece como "sem avaliações ainda", e a nota de uso vem das avaliações dos compradores.
+The proven differentiators, the sources and the date the base was updated, the templates and the calibration. Performance only appears after the platform measures it; until then the Solver shows "no reviews yet", and the usage rating comes from buyers' reviews.
 
-## Dinheiro e responsabilidade
+## Money and responsibility
 
-A compra da licença paga o criador na hora. Por isso a plataforma só aceita, nesta fase, criadores convidados e revisa 100% das versões. Cada atualização do Solver precisa ser revisada de novo, com a versão maior que a publicada.
+Buying the license pays the creator immediately. That is why, in this phase, the platform only accepts invited creators and reviews 100% of versions. Each update to the Solver must be reviewed again, with a version higher than the published one.

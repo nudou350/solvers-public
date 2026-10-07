@@ -1,0 +1,29 @@
+{
+  "name": "Mudança de Apartamento",
+  "tagline": "Organize sua mudança de apartamento: prazos, transportadora, endereço e vistoria",
+  "description": "Planeja a sua mudança de apartamento do primeiro orçamento ao último aviso de endereço. Você informa data, tamanho da casa, se o imóvel é alugado ou próprio e quem ajuda; o Solver monta um cronograma por prazo, ajuda a comparar propostas de transportadoras com as perguntas certas e entrega a lista de quem avisar sobre o novo endereço e o roteiro da vistoria de saída com fotos. É para quem muda de apartamento no Brasil sem ajuda profissional. Não faz: não é consultoria jurídica (contrato de aluguel, caução e multas dependem do seu contrato e da lei local; confira com a imobiliária ou um advogado), não indica empresas nem garante preços, não cobre mudança internacional nem de escritório e não preenche formulários por você. Prazos e regras de órgãos e concessionárias mudam: o Solver aponta o que conferir no site oficial de cada um.",
+  "packageContents": [
+    "Método em 4 etapas com checklist",
+    "Base de conhecimento da experiência da criadora e de sites públicos, com data e conferência",
+    "Modelos prontos: cronograma, comparativo de transportadoras, avisos de endereço e vistoria de saída"
+  ],
+  "requirements": [
+    {
+      "key": "any",
+      "label": "Claude, ChatGPT ou Claude Code"
+    }
+  ],
+  "searchPhrases": [
+    "vou me mudar de apartamento e não sei por onde começar",
+    "checklist de mudança por prazo",
+    "como contratar transportadora de mudança",
+    "o que perguntar para a empresa de mudança antes de fechar",
+    "quem avisar quando eu mudar de endereço",
+    "vistoria de saída do apartamento alugado",
+    "como me preparar para entregar o apartamento alugado",
+    "cronograma de mudança em 30 dias",
+    "comparar orçamentos de mudança",
+    "como organizar as caixas e o inventário da mudança"
+  ],
+  "creatorBio": "Já fiz três mudanças de apartamento (duas de aluguel, uma de imóvel próprio) e ajudei amigos a se mudar. O conhecimento vem da minha experiência, não de uma profissão na área."
+}

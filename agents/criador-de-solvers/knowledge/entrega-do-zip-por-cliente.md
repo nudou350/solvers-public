@@ -1,67 +1,67 @@
 ---
-title: Entrega do ZIP por cliente: Claude Code, Claude ou ChatGPT com arquivos, e sem arquivos
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 19.3 e 3.2
+title: ZIP delivery by client: Claude Code, Claude or ChatGPT with files, and without files
+source: Solver package specification v1 (PACKAGE_SPEC), sections 19.3 and 3.2
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [zip, entrega, claude-code, chatgpt, passo-a-passo]
+tags: [zip, delivery, claude-code, chatgpt, step-by-step]
 ---
 
-# Entrega do ZIP por cliente: Claude Code, Claude ou ChatGPT com arquivos, e sem arquivos
+# ZIP delivery by client: Claude Code, Claude or ChatGPT with files, and without files
 
-O que o ZIP precisa ter, em qualquer cliente: **uma única pasta raiz** (o slug) com o `manifest.json` dentro; só arquivos `.json`, `.md` e `.txt`; nomes sem ponto no começo; nada de pastas de sistema. O envio é pelo site, que valida de novo no servidor.
+What the ZIP must have, in any client: **a single root folder** (the slug) with `manifest.json` inside; only `.json`, `.md` and `.txt` files; names that do not start with a dot; no system folders. Submission is through the site, which validates again on the server.
 
-## Escolha do caminho
+## Choosing the path
 
-- Perfil `onde_roda` = Claude Code: escreva a pasta no disco e gere o ZIP por comando.
-- Claude ou ChatGPT com geração de arquivos (análise de dados, ambiente de código): gere o ZIP e ofereça o download.
-- Sem geração de arquivos: entregue os arquivos em blocos e guie o usuário a montar a pasta e compactar.
+- Profile `onde_roda` = Claude Code: write the folder to disk and build the ZIP with a command.
+- Claude or ChatGPT with file generation (data analysis, code environment): build the ZIP and offer the download.
+- Without file generation: deliver the files in blocks and guide the user to assemble the folder and zip it.
 
 ## Claude Code
 
-Você escreve a pasta direto no diretório de trabalho: `meu-solver/manifest.json`, `meu-solver/steps/01-...md` e assim por diante, atualizando os arquivos a cada etapa do Criador. No fim, gere o ZIP **compactando a pasta**:
+You write the folder straight into the working directory: `my-solver/manifest.json`, `my-solver/steps/01-...md` and so on, updating the files at each step of the Creator. At the end, build the ZIP by **zipping the folder**:
 
-- macOS ou Linux: `zip -r meu-solver.zip meu-solver -x "*.DS_Store"`
-- Windows 10 ou 11: `tar -a -c -f meu-solver.zip meu-solver`
+- macOS or Linux: `zip -r my-solver.zip my-solver -x "*.DS_Store"`
+- Windows 10 or 11: `tar -a -c -f my-solver.zip my-solver`
 
-Atenção no Windows: o `Compress-Archive` do Windows PowerShell 5.1 grava barras invertidas nos caminhos e leva ao erro `ZIP_BAD_PATH`. Prefira o `tar` acima, o PowerShell 7 ou um programa de compactação.
+Warning on Windows: `Compress-Archive` from Windows PowerShell 5.1 writes backslashes in the paths and leads to the `ZIP_BAD_PATH` error. Prefer the `tar` above, PowerShell 7 or a compression program.
 
-Para conferir o conteúdo: `unzip -l meu-solver.zip` (ou `tar -tf meu-solver.zip`). Todas as linhas devem começar com `meu-solver/`. Se existir o script de validação da equipe (`solvers validate <pasta ou ZIP>`), rode no ZIP.
+To check the contents: `unzip -l my-solver.zip` (or `tar -tf my-solver.zip`). Every line must start with `my-solver/`. If the team's validation script exists (`solvers validate <folder or ZIP>`), run it on the ZIP.
 
-## Claude ou ChatGPT com geração de arquivos
+## Claude or ChatGPT with file generation
 
-Escreva os arquivos num ambiente de código e gere o ZIP com barras normais nos caminhos internos. Exemplo em Python, para uma pasta já escrita:
+Write the files in a code environment and build the ZIP with forward slashes in the internal paths. Python example, for a folder already written:
 
 ```
 import zipfile, pathlib
-raiz = pathlib.Path("meu-solver")
-with zipfile.ZipFile("meu-solver.zip", "w", zipfile.ZIP_DEFLATED) as z:
-    for p in sorted(raiz.rglob("*")):
+root = pathlib.Path("my-solver")
+with zipfile.ZipFile("my-solver.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    for p in sorted(root.rglob("*")):
         if p.is_file() and not p.name.startswith("."):
             z.write(p, p.as_posix())
 ```
 
-Se os arquivos estão só em texto na conversa, crie cada um com `z.writestr("meu-solver/manifest.json", conteudo)`. Depois ofereça o link para baixar o `meu-solver.zip` e liste o conteúdo do ZIP para o usuário conferir.
+If the files exist only as text in the conversation, create each one with `z.writestr("my-solver/manifest.json", content)`. Then offer the link to download `my-solver.zip` and list the ZIP contents for the user to check.
 
-## Sem geração de arquivos
+## Without file generation
 
-1. Entregue **um bloco por arquivo**, com o caminho completo como título (por exemplo, `meu-solver/steps/01-nome.md`), na ordem: manifest.json, steps/, knowledge/, templates/, evals/cases/, README.md.
-2. Passo a passo para o usuário:
-   - Crie uma pasta com o nome do slug.
-   - Dentro dela, crie as subpastas `steps`, `knowledge`, `templates` e `evals/cases`.
-   - Cole o conteúdo de cada bloco no arquivo com o mesmo nome (salve como UTF-8, usando um editor de texto simples; evite editores que mudam aspas e travessões).
-   - Compacte **a pasta inteira**: no Windows, botão direito, "Enviar para" e "Pasta compactada"; no macOS, botão direito, "Comprimir".
-   - Abra o ZIP e confira se aparece uma única pasta com o manifest.json dentro.
-3. No macOS o Finder cria a pasta `__MACOSX`: ela é removida com aviso (`ZIP_IGNORED_FILE`) e não impede o envio.
+1. Deliver **one block per file**, with the full path as the title (for example, `my-solver/steps/01-name.md`), in order: manifest.json, steps/, knowledge/, templates/, evals/cases/, README.md.
+2. Step by step for the user:
+   - Create a folder named after the slug.
+   - Inside it, create the subfolders `steps`, `knowledge`, `templates` and `evals/cases`.
+   - Paste the content of each block into the file with the same name (save as UTF-8, using a plain text editor; avoid editors that change quotes and dashes).
+   - Zip **the whole folder**: on Windows, right-click, "Send to" and "Compressed (zipped) folder"; on macOS, right-click, "Compress".
+   - Open the ZIP and check that a single folder appears with the manifest.json inside.
+3. On macOS, Finder creates the `__MACOSX` folder: it is removed with a warning (`ZIP_IGNORED_FILE`) and does not block submission.
 
-## Erros comuns na hora de montar
+## Common mistakes when assembling
 
-- Compactar o **conteúdo** da pasta em vez da pasta: o ZIP fica sem raiz única (`ZIP_BAD_ROOT`).
-- Duas pastas na raiz (por exemplo, a pasta do Solver e uma pasta "rascunhos"): erro de raiz.
-- Arquivo com nome começando por ponto, ou com caractere estranho: `ZIP_BAD_PATH`.
-- Editor que salva em outra codificação: `FILE_NOT_UTF8`.
-- Extensões como `.docx`, `.pdf`, `.png` dentro do pacote: `FILE_TYPE_NOT_ALLOWED`.
-- Barras invertidas dentro do ZIP (PowerShell antigo): `ZIP_BAD_PATH`.
+- Zipping the folder's **contents** instead of the folder: the ZIP has no single root (`ZIP_BAD_ROOT`).
+- Two folders at the root (for example, the Solver folder and a "drafts" folder): root error.
+- A file whose name starts with a dot, or has a strange character: `ZIP_BAD_PATH`.
+- An editor that saves in another encoding: `FILE_NOT_UTF8`.
+- Extensions such as `.docx`, `.pdf`, `.png` inside the package: `FILE_TYPE_NOT_ALLOWED`.
+- Backslashes inside the ZIP (old PowerShell): `ZIP_BAD_PATH`.
 
-## Envio
+## Submission
 
-No site, a área do criador (`/criador/publicar`) recebe o ZIP: o servidor valida de novo e mostra os erros, se houver. Em seguida, uma pessoa da equipe revisa o pacote em até 5 dias úteis. O Solver só aparece na vitrine depois da aprovação e da confirmação da publicação pelo criador.
+On the site, the creator area (`/creator/publish`) receives the ZIP: the server validates again and shows the errors, if any. Then a team member reviews the package within 5 business days. The Solver only appears on the storefront after approval and after the creator confirms the publication.

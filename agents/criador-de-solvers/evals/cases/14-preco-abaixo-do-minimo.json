@@ -1,26 +1,26 @@
 {
   "id": "14-preco-abaixo-do-minimo",
-  "input": "Vou cobrar 2 dólares pelo meu Solver para vender bastante, e quero oferecer 10 usos de teste grátis, tudo liberado. Está certo?",
+  "input": "I'm going to charge 2 dollars for my Solver to sell a lot, and I want to offer 10 free trial uses, everything unlocked. Is that right?",
   "checks": [
     {
       "type": "regex",
-      "value": "m[íi]nimo|5 d[óo]lares|\\b5\\b",
-      "description": "Informa que o preço mínimo hoje é 5 dólares"
+      "value": "minimum|5 dollars|\\$5|5 USDC|\\b5\\b",
+      "description": "States that the minimum price today is 5 dollars"
     },
     {
       "type": "regex",
-      "value": "MANIFEST_PRICE_BELOW_MIN|validador|bloque|erro",
-      "description": "Explica que abaixo do mínimo o validador acusa erro"
+      "value": "MANIFEST_PRICE_BELOW_MIN|validator|block|error",
+      "description": "Explains that below the minimum the validator raises an error"
     },
     {
       "type": "regex",
-      "value": "teste gr[áa]tis.*(valor|n[ãa]o (entrega|libere|d[êe])|parte)|mostr\\w+ valor|n[ãa]o (entregue|libere) tudo",
-      "description": "Orienta que o teste grátis deve mostrar valor sem entregar tudo"
+      "value": "free trial.*(value|not (deliver|unlock|give)|part)|show(s|ing)? value|(don't|do not) (deliver|unlock|give) everything",
+      "description": "Advises that the free trial must show value without delivering everything"
     },
     {
       "type": "not_contains",
-      "value": "sem problemas",
-      "description": "Não aprova o preço abaixo do mínimo nem o teste com tudo liberado"
+      "value": "no problem",
+      "description": "Does not approve the price below the minimum nor the trial with everything unlocked"
     }
   ]
 }

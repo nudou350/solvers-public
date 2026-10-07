@@ -1,79 +1,92 @@
 {
   "specVersion": 1,
   "slug": "mudanca-apartamento",
-  "name": "Mudança de Apartamento",
-  "tagline": "Organize sua mudança de apartamento: prazos, transportadora, endereço e vistoria",
-  "description": "Planeja a sua mudança de apartamento do primeiro orçamento ao último aviso de endereço. Você informa data, tamanho da casa, se o imóvel é alugado ou próprio e quem ajuda; o Solver monta um cronograma por prazo, ajuda a comparar propostas de transportadoras com as perguntas certas e entrega a lista de quem avisar sobre o novo endereço e o roteiro da vistoria de saída com fotos. É para quem muda de apartamento no Brasil sem ajuda profissional. Não faz: não é consultoria jurídica (contrato de aluguel, caução e multas dependem do seu contrato e da lei local; confira com a imobiliária ou um advogado), não indica empresas nem garante preços, não cobre mudança internacional nem de escritório e não preenche formulários por você. Prazos e regras de órgãos e concessionárias mudam: o Solver aponta o que conferir no site oficial de cada um.",
+  "name": "Apartment Move",
+  "tagline": "Plan your apartment move: deadlines, movers, address changes and move-out inspection",
+  "description": "Plans your apartment move from the first quote to the last change-of-address notice. You give the date, the size of your home, whether you rent or own and who is helping; the Solver builds a deadline-based schedule, helps you compare moving company quotes with the right questions, and hands you a list of who to notify about your new address plus a photo-based move-out inspection walkthrough. It is built for people moving apartments in Brazil without professional help: the address-change list (Detran, TSE, Receita Federal, Correios, utilities) and the rental notes (Brazilian tenancy law) are Brazil-specific. What it does not do: it is not legal advice (rental contracts, security deposits and penalties depend on your contract and local law; check with your landlord, the rental agency or a lawyer), it does not recommend companies or guarantee prices, it does not cover international or office moves, and it does not fill in forms for you. Deadlines and rules of agencies and utility companies change: the Solver points out what to check on each one's official website.",
   "category": "Dia a dia",
   "version": "1.0.0",
   "usesMemory": true,
   "creator": {
     "id": "marina-mudancas",
     "name": "Marina",
-    "bio": "Já fiz três mudanças de apartamento (duas de aluguel, uma de imóvel próprio) e ajudei amigos a se mudar. O conhecimento vem da minha experiência, não de uma profissão na área."
+    "bio": "I have moved apartments three times (two rentals, one owned) and helped friends move. The knowledge comes from my own experience, not from a professional background in the field."
   },
-  "terms": { "rightsConfirmed": true, "sourcesListed": true },
+  "terms": {
+    "rightsConfirmed": true,
+    "sourcesListed": true
+  },
   "requirements": [
-    { "type": "client", "label": "Claude, ChatGPT ou Claude Code", "key": "any" }
+    {
+      "type": "client",
+      "label": "Claude, ChatGPT or Claude Code",
+      "key": "any"
+    }
   ],
   "packageContents": [
-    "Método em 4 etapas com checklist",
-    "Base de conhecimento da experiência da criadora e de sites públicos, com data e conferência",
-    "Modelos prontos: cronograma, comparativo de transportadoras, avisos de endereço e vistoria de saída"
+    "4-step method with checklists",
+    "Knowledge base from the creator's own experience and public websites, with dates and verification",
+    "Ready-made templates: schedule, mover comparison, address-change notices and move-out inspection"
   ],
   "searchPhrases": [
-    "vou me mudar de apartamento e não sei por onde começar",
-    "checklist de mudança por prazo",
-    "como contratar transportadora de mudança",
-    "o que perguntar para a empresa de mudança antes de fechar",
-    "quem avisar quando eu mudar de endereço",
-    "vistoria de saída do apartamento alugado",
-    "como me preparar para entregar o apartamento alugado",
-    "cronograma de mudança em 30 dias",
-    "comparar orçamentos de mudança",
-    "como organizar as caixas e o inventário da mudança"
+    "I am moving apartments and do not know where to start",
+    "moving checklist by deadline",
+    "how to hire a moving company",
+    "what to ask a moving company before signing",
+    "who to notify when I change address",
+    "move-out inspection for a rented apartment",
+    "how to prepare to hand back a rented apartment",
+    "moving schedule for the next 30 days",
+    "compare moving quotes",
+    "how to pack boxes and make a moving inventory",
+    "change of address checklist for a move in Brazil"
   ],
-  "differentiators": ["liveData", "memory"],
-  "escalation": { "enabled": false },
+  "differentiators": [
+    "liveData",
+    "memory"
+  ],
+  "escalation": {
+    "enabled": false
+  },
   "steps": [
     {
       "file": "steps/01-levantar-a-situacao.md",
-      "title": "Levantar a situação da mudança",
+      "title": "Assess your move",
       "gate": [
-        "Data (ou semanas até a mudança) confirmada com o usuário",
-        "Situação do imóvel atual (alugado, próprio ou familiar) e destino anotados",
-        "Volume e quem ajuda definidos em faixas",
-        "Ficha da mudança mostrada e aprovada pelo usuário"
+        "Date (or weeks until the move) confirmed with the user",
+        "Current home situation (rented, owned or family-owned) and destination noted",
+        "Volume and who helps defined in ranges",
+        "Move summary sheet shown to and approved by the user"
       ]
     },
     {
       "file": "steps/02-montar-o-cronograma.md",
-      "title": "Montar o cronograma por prazo",
+      "title": "Build the schedule by deadline",
       "gate": [
-        "Janelas de prazo com datas reais calculadas a partir da data da mudança",
-        "Cada tarefa tem responsável e prazo",
-        "3 tarefas críticas marcadas com o motivo",
-        "Cronograma ajustado ao perfil (imóvel, volume e ajuda) e conferido pelo usuário"
+        "Deadline windows with real dates calculated from the move date",
+        "Every task has an owner and a due date",
+        "3 critical tasks marked with the reason",
+        "Schedule adjusted to the profile (home, volume and help) and checked by the user"
       ]
     },
     {
       "file": "steps/03-contratar-a-transportadora.md",
-      "title": "Contratar a transportadora",
+      "title": "Hire the moving company",
       "gate": [
-        "Pedido de cotação único escrito com data, endereços (bairro e cidade), andares e itens grandes",
-        "Pelo menos 2 propostas comparadas no mesmo formato, ou decisão de não contratar empresa registrada",
-        "Comparativo mostra o que cada proposta inclui e não inclui, com os valores informados pelo usuário",
-        "Seguro, cancelamento e confirmação por escrito conferidos antes de fechar"
+        "A single written quote request with date, addresses (neighborhood and city), floors and large items",
+        "At least 2 quotes compared in the same format, or a decision not to hire a registered company",
+        "Comparison shows what each quote includes and excludes, using the amounts provided by the user",
+        "Insurance, cancellation and written confirmation checked before signing"
       ]
     },
     {
       "file": "steps/04-fechar-burocracias-e-vistoria.md",
-      "title": "Fechar as burocracias e a vistoria de saída",
+      "title": "Close the paperwork and the move-out inspection",
       "gate": [
-        "Lista de avisos de endereço preenchida com o que, a quem e até quando, cada prazo marcado para conferir na fonte oficial",
-        "Vistoria de saída conduzida com fotos e leitura dos medidores, ou marcada como não aplicável (imóvel próprio)",
-        "Conferência do dia e da semana seguinte entregues ao usuário",
-        "Aviso de conferir na fonte oficial dito ao usuário, sem consultoria jurídica"
+        "Address-change list filled in with what, who and by when, each deadline marked to check at the official source",
+        "Move-out inspection carried out with photos and meter readings, or marked not applicable (owned home)",
+        "Move-day and following-week checklists delivered to the user",
+        "Reminder to check official sources given to the user, without legal advice"
       ]
     }
   ],
@@ -81,76 +94,102 @@
     "updatedAt": "2026-10-02",
     "reviewEveryDays": 90,
     "sources": [
-      "Experiência própria da criadora em três mudanças de apartamento",
-      "Sites oficiais de concessionárias, bancos e órgãos públicos (consulta genérica, a conferir caso a caso)"
+      "The creator's own experience of three apartment moves",
+      "Official websites of utility companies, banks and public agencies in Brazil (generic lookup, to be verified case by case)"
     ]
   },
   "templates": [
     {
       "name": "cronograma-de-mudanca",
       "path": "templates/cronograma-de-mudanca.md",
-      "title": "Cronograma de mudança por prazo",
-      "description": "Janelas de prazo com tarefas, responsável e caixa de feito"
+      "title": "Moving schedule by deadline",
+      "description": "Deadline windows with tasks, owner and a done checkbox"
     },
     {
       "name": "comparativo-de-transportadoras",
       "path": "templates/comparativo-de-transportadoras.md",
-      "title": "Comparativo de transportadoras",
-      "description": "Tabela para comparar propostas no mesmo formato, com o que inclui e o que não inclui"
+      "title": "Moving company comparison",
+      "description": "Table to compare quotes in the same format, showing what is included and what is not"
     },
     {
       "name": "lista-de-avisos-de-endereco",
       "path": "templates/lista-de-avisos-de-endereco.md",
-      "title": "Lista de avisos de endereço",
-      "description": "Quem avisar, até quando e como, com cada prazo a conferir na fonte oficial"
+      "title": "Change-of-address notice list",
+      "description": "Who to notify, by when and how, with each deadline to check at the official source"
     },
     {
       "name": "checklist-de-vistoria-de-saida",
       "path": "templates/checklist-de-vistoria-de-saida.md",
-      "title": "Checklist de vistoria de saída",
-      "description": "Fotos, medidores e registros para entregar o apartamento alugado"
+      "title": "Move-out inspection checklist",
+      "description": "Photos, meters and records to hand back a rented apartment"
     }
   ],
   "onboarding": {
     "questions": [
       {
         "id": "situacao_imovel",
-        "ask": "O apartamento de onde você sai é alugado, próprio ou de familiar?",
-        "why": "Se for alugado, entram na lista o aviso prévio e a vistoria de saída",
-        "options": ["Alugado", "Próprio", "De familiar"]
+        "ask": "Is the apartment you are leaving rented, owned or a family member's?",
+        "why": "If it is rented, the notice period and the move-out inspection are added to the list",
+        "options": [
+          "Rented",
+          "Owned",
+          "Family member's"
+        ]
       },
       {
         "id": "volume",
-        "ask": "Quanta coisa você tem para mudar?",
-        "why": "O volume muda o tamanho do veículo, o número de ajudantes e as tarefas de embalar",
-        "options": ["Só o essencial", "Apartamento completo", "Muita coisa ou itens grandes"]
+        "ask": "How much stuff do you have to move?",
+        "why": "Volume changes the vehicle size, the number of helpers and the packing tasks",
+        "options": [
+          "Just the essentials",
+          "A full apartment",
+          "A lot of stuff or large items"
+        ]
       },
       {
         "id": "quem_ajuda",
-        "ask": "Quem vai ajudar na mudança?",
-        "why": "Muda as tarefas do cronograma e se vale cotar empresa com embalagem",
-        "options": ["Faço com amigos e família", "Contrato empresa só para transportar", "Contrato empresa com embalagem"]
+        "ask": "Who is going to help with the move?",
+        "why": "It changes the schedule tasks and whether it is worth quoting a company with packing",
+        "options": [
+          "Friends and family",
+          "I hire a company only to transport",
+          "I hire a company with packing"
+        ]
       },
       {
         "id": "ja_mudou",
-        "ask": "Você já organizou uma mudança antes?",
-        "why": "Define quanto eu explico: quem nunca mudou recebe os termos explicados",
-        "options": ["Primeira vez", "Já mudei uma ou duas vezes", "Mudo com frequência"]
+        "ask": "Have you organized a move before?",
+        "why": "It sets how much I explain: first-timers get the terms explained",
+        "options": [
+          "First time",
+          "I have moved once or twice",
+          "I move often"
+        ]
       }
     ]
   },
-  "guarantee": { "available": false, "defaultCriteria": [] },
-  "pricing": { "priceUsdc": 9, "royaltyBps": 0 },
+  "guarantee": {
+    "available": false,
+    "defaultCriteria": []
+  },
+  "pricing": {
+    "priceUsdc": 9,
+    "royaltyBps": 0
+  },
   "trial": {
     "uses": 3,
     "steps": 2,
     "searches": 3,
     "tools": {},
     "templates": [],
-    "summary": "As duas primeiras etapas: levantar a situação da mudança e montar o cronograma por prazo",
-    "lockedSummary": "Comparativo de transportadoras, avisos de endereço e roteiro da vistoria de saída"
+    "summary": "The first two steps: assess your move and build the schedule by deadline",
+    "lockedSummary": "Mover comparison, change-of-address notices and the move-out inspection walkthrough"
   },
   "versions": [
-    { "version": "1.0.0", "releasedAt": "2026-10-02", "notes": "Primeira versão" }
+    {
+      "version": "1.0.0",
+      "releasedAt": "2026-10-02",
+      "notes": "First release"
+    }
   ]
 }

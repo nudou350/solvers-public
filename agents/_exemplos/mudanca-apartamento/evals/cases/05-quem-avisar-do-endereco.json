@@ -1,10 +1,26 @@
 {
   "id": "05-quem-avisar-do-endereco",
-  "input": "Depois que eu mudar, quem eu preciso avisar do meu novo endereço? Tenho carro, plano de saúde e internet.",
+  "input": "After I move, who do I need to tell about my new address? I have a car, a health plan and internet.",
   "checks": [
-    { "type": "regex", "value": "banco", "description": "Conteúdo: inclui bancos e cartões na lista de avisos" },
-    { "type": "regex", "value": "Detran", "description": "Conteúdo: lembra do cadastro do veículo no Detran" },
-    { "type": "regex", "value": "site oficial|fonte oficial|conferir|confirme", "description": "Ressalva: manda conferir prazos e regras na fonte oficial" },
-    { "type": "not_contains", "value": "o prazo é de 30 dias", "description": "Anti: não afirma prazo de órgão como certeza" }
+    {
+      "type": "regex",
+      "value": "bank",
+      "description": "Content: includes banks and cards in the notice list"
+    },
+    {
+      "type": "regex",
+      "value": "Detran",
+      "description": "Content: remembers the vehicle registration at the Detran"
+    },
+    {
+      "type": "regex",
+      "value": "official (website|site|source)|check|confirm",
+      "description": "Caveat: tells the user to check deadlines and rules at the official source"
+    },
+    {
+      "type": "not_contains",
+      "value": "the deadline is 30 days",
+      "description": "Anti: does not state an agency deadline as certain"
+    }
   ]
 }

@@ -1,25 +1,25 @@
 ---
-title: O que fazer em cada semana da mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: What to do in each week of the move
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [cronograma, checklist, semanas]
+tags: [schedule, checklist, weeks]
 ---
 
-# O que fazer em cada semana da mudança
+# What to do in each week of the move
 
-## De 8 a 4 semanas antes
+## From 8 to 4 weeks before
 
-Nesta fase a criadora recomenda fechar a data, conferir o aviso prévio do contrato de aluguel (quando for o caso), pedir orçamentos e começar a separar o que será doado, vendido ou descartado. Também ajuda esvaziar o que ocupa mais espaço e se usa pouco: armários de despensa, a parte alta dos guarda-roupas e a área de serviço. Quanto menos coisa a mudar, menor o orçamento e menos caixas para abrir depois.
+In this phase the creator recommends locking in the date, checking the notice period in the rental contract (when it applies), asking for quotes and starting to sort what will be donated, sold or thrown away. It also helps to empty what takes up the most space and is rarely used: pantry cupboards, the top of the wardrobes and the laundry area. The less there is to move, the smaller the quote and the fewer boxes to open afterward.
 
-## 3 e 2 semanas antes
+## 3 and 2 weeks before
 
-Fechar a transportadora (ou combinar o dia com amigos), reservar o elevador de serviço e o horário nos dois condomínios, e comprar ou pedir emprestado material de embalagem. Começar a embalar o que não se usa no dia a dia: livros, enfeites, roupas de outra estação, louça de festa. Avisar quem precisa saber do novo endereço antes da mudança, como o banco e o trabalho, e conferir os prazos de cada concessionária.
+Hire the moving company (or agree on the day with friends), book the service elevator and the time slot in both buildings, and buy or borrow packing material. Start packing what is not used day to day: books, decorations, clothes from another season, party dishes. Notify those who need to know the new address before the move, such as the bank and the employer, and check the deadlines of each utility company.
 
-## Última semana, véspera e dia
+## Last week, the day before and the day itself
 
-Na última semana, embalar o resto aos poucos, descongelar e esvaziar a geladeira e separar uma caixa ou mala de primeira noite (documentos, remédios, carregadores, roupa de cama, papel higiênico). Na véspera, conferir o horário da empresa e desmontar o que for combinado. No dia, acompanhar o carregamento com a lista do inventário em mãos e dar uma volta final em todos os cômodos, armários e na área de serviço antes de fechar a porta.
+In the last week, pack the rest little by little, defrost and empty the fridge and set aside a first-night box or suitcase (documents, medication, chargers, bed linen, toilet paper). The day before, confirm the company's time and take apart what was agreed. On the day, follow the loading with the inventory list in hand and take a final walk through every room, cupboard and the laundry area before closing the door.
 
-## Até 2 semanas depois
+## Up to 2 weeks after
 
-Conferir se os avisos de endereço foram aceitos, se as contas do imóvel novo estão no nome certo, se não houve cobrança duplicada e se a correspondência está chegando. Guardar por um tempo as fotos e os registros da mudança e da entrega das chaves, caso apareça alguma dúvida.
+Check that the address notices were accepted, that the accounts of the new home are in the right name, that there was no duplicate billing and that mail is arriving. Keep the photos and records of the move and of the handover of the keys for a while, in case any question comes up.

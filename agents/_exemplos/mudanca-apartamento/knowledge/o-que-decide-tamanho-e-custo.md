@@ -1,21 +1,21 @@
 ---
-title: O que decide o tamanho do veículo e o custo da mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: What decides the vehicle size and the cost of a move
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [volume, custo, caminhao]
+tags: [volume, cost, truck]
 ---
 
-# O que decide o tamanho do veículo e o custo da mudança
+# What decides the vehicle size and the cost of a move
 
-## Os fatores que mais pesam
+## The factors that weigh the most
 
-Pela experiência da criadora, o preço e o tamanho do veículo dependem principalmente de cinco coisas: o volume de móveis e caixas, a distância entre os endereços, os andares sem elevador nos dois prédios, a presença de itens grandes ou frágeis e se a empresa também embala e monta os móveis. Dois apartamentos do mesmo tamanho podem ter orçamentos bem diferentes só porque um deles tem escada e o outro tem elevador de serviço.
+From the creator's experience, the price and the vehicle size depend mainly on five things: the volume of furniture and boxes, the distance between the addresses, the floors without an elevator in both buildings, the presence of large or fragile items and whether the company also packs and assembles the furniture. Two apartments of the same size can have very different quotes just because one has stairs and the other has a service elevator.
 
-## Como estimar o volume sem medir
+## How to estimate volume without measuring
 
-Uma forma simples usada pela criadora: contar os móveis grandes (cama, guarda-roupa, sofá, mesa, geladeira, máquina de lavar) e estimar as caixas pelo número de cômodos e de estantes. A pessoa deve dizer "estimado" na proposta e pedir que a empresa confirme o volume em visita ou por vídeo. Estimativa errada é a principal causa de acréscimo no dia, então vale registrar a lista dos itens grandes.
+A simple way used by the creator: count the large furniture items (bed, wardrobe, sofa, table, fridge, washing machine) and estimate the boxes from the number of rooms and shelves. The person should say "estimated" in the request and ask the company to confirm the volume with a visit or by video. A wrong estimate is the main cause of an extra charge on the day, so it is worth recording the list of large items.
 
-## O que pode aparecer como custo extra
+## What can show up as an extra cost
 
-Entre os acréscimos que a criadora já viu ou ouviu de amigos estão a taxa por andar sem elevador, a hora de espera quando o elevador de serviço não foi reservado, a desmontagem e a montagem de móveis, o material de embalagem e itens fora da lista informada. Nem toda empresa cobra tudo isso. Por isso o Solver pede que cada item seja perguntado e que a resposta fique por escrito.
+Among the extra charges the creator has seen or heard about from friends are the fee per floor without an elevator, the waiting time when the service elevator was not booked, the disassembly and assembly of furniture, packing material and items outside the list provided. Not every company charges all of this. That is why the Solver asks that each item be asked about and that the answer be in writing.

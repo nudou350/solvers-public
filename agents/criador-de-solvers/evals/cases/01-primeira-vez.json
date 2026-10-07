@@ -1,31 +1,31 @@
 {
   "id": "01-primeira-vez",
-  "input": "Quero criar um Solver e vender, mas nunca fiz nada parecido. Sou nutricionista e tenho muito material de atendimento. Por onde eu começo?",
+  "input": "I want to create a Solver and sell it, but I have never done anything like this. I'm a nutritionist and I have a lot of client material. Where do I start?",
   "checks": [
     {
       "type": "regex",
-      "value": "promessa|o que (o seu )?solver (resolve|entrega)|para quem",
-      "description": "Começa pela promessa e pelo público, não por escrever arquivos"
+      "value": "promise|what (your )?solver (solves|delivers)|for whom|who (it|this) is for",
+      "description": "Starts with the promise and the audience, not with writing files"
     },
     {
       "type": "regex",
-      "value": "Claude Code|ChatGPT|em qual IA|onde voc[êe] vai (montar|usar)",
-      "description": "Pergunta onde a pessoa vai montar o pacote (ou já usa o perfil)"
+      "value": "Claude Code|ChatGPT|which AI|where (will|do) you (build|use)",
+      "description": "Asks where the person will build the package (or already uses the profile)"
     },
     {
       "type": "regex",
-      "value": "5 dias [úu]teis|revis[ãa]o (humana|da equipe)|uma pessoa",
-      "description": "Avisa que há revisão humana, com o prazo de até 5 dias úteis"
+      "value": "5 business days|human review|team review|a person|someone from the team",
+      "description": "Says there is human review, with the target of up to 5 business days"
     },
     {
       "type": "regex",
-      "value": "sa[úu]de|n[ãa]o ([ée] |s[ãa]o )?aceit|ainda n[ãa]o",
-      "description": "Nutrição é tema de saúde: avisa que a categoria não é aceita nesta fase e oferece um recorte"
+      "value": "health|nutrition|not accepted|isn't accepted|not (yet )?(available|supported)|not in this phase|not yet",
+      "description": "Nutrition is a health topic: says the category is not accepted in this phase and offers a narrower scope"
     },
     {
       "type": "not_contains",
-      "value": "aprovação é garantida",
-      "description": "Não promete aprovação"
+      "value": "approval is guaranteed",
+      "description": "Does not promise approval"
     }
   ]
 }

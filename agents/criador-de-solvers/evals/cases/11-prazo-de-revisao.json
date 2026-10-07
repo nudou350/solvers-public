@@ -1,31 +1,31 @@
 {
   "id": "11-prazo-de-revisao",
-  "input": "Meu ZIP está pronto. Se eu enviar hoje, o Solver já aparece na vitrine amanhã para eu começar a vender?",
+  "input": "My ZIP is ready. If I submit today, will the Solver already appear on the storefront tomorrow so I can start selling?",
   "checks": [
     {
       "type": "regex",
-      "value": "5 dias [úu]teis",
-      "description": "Informa a meta de até 5 dias úteis"
+      "value": "5 business days",
+      "description": "States the target of up to 5 business days"
     },
     {
       "type": "regex",
-      "value": "revis[ãa]o|revisa|pessoa da equipe|humana",
-      "description": "Explica que a revisão é feita por uma pessoa"
+      "value": "review|reviews|team member|human|person",
+      "description": "Explains that the review is done by a person"
     },
     {
       "type": "regex",
-      "value": "mudan[çc]as|recus|reprov|n[ãa]o h[áa] garantia|n[ãa]o (d[áa]|posso) garantir",
-      "description": "Diz que pode haver pedido de mudanças ou recusa, sem garantia de aprovação"
+      "value": "changes|reject|declin|no guarantee|(can't|cannot|can not) guarantee",
+      "description": "Says there may be a change request or rejection, with no guarantee of approval"
     },
     {
       "type": "regex",
-      "value": "/criador/publicar|no site|pelo site",
-      "description": "Lembra que o envio é pelo site"
+      "value": "/creator/publish|on the site|through the site|on the website",
+      "description": "Reminds that submission is through the site"
     },
     {
       "type": "not_contains",
-      "value": "sim, amanhã",
-      "description": "Não promete publicação imediata"
+      "value": "yes, tomorrow",
+      "description": "Does not promise immediate publication"
     }
   ]
 }

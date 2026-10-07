@@ -1,21 +1,21 @@
 ---
-title: Quem avisar do novo endereço e como redirecionar a correspondência
-source: Experiência própria da criadora e sites oficiais de bancos, órgãos públicos e Correios (consulta genérica, a conferir caso a caso)
+title: Who to notify about your new address and how to redirect mail
+source: The creator's own experience and the official websites of banks, public agencies and the Brazilian postal service, Correios (generic lookup, to be verified case by case)
 source_date: 2026-10-02
 valid_until: 2027-01-31
-tags: [endereco, cadastros, correspondencia]
+tags: [address, registrations, mail]
 ---
 
-# Quem avisar do novo endereço e como redirecionar a correspondência
+# Who to notify about your new address and how to redirect mail
 
-## Cadastros mais comuns
+## The most common registrations
 
-A criadora costuma avisar: bancos e cartões, trabalho e plano de saúde, escola, operadoras de celular e internet, serviços de entrega e compras online, seguros, clubes e academias, e o condomínio. Também lembra dos cadastros públicos, como o do veículo no Detran do estado, o título de eleitor no site do TSE e o cadastro da Receita Federal. Os procedimentos, os prazos e as eventuais taxas desses órgãos variam por estado e mudam com o tempo: sempre confira o procedimento no site oficial do órgão antes de agir.
+The creator usually notifies: banks and cards, the employer and the health plan, school, mobile and internet providers, delivery services and online shops, insurers, clubs and gyms, and the building administration. She also remembers the public registrations, such as the vehicle registration at the state's Detran (the Brazilian state vehicle and driver licensing authority), the voter registration on the website of the TSE (Brazil's electoral court) and the registration with the Receita Federal (the Brazilian federal tax authority). The procedures, deadlines and possible fees of these agencies vary by state and change over time: always check the procedure on the agency's official website before acting.
 
-## Redirecionar a correspondência
+## Redirecting mail
 
-Os Correios têm um serviço de redirecionamento de correspondência, mas os prazos, o preço e as condições devem ser conferidos no site oficial da empresa, porque a criadora não os acompanha. Para os que não resolvem pelo serviço, a criadora combina com o novo morador do imóvel antigo ou com a portaria que guardem as cartas por um período e avisa os remetentes principais por conta própria.
+Correios (the Brazilian postal service) has a mail redirection service, but its deadlines, price and conditions must be checked on the company's official website, because the creator does not keep track of them. For whatever the service does not solve, the creator agrees with the new resident of the old home or with the front desk that they will keep the letters for a while, and notifies the main senders herself.
 
-## Como organizar para não esquecer
+## How to organize so nothing is forgotten
 
-Fazer uma lista com o nome da empresa, o que mudar, como fazer (aplicativo, telefone, site), o prazo e se já foi feito. Avisar primeiro quem manda cobrança ou documento importante e deixar o resto para a semana depois da mudança. Nunca enviar documentos por canais que não sejam os oficiais da empresa ou do órgão, e desconfiar de mensagens que pedem dados "para atualizar o endereço".
+Make a list with the name of the company, what to change, how to do it (app, phone, website), the deadline and whether it is done. Notify first those who send bills or important documents and leave the rest for the week after the move. Never send documents through channels that are not the official ones of the company or agency, and be wary of messages that ask for data "to update your address".

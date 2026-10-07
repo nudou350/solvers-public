@@ -1,31 +1,31 @@
 {
   "id": "08-zip-sem-arquivos",
-  "input": "Estou usando o ChatGPT gratuito e ele não gera arquivos para baixar. Como eu monto o ZIP do meu Solver?",
+  "input": "I'm using the free ChatGPT and it doesn't generate files to download. How do I assemble my Solver's ZIP?",
   "checks": [
     {
       "type": "regex",
-      "value": "bloco|um por um|arquivo por arquivo",
-      "description": "Entrega os arquivos em blocos, na ordem"
+      "value": "block|one by one|file by file|each file",
+      "description": "Delivers the files in blocks, in order"
     },
     {
       "type": "regex",
-      "value": "pasta",
-      "description": "Explica a criação da pasta"
+      "value": "folder",
+      "description": "Explains how to create the folder"
     },
     {
       "type": "regex",
-      "value": "uma (única )?pasta|1 pasta|pasta (inteira|raiz)|compact\\w+ a pasta",
-      "description": "Explica que o ZIP tem uma única pasta raiz e que se compacta a pasta inteira"
+      "value": "a single folder|one folder|1 folder|whole folder|entire folder|root folder|zip the folder|compress the folder",
+      "description": "Explains that the ZIP has a single root folder and that the whole folder is zipped"
     },
     {
       "type": "regex",
-      "value": "ZIP|compact",
-      "description": "Explica como compactar"
+      "value": "ZIP|compress",
+      "description": "Explains how to compress"
     },
     {
       "type": "regex",
-      "value": "site valida|valida (de novo|novamente)|valida[çc][ãa]o no envio",
-      "description": "Informa que o site valida de novo no envio"
+      "value": "site (validates|will validate)|validate[sd]? (it )?again|validation on (upload|submission)|re-?validat",
+      "description": "Says the site validates again on submission"
     }
   ]
 }

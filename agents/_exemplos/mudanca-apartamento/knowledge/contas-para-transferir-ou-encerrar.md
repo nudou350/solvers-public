@@ -1,21 +1,21 @@
 ---
-title: Contas para transferir ou encerrar na mudança
-source: Experiência própria da criadora e sites oficiais das concessionárias (consulta genérica, a conferir caso a caso)
+title: Accounts to transfer or close when you move
+source: The creator's own experience and the official websites of utility companies (generic lookup, to be verified case by case)
 source_date: 2026-10-02
 valid_until: 2027-01-31
-tags: [contas, luz, agua, internet, prazos]
+tags: [accounts, electricity, water, internet, deadlines]
 ---
 
-# Contas para transferir ou encerrar na mudança
+# Accounts to transfer or close when you move
 
-## A lista comum
+## The common list
 
-Contas que costumam estar no nome de quem mora: energia elétrica, água e esgoto, gás (encanado ou botijão com cadastro), internet e TV, telefone fixo, condomínio e IPTU quando o imóvel é próprio. Cada empresa tem seu próprio procedimento para encerrar a ligação no endereço antigo e abrir ou transferir no endereço novo, e os prazos e as regras variam por cidade, estado e empresa. Os prazos que a criadora lembra são de mudanças anteriores e não valem como regra: confira no site ou no atendimento oficial de cada empresa.
+Accounts that are usually in the name of whoever lives there: electricity, water and sewage, gas (piped, or bottled with a registration), internet and TV, landline, building fees and property tax (IPTU) when the property is owned. Each company has its own procedure to close the connection at the old address and open or transfer it at the new one, and the deadlines and rules vary by city, state and company. The deadlines the creator remembers come from previous moves and are not a rule: check on the website or with the official customer service of each company.
 
-## Ordem sugerida pela criadora
+## Order suggested by the creator
 
-Primeiro, perguntar à empresa como e com quanta antecedência avisar a saída e quando será feita a última leitura do consumo. Segundo, pedir a ligação no endereço novo com antecedência, porque algumas empresas precisam agendar visita ou religação. Terceiro, guardar o protocolo de cada atendimento e conferir a última fatura do endereço antigo. Em imóvel alugado, pergunte à imobiliária de quem é o nome da conta e se é preciso mandar comprovante de encerramento.
+First, ask the company how and how far in advance to give notice of leaving and when the last consumption reading will be taken. Second, request the connection at the new address in advance, because some companies need to schedule a visit or a reconnection. Third, keep the protocol number of each contact and check the last bill of the old address. On a rental, ask the rental agency whose name the account is in and whether proof of closure must be sent.
 
-## O que conferir depois
+## What to check afterward
 
-Na primeira fatura do endereço novo, confira se o endereço está certo, se o nome do titular está certo e se a leitura inicial do medidor bate com a que você anotou. Se houver cobrança no endereço antigo depois da saída, procure o atendimento com o protocolo em mãos. Dúvidas sobre direitos do consumidor devem ser conferidas na fonte oficial ou com um órgão de defesa do consumidor.
+On the first bill of the new address, check that the address is right, that the account holder's name is right and that the initial meter reading matches the one you noted. If there is a charge at the old address after you left, contact customer service with the protocol number at hand. Questions about consumer rights should be checked at the official source or with a consumer protection agency.

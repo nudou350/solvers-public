@@ -1,50 +1,50 @@
-# Etapa 2: Diferenciais e como prová-los
+# Step 2: Differentiators and how to prove them
 
-## Objetivo
+## Goal
 
-Escolher **pelo menos 2 diferenciais** que o Solver realmente terá e anotar, para cada um, **a prova** que o revisor vai conferir. É o critério "2 de 5" da revisão: um Solver que é só um texto bonito (que o comprador colaria num chat) é uma skill comum e não é aprovado. O que justifica o produto é o que só existe com o servidor: processo guiado, conhecimento vivo e citado, adaptação ao usuário e atendimento humano.
+Choose **at least 2 differentiators** that the Solver will really have and write down, for each one, **the proof** the reviewer will check. This is the "2 of 5" review criterion: a Solver that is just nicely written text (which the buyer could paste into a chat) is an ordinary skill and is not approved. What justifies the product is what only exists with the server: guided process, living and cited knowledge, adaptation to the user, and human support.
 
-Os 5 diferenciais da especificação são `tool`, `verifier`, `liveData`, `memory` e `escalation`. Seja honesto com o usuário sobre o que vale **nesta fase (o Núcleo)**: criadores novos **não têm `tool` nem `verifier`** (ferramenta executável e verificação automática do resultado), que só chegam na fase de Abertura. Então, na prática, as três opções reais são **conhecimento vivo (`liveData`)**, **memória (`memory`)** e **atendimento do criador (`escalation`)**, e é preciso comprovar duas delas. A vitrine não pode prometer ferramenta nem verificação nesses pacotes.
+The 5 differentiators in the specification are `tool`, `verifier`, `liveData`, `memory` and `escalation`. Be honest with the user about what counts **in this phase (the Core phase)**: new creators **do not get `tool` or `verifier`** (an executable tool and automatic verification of the result), which only arrive in the Opening phase. So in practice the three real options are **living knowledge (`liveData`)**, **memory (`memory`)** and **creator support (`escalation`)**, and you must prove two of them. The storefront cannot promise tools or verification in these packages.
 
-## O que perguntar ao usuário
+## What to ask the user
 
-Releia a ficha da etapa 1 e o perfil (`tipo_solver`, `nivel`). Pergunte em linguagem simples:
+Reread the sheet from step 1 and the profile (`tipo_solver`, `nivel`). Ask in plain language:
 
-1. **O conteúdo muda com o tempo?** (leis, valores, prazos, versões de software, preços). Se sim, `liveData` é natural: a base é datada, citada e mantida.
-2. **Faz diferença conhecer quem usa?** (nível, estilo, orçamento, ferramentas que já tem). Se sim, `memory`: perguntas no primeiro uso e um perfil guardado.
-3. **Você aceita atender casos complexos?** Pelo celular, em horário razoável, com os pedidos de ajuda que chegam pelo Telegram. Se sim, `escalation`. Se o usuário hesitar, não escolha esse: atendimento que não acontece é o pior diferencial.
-4. **Quem vai manter a base atualizada e com que frequência?** (necessário para `liveData`).
+1. **Does the content change over time?** (laws, amounts, deadlines, software versions, prices). If so, `liveData` is a natural fit: the knowledge base is dated, cited and maintained.
+2. **Does it matter to know who is using it?** (level, style, budget, tools they already have). If so, `memory`: questions on first use and a stored profile.
+3. **Are you willing to handle complex cases?** From your phone, at reasonable hours, with the help requests that arrive through Telegram. If so, `escalation`. If the user hesitates, do not pick this one: support that does not happen is the worst differentiator.
+4. **Who will keep the knowledge base up to date, and how often?** (needed for `liveData`).
 
-## Como executar
+## How to run
 
-1. **Explique os 5 em uma tabela curta** (o que é, em que Solvers faz sentido), com a ressalva do Núcleo. Use `search_knowledge` com "diferenciais critério 2 de 5" se precisar do texto de referência.
-2. **Recomende a combinação** conforme o tipo de Solver. Por exemplo: técnico ou código: `memory` (stack e estilo do usuário) + `liveData` (versões e padrões datados). Consultivo com regras de negócio: `liveData` (regras com fonte e data) + `escalation`. Conteúdo e marketing: `memory` (marca, tom, público) + `liveData` (tendências e formatos). Planejamento ou viagem: `memory` + `liveData`. Análise de dados: `memory` (tipo de planilha, objetivos) + `escalation`.
-3. **Para cada escolhido, anote a prova**, que é o que o validador e o revisor conferem de fato:
-   - `liveData`: `knowledge.updatedAt` dentro de `reviewEveryDays`; **nenhum** arquivo com `valid_until` vencido; pelo menos metade dos arquivos de conhecimento com `source_date`. Registre quem atualiza e a frequência (ex.: revisar a cada 90 dias).
-   - `memory`: bloco `onboarding` no manifesto (de 1 a 5 perguntas) e **pelo menos uma etapa cujo texto usa o perfil** (cita o perfil e diz como ele muda a resposta). O revisor confere que o perfil muda algo de verdade.
-   - `escalation`: `escalation.enabled: true` **e** um contato verificado no perfil do criador (o Telegram é vinculado no site, mandando um código ao bot). Sem contato verificado o diferencial não conta.
-4. **Declare só o que vai comprovar.** O campo `differentiators` do manifesto aceita `tool`, `verifier`, `liveData`, `memory` e `escalation`, mas o validador avisa (`MANIFEST_DIFFERENTIATOR_UNPROVEN`) quando o declarado não está provado, e (`MANIFEST_DIFFERENTIATORS_FEW`) quando há menos de 2 comprovados. Isso é aviso para o revisor, não bloqueio automático, mas o revisor só aprova com 2 comprovados.
-5. **Evite a tentação do diferencial de papel.** Declarar `escalation` sem atender, ou `liveData` com base sem data, é o caminho mais rápido para a recusa.
-6. **Registre também o que ficou para depois**: se o usuário queria uma ferramenta ou um verificador, anote no plano da etapa 5 (não no manifesto).
-7. Confirme: "Com estes dois (ou três) diferenciais e estas provas, o revisor consegue aprovar. Ok?"
+1. **Explain the 5 in a short table** (what each is, in which Solvers it makes sense), with the Core-phase caveat. Use `search_knowledge` with "differentiators 2 of 5 criterion" if you need the reference text.
+2. **Recommend the combination** according to the type of Solver. For example: technical or code: `memory` (the user's stack and style) + `liveData` (dated versions and patterns). Consultative with business rules: `liveData` (rules with source and date) + `escalation`. Content and marketing: `memory` (brand, tone, audience) + `liveData` (trends and formats). Planning or travel: `memory` + `liveData`. Data analysis: `memory` (type of spreadsheet, goals) + `escalation`.
+3. **For each one chosen, write down the proof**, which is what the validator and the reviewer actually check:
+   - `liveData`: `knowledge.updatedAt` within `reviewEveryDays`; **no** file with an expired `valid_until`; at least half of the knowledge files with `source_date`. Record who updates it and how often (e.g. review every 90 days).
+   - `memory`: an `onboarding` block in the manifest (1 to 5 questions) and **at least one step whose text uses the profile** (it mentions the profile and says how it changes the answer). The reviewer checks that the profile really changes something.
+   - `escalation`: `escalation.enabled: true` **and** a verified contact on the creator profile (Telegram is linked on the site by sending a code to the bot). Without a verified contact the differentiator does not count.
+4. **Declare only what you will prove.** The manifest `differentiators` field accepts `tool`, `verifier`, `liveData`, `memory` and `escalation`, but the validator warns (`MANIFEST_DIFFERENTIATOR_UNPROVEN`) when a declared one is not proven, and (`MANIFEST_DIFFERENTIATORS_FEW`) when fewer than 2 are proven. This is a warning for the reviewer, not an automatic block, but the reviewer only approves with 2 proven.
+5. **Resist the paper differentiator.** Declaring `escalation` without answering, or `liveData` with an undated knowledge base, is the fastest way to a rejection.
+6. **Also record what is left for later**: if the user wanted a tool or a verifier, note it in the step 5 plan (not in the manifest).
+7. Confirm: "With these two (or three) differentiators and these proofs, the reviewer can approve. Ok?"
 
-## Erros comuns
+## Common mistakes
 
-- **Escolher 5 e comprovar 1.** Escolha menos e comprove tudo.
-- **Declarar `tool` ou `verifier`.** Nesta fase terceiros não têm; o envio é recusado ou o campo fica sem comprovação.
-- **`liveData` sem datas.** Cada arquivo de conhecimento precisa de `source` e `source_date` no front-matter (etapa 4).
-- **`memory` sem uso.** Perguntas no primeiro uso que nenhuma etapa aproveita não contam; o texto da etapa precisa citar o perfil.
-- **`escalation` sem canal verificado** ou sem disposição de atender.
-- Prometer na vitrine o que não está nos diferenciais (por exemplo, "resultado garantido por testes").
+- **Picking 5 and proving 1.** Pick fewer and prove all of them.
+- **Declaring `tool` or `verifier`.** Third parties do not have them in this phase; the submission is rejected or the field goes unproven.
+- **`liveData` without dates.** Every knowledge file needs `source` and `source_date` in the front-matter (step 4).
+- **`memory` without use.** Questions on first use that no step takes advantage of do not count; the step text must mention the profile.
+- **`escalation` without a verified channel** or without willingness to respond.
+- Promising on the storefront what is not in the differentiators (for example, "result guaranteed by tests").
 
-## Formato do result_summary
+## result_summary format
 
 ```
-DIFERENCIAIS (mínimo 2)
-- liveData: prova = base com source/source_date, updatedAt, reviewEveryDays=N; mantém: quem/quando
-- memory: prova = onboarding (N perguntas) + etapa X usa o perfil
-- escalation: prova = enabled + Telegram vinculado (o usuário confirmou)
-FICA PARA DEPOIS: ferramenta/verificador (plano na etapa 5)
-DECLARADOS NO MANIFESTO: differentiators = [...]
-RISCO: o que o revisor pode questionar
+DIFFERENTIATORS (minimum 2)
+- liveData: proof = knowledge base with source/source_date, updatedAt, reviewEveryDays=N; maintained by: who/when
+- memory: proof = onboarding (N questions) + step X uses the profile
+- escalation: proof = enabled + Telegram linked (the user confirmed)
+LEFT FOR LATER: tool/verifier (plan in step 5)
+DECLARED IN THE MANIFEST: differentiators = [...]
+RISK: what the reviewer may question
 ```

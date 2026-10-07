@@ -1,59 +1,59 @@
 ---
-title: Envio, revisão humana, publicação e versões
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 14 e 15, e contrato de estados da plataforma
+title: Submission, human review, publication and versions
+source: Solver package specification v1 (PACKAGE_SPEC), sections 14 and 15, and the platform's state contract
 source_date: 2026-09-30
 valid_until: 2027-03-31
-tags: [envio, revisao, publicacao, versoes, semver]
+tags: [submission, review, publication, versions, semver]
 ---
 
-# Envio, revisão humana, publicação e versões
+# Submission, human review, publication and versions
 
-Esta base descreve o caminho do ZIP até a vitrine: quem pode enviar, as etapas de validação e revisão (meta de até 5 dias úteis), a publicação, as regras de versão, a suspensão e o que o criador deve manter depois de publicar.
+This knowledge file describes the path from the ZIP to the storefront: who can submit, the validation and review stages (target of up to 5 business days), publication, version rules, suspension and what the creator must maintain after publishing.
 
-## Quem pode enviar
+## Who can submit
 
-Nesta fase, **criadores convidados**. A plataforma envia um código de convite por e-mail; o criador informa o código depois de entrar no site, completa o perfil (nome, bio, aceite dos termos) e vincula o contato de atendimento (Telegram) se quiser o diferencial `escalation`. Na fase de Abertura, qualquer pessoa com perfil completo poderá enviar, com limites de envios.
+In this phase, **invited creators**. The platform sends an invitation code by email; the creator enters the code after signing in to the site, completes the profile (name, bio, acceptance of the terms) and links the support contact (Telegram) if they want the `escalation` differentiator. In the Opening phase, anyone with a complete profile will be able to submit, with limits on submissions.
 
-## O fluxo, em linguagem simples
+## The flow, in plain language
 
-1. **Envio**: o criador sobe o ZIP em `/criador/publicar`. O site recebe o arquivo e responde que está recebido.
-2. **Validação**: o servidor extrai o ZIP em área isolada e roda o validador. Se houver erro, o pacote volta com o motivo (código, caminho e como corrigir).
-3. **Revisão**: uma pessoa da equipe lê tudo (manifesto, etapas, conhecimento, modelos, casos de teste, varreduras automáticas). Meta: até 5 dias úteis. Ela pode **aprovar**, **pedir mudanças** (você corrige e reenvia, na mesma versão enquanto ela não for publicada) ou **recusar**, sempre com o motivo.
-4. **Confirmação do criador**: aprovado, o criador confirma a publicação no próprio site (a assinatura final é dele, a plataforma paga a taxa).
-5. **Aprovação final da plataforma** (Solver novo): a equipe conclui o registro. Atualizações de um Solver já aprovado não repetem esse passo.
-6. **Publicação**: o Solver entra na vitrine.
+1. **Submission**: the creator uploads the ZIP at `/creator/publish`. The site receives the file and replies that it was received.
+2. **Validation**: the server extracts the ZIP in an isolated area and runs the validator. If there is an error, the package comes back with the reason (code, path and how to fix it).
+3. **Review**: a team member reads everything (manifest, steps, knowledge, templates, test cases, automatic scans). Target: up to 5 business days. They can **approve**, **request changes** (you fix and resubmit, on the same version as long as it has not been published) or **reject**, always with the reason.
+4. **Creator confirmation**: once approved, the creator confirms the publication on the site (the final signature is theirs; the platform pays the fee).
+5. **Final platform approval** (new Solver): the team completes the registration. Updates to an already approved Solver do not repeat this step.
+6. **Publication**: the Solver goes onto the storefront.
 
-Se algum passo falhar no meio, o estado vira "falha de publicação" e a equipe tenta de novo; a vitrine só muda no final.
+If any step fails midway, the state becomes "publication failed" and the team tries again; the storefront only changes at the end.
 
-## Não há garantia de aprovação
+## There is no guarantee of approval
 
-A aprovação depende da revisão. Nunca prometa a data, a aprovação ou a venda. Nenhuma nota é prometida: a plataforma mede o desempenho depois, com método próprio, e até lá aparece "sem avaliações ainda".
+Approval depends on the review. Never promise the date, the approval or sales. No rating is promised: the platform measures performance later, with its own method, and until then it shows "no reviews yet".
 
-## Versões
+## Versions
 
-- A versão é `MAJOR.MINOR.PATCH`. A nova precisa ser **maior** que a publicada (`MANIFEST_VERSION_NOT_GREATER`).
-- **MAJOR** (2.0.0): mudou `tools`, `onboarding`, `requirements` ou a estrutura das etapas.
-- **MINOR** (1.1.0): conteúdo novo (mais conhecimento, nova etapa opcional dentro da mesma estrutura).
-- **PATCH** (1.0.1): correções.
-- **Toda versão passa pela revisão completa**, com a diferença de todos os arquivos. Não existe atalho para "mudança pequena".
-- Cada versão precisa de uma entrada em `versions[]` com data e nota do que mudou.
-- Sessões abertas da versão antiga pedem para reativar ao usar de novo.
+- The version is `MAJOR.MINOR.PATCH`. The new one must be **greater** than the published one (`MANIFEST_VERSION_NOT_GREATER`).
+- **MAJOR** (2.0.0): `tools`, `onboarding`, `requirements` or the structure of the steps changed.
+- **MINOR** (1.1.0): new content (more knowledge, a new optional step within the same structure).
+- **PATCH** (1.0.1): fixes.
+- **Every version goes through full review**, with the diff of all files. There is no shortcut for a "small change".
+- Each version needs an entry in `versions[]` with a date and a note on what changed.
+- Open sessions on the old version ask to reactivate when used again.
 
-## Alteração direta fora da revisão
+## Direct changes outside review
 
-Mudar preço ou versão diretamente fora do fluxo do site não faz efeito no que é servido: o servidor continua entregando a versão aprovada e **bloqueia a venda** até a diferença ser resolvida. Use sempre o fluxo do site.
+Changing the price or version directly outside the site flow has no effect on what is served: the server keeps delivering the approved version and **blocks sales** until the difference is resolved. Always use the site flow.
 
-## Suspensão e retirada
+## Suspension and withdrawal
 
-A plataforma pode **suspender** um Solver na hora (por abuso, direitos, segurança): ele para de responder, inclusive para quem já comprou. O criador também pode retirar o Solver e reativá-lo depois. Em caso de dúvida sobre direitos ou segurança, a suspensão vem antes da discussão.
+The platform can **suspend** a Solver immediately (for abuse, rights or security reasons): it stops responding, including for those who have already bought it. The creator can also withdraw the Solver and reactivate it later. If there is doubt about rights or security, suspension comes before discussion.
 
-## Dinheiro
+## Money
 
-A compra da licença paga o criador no ato. Por isso a revisão é completa e o Solver pode ser desligado a qualquer momento. As regras de reembolso e de contestação fazem parte dos termos do criador.
+Buying the license pays the creator immediately. That is why review is full and the Solver can be switched off at any time. The refund and dispute rules are part of the creator terms.
 
-## Depois de publicado
+## After publication
 
-- Mantenha a base atualizada dentro do prazo de `reviewEveryDays`. Conteúdo vencido gera avisos e derruba o diferencial `liveData`.
-- Se mudar a base, suba a versão (MINOR ou PATCH) e envie de novo.
-- Responda aos pedidos de ajuda, se declarou `escalation`.
-- Se a média das avaliações ficar abaixo de 3,5 depois de 10 avaliações, o Solver sai da vitrine até a correção.
+- Keep the knowledge base current within the `reviewEveryDays` window. Expired content raises warnings and takes down the `liveData` differentiator.
+- If you change the base, bump the version (MINOR or PATCH) and submit again.
+- Answer help requests, if you declared `escalation`.
+- If the average rating falls below 3.5 after 10 reviews, the Solver leaves the storefront until it is fixed.

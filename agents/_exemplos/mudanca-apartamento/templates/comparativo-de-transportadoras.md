@@ -1,31 +1,31 @@
-# Comparativo de transportadoras
+# Moving company comparison
 
-Preencha só com o que cada empresa informou por escrito. Onde faltar resposta, escreva "perguntar". Não use valores que a empresa não tenha enviado.
+Fill in only what each company stated in writing. Where an answer is missing, write "ask". Do not use amounts the company did not send.
 
-| Item | Empresa A | Empresa B | Empresa C |
+| Item | Company A | Company B | Company C |
 |---|---|---|---|
-| Valor total informado | | | |
-| Data e janela de horário | | | |
-| Tamanho do veículo e número de ajudantes | | | |
-| Inclui embalagem? | | | |
-| Inclui desmontagem e montagem? | | | |
-| Taxa por andar sem elevador ou por espera | | | |
-| Seguro: o que cobre e qual o limite | | | |
-| Sinal e forma de pagamento | | | |
-| Cancelamento e atraso (o que a proposta diz) | | | |
-| Proposta por escrito recebida? | | | |
+| Total price quoted | | | |
+| Date and time window | | | |
+| Vehicle size and number of helpers | | | |
+| Includes packing? | | | |
+| Includes disassembly and assembly? | | | |
+| Fee per floor without an elevator or for waiting | | | |
+| Insurance: what it covers and the limit | | | |
+| Deposit and payment method | | | |
+| Cancellation and delay (what the quote says) | | | |
+| Written quote received? | | | |
 
-## O que o menor preço não inclui
+## What the lowest price does not include
 
-Liste, para a proposta mais barata, o que ficou de fora e some uma estimativa dos itens que o usuário vai precisar contratar à parte (marque como "estimado pelo usuário").
+For the cheapest quote, list what was left out and add an estimate of the items the user will need to hire separately (mark them as "estimated by the user").
 
-## Recomendação e motivo
+## Recommendation and reason
 
-Uma frase: qual proposta parece mais adequada e por quê. A decisão é do usuário.
+One sentence: which quote seems most suitable and why. The decision is the user's.
 
-## Antes de fechar
+## Before signing
 
-- [ ] Proposta e inventário por escrito
-- [ ] Nome completo da empresa e telefone do responsável pela equipe
-- [ ] Seguro e cancelamento entendidos
-- [ ] Condomínios avisados do dia e do horário
+- [ ] Quote and inventory in writing
+- [ ] Full name of the company and phone number of the person in charge of the crew
+- [ ] Insurance and cancellation understood
+- [ ] Building administrations at both ends told the day and the time

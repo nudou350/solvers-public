@@ -2,9 +2,9 @@
   "specVersion": 1,
   "id": "c71ad0a50f750e75c71ad0a50f750e75",
   "slug": "criador-de-solvers",
-  "name": "Criador de Solvers",
-  "tagline": "Transforme o que você sabe em um Solver completo e válido, passo a passo",
-  "description": "O Solver gratuito da plataforma que guia qualquer pessoa a montar um pacote Solver excelente com a própria IA (Claude Code, Claude ou ChatGPT). Em 7 etapas ele ajuda você a definir a promessa e o público, escolher os diferenciais, escrever o processo com checklists, organizar o conhecimento com fonte e data, planejar a calibragem do primeiro uso e montar os casos de teste. No meio do caminho ele consulta o validador do servidor, que aponta cada erro e como corrigir, e no fim entrega o ZIP pronto para publicar pelo site, onde uma pessoa da equipe revisa em até 5 dias úteis. Não escreve o seu conhecimento por você, não promete nota nem aprovação, e não aceita pacotes de finanças, jurídico ou saúde nesta fase.",
+  "name": "Solver Creator",
+  "tagline": "Turn what you know into a complete, valid Solver, step by step",
+  "description": "The platform's free Solver that guides anyone to build an excellent Solver package with their own AI (Claude Code, Claude or ChatGPT). In 7 steps it helps you define the promise and the audience, choose the differentiators, write the process with checklists, organize knowledge with source and date, plan the first-use calibration and build the test cases. Along the way it queries the server validator, which points out each error and how to fix it, and at the end it hands you the ZIP ready to publish through the site, where a team member reviews it within 5 business days. It does not write your knowledge for you, does not promise a rating or approval, and does not accept Finance, Legal or health packages in this phase.",
   "category": "Outros",
   "version": "1.0.0",
   "platform": true,
@@ -12,112 +12,112 @@
   "creator": {
     "id": "solvers",
     "name": "Solvers",
-    "bio": "Equipe da plataforma Solvers. Mantém o formato do pacote, o validador e a revisão dos Solvers publicados.",
+    "bio": "The Solvers platform team. It maintains the package format, the validator and the review of published Solvers.",
     "avatarUrl": null
   },
   "terms": { "rightsConfirmed": true, "sourcesListed": true },
   "requirements": [
-    { "type": "client", "label": "Claude, ChatGPT ou Claude Code", "key": "any" }
+    { "type": "client", "label": "Claude, ChatGPT or Claude Code", "key": "any" }
   ],
   "packageContents": [
-    "Método em 7 etapas, da promessa ao ZIP pronto, com checklist em cada uma",
-    "Validador do pacote que aponta cada erro, o caminho e como corrigir",
-    "Base de conhecimento com o formato do pacote, os códigos de erro e boas práticas por tipo de Solver",
-    "Dois pacotes de exemplo completos, um mínimo e um mais rico",
-    "Modelos prontos: manifesto, etapa, conhecimento, caso de teste, calibragem, README do revisor e checklist de envio",
-    "Memória do seu nível e do tipo de Solver que você quer criar, entre sessões"
+    "A 7-step method, from the promise to a ready ZIP, with a checklist in each step",
+    "A package validator that points out each error, its path and how to fix it",
+    "A knowledge base with the package format, the error codes and best practices by type of Solver",
+    "Two complete example packages, a minimal one and a richer one",
+    "Ready-made templates: manifest, step, knowledge, test case, calibration, reviewer README and submission checklist",
+    "Memory of your level and of the type of Solver you want to create, between sessions"
   ],
   "steps": [
     {
       "file": "steps/01-promessa-e-publico.md",
-      "title": "Promessa e público",
+      "title": "Promise and audience",
       "gate": [
-        "Perfil do criador consultado e usado para ajustar o nível da conversa",
-        "Promessa em uma frase (o que resolve e para quem) aprovada pelo usuário",
-        "Pelo menos 3 itens do que o Solver NÃO faz definidos",
-        "Categoria escolhida entre as permitidas a criadores novos (sem Finanças, Jurídico e saúde)",
-        "tagline, description e pelo menos 8 searchPhrases rascunhadas dentro dos limites"
+        "Creator profile checked and used to adjust the level of the conversation",
+        "Promise in one sentence (what it solves and for whom) approved by the user",
+        "At least 3 items that the Solver does NOT do defined",
+        "Category chosen among those allowed to new creators (no Finance, Legal or health)",
+        "tagline, description and at least 8 searchPhrases drafted within the limits"
       ]
     },
     {
       "file": "steps/02-diferenciais.md",
-      "title": "Diferenciais e como prová-los",
+      "title": "Differentiators and how to prove them",
       "gate": [
-        "Pelo menos 2 diferenciais escolhidos entre memory, liveData e escalation",
-        "Para cada diferencial, a prova que o revisor vai conferir está anotada",
-        "O usuário entendeu que ferramenta e verificação automática ficam para a Abertura",
-        "Se escalation: o usuário confirmou que atende e vai vincular o Telegram no perfil",
-        "Se liveData: quem atualiza, com que frequência e a data de revisão definidas"
+        "At least 2 differentiators chosen among memory, liveData and escalation",
+        "For each differentiator, the proof the reviewer will check is written down",
+        "The user understood that tools and automatic verification are left for the Opening phase",
+        "If escalation: the user confirmed they will respond and will link Telegram on their profile",
+        "If liveData: who updates it, how often, and the review date defined"
       ]
     },
     {
       "file": "steps/03-processo-e-gates.md",
-      "title": "Processo e gates",
+      "title": "Process and gates",
       "gate": [
-        "3 a 6 etapas definidas, cada uma com objetivo e saída verificável",
-        "Cada arquivo de etapa tem as 5 seções e entre 400 e 12.000 caracteres",
-        "Cada etapa tem de 3 a 6 itens de gate objetivos",
-        "Se memory foi escolhido, pelo menos uma etapa cita e usa o perfil do usuário",
-        "validate_package rodado sem erro nas etapas e no manifesto"
+        "3 to 6 steps defined, each with a goal and a verifiable output",
+        "Each step file has the 5 sections and between 400 and 12,000 characters",
+        "Each step has 3 to 6 objective gate items",
+        "If memory was chosen, at least one step mentions and uses the user's profile",
+        "validate_package run with no errors in the steps and the manifest"
       ]
     },
     {
       "file": "steps/04-conhecimento.md",
-      "title": "Conhecimento com fonte, data e direitos",
+      "title": "Knowledge with source, date and rights",
       "gate": [
-        "Fontes listadas e direitos de uso confirmados pelo usuário",
-        "Cada arquivo .md tem front-matter com source e source_date (AAAA-MM-DD)",
-        "PDFs, páginas e planilhas convertidos em .md por títulos, com seções de 200 a 2.000 caracteres",
-        "Conteúdo que perde a validade tem valid_until",
-        "Nenhum dado pessoal, senha ou texto copiado sem permissão",
-        "Tamanhos dentro dos limites: arquivo até 10 MB e ZIP até 50 MB"
+        "Sources listed and rights of use confirmed by the user",
+        "Each .md file has front-matter with source and source_date (YYYY-MM-DD)",
+        "PDFs, pages and spreadsheets converted into .md by headings, with sections of 200 to 2,000 characters",
+        "Content that expires has valid_until",
+        "No personal data, passwords or text copied without permission",
+        "Sizes within the limits: file up to 10 MB and ZIP up to 50 MB"
       ]
     },
     {
       "file": "steps/05-ferramentas-e-verificacao.md",
-      "title": "Ferramentas e verificação",
+      "title": "Tools and verification",
       "gate": [
-        "O usuário entendeu que, no Núcleo, o pacote não leva tools, verificador nem garantia",
-        "Plano de ferramentas futuras registrado (nome, entrada, saída e motivo) ou a palavra nenhuma",
-        "Verificação substituta definida: gates objetivos, modelos e casos de teste",
-        "Manifesto sem tools e com guarantee.available igual a false"
+        "The user understood that, in the Core phase, the package carries no tools, verifier or guarantee",
+        "Plan for future tools recorded (name, input, output and reason) or the word none",
+        "Substitute verification defined: objective gates, templates and test cases",
+        "Manifest without tools and with guarantee.available equal to false"
       ]
     },
     {
       "file": "steps/06-calibragem-e-memoria.md",
-      "title": "Calibragem e memória",
+      "title": "Calibration and memory",
       "gate": [
-        "De 1 a 5 perguntas de calibragem com id, ask, why e, se fechadas, de 2 a 6 opções",
-        "Nenhuma pergunta pede dado sensível",
-        "Separado o que vira perfil (preferência durável) do que fica de fora; notas só a pedido do usuário",
-        "Etapas ajustadas para usar o perfil e usesMemory igual a true no manifesto",
-        "Comportamento de quem pula as perguntas definido"
+        "1 to 5 calibration questions with id, ask, why and, if closed, 2 to 6 options",
+        "No question asks for sensitive data",
+        "What becomes the profile (a lasting preference) separated from what stays out; notes only on the user's request",
+        "Steps adjusted to use the profile and usesMemory equal to true in the manifest",
+        "Behavior for someone who skips the questions defined"
       ]
     },
     {
       "file": "steps/07-evals-e-empacotamento.md",
-      "title": "Casos de teste e ZIP pronto",
+      "title": "Test cases and ready ZIP",
       "gate": [
-        "10 ou mais casos de teste (meta: 12) com checagens que testam de verdade",
-        "validate_package sem erro, com os avisos que restaram justificados",
-        "ZIP com 1 pasta raiz contendo manifest.json, só .json, .md e .txt, sem lixo de sistema",
-        "Validação do ZIP inteiro feita (script) ou o usuário sabe que o site valida de novo no envio",
-        "README.md do revisor e checklist de pré-envio preenchidos",
-        "Usuário sabe que o envio é em /criador/publicar e que a revisão humana leva até 5 dias úteis"
+        "10 or more test cases (target: 12) with checks that really test something",
+        "validate_package with no errors, and the remaining warnings justified",
+        "ZIP with 1 root folder containing manifest.json, only .json, .md and .txt, no system junk",
+        "Whole-ZIP validation done (script) or the user knows the site validates again on submission",
+        "Reviewer README.md and pre-submission checklist filled in",
+        "The user knows that submission is at /creator/publish and that human review takes up to 5 business days"
       ]
     }
   ],
   "tools": [
     {
       "name": "validate_package",
-      "description": "Valida o manifesto e as etapas de um pacote Solver com as regras de criadores novos (specVersion 1). Entrada: manifest (o manifest.json como objeto), steps (lista de { file, content } com o texto de cada etapa) e, opcionais, files (lista de { path, size } com todos os arquivos do pacote), knowledge (lista de { path, head } com as primeiras linhas de cada arquivo de conhecimento), templates (lista de { path, content }) e evals (lista de { path, content }). Saída: ok, errors e warnings (cada um com code, path, message e fix), stats e summary. Use nas etapas 3 e 7. Não valida o ZIP inteiro: isso acontece no script e no envio pelo site.",
+      "description": "Validates the manifest and the steps of a Solver package with the rules for new creators (specVersion 1). Input: manifest (the manifest.json as an object), steps (a list of { file, content } with the text of each step) and, optionally, files (a list of { path, size } with all the package's files), knowledge (a list of { path, head } with the first lines of each knowledge file), templates (a list of { path, content }) and evals (a list of { path, content }). Output: ok, errors and warnings (each with code, path, message and fix), stats and summary. Use it in steps 3 and 7. It does not validate the whole ZIP: that happens in the script and on submission through the site.",
       "runner": "builtin:validate-package",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
         "required": ["manifest", "steps"],
         "properties": {
-          "manifest": { "type": "object", "description": "Conteúdo do manifest.json já convertido em objeto" },
+          "manifest": { "type": "object", "description": "Content of manifest.json already converted into an object" },
           "steps": {
             "type": "array",
             "maxItems": 12,
@@ -126,8 +126,8 @@
               "additionalProperties": false,
               "required": ["file", "content"],
               "properties": {
-                "file": { "type": "string", "maxLength": 200, "description": "Caminho da etapa, como no manifesto (ex.: steps/01-nome.md)" },
-                "content": { "type": "string", "maxLength": 60000, "description": "Texto completo da etapa" }
+                "file": { "type": "string", "maxLength": 200, "description": "Path of the step, as in the manifest (e.g. steps/01-name.md)" },
+                "content": { "type": "string", "maxLength": 60000, "description": "Full text of the step" }
               }
             }
           },
@@ -153,7 +153,7 @@
               "required": ["path", "head"],
               "properties": {
                 "path": { "type": "string", "maxLength": 300 },
-                "head": { "type": "string", "maxLength": 4000, "description": "Primeiras linhas do arquivo, incluindo o front-matter" }
+                "head": { "type": "string", "maxLength": 4000, "description": "First lines of the file, including the front-matter" }
               }
             }
           },
@@ -223,39 +223,39 @@
     }
   ],
   "templates": [
-    { "name": "manifest-esqueleto", "path": "templates/manifest-esqueleto.json", "title": "Esqueleto do manifest.json (v1)", "description": "Manifesto completo e válido para criador novo, com tudo o que precisa ser trocado marcado" },
-    { "name": "etapa-modelo", "path": "templates/etapa-modelo.md", "title": "Etapa com as 5 seções", "description": "Modelo de arquivo de etapa para a IA, com as seções e o gate" },
-    { "name": "conhecimento-front-matter", "path": "templates/conhecimento-front-matter.md", "title": "Arquivo de conhecimento com front-matter", "description": "Cabeçalho com fonte, data e validade e a estrutura por títulos" },
-    { "name": "caso-de-eval", "path": "templates/caso-de-eval.json", "title": "Caso de teste (eval)", "description": "Caso com entrada e checagens contains, regex e not_contains" },
-    { "name": "pergunta-de-calibragem", "path": "templates/pergunta-de-calibragem.json", "title": "Perguntas de calibragem", "description": "Bloco onboarding com perguntas abertas e fechadas" },
-    { "name": "readme-do-revisor", "path": "templates/readme-do-revisor.md", "title": "README para o revisor", "description": "Nota ao revisor: o que o pacote promete, como provar e onde olhar" },
-    { "name": "checklist-pre-envio", "path": "templates/checklist-pre-envio.md", "title": "Checklist de pré-envio", "description": "Conferência final antes de subir o ZIP no site" }
+    { "name": "manifest-esqueleto", "path": "templates/manifest-esqueleto.json", "title": "manifest.json skeleton (v1)", "description": "A complete, valid manifest for a new creator, with everything that needs replacing marked" },
+    { "name": "etapa-modelo", "path": "templates/etapa-modelo.md", "title": "Step with the 5 sections", "description": "A step file template for the AI, with the sections and the gate" },
+    { "name": "conhecimento-front-matter", "path": "templates/conhecimento-front-matter.md", "title": "Knowledge file with front-matter", "description": "A header with source, date and validity, and the structure by headings" },
+    { "name": "caso-de-eval", "path": "templates/caso-de-eval.json", "title": "Test case (eval)", "description": "A case with an input and contains, regex and not_contains checks" },
+    { "name": "pergunta-de-calibragem", "path": "templates/pergunta-de-calibragem.json", "title": "Calibration questions", "description": "An onboarding block with open and closed questions" },
+    { "name": "readme-do-revisor", "path": "templates/readme-do-revisor.md", "title": "README for the reviewer", "description": "A note to the reviewer: what the package promises, how to prove it and where to look" },
+    { "name": "checklist-pre-envio", "path": "templates/checklist-pre-envio.md", "title": "Pre-submission checklist", "description": "A final check before uploading the ZIP to the site" }
   ],
   "onboarding": {
     "questions": [
       {
         "id": "nivel",
-        "ask": "Você já criou algo parecido (curso, guia, skill, prompt) ou é a primeira vez?",
-        "why": "Define o quanto eu explico e o quanto eu faço por você",
-        "options": ["Primeira vez", "Já fiz algo parecido", "Já publiquei um produto digital"]
+        "ask": "Have you built something similar before (a course, guide, skill, prompt), or is this your first time?",
+        "why": "Sets how much I explain and how much I do for you",
+        "options": ["First time", "I've built something similar", "I've published a digital product"]
       },
       {
         "id": "tipo_solver",
-        "ask": "Que tipo de Solver você quer criar?",
-        "why": "Cada tipo pede um processo e um conhecimento diferentes",
-        "options": ["Técnico ou código", "Conteúdo e marketing", "Consultivo com regras de negócio", "Planejamento ou viagem", "Análise de dados", "Ainda não sei"]
+        "ask": "What type of Solver do you want to create?",
+        "why": "Each type needs a different process and different knowledge",
+        "options": ["Technical or code", "Content and marketing", "Consultative with business rules", "Planning or travel", "Data analysis", "Not sure yet"]
       },
       {
         "id": "onde_roda",
-        "ask": "Em qual IA você vai montar o pacote: Claude Code, Claude ou ChatGPT?",
-        "why": "Muda a forma como entrego os arquivos e o ZIP no final",
-        "options": ["Claude Code", "Claude (site ou app)", "ChatGPT", "Outra"]
+        "ask": "Which AI will you build the package in: Claude Code, Claude or ChatGPT?",
+        "why": "Changes how I hand over the files and the ZIP at the end",
+        "options": ["Claude Code", "Claude (website or app)", "ChatGPT", "Other"]
       },
       {
         "id": "material_fonte",
-        "ask": "Você já tem material-fonte (PDFs, planilhas, textos, anotações) ou começa do zero?",
-        "why": "Decide se começamos pela coleta ou pela conversão do que você já tem",
-        "options": ["Tenho material pronto", "Tenho um pouco", "Começo do zero"]
+        "ask": "Do you already have source material (PDFs, spreadsheets, texts, notes), or are you starting from scratch?",
+        "why": "Decides whether we start by gathering or by converting what you already have",
+        "options": ["I have material ready", "I have a little", "Starting from scratch"]
       }
     ]
   },
@@ -265,49 +265,49 @@
     "updatedAt": "2026-10-02",
     "reviewEveryDays": 90,
     "sources": [
-      "Especificação do pacote Solver v1 (PACKAGE_SPEC)",
-      "Validador de pacotes da plataforma Solvers",
-      "Regras de revisão e publicação da plataforma Solvers"
+      "Solver package specification v1 (PACKAGE_SPEC)",
+      "The Solvers platform package validator",
+      "The Solvers platform review and publication rules"
     ]
   },
   "guarantee": { "available": false, "defaultCriteria": [] },
   "pricing": { "priceUsdc": 0, "royaltyBps": 0 },
   "searchPhrases": [
-    "criar um Solver",
-    "montar um especialista de IA para vender",
-    "transformar meu conhecimento em produto",
-    "publicar meu Solver na plataforma",
-    "criar uma skill ou agente para vender",
-    "empacotar minha experiência em um assistente de IA",
-    "como criar meu próprio especialista",
-    "montar o pacote do meu Solver",
-    "validar o pacote do meu Solver",
-    "virar criador na plataforma Solvers",
-    "transformar meu método de trabalho em IA",
-    "criar um GPT ou Claude especialista",
-    "gerar o ZIP do meu Solver",
-    "escrever as etapas do meu especialista",
-    "casos de teste para o meu especialista",
-    "converter PDF em base de conhecimento para IA",
-    "perguntas de calibragem do primeiro uso"
+    "create a Solver",
+    "build an AI specialist to sell",
+    "turn my knowledge into a product",
+    "publish my Solver on the platform",
+    "create a skill or agent to sell",
+    "package my experience into an AI assistant",
+    "how to create my own AI specialist",
+    "build my Solver package",
+    "validate my Solver package",
+    "become a creator on the Solvers platform",
+    "turn my way of working into an AI",
+    "create a custom GPT or Claude specialist",
+    "generate the ZIP for my Solver",
+    "write the steps for my specialist",
+    "test cases for my AI specialist",
+    "convert a PDF into an AI knowledge base",
+    "first-use calibration questions"
   ],
   "beforeAfter": [
     {
-      "prompt": "Quero criar um Solver sobre fechamento de MEI e vender. Como faço?",
-      "withoutSolver": "Ótima ideia! Escreva um prompt bem detalhado explicando as regras do MEI, peça para a IA agir como contador e publique em algum lugar. Dica: capriche nas instruções e teste com alguns exemplos.",
-      "withSolver": "Antes do texto, a promessa: o que o seu Solver resolve e para quem? Proponho: 'fechar o mês do MEI sem erro: limite, DAS e relatório'. Depois escolhemos pelo menos 2 diferenciais que o revisor consegue conferir (por exemplo, base com fonte e data para os valores do DAS e uma calibragem que pergunta a atividade do MEI). Em seguida escrevemos 3 etapas com checklist, a base de conhecimento com source e source_date, 10 casos de teste e rodamos o validador, que aponta cada erro e como corrigir. No fim você recebe o ZIP pronto para publicar; uma pessoa da equipe revisa em até 5 dias úteis. Como o conteúdo é fiscal, ele precisa de ressalva clara de conferir no portal oficial. Você já tem o material (leis, tabelas, anotações) ou começamos a coletar?"
+      "prompt": "I want to create a Solver about closing the month for a Brazilian MEI (micro-entrepreneur) and sell it. How do I do it?",
+      "withoutSolver": "Great idea! Write a really detailed prompt explaining the MEI rules, ask the AI to act as an accountant and publish it somewhere. Tip: put effort into the instructions and test with a few examples.",
+      "withSolver": "Before any text, the promise: what does your Solver solve and for whom? I propose: 'close the month for a Brazilian MEI without mistakes: limit, DAS (the monthly tax slip) and report'. Then we choose at least 2 differentiators the reviewer can check (for example, a knowledge base with source and date for the DAS values and a calibration that asks the MEI's activity). Next we write 3 steps with a checklist, the knowledge base with source and source_date, 10 test cases and run the validator, which points out each error and how to fix it. At the end you get the ZIP ready to publish; a team member reviews it within 5 business days. Since the content is tax-related, it needs a clear reminder to check the official portal. Do you already have the material (laws, tables, notes) or do we start collecting it?"
     },
     {
-      "prompt": "Tenho um PDF de 60 páginas com o meu método. Já posso subir como está?",
-      "withoutSolver": "Pode tentar subir o PDF. Se der problema, converta para outro formato.",
-      "withSolver": "Ainda não: nesta fase o pacote só aceita .md e .txt (PDF entra mais para a frente). Eu converto o PDF aqui, na sua IA, em arquivos .md curtos, divididos por títulos, cada um com source (de onde veio), source_date (a data da fonte) e, se vencer, valid_until. Antes, confirme que você tem direito de usar o conteúdo: material de terceiros sem permissão não passa na revisão. Quer começar pelos 3 capítulos mais importantes e depois seguimos?"
+      "prompt": "I have a 60-page PDF with my method. Can I upload it as it is?",
+      "withoutSolver": "You can try uploading the PDF. If there is a problem, convert it to another format.",
+      "withSolver": "Not yet: in this phase the package only accepts .md and .txt (PDF comes later). I convert the PDF here, in your AI, into short .md files split by headings, each with source (where it came from), source_date (the date of the source) and, if it expires, valid_until. First, confirm that you have the right to use the content: third-party material without permission does not pass review. Want to start with the 3 most important chapters and then keep going?"
     }
   ],
   "versions": [
     {
       "version": "1.0.0",
       "releasedAt": "2026-10-02T12:00:00Z",
-      "notes": "Primeira versão: método em 7 etapas, validador de pacote, base com formato, códigos de erro, boas práticas e dois exemplos completos, e modelos prontos."
+      "notes": "First version: a 7-step method, a package validator, a knowledge base with the format, error codes, best practices and two complete examples, and ready-made templates."
     }
   ]
 }

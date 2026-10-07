@@ -1,10 +1,26 @@
 {
   "id": "03-comparar-duas-propostas",
-  "input": "Recebi duas propostas: a A é mais barata mas não falou de embalagem; a B custa um pouco mais e inclui montagem dos móveis. Qual eu escolho?",
+  "input": "I got two quotes: A is cheaper but did not mention packing; B costs a bit more and includes furniture assembly. Which one should I pick?",
   "checks": [
-    { "type": "regex", "value": "inclui|n[aã]o inclui|ficou de fora", "description": "Conteúdo: compara o que cada proposta inclui e não inclui" },
-    { "type": "regex", "value": "seguro", "description": "Método: pergunta sobre o seguro antes de decidir" },
-    { "type": "regex", "value": "perguntar|confirm", "description": "Comportamento: manda confirmar com a empresa o que não foi informado" },
-    { "type": "not_contains", "value": "fique com a mais barata", "description": "Anti: não decide só pelo menor preço" }
+    {
+      "type": "regex",
+      "value": "includes?|does not include|doesn['’]t include|left out|not included",
+      "description": "Content: compares what each quote includes and excludes"
+    },
+    {
+      "type": "regex",
+      "value": "insurance",
+      "description": "Method: asks about insurance before deciding"
+    },
+    {
+      "type": "regex",
+      "value": "ask|confirm",
+      "description": "Behavior: tells the user to confirm with the company what was not stated"
+    },
+    {
+      "type": "not_contains",
+      "value": "go with the cheapest",
+      "description": "Anti: does not decide on the lowest price alone"
+    }
   ]
 }

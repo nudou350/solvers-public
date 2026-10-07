@@ -1,40 +1,40 @@
-# Nota ao revisor: NOME DO SOLVER (versão 1.0.0)
+# Note to the reviewer: SOLVER NAME (version 1.0.0)
 
-Este arquivo é só para a pessoa que revisa o pacote. Ele não chega ao comprador.
+This file is only for the person reviewing the package. It does not reach the buyer.
 
-## O que o Solver promete
+## What the Solver promises
 
-- Promessa em uma frase: TROQUE
-- Público: TROQUE
-- O que NÃO faz: TROQUE (3 itens ou mais)
-- Categoria escolhida e por quê: TROQUE (se o conteúdo é fiscal ou regulatório, onde está a ressalva)
+- Promise in one sentence: REPLACE
+- Audience: REPLACE
+- What it does NOT do: REPLACE (3 items or more)
+- Category chosen and why: REPLACE (if the content is tax-related or regulatory, where the disclaimer is)
 
-## Diferenciais e como conferir (pelo menos 2)
+## Differentiators and how to check them (at least 2)
 
-- liveData: arquivos em knowledge/ com source e source_date; manifesto com knowledge.updatedAt e reviewEveryDays; quem atualiza e quando: TROQUE
-- memory: onboarding com N perguntas; a etapa steps/0X usa o perfil para mudar: TROQUE
-- escalation: TROQUE (ou "não declarado")
+- liveData: files in knowledge/ with source and source_date; manifest with knowledge.updatedAt and reviewEveryDays; who updates and when: REPLACE
+- memory: onboarding with N questions; step steps/0X uses the profile to change: REPLACE
+- escalation: REPLACE (or "not declared")
 
-## Fontes e direitos
+## Sources and rights
 
-- Lista das fontes (nome, data, link) e quem é o autor ou tem a permissão: TROQUE
-- Material de terceiros usado e como a permissão foi obtida: TROQUE (ou "nenhum")
+- List of sources (name, date, link) and who is the author or holds the permission: REPLACE
+- Third-party material used and how permission was obtained: REPLACE (or "none")
 
-## Avisos do validador que restaram e por que
+## Validator warnings that remain and why
 
-- CODIGO_DO_AVISO em caminho/arquivo: justificativa TROQUE (ou "nenhum aviso")
+- WARNING_CODE at path/file: justification REPLACE (or "no warnings")
 
-## Plano para a Abertura (ferramentas e verificação)
+## Plan for the Opening phase (tools and verification)
 
-- Ferramenta futura 1: nome, o que faz, entrada, saída (ou "nenhuma")
+- Future tool 1: name, what it does, input, output (or "none")
 
-## Como testar rápido
+## How to test quickly
 
-- Pedido de exemplo 1 e o que se espera ver: TROQUE
-- Pedido de exemplo 2: TROQUE
-- Os casos de teste ficam em evals/cases (N casos); nenhuma nota foi criada.
+- Sample request 1 and what you should expect to see: REPLACE
+- Sample request 2: REPLACE
+- The test cases are in evals/cases (N cases); no score was created.
 
-## Atenção do criador
+## Creator's attention points
 
-- Onde o revisor deve olhar com mais cuidado: TROQUE
-- Contato para dúvidas: o que consta no perfil do criador na plataforma.
+- Where the reviewer should look more carefully: REPLACE
+- Contact for questions: what is on the creator's profile on the platform.

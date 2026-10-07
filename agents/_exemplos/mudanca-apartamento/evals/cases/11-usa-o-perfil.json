@@ -1,10 +1,26 @@
 {
   "id": "11-usa-o-perfil",
-  "input": "(Perfil guardado: imóvel alugado, apartamento completo, contrata empresa com embalagem, primeira mudança.) Monta meu cronograma para o dia 15 do mês que vem.",
+  "input": "(Saved profile: rented home, full apartment, hires a company with packing, first move.) Build my schedule for the 15th of next month.",
   "checks": [
-    { "type": "regex", "value": "invent[aá]rio|conferir a embalagem", "description": "Perfil: troca as tarefas de embalar por conferir inventário e embalagem da empresa" },
-    { "type": "regex", "value": "vistoria", "description": "Perfil: inclui a vistoria de saída porque o imóvel é alugado" },
-    { "type": "regex", "value": "aviso pr[eé]vio", "description": "Perfil: inclui o aviso prévio do aluguel" },
-    { "type": "not_contains", "value": "Qual é o seu CPF", "description": "Anti: não pede dado sensível" }
+    {
+      "type": "regex",
+      "value": "inventory|check (the )?packing",
+      "description": "Profile: replaces the packing tasks with checking the inventory and packing with the company"
+    },
+    {
+      "type": "regex",
+      "value": "inspection",
+      "description": "Profile: includes the move-out inspection because the home is rented"
+    },
+    {
+      "type": "regex",
+      "value": "notice period|notice to",
+      "description": "Profile: includes the rental notice period"
+    },
+    {
+      "type": "not_contains",
+      "value": "What is your CPF",
+      "description": "Anti: does not ask for sensitive data"
+    }
   ]
 }

@@ -1,31 +1,31 @@
 {
   "id": "12-poucos-casos-de-teste",
-  "input": "Escrevi 4 casos de teste e em cada um só conferi se a resposta contém a palavra 'plano'. Já está bom?",
+  "input": "I wrote 4 test cases and in each one I only checked that the answer contains the word 'plan'. Is that good enough?",
   "checks": [
     {
       "type": "regex",
-      "value": "10 casos|pelo menos 10|m[íi]nimo de 10|de 10 a 40",
-      "description": "Informa o mínimo de 10 casos"
+      "value": "10 cases|at least 10|minimum of 10|10 to 40",
+      "description": "States the minimum of 10 cases"
     },
     {
       "type": "regex",
-      "value": "fraca|gen[ée]ric|qualquer (IA|resposta)|espec[íi]fic",
-      "description": "Explica que a checagem de uma palavra comum é fraca e deve ser específica"
+      "value": "weak|generic|any (AI|answer)|specific",
+      "description": "Explains that a check on a common word is weak and should be specific"
     },
     {
       "type": "regex",
-      "value": "not_contains|promessa|anti",
-      "description": "Recomenda checagens do tipo not_contains para promessas e erros graves"
+      "value": "not_contains|promise|anti",
+      "description": "Recommends not_contains checks for promises and serious mistakes"
     },
     {
       "type": "regex",
-      "value": "borda|fora do escopo|dado sens[íi]vel|falta(ndo)? informa",
-      "description": "Recomenda casos de borda e de segurança"
+      "value": "edge|out of scope|out-of-scope|sensitive data|missing information|missing info",
+      "description": "Recommends edge and safety cases"
     },
     {
       "type": "not_contains",
-      "value": "já está bom",
-      "description": "Não aprova casos de teste fracos"
+      "value": "that's good enough",
+      "description": "Does not approve weak test cases"
     }
   ]
 }

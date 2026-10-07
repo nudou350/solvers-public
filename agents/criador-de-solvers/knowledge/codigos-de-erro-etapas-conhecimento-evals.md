@@ -1,68 +1,68 @@
 ---
-title: Códigos de erro do validador (etapas, conhecimento, modelos, ferramentas, testes) e como corrigir
-source: Catálogo de códigos de validação da plataforma Solvers (Apêndice A da especificação v1)
+title: Validator error codes (steps, knowledge, templates, tools, tests) and how to fix them
+source: Catalog of validation codes of the Solvers platform (Appendix A of the v1 specification)
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [erros, validador, etapas, conhecimento, evals]
+tags: [errors, validator, steps, knowledge, evals]
 ---
 
-# Códigos de erro do validador (etapas, conhecimento, modelos, ferramentas, testes) e como corrigir
+# Validator error codes (steps, knowledge, templates, tools, tests) and how to fix them
 
-Cada resposta do validador traz `code`, `path`, `message` e `fix`. Erro (E) bloqueia; aviso (A) vai ao revisor.
+Each validator response carries `code`, `path`, `message` and `fix`. An error (E) blocks; a warning (A) goes to the reviewer.
 
-## Etapas
+## Steps
 
-- `STEP_FILE_MISSING` (E): o manifesto declara uma etapa cujo arquivo não existe. Crie o arquivo ou corrija o caminho.
-- `STEP_SECTION_MISSING` (E em specVersion 1 para Objetivo, Como executar e Formato do result_summary; aviso para as outras duas): falta uma seção. Acrescente a linha `## Título` com o nome exato.
-- `STEP_TOO_SHORT_LONG` (E): etapa fora de 400 a 12.000 caracteres. Detalhe ou divida.
-- `GATE_TOO_MANY` (E): gate com mais de 6 itens. Reduza e agrupe.
-- `GATE_EVIDENCE_UNKNOWN_TOOL` (E): gate com evidência de uma ferramenta que não existe. Nesta fase use só gates de texto (sem `evidence`).
-- `STEP_REFERENCE_UNKNOWN` (A): a etapa cita, junto de `run_tool` ou da palavra ferramenta, um nome que não existe em `tools`. Corrija o nome, retire a menção (terceiros não têm ferramentas) ou use uma tool do conector.
-- `STEP_SENSITIVE_ASK` (A): a etapa manda pedir dado sensível. Reescreva para pedir faixas, exemplos fictícios ou orientar o usuário a fazer ele mesmo.
-- `STEP_EXTERNAL_URL` (A): endereço de internet junto de verbo de envio, ou com parâmetros. Retire; etapa não manda dados para fora.
-- `STEP_INJECTION_PATTERN` (A): trecho que parece mandar a IA descartar regras, esconder algo do usuário ou agir como sistema. Reescreva sem isso.
-- `TEXT_HIDDEN_CHARS` (A): caractere invisível ou de direção. Apague e digite de novo o trecho.
+- `STEP_FILE_MISSING` (E): the manifest declares a step whose file does not exist. Create the file or fix the path.
+- `STEP_SECTION_MISSING` (E in specVersion 1 for Goal, How to run and result_summary format; a warning for the other two): a section is missing. Add the line `## Title` with the exact name (the section titles are the English standard: `Goal`, `What to ask the user`, `How to run`, `Common mistakes`, `result_summary format`; the old Portuguese titles `Objetivo`, `O que perguntar ao usuário`, `Como executar`, `Erros comuns`, `Formato do result_summary` are still accepted for older packages).
+- `STEP_TOO_SHORT_LONG` (E): step outside 400 to 12,000 characters. Add detail or split it.
+- `GATE_TOO_MANY` (E): a gate with more than 6 items. Reduce and group.
+- `GATE_EVIDENCE_UNKNOWN_TOOL` (E): a gate with evidence from a tool that does not exist. In this phase use text gates only (no `evidence`).
+- `STEP_REFERENCE_UNKNOWN` (W): the step mentions, next to `run_tool` or the word "ferramenta" (tool), a name that does not exist in `tools`. Fix the name, remove the mention (third parties have no tools) or use a connector tool.
+- `STEP_SENSITIVE_ASK` (W): the step tells the AI to ask for sensitive data. Rewrite it to ask for ranges, made-up examples or to guide the user to do it themselves.
+- `STEP_EXTERNAL_URL` (W): an internet address next to a sending verb, or with parameters. Remove it; a step does not send data outside.
+- `STEP_INJECTION_PATTERN` (W): a passage that seems to tell the AI to discard rules, hide something from the user or pose as the system. Rewrite without it.
+- `TEXT_HIDDEN_CHARS` (W): an invisible or direction-control character. Delete and retype the passage.
 
-## Conhecimento
+## Knowledge
 
-- `KNOWLEDGE_SOURCE_MISSING` (E): arquivo sem `source` no front-matter (ou sem front-matter; `.txt` sem o `.meta.json`). Acrescente a fonte.
-- `KNOWLEDGE_DATE_INVALID` (E): `source_date`, `valid_until` ou `knowledge.updatedAt` fora de `AAAA-MM-DD` ou data inexistente. Escreva como 2026-09-30.
-- `KNOWLEDGE_FRONTMATTER_INVALID` (E): bloco `---` aberto e não fechado, linha que não é `chave: valor` ou chave repetida. Ajuste o cabeçalho.
-- `KNOWLEDGE_EXPIRED` (A): `valid_until` já passou. Atualize o arquivo e a data, ou remova.
-- `KNOWLEDGE_TOO_BIG` (E): mais de 10.000 trechos. Priorize o essencial.
-- `PDF_NO_TEXT` (E, reservado para a Abertura): PDF sem texto. Hoje PDF nem é aceito: converta para `.md`.
+- `KNOWLEDGE_SOURCE_MISSING` (E): a file without `source` in the front-matter (or without front-matter; a `.txt` without its `.meta.json`). Add the source.
+- `KNOWLEDGE_DATE_INVALID` (E): `source_date`, `valid_until` or `knowledge.updatedAt` outside `YYYY-MM-DD` or a nonexistent date. Write it like 2026-09-30.
+- `KNOWLEDGE_FRONTMATTER_INVALID` (E): a `---` block opened and not closed, a line that is not `key: value`, or a repeated key. Fix the header.
+- `KNOWLEDGE_EXPIRED` (W): `valid_until` has already passed. Update the file and the date, or remove it.
+- `KNOWLEDGE_TOO_BIG` (E): more than 10,000 excerpts. Prioritize the essentials.
+- `PDF_NO_TEXT` (E, reserved for the Opening phase): a PDF without text. Today a PDF is not even accepted: convert it to `.md`.
 
-## Modelos (templates)
+## Templates
 
-- `TEMPLATE_MISSING` (E): modelo declarado em `templates[]` cujo arquivo não existe. Crie ou corrija o caminho.
-- `TEMPLATE_UNDECLARED` (A): arquivo em `templates/` sem declaração; não será entregue. Declare em `templates[]` ou remova.
-- `TEMPLATE_TYPE_FORBIDDEN` (E): tipo que não vale nesta fase. Use `.md`, `.txt` ou `.json`.
+- `TEMPLATE_MISSING` (E): a template declared in `templates[]` whose file does not exist. Create it or fix the path.
+- `TEMPLATE_UNDECLARED` (W): a file in `templates/` without a declaration; it will not be delivered. Declare it in `templates[]` or remove it.
+- `TEMPLATE_TYPE_FORBIDDEN` (E): a type that is not valid in this phase. Use `.md`, `.txt` or `.json`.
 
-## Ferramentas (não valem para criador novo)
+## Tools (not valid for new creators)
 
-- `TOOL_FORBIDDEN_RUNNER` (E): o pacote tem uma ferramenta; criador novo não tem ferramentas nesta fase. Remova `tools` e registre o plano na etapa 5 do Criador.
-- `TOOL_SCHEMA_MISSING`, `TOOL_SCHEMA_UNSAFE`, `TOOL_HTTP_HOST`, `TOOL_EGRESS_MISSING`: erros de ferramentas por internet, só relevantes na Abertura.
+- `TOOL_FORBIDDEN_RUNNER` (E): the package has a tool; new creators have no tools in this phase. Remove `tools` and record the plan in step 5 of the Creator.
+- `TOOL_SCHEMA_MISSING`, `TOOL_SCHEMA_UNSAFE`, `TOOL_HTTP_HOST`, `TOOL_EGRESS_MISSING`: errors for tools over the internet, only relevant in the Opening phase.
 
-## Teste grátis
+## Free trial
 
-- `TRIAL_STEPS_EXCEED` (E): `trial.steps` maior que o número de etapas. Reduza.
-- `TRIAL_TOOL_UNKNOWN` (E): `trial.tools` cita ferramenta que não existe. Deixe `tools` como `{}`.
-- `TRIAL_TEMPLATE_UNKNOWN` (E): `trial.templates` cita um modelo que não está em `templates[]`. Use só nomes existentes.
+- `TRIAL_STEPS_EXCEED` (E): `trial.steps` greater than the number of steps. Reduce it.
+- `TRIAL_TOOL_UNKNOWN` (E): `trial.tools` mentions a tool that does not exist. Leave `tools` as `{}`.
+- `TRIAL_TEMPLATE_UNKNOWN` (E): `trial.templates` mentions a template that is not in `templates[]`. Use only existing names.
 
-## Calibragem
+## Calibration
 
-- `ONBOARDING_NEEDS_MEMORY` (E): há `onboarding` sem `"usesMemory": true`. Acrescente.
-- `ONBOARDING_SENSITIVE` (A): pergunta com termo de dado sensível (senha, CPF, cartão, token...). Troque por faixas ou categorias.
+- `ONBOARDING_NEEDS_MEMORY` (E): there is an `onboarding` without `"usesMemory": true`. Add it.
+- `ONBOARDING_SENSITIVE` (W): a question with a sensitive-data term (password, CPF, card, token...). Replace it with ranges or categories.
 
-## Casos de teste (evals)
+## Test cases (evals)
 
-- `EVAL_TOO_FEW_CASES` (E em specVersion 1): menos de 10 casos. Escreva mais, cobrindo pedidos típicos, bordas e segurança.
-- `EVAL_CASE_INVALID` (E): caso sem `id`, com `id` repetido, sem `input` ou `checks`, com `type` diferente de `contains`, `regex` ou `not_contains`, checagem sem `value` ou `description`, ou regex inválida. Corrija usando o modelo `caso-de-eval`.
+- `EVAL_TOO_FEW_CASES` (E in specVersion 1): fewer than 10 cases. Write more, covering typical requests, edge cases and safety.
+- `EVAL_CASE_INVALID` (E): a case without `id`, with a repeated `id`, without `input` or `checks`, with a `type` other than `contains`, `regex` or `not_contains`, a check without `value` or `description`, or an invalid regex. Fix it using the `caso-de-eval` template.
 
-## Códigos internos (da revisão)
+## Internal codes (from review)
 
-- `DIFF_UNREVIEWED_FILE` (E) e `SCAN_DUPLICATE_CONTENT` (A): são da etapa de revisão da plataforma. O segundo avisa que o conteúdo parece o de outro pacote já publicado: se for seu, explique no README; se não for, reescreva.
+- `DIFF_UNREVIEWED_FILE` (E) and `SCAN_DUPLICATE_CONTENT` (W): these belong to the platform's review stage. The second warns that the content looks like that of another published package: if it is yours, explain it in the README; if not, rewrite it.
 
-## Como ler a resposta do validador
+## How to read the validator response
 
-A resposta traz `ok` (verdadeiro quando não há erros), `errors`, `warnings`, `stats` (arquivos, etapas, casos, trechos estimados, diferenciais comprovados) e `summary`. Corrija **os erros do mais estrutural para o mais fino** (manifesto, depois etapas, depois conhecimento) e rode de novo. Avisos que sobrarem devem ser justificados no README do revisor.
+The response carries `ok` (true when there are no errors), `errors`, `warnings`, `stats` (files, steps, cases, estimated excerpts, proven differentiators) and `summary`. Fix **errors from the most structural to the finest** (manifest, then steps, then knowledge) and run again. Warnings that remain must be justified in the reviewer README.

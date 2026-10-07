@@ -1,27 +1,27 @@
-# Lista de avisos de endereço
+# Change-of-address notice list
 
-Novo endereço (só o bairro e a cidade aqui; o endereço completo você informa direto a cada empresa): ______
+New address (only the neighborhood and the city here; you give the full address directly to each company): ______
 
-Cada prazo abaixo deve ser conferido no site ou no atendimento oficial de cada empresa ou órgão.
+Each deadline below must be checked on the official website or customer service of each company or agency.
 
-| Quem avisar | O que mudar | Como (app, telefone, site) | Prazo a conferir | Feito |
+| Who to notify | What to change | How (app, phone, website) | Deadline to check | Done |
 |---|---|---|---|---|
-| Banco e cartões | Endereço de correspondência | | conferir no site oficial | [ ] |
-| Trabalho e plano de saúde | Endereço cadastral | | conferir | [ ] |
-| Escola ou curso | Endereço e transporte | | conferir | [ ] |
-| Energia elétrica | Encerrar no antigo e ligar no novo | | conferir na concessionária | [ ] |
-| Água e esgoto | Encerrar no antigo e ligar no novo | | conferir na concessionária | [ ] |
-| Gás | Encerrar no antigo e ligar no novo | | conferir na fornecedora | [ ] |
-| Internet, TV e celular | Transferir ou cancelar o plano | | conferir na operadora | [ ] |
-| Condomínio e imobiliária | Aviso de saída e entrega das chaves | | conferir no contrato | [ ] |
-| Detran (veículo e CNH) | Endereço do veículo e do condutor | | conferir no site do Detran do estado | [ ] |
-| Título de eleitor | Domicílio eleitoral, se mudar de cidade | | conferir no site do TSE | [ ] |
-| Receita Federal | Endereço cadastral | | conferir no site oficial | [ ] |
-| Correios | Redirecionamento de correspondência | | conferir no site dos Correios | [ ] |
-| Compras online, seguros e assinaturas | Endereço de entrega | | conferir em cada serviço | [ ] |
+| Bank and cards | Mailing address | | check on the official website | [ ] |
+| Employer and health plan | Registered address | | check | [ ] |
+| School or course | Address and transport | | check | [ ] |
+| Electricity | Close at the old address and connect at the new one | | check with the utility company | [ ] |
+| Water and sewage | Close at the old address and connect at the new one | | check with the utility company | [ ] |
+| Gas | Close at the old address and connect at the new one | | check with the supplier | [ ] |
+| Internet, TV and mobile | Transfer or cancel the plan | | check with the provider | [ ] |
+| Building administration and rental agency | Notice of leaving and handover of the keys | | check in the contract | [ ] |
+| Detran (vehicle and driver's license, Brazil) | Address of the vehicle and of the driver | | check on your state's Detran website | [ ] |
+| Voter registration (TSE, Brazil) | Voting domicile, if you move to another city | | check on the TSE website | [ ] |
+| Receita Federal (Brazilian tax authority) | Registered address | | check on the official website | [ ] |
+| Correios (Brazilian postal service) | Mail redirection | | check on the Correios website | [ ] |
+| Online shops, insurers and subscriptions | Delivery address | | check with each service | [ ] |
 
-## Modelo de mensagem curta
+## Short message template
 
-"Olá, vou me mudar em DD/MM/AAAA e preciso atualizar o meu endereço. Como faço e qual é o prazo? Peço o número do protocolo do atendimento. Obrigada(o)."
+"Hello, I am moving on DD/MM/YYYY and I need to update my address. How do I do it and what is the deadline? Please give me the protocol number for this contact. Thank you."
 
-Não envie documentos por canais que não sejam os oficiais; desconfie de mensagens que pedem dados "para atualizar o endereço".
+Do not send documents through channels that are not the official ones; be wary of messages that ask for data "to update your address".

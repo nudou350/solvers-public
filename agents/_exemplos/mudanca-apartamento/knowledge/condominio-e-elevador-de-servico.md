@@ -1,21 +1,21 @@
 ---
-title: Condomínio, elevador de serviço e regras do prédio na mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: Building rules, the service elevator and the front desk on moving day
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [condominio, elevador, portaria]
+tags: [building, elevator, front-desk]
 ---
 
-# Condomínio, elevador de serviço e regras do prédio na mudança
+# Building rules, the service elevator and the front desk on moving day
 
-## O que perguntar à portaria ou ao síndico
+## What to ask the front desk or the building manager
 
-Na experiência da criadora, muitos prédios têm regras próprias para mudança: dias e horários permitidos, reserva do elevador de serviço, taxa ou depósito, proteção das paredes do elevador e dos corredores e um limite de tempo. As regras variam de prédio para prédio e ficam no regimento interno, que a pessoa pode pedir à administração. Ela deve perguntar nos dois prédios, o antigo e o novo, e anotar quem confirmou e quando.
+In the creator's experience, many buildings have their own rules for moves: allowed days and hours, booking of the service elevator, a fee or deposit, protection for the elevator walls and hallways and a time limit. The rules vary from building to building and are in the building's internal regulations (regimento interno), which the person can ask the administration for. They should ask at both buildings, the old one and the new one, and note who confirmed and when.
 
-## Quando o prédio não tem elevador de serviço
+## When the building has no service elevator
 
-Perguntar qual elevador pode ser usado e em que horário, e avisar a transportadora para que ela inclua isso no orçamento. Em prédios sem elevador, perguntar o número de andares e se a equipe cobra mais por andar. A criadora já teve que mudar o horário porque o prédio só permitia a mudança em uma janela curta, e ficou sabendo só na véspera: por isso confirma antes de fechar a data com a empresa.
+Ask which elevator can be used and at what hours, and tell the moving company so that it includes this in the quote. In buildings without an elevator, ask how many floors there are and whether the crew charges more per floor. The creator once had to change the time because the building only allowed moves in a short window, and she only found out the day before: that is why she confirms before locking in the date with the company.
 
-## Cuidados no dia
+## Care on the day
 
-Avisar a portaria do horário e do nome da empresa, pedir que a entrada de pessoas seja autorizada, proteger a porta e o piso da entrada se o prédio exigir, e combinar onde o veículo pode parar. Depois da mudança, a criadora deixa o local limpo e avisa a administração, para evitar reclamação de dano nas áreas comuns. Dúvidas sobre multas ou taxas do prédio devem ser conferidas com o síndico e com o regimento.
+Tell the front desk the time and the name of the company, ask that the entry of people be authorized, protect the door and the floor at the entrance if the building requires it, and agree on where the vehicle can park. After the move, the creator leaves the place clean and tells the administration, to avoid complaints about damage to common areas. Questions about the building's fines or fees should be checked with the building manager and the regulations.

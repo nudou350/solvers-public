@@ -1,61 +1,61 @@
 ---
-title: Formato do pacote Solver (pastas, ZIP e limites)
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 3, 6 e 7, aprovada em 2026-09-30
+title: Solver package format (folders, ZIP and limits)
+source: Solver package specification v1 (PACKAGE_SPEC), sections 3, 6 and 7, approved on 2026-09-30
 source_date: 2026-09-30
 valid_until: 2027-03-31
-tags: [formato, zip, pastas, limites]
+tags: [format, zip, folders, limits]
 ---
 
-# Formato do pacote Solver (pastas, ZIP e limites)
+# Solver package format (folders, ZIP and limits)
 
-Quem decide se um pacote é válido é sempre o validador do servidor. Este texto explica o formato: a estrutura de pastas, as regras do ZIP, os caminhos do manifesto, as fases da plataforma e os formatos de conhecimento aceitos. Em caso de diferença, vale o validador.
+The server validator always decides whether a package is valid. This text explains the format: the folder structure, the ZIP rules, the manifest paths, the platform phases and the accepted knowledge formats. If there is a difference, the validator wins.
 
-## O que é um pacote
+## What a package is
 
-Um Solver é uma pasta entregue em ZIP com manifesto, etapas, conhecimento, modelos e casos de teste. O servidor nunca entrega a pasta ao comprador: entrega uma etapa por vez, busca no conhecimento, guarda a memória e entrega os modelos declarados. O comprador usa a própria IA (Claude ou ChatGPT) por um conector. O que diferencia um Solver de uma skill comum é o que só existe no servidor: processo guiado etapa por etapa, conhecimento citado e datado, memória e atendimento do criador.
+A Solver is a folder delivered as a ZIP with a manifest, steps, knowledge, templates and test cases. The server never hands the folder to the buyer: it delivers one step at a time, searches the knowledge, keeps the memory and delivers the declared templates. The buyer uses their own AI (Claude or ChatGPT) through a connector. What sets a Solver apart from an ordinary skill is what only exists on the server: a step-by-step guided process, cited and dated knowledge, memory and creator support.
 
-## Árvore de pastas
+## Folder tree
 
-Dentro do ZIP há **uma única pasta raiz** (o slug do Solver) com:
+Inside the ZIP there is **a single root folder** (the Solver's slug) with:
 
-- `manifest.json`: obrigatório. Descreve o Solver (campo a campo em outro arquivo desta base).
-- `steps/`: de 1 a 12 arquivos `.md`, uma etapa por arquivo. Recomendado: de 3 a 6.
-- `knowledge/`: opcional. Arquivos `.md` ou `.txt` em subpastas livres, com fonte e data.
-- `templates/`: opcional. Modelos entregues ao comprador (`.md`, `.txt`, `.json`), só os declarados em `templates[]` do manifesto.
-- `evals/cases/`: de 10 a 40 arquivos `.json`, um caso de teste por arquivo.
-- `evals/outputs/` e `evals/report.json`: opcionais no envio. A plataforma gera o relatório oficial. Nunca invente nota.
-- `README.md`: opcional. Nota para o revisor; não chega ao comprador.
-- `verifier/`: só pacotes da plataforma. Em envio de criador novo é erro.
+- `manifest.json`: required. Describes the Solver (field by field in another file of this knowledge base).
+- `steps/`: 1 to 12 `.md` files, one step per file. Recommended: 3 to 6.
+- `knowledge/`: optional. `.md` or `.txt` files in free subfolders, with source and date.
+- `templates/`: optional. Templates delivered to the buyer (`.md`, `.txt`, `.json`), only those declared in the manifest's `templates[]`.
+- `evals/cases/`: 10 to 40 `.json` files, one test case per file.
+- `evals/outputs/` and `evals/report.json`: optional on submission. The platform generates the official report. Never make up a score.
+- `README.md`: optional. A note for the reviewer; it does not reach the buyer.
+- `verifier/`: platform packages only. In a new creator's submission it is an error.
 
-## Regras do ZIP (fase atual, o Núcleo)
+## ZIP rules (current phase, the Core phase)
 
-- Tamanho do ZIP: até 50 MB (erro `ZIP_TOO_LARGE`).
-- Tamanho real depois de descompactado: até 150 MB (`ZIP_EXPANDS_TOO_MUCH`).
-- Quantidade de arquivos: até 2.000 (`ZIP_TOO_MANY_FILES`).
-- Raiz: exatamente 1 pasta contendo o `manifest.json` (`ZIP_BAD_ROOT`).
-- Nomes de arquivo únicos, sem distinguir maiúsculas (`ZIP_DUPLICATE_ENTRY`).
-- Caminhos relativos, sem `..`, sem barra invertida, sem caractere de controle, sem nome começando com ponto; permitidos letras e dígitos (inclusive acentuados), ponto, hífen, sublinhado, espaço e a barra `/` (`ZIP_BAD_PATH`).
-- Lixo de sistema (`__MACOSX/`, `.DS_Store`, `Thumbs.db`) é removido com aviso (`ZIP_IGNORED_FILE`).
-- Links simbólicos são recusados (`ZIP_SYMLINK`).
-- Extensões permitidas: `.json`, `.md` e `.txt` (`FILE_TYPE_NOT_ALLOWED`).
-- Texto em UTF-8 válido (`FILE_NOT_UTF8`).
-- Arquivo individual: até 10 MB (`FILE_TOO_LARGE`).
-- Conhecimento: até 10.000 trechos no pacote (`KNOWLEDGE_TOO_BIG`).
+- ZIP size: up to 50 MB (error `ZIP_TOO_LARGE`).
+- Real size once uncompressed: up to 150 MB (`ZIP_EXPANDS_TOO_MUCH`).
+- Number of files: up to 2,000 (`ZIP_TOO_MANY_FILES`).
+- Root: exactly 1 folder containing the `manifest.json` (`ZIP_BAD_ROOT`).
+- Unique file names, ignoring case (`ZIP_DUPLICATE_ENTRY`).
+- Relative paths, no `..`, no backslash, no control character, no name starting with a dot; letters and digits (including accented ones), dot, hyphen, underscore, space and the slash `/` are allowed (`ZIP_BAD_PATH`).
+- System junk (`__MACOSX/`, `.DS_Store`, `Thumbs.db`) is removed with a warning (`ZIP_IGNORED_FILE`).
+- Symbolic links are rejected (`ZIP_SYMLINK`).
+- Allowed extensions: `.json`, `.md` and `.txt` (`FILE_TYPE_NOT_ALLOWED`).
+- Valid UTF-8 text (`FILE_NOT_UTF8`).
+- Individual file: up to 10 MB (`FILE_TOO_LARGE`).
+- Knowledge: up to 10,000 excerpts in the package (`KNOWLEDGE_TOO_BIG`).
 
-Nada do ZIP é executado: a extração acontece em pasta isolada.
+Nothing in the ZIP is executed: extraction happens in an isolated folder.
 
-## Caminhos escritos no manifesto
+## Paths written in the manifest
 
-Todo caminho no manifesto (`steps[].file`, `templates[].path`) precisa ser relativo, começar por `steps/` ou `templates/`, existir no ZIP e ficar dentro da pasta do pacote. Se não, o erro é `MANIFEST_PATH_ESCAPE` (ou `STEP_FILE_MISSING` e `TEMPLATE_MISSING` quando o arquivo não existe).
+Every path in the manifest (`steps[].file`, `templates[].path`) must be relative, start with `steps/` or `templates/`, exist in the ZIP and stay inside the package folder. Otherwise the error is `MANIFEST_PATH_ESCAPE` (or `STEP_FILE_MISSING` and `TEMPLATE_MISSING` when the file does not exist).
 
-## Fases de abertura
+## Opening phases
 
-Hoje vale o **Núcleo**: criadores convidados, conhecimento em `.md` e `.txt`, modelos `.md`, `.txt` e `.json`, nenhuma ferramenta própria do criador, nenhuma garantia. Na **Abertura** (sem data prometida) entram PDF, HTML e CSV no conhecimento, ferramentas por internet (`http`), gates com evidência e avaliação rodada pela plataforma. Não escreva pacote contando com a Abertura.
+Today the **Core phase** applies: invited creators, knowledge in `.md` and `.txt`, templates in `.md`, `.txt` and `.json`, no creator-owned tools, no guarantee. In the **Opening phase** (no promised date) PDF, HTML and CSV in knowledge, tools over the internet (`http`), gates with evidence and platform-run evaluation come in. Do not write a package counting on the Opening phase.
 
-## Hash e versão
+## Hash and version
 
-A plataforma calcula uma impressão digital (hash) do pacote na aprovação, sobre todos os arquivos, ignorando o `evals/report.json`. Qualquer mudança de arquivo muda o hash e exige nova revisão.
+The platform computes a fingerprint (hash) of the package at approval, over all files, ignoring `evals/report.json`. Any file change changes the hash and requires a new review.
 
-## Formatos de conhecimento nesta fase
+## Knowledge formats in this phase
 
-`.md` é o formato recomendado. `.txt` vira uma seção única e precisa de um arquivo vizinho `nome.txt.meta.json` com a fonte. PDF, HTML e planilhas devem ser convertidos para `.md` antes (veja a base sobre conversão). O servidor corta o conhecimento em trechos por títulos `#` a `###`, com limite de cerca de 2.000 caracteres por trecho e sobreposição de 200, e busca por significado (multilíngue).
+`.md` is the recommended format. `.txt` becomes a single section and needs a neighboring file `name.txt.meta.json` with the source. PDFs, HTML and spreadsheets must be converted to `.md` beforehand (see the knowledge file on conversion). The server splits knowledge into excerpts by `#` to `###` headings, with a limit of about 2,000 characters per excerpt and a 200-character overlap, and searches by meaning (multilingual).

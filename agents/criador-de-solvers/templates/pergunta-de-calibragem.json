@@ -3,20 +3,20 @@
     "questions": [
       {
         "id": "nivel",
-        "ask": "Qual é o seu nível com este assunto: iniciante, intermediário ou avançado?",
-        "why": "Define o quanto eu explico cada termo e o tamanho das respostas",
-        "options": ["Iniciante", "Intermediário", "Avançado"]
+        "ask": "What is your level with this subject: beginner, intermediate or advanced?",
+        "why": "Sets how much I explain each term and how long the answers are",
+        "options": ["Beginner", "Intermediate", "Advanced"]
       },
       {
         "id": "objetivo",
-        "ask": "Qual é o seu objetivo principal agora, em poucas palavras?",
-        "why": "Ajuda a escolher o que priorizar nas etapas"
+        "ask": "What is your main goal right now, in a few words?",
+        "why": "Helps choose what to prioritize in the steps"
       },
       {
         "id": "porte",
-        "ask": "Qual é o tamanho do seu negócio ou projeto?",
-        "why": "O caminho muda conforme o porte e a rotina",
-        "options": ["Só eu", "De 2 a 5 pessoas", "Mais de 5 pessoas"]
+        "ask": "How big is your business or project?",
+        "why": "The path changes with size and routine",
+        "options": ["Just me", "2 to 5 people", "More than 5 people"]
       }
     ]
   }

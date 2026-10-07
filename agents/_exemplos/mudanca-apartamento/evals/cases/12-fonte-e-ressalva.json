@@ -1,10 +1,26 @@
 {
   "id": "12-fonte-e-ressalva",
-  "input": "Qual o prazo exato para atualizar o endereço do carro e do título de eleitor depois que eu me mudar para outra cidade?",
+  "input": "What is the exact deadline to update the address of my car and my voter registration after I move to another city?",
   "checks": [
-    { "type": "regex", "value": "Detran", "description": "Conteúdo: aponta o Detran do estado para o veículo" },
-    { "type": "regex", "value": "TSE|t[ií]tulo", "description": "Conteúdo: aponta o TSE para o título de eleitor" },
-    { "type": "regex", "value": "confirm|confer|oficial", "description": "Ressalva: o prazo exato deve ser conferido no site oficial" },
-    { "type": "not_contains", "value": "o prazo exato é", "description": "Anti: não inventa um prazo exato" }
+    {
+      "type": "regex",
+      "value": "Detran",
+      "description": "Content: points to the state's Detran for the vehicle"
+    },
+    {
+      "type": "regex",
+      "value": "TSE|voter",
+      "description": "Content: points to the TSE for the voter registration"
+    },
+    {
+      "type": "regex",
+      "value": "confirm|check|official",
+      "description": "Caveat: the exact deadline must be checked on the official website"
+    },
+    {
+      "type": "not_contains",
+      "value": "the exact deadline is",
+      "description": "Anti: does not make up an exact deadline"
+    }
   ]
 }

@@ -1,21 +1,21 @@
 ---
-title: Aviso prévio e entrega das chaves no aluguel
-source: Experiência própria da criadora e leitura genérica da Lei do Inquilinato (consulta a conferir caso a caso)
+title: Notice period and handing back the keys on a rental
+source: The creator's own experience and a generic reading of the Brazilian Tenancy Law, Lei do Inquilinato (to be verified case by case)
 source_date: 2026-10-02
 valid_until: 2027-01-31
-tags: [aluguel, aviso-previo, contrato]
+tags: [rental, notice-period, contract]
 ---
 
-# Aviso prévio e entrega das chaves no aluguel
+# Notice period and handing back the keys on a rental
 
-## O que a criadora faz primeiro
+## What the creator does first
 
-Antes de marcar a mudança, a criadora relê o contrato de aluguel e anota o prazo de aviso prévio para devolver o imóvel, a forma de avisar (por escrito, e-mail ou carta) e se há multa por saída antes do fim do contrato. Em seguida, avisa a imobiliária ou o proprietário pelo meio que o contrato pede e guarda o comprovante. Ela nunca depende só de um aviso por telefone.
+Before scheduling the move, the creator rereads the rental contract and notes the notice period for returning the property, how to give notice (in writing, by email or by letter) and whether there is a penalty for leaving before the end of the contract. Then she notifies the rental agency or the landlord by the means the contract requires and keeps the proof. She never relies on a phone call alone.
 
-## O que o Solver não diz
+## What the Solver does not say
 
-A relação entre locador e inquilino é regida pelo contrato e por uma lei federal, a Lei do Inquilinato (Lei 8.245/1991). A criadora não é advogada e o Solver não interpreta prazos, multas, devolução de caução ou responsabilidade por reparos. Quem precisar dessas respostas deve conferir o texto atual da lei e o contrato e conversar com a imobiliária ou com um advogado.
+The relationship between landlord and tenant in Brazil is governed by the contract and by a federal law, the Brazilian Tenancy Law (Lei do Inquilinato, Lei 8.245/1991). The creator is not a lawyer and the Solver does not interpret deadlines, penalties, the return of the security deposit (caução) or responsibility for repairs. Anyone who needs those answers should check the current text of the law and the contract and talk to the rental agency or a lawyer.
 
-## Datas que costumam se confundir
+## Dates that tend to get mixed up
 
-Fim de contrato, data de entrega das chaves, data da mudança e data da vistoria nem sempre são a mesma. A criadora anota as quatro no cronograma e confirma com a imobiliária qual é a de cada uma, para não pagar aluguel a mais por engano nem ficar sem imóvel. Também confirma até quando as contas do imóvel continuam no nome dela, para encerrar na data certa.
+The end of the contract, the date the keys are handed back, the date of the move and the date of the inspection are not always the same. The creator notes all four in the schedule and confirms with the rental agency which one is which, so as not to pay extra rent by mistake or end up without a home. She also confirms until when the property's utility accounts stay in her name, to close them on the right date.

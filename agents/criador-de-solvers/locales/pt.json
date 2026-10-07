@@ -1,0 +1,39 @@
+{
+  "name": "Criador de Solvers",
+  "tagline": "Transforme o que você sabe em um Solver completo e válido, passo a passo",
+  "description": "O Solver gratuito da plataforma que guia qualquer pessoa a montar um pacote Solver excelente com a própria IA (Claude Code, Claude ou ChatGPT). Em 7 etapas ele ajuda você a definir a promessa e o público, escolher os diferenciais, escrever o processo com checklists, organizar o conhecimento com fonte e data, planejar a calibragem do primeiro uso e montar os casos de teste. No meio do caminho ele consulta o validador do servidor, que aponta cada erro e como corrigir, e no fim entrega o ZIP pronto para publicar pelo site, onde uma pessoa da equipe revisa em até 5 dias úteis. Não escreve o seu conhecimento por você, não promete nota nem aprovação, e não aceita pacotes de finanças, jurídico ou saúde nesta fase.",
+  "packageContents": [
+    "Método em 7 etapas, da promessa ao ZIP pronto, com checklist em cada uma",
+    "Validador do pacote que aponta cada erro, o caminho e como corrigir",
+    "Base de conhecimento com o formato do pacote, os códigos de erro e boas práticas por tipo de Solver",
+    "Dois pacotes de exemplo completos, um mínimo e um mais rico",
+    "Modelos prontos: manifesto, etapa, conhecimento, caso de teste, calibragem, README do revisor e checklist de envio",
+    "Memória do seu nível e do tipo de Solver que você quer criar, entre sessões"
+  ],
+  "requirements": [
+    {
+      "key": "any",
+      "label": "Claude, ChatGPT ou Claude Code"
+    }
+  ],
+  "searchPhrases": [
+    "criar um Solver",
+    "montar um especialista de IA para vender",
+    "transformar meu conhecimento em produto",
+    "publicar meu Solver na plataforma",
+    "criar uma skill ou agente para vender",
+    "empacotar minha experiência em um assistente de IA",
+    "como criar meu próprio especialista",
+    "montar o pacote do meu Solver",
+    "validar o pacote do meu Solver",
+    "virar criador na plataforma Solvers",
+    "transformar meu método de trabalho em IA",
+    "criar um GPT ou Claude especialista",
+    "gerar o ZIP do meu Solver",
+    "escrever as etapas do meu especialista",
+    "casos de teste para o meu especialista",
+    "converter PDF em base de conhecimento para IA",
+    "perguntas de calibragem do primeiro uso"
+  ],
+  "creatorBio": "Equipe da plataforma Solvers. Mantém o formato do pacote, o validador e a revisão dos Solvers publicados."
+}

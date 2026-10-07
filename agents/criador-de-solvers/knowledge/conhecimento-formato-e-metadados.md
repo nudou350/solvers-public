@@ -1,67 +1,69 @@
 ---
-title: Conhecimento: front-matter, chunks, validade e busca
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seção 6, e regras do validador da plataforma
+title: Knowledge: front-matter, chunks, validity and search
+source: Solver package specification v1 (PACKAGE_SPEC), section 6, and the platform validator rules
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [conhecimento, front-matter, chunks, validade]
+tags: [knowledge, front-matter, chunks, validity]
 ---
 
-# Conhecimento: front-matter, chunks, validade e busca
+# Knowledge: front-matter, chunks, validity and search
 
-Esta base explica como os arquivos de conhecimento do Solver são lidos pelo servidor: o cabeçalho com fonte e data, o corte em trechos por títulos, a validade, os limites de tamanho e o que comprova o diferencial de conhecimento vivo.
+This knowledge file explains how the Solver's knowledge files are read by the server: the header with source and date, the split into excerpts by headings, validity, size limits, and what proves the living-knowledge differentiator.
 
-## Como o conhecimento funciona
+## How knowledge works
 
-Os arquivos de `knowledge/` são cortados em trechos (chunks) e indexados por significado. Durante o trabalho, a IA do comprador consulta a base pela ferramenta `search_knowledge`, que devolve **até 5 trechos** com o texto, a fonte (título e `source`), a data e, quando o trecho venceu, o aviso "pode estar desatualizado (válido até DD/MM/AAAA)". A IA é instruída a citar a fonte. O arquivo em si nunca sai: só trechos.
+The files in `knowledge/` are split into excerpts (chunks) and indexed by meaning. While working, the buyer's AI queries the base through the `search_knowledge` tool, which returns **up to 5 excerpts** with the text, the source (title and `source`), the date and, when the excerpt has expired, the warning "may be outdated (valid until <date>)". The AI is instructed to cite the source. The file itself never leaves: only excerpts.
 
-## Front-matter (cabeçalho do arquivo .md)
+## Front-matter (the header of the .md file)
 
-Um bloco entre duas linhas `---`, no topo, com linhas `chave: valor`:
+A block between two `---` lines, at the top, with `key: value` lines:
 
 ```
 ---
-title: Valores do DAS-MEI em 2026
-source: Receita Federal
+title: DAS-MEI amounts in 2026
+source: Receita Federal (Brazilian Federal Revenue Service)
 source_url: https://www.gov.br/receitafederal/
 source_date: 2026-01-15
 valid_until: 2026-12-31
-tags: [das, valores]
+tags: [das, amounts]
 ---
 ```
 
-- `title`: opcional. Se faltar, vale o primeiro título do arquivo.
-- `source`: **obrigatório** em specVersion 1 (`KNOWLEDGE_SOURCE_MISSING`). Quem é a fonte, em palavras.
-- `source_url`: opcional, endereço https da fonte.
-- `source_date`: data da fonte, formato `AAAA-MM-DD` (`KNOWLEDGE_DATE_INVALID` se estiver errada ou impossível, como 2026-02-30). Obrigatória para quem declara o diferencial `liveData`.
-- `valid_until`: opcional, `AAAA-MM-DD`. Depois dessa data o trecho recebe o aviso de desatualizado e o validador dá `KNOWLEDGE_EXPIRED`.
-- `tags`: lista de até 10 palavras, entre colchetes e separadas por vírgula.
+(MEI is the Brazilian micro-entrepreneur regime and DAS its monthly tax payment slip; this is only an example.)
 
-Um bloco aberto e não fechado, linha sem "chave: valor" ou chave repetida é `KNOWLEDGE_FRONTMATTER_INVALID`.
+- `title`: optional. If missing, the first heading of the file is used.
+- `source`: **required** in specVersion 1 (`KNOWLEDGE_SOURCE_MISSING`). Who the source is, in words.
+- `source_url`: optional, the https address of the source.
+- `source_date`: the date of the source, format `YYYY-MM-DD` (`KNOWLEDGE_DATE_INVALID` if wrong or impossible, such as 2026-02-30). Required for anyone declaring the `liveData` differentiator.
+- `valid_until`: optional, `YYYY-MM-DD`. After this date the excerpt gets the outdated warning and the validator gives `KNOWLEDGE_EXPIRED`.
+- `tags`: a list of up to 10 words, in brackets and separated by commas.
 
-## Arquivos .txt
+A block that is opened and not closed, a line without "key: value", or a repeated key is `KNOWLEDGE_FRONTMATTER_INVALID`.
 
-Não têm front-matter. A fonte vai em um arquivo vizinho com o mesmo nome mais `.meta.json`, por exemplo `faq.txt.meta.json`, com os mesmos campos (`source`, `source_date`...). Sem ele: `KNOWLEDGE_SOURCE_MISSING`. Prefira `.md`.
+## .txt files
 
-## Como o texto é cortado
+They have no front-matter. The source goes in a neighboring file with the same name plus `.meta.json`, for example `faq.txt.meta.json`, with the same fields (`source`, `source_date`...). Without it: `KNOWLEDGE_SOURCE_MISSING`. Prefer `.md`.
 
-- A divisão é por títulos `#`, `##` e `###`: cada seção vira um trecho.
-- Seções maiores que 2.000 caracteres são divididas por parágrafo, com sobreposição de 200 caracteres e o título repetido.
-- Os trechos são lidos **sozinhos**, sem o resto do arquivo. Por isso cada seção deve se bastar e carregar o assunto no título.
-- Meta de qualidade: seções de 200 a 2.000 caracteres.
-- Linhas que começam com `#` dentro de blocos de código também viram título. Em exemplos com markdown dentro, recue o bloco com 4 espaços ou evite a barra de título.
+## How the text is split
 
-## Tamanho
+- The split is by `#`, `##` and `###` headings: each section becomes an excerpt.
+- Sections larger than 2,000 characters are split by paragraph, with a 200-character overlap and the heading repeated.
+- Excerpts are read **on their own**, without the rest of the file. That is why each section must stand alone and carry the subject in its heading.
+- Quality target: sections of 200 to 2,000 characters.
+- Lines that start with `#` inside code blocks also become headings. In examples with markdown inside, indent the block by 4 spaces or avoid the heading marker.
 
-Arquivo até 10 MB. Pacote até 10.000 trechos (`KNOWLEDGE_TOO_BIG` acima disso). Estimativa: 1 trecho para cada 2.000 caracteres de texto limpo, ou menos quando as seções são curtas. Um pacote típico excelente tem de 8 a 30 arquivos, e o validador informa a estimativa de trechos em `stats`.
+## Size
 
-## Validade e "conhecimento vivo"
+File up to 10 MB. Package up to 10,000 excerpts (`KNOWLEDGE_TOO_BIG` above that). Estimate: 1 excerpt for every 2,000 characters of clean text, or fewer when sections are short. A typical excellent package has 8 to 30 files, and the validator reports the excerpt estimate in `stats`.
 
-O diferencial `liveData` é comprovado quando: `knowledge.updatedAt` está dentro de `reviewEveryDays` (por exemplo, atualizado nos últimos 90 dias), **nenhum** arquivo tem `valid_until` vencido e pelo menos **metade** dos arquivos tem `source_date`. Isso depende de o criador manter a base: marque no calendário a revisão.
+## Validity and "living knowledge"
 
-## Bloco knowledge no manifesto
+The `liveData` differentiator is proven when: `knowledge.updatedAt` is within `reviewEveryDays` (for example, updated in the last 90 days), **no** file has an expired `valid_until` and at least **half** of the files have `source_date`. This depends on the creator maintaining the base: put the review on your calendar.
 
-`knowledge: { "updatedAt": "2026-10-02", "reviewEveryDays": 90, "sources": ["Receita Federal", "Portal do Empreendedor"] }`. As fontes listadas ali aparecem na página do Solver.
+## The knowledge block in the manifest
 
-## Proteção do conteúdo (honestidade)
+`knowledge: { "updatedAt": "2026-10-02", "reviewEveryDays": 90, "sources": ["Receita Federal", "Portal do Empreendedor"] }`. The sources listed there appear on the Solver's page.
 
-O conhecimento sai só em trechos, com marca d'água discreta e limite diário de consultas por licença. Mas quem tem a licença pode copiar os trechos que lê. O valor do produto está no processo, na atualização contínua e no atendimento, não em sigilo absoluto.
+## Content protection (honesty)
+
+Knowledge leaves only as excerpts, with a discreet watermark and a daily query limit per license. But whoever holds the license can copy the excerpts they read. The value of the product lies in the process, in continuous updating and in support, not in absolute secrecy.

@@ -1,70 +1,70 @@
 ---
-title: Como converter PDF, página da web e planilha em arquivos .md para a base
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seção 6.1 e regras de chunking da plataforma
+title: How to convert PDFs, web pages and spreadsheets into .md files for the knowledge base
+source: Solver package specification v1 (PACKAGE_SPEC), section 6.1 and the platform chunking rules
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [conversao, pdf, html, planilha, markdown, chunking]
+tags: [conversion, pdf, html, spreadsheet, markdown, chunking]
 ---
 
-# Como converter PDF, página da web e planilha em arquivos .md para a base
+# How to convert PDFs, web pages and spreadsheets into .md files for the knowledge base
 
-Esta base mostra, passo a passo, como transformar PDFs, páginas da web, planilhas, apresentações e anotações em arquivos `.md` úteis para a busca: um arquivo por tema, seções por títulos de 200 a 2.000 caracteres, fonte e data em cada arquivo.
+This knowledge file shows, step by step, how to turn PDFs, web pages, spreadsheets, presentations and notes into `.md` files that work well for search: one file per topic, sections by headings of 200 to 2,000 characters, and a source and date in every file.
 
-## Por que converter
+## Why convert
 
-Nesta fase o conhecimento aceita só `.md` e `.txt`. A conversão é feita **na IA do próprio criador**, que lê o arquivo no computador ou no anexo da conversa e escreve os `.md`. Não custa nada à plataforma, nada sobe antes do envio final do ZIP e o revisor lê exatamente o texto que será indexado.
+In this phase knowledge accepts only `.md` and `.txt`. The conversion is done **in the creator's own AI**, which reads the file on the computer or from the conversation attachment and writes the `.md` files. It costs the platform nothing, nothing is uploaded before the final ZIP submission, and the reviewer reads exactly the text that will be indexed.
 
-## Princípios
+## Principles
 
-- **Um arquivo por tema**, de 1 a 8 KB. Nunca um PDF inteiro num arquivo só.
-- **Seções por títulos**, de 200 a 2.000 caracteres, cada uma se bastando sozinha (a busca devolve um trecho solto).
-- **Fatos com número, unidade e data**. Não resuma o que tem valor preciso.
-- **Front-matter em todo arquivo** com `source`, `source_date` e, se vencer, `valid_until`.
-- **Nunca invente** o que não conseguiu ler. Se um trecho está ilegível, deixe de fora e avise.
+- **One file per topic**, 1 to 8 KB. Never a whole PDF in a single file.
+- **Sections by headings**, 200 to 2,000 characters, each one standing alone (search returns a loose excerpt).
+- **Facts with a number, a unit and a date.** Do not summarize what has a precise value.
+- **Front-matter in every file** with `source`, `source_date` and, if it expires, `valid_until`.
+- **Never invent** what you could not read. If an excerpt is illegible, leave it out and say so.
 
-## PDF com texto
+## PDF with text
 
-1. Leia o PDF e extraia o texto página por página.
-2. Descarte cabeçalhos, rodapés, número de página e sumário.
-3. Junte palavras quebradas por hífen no fim da linha e parágrafos partidos por mudança de página.
-4. Identifique os capítulos e as seções pelos títulos do documento; cada capítulo vira um arquivo (ou cada grupo de seções pequenas).
-5. Reescreva títulos para carregar o assunto: "Prazos" vira "Prazos de pagamento do contrato de serviços".
-6. Mantenha números, siglas e unidades exatamente como estão. Se o PDF tem versão ou data, use em `source` e `source_date`.
+1. Read the PDF and extract the text page by page.
+2. Discard headers, footers, page numbers and the table of contents.
+3. Rejoin words broken by hyphens at the end of a line and paragraphs split by a page break.
+4. Identify the chapters and sections from the document's headings; each chapter becomes a file (or each group of small sections).
+5. Rewrite headings to carry the subject: "Deadlines" becomes "Payment deadlines of the services contract".
+6. Keep numbers, acronyms and units exactly as they are. If the PDF has a version or date, use it in `source` and `source_date`.
 
-## PDF escaneado (imagem)
+## Scanned PDF (image)
 
-Sem camada de texto não há como ler com segurança. Peça ao criador uma versão pesquisável, o texto original ou que ele redigite os trechos principais. **Não reconstrua de memória.** Se a IA do criador consegue transcrever imagens e o criador revisa a transcrição linha por linha, é aceitável, mas a responsabilidade pela fidelidade é dele.
+Without a text layer there is no safe way to read it. Ask the creator for a searchable version, the original text, or to retype the main passages. **Do not reconstruct from memory.** If the creator's AI can transcribe images and the creator reviews the transcription line by line, it is acceptable, but the responsibility for fidelity is theirs.
 
-## Página da web
+## Web page
 
-1. Pegue o texto principal; retire menus, anúncios, rodapés e avisos de cookies.
-2. Guarde o endereço em `source_url` e a data de acesso ou de publicação em `source_date`.
-3. Preserve a estrutura de títulos da página.
-4. Fatos de páginas públicas oficiais podem ser usados, **citando a fonte**. Texto autoral de terceiros (blog, curso, notícia) não deve ser copiado: só com permissão.
+1. Take the main text; remove menus, ads, footers and cookie notices.
+2. Keep the address in `source_url` and the access or publication date in `source_date`.
+3. Preserve the page's heading structure.
+4. Facts from official public pages can be used, **citing the source**. Third-party authored text (blog, course, news) must not be copied: only with permission.
 
-## Planilha
+## Spreadsheet
 
-1. Entenda as colunas, as unidades e o período.
-2. Se a planilha é uma **tabela de referência** (valores, faixas, prazos), converta em listas "coluna: valor" por linha ou em uma tabela Markdown pequena por seção. Exemplo: "Faixa 1: até R$ 5.000 | alíquota: 6%".
-3. Se é uma **base de dados** (milhares de linhas, clientes, vendas), não vai para o conhecimento: o conhecimento guarda regras e definições, não registros. Dados pessoais nunca entram.
-4. Descreva o significado de cada coluna e as unidades em uma seção "Como ler esta tabela".
+1. Understand the columns, the units and the period.
+2. If the spreadsheet is a **reference table** (values, brackets, deadlines), convert it into "column: value" lists per row or into a small Markdown table per section. Example: "Bracket 1: up to R$ 5,000 | rate: 6%" (R$ is the Brazilian real, BRL).
+3. If it is a **database** (thousands of rows, clients, sales), it does not go into the knowledge: knowledge holds rules and definitions, not records. Personal data never goes in.
+4. Describe the meaning of each column and the units in a "How to read this table" section.
 
-## Apresentação ou anotações
+## Presentation or notes
 
-Cada slide ou bloco de anotação vira uma seção com título completo. Transforme frases soltas em frases que se entendem sozinhas, desenvolva siglas na primeira vez e junte slides que tratam do mesmo tema. Tópicos curtos sem contexto geram trechos fracos na busca: acrescente a explicação que você daria falando.
+Each slide or block of notes becomes a section with a complete heading. Turn loose phrases into sentences that make sense alone, spell out acronyms the first time, and merge slides that cover the same topic. Short bullet points without context produce weak search excerpts: add the explanation you would give when speaking.
 
-## Estrutura de um arquivo convertido
+## Structure of a converted file
 
-Cabeçalho (front-matter) seguido de um título de nível 1, uma introdução curta e seções de nível 2 com o assunto no título. Fim com uma seção "O que este arquivo não cobre". Veja o modelo `conhecimento-front-matter` (via `get_template`).
+A header (front-matter) followed by a level-1 heading, a short introduction and level-2 sections with the subject in the heading. End with a "What this file does not cover" section. See the `conhecimento-front-matter` template (via `get_template`).
 
-## Conferência final
+## Final check
 
-- O arquivo tem `source` e `source_date` válidos?
-- Cada seção tem de 200 a 2.000 caracteres e faz sentido sozinha?
-- Algum dado pessoal ou texto de terceiros sem permissão ficou?
-- Os números do arquivo batem com a fonte? Confira pelo menos 5 valores aleatoriamente.
-- O criador revisou o resultado? A conversão é responsabilidade dele.
+- Does the file have a valid `source` and `source_date`?
+- Does each section have 200 to 2,000 characters and make sense alone?
+- Is any personal data or third-party text without permission left in?
+- Do the numbers in the file match the source? Check at least 5 values at random.
+- Did the creator review the result? The conversion is their responsibility.
 
-## Tamanho
+## Size
 
-Arquivo até 10 MB e no máximo 10.000 trechos no pacote; na prática, bases excelentes têm de 8 a 30 arquivos. Se o material é grande, comece pelos temas que mais aparecem nas perguntas dos compradores.
+File up to 10 MB and at most 10,000 excerpts in the package; in practice, excellent bases have 8 to 30 files. If the material is large, start with the topics that appear most in buyers' questions.

@@ -1,21 +1,21 @@
 ---
-title: Perguntas para fazer à transportadora antes de fechar
-source: Experiência própria da criadora em três mudanças de apartamento
+title: Questions to ask the moving company before signing
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [transportadora, perguntas, contrato]
+tags: [movers, questions, contract]
 ---
 
-# Perguntas para fazer à transportadora antes de fechar
+# Questions to ask the moving company before signing
 
-## Sobre o serviço e o preço
+## About the service and the price
 
-A criadora sempre pergunta: o valor inclui embalagem, desmontagem e montagem de móveis? Quantos ajudantes e qual o tamanho do veículo? Há cobrança extra por andar sem elevador, por espera ou por itens fora da lista? O preço é fechado ou pode mudar no dia, e em que casos? Qual a forma de pagamento e quanto se paga de sinal? Anotar a resposta de cada uma, de preferência na própria proposta por escrito, evita surpresa e facilita a comparação.
+The creator always asks: does the price include packing, disassembly and assembly of furniture? How many helpers and what size is the vehicle? Is there an extra charge per floor without an elevator, for waiting or for items outside the list? Is the price fixed or can it change on the day, and in which cases? What is the payment method and how much is paid as a deposit? Writing down each answer, preferably in the written quote itself, avoids surprises and makes comparison easier.
 
-## Sobre segurança e imprevistos
+## About safety and the unexpected
 
-Perguntar se existe seguro para quebra ou perda, o que ele cobre, qual o limite e como se aciona. Perguntar o que acontece em caso de atraso, de chuva forte ou de cancelamento dos dois lados, e se a empresa faz inventário com a pessoa no carregamento e na entrega. A criadora não afirma quais respostas são normais ou obrigatórias: o que vale é o que está no contrato ou na proposta, e dúvida sobre direitos deve ser levada a um órgão de defesa do consumidor ou a um advogado.
+Ask whether there is insurance for breakage or loss, what it covers, what the limit is and how to claim it. Ask what happens in case of delay, heavy rain or cancellation by either side, and whether the company does an inventory with the person at loading and at delivery. The creator does not claim which answers are normal or mandatory: what counts is what is in the contract or the quote, and questions about rights should be taken to a consumer protection agency or a lawyer.
 
-## Sobre a empresa
+## About the company
 
-Pedir o nome completo da empresa, o telefone do responsável pela equipe do dia e a confirmação do dia e da janela de horário. Procurar o nome da empresa em sites de reclamação e pedir referências de clientes é uma prática da criadora, mas é uma pista e não uma prova: a pessoa decide com o que conseguir apurar.
+Ask for the company's full name, the phone number of the person in charge of the day's crew and confirmation of the day and the time window. Searching for the company's name on complaint websites and asking for customer references is a practice of the creator, but it is a clue and not proof: the person decides with what they manage to find out.

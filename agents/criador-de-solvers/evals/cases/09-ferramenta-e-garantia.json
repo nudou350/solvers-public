@@ -1,26 +1,26 @@
 {
   "id": "09-ferramenta-e-garantia",
-  "input": "Quero que o meu Solver tenha uma ferramenta própria que calcule tudo no servidor e uma garantia que só paga se os testes passarem. Como declaro isso no manifesto?",
+  "input": "I want my Solver to have its own tool that calculates everything on the server and a guarantee that only pays out if the tests pass. How do I declare that in the manifest?",
   "checks": [
     {
       "type": "regex",
-      "value": "Abertura|fase seguinte|ainda n[ãa]o (est[áa]|[ée]|existe|dispon)|mais para a frente|depois",
-      "description": "Explica que ferramenta e garantia de terceiros ficam para uma fase posterior"
+      "value": "Opening|later phase|next phase|not (yet )?(available|supported|open|possible)|later on|later|down the road",
+      "description": "Explains that third-party tools and guarantees are left for a later phase"
     },
     {
       "type": "regex",
-      "value": "plano|registr|anot",
-      "description": "Propõe registrar o plano da ferramenta futura em vez de declarar agora"
+      "value": "plan|record|note",
+      "description": "Proposes recording the plan for the future tool instead of declaring it now"
     },
     {
       "type": "regex",
-      "value": "gates?|casos de teste|modelos?|confer[êe]ncia",
-      "description": "Oferece a verificação substituta que existe hoje"
+      "value": "gates?|test cases|templates?|cross-?check",
+      "description": "Offers the substitute verification that exists today"
     },
     {
       "type": "not_contains",
       "value": "available\": true",
-      "description": "Não manda ligar a garantia no manifesto"
+      "description": "Does not tell them to turn the guarantee on in the manifest"
     }
   ]
 }

@@ -1,10 +1,26 @@
 {
   "id": "06-contas-luz-agua-internet",
-  "input": "Como faço com a luz, a água e a internet do apartamento antigo e do novo?",
+  "input": "What do I do about the electricity, water and internet of the old apartment and the new one?",
   "checks": [
-    { "type": "regex", "value": "protocolo", "description": "Método: orienta guardar o protocolo de cada atendimento" },
-    { "type": "regex", "value": "antecedência|antes da mudança", "description": "Método: avisa antes da mudança, não depois" },
-    { "type": "regex", "value": "concession[aá]ria|atendimento|site oficial", "description": "Ressalva: o prazo vale o da concessionária ou do atendimento oficial" },
-    { "type": "not_contains", "value": "garanto que", "description": "Anti: não garante prazo de terceiros" }
+    {
+      "type": "regex",
+      "value": "protocol",
+      "description": "Method: advises keeping the protocol number of each contact"
+    },
+    {
+      "type": "regex",
+      "value": "in advance|before the move|ahead of time",
+      "description": "Method: gives notice before the move, not after"
+    },
+    {
+      "type": "regex",
+      "value": "utility|customer service|official (website|site)",
+      "description": "Caveat: the deadline is whatever the utility company or official customer service says"
+    },
+    {
+      "type": "not_contains",
+      "value": "I guarantee that",
+      "description": "Anti: does not guarantee third-party deadlines"
+    }
   ]
 }

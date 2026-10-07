@@ -1,60 +1,60 @@
-# Etapa 5: Ferramentas e verificação
+# Step 5: Tools and verification
 
-## Objetivo
+## Goal
 
-Combinar com o usuário, **sem criar falsa expectativa**, o que é possível agora em matéria de ferramentas e de verificação do resultado, **registrar o plano** do que ele gostaria de ter no futuro e definir a **verificação substituta** que o pacote terá hoje. Ao fim da etapa o manifesto está coerente com a fase: sem `tools`, sem garantia por testes, sem pasta `verifier/`.
+Agree with the user, **without creating false expectations**, on what is possible today regarding tools and verification of the result, **record the plan** for what they would like to have in the future, and define the **substitute verification** the package will have today. By the end of the step the manifest is consistent with the phase: no `tools`, no test-based guarantee, no `verifier/` folder.
 
-A regra desta fase (o Núcleo): pacotes de criadores novos são **processo guiado + conhecimento vivo e citado + memória + atendimento do criador**. **Ferramenta executável no servidor** (por exemplo, uma calculadora que roda de verdade) e **verificador automático do resultado** (por exemplo, rodar testes) ainda não estão abertos a terceiros. Eles ficam para a fase de Abertura, com regras de segurança próprias, e sem data prometida. Isso é menos do que um Solver completo da plataforma tem, mas já é bem mais do que uma skill comum. Diga isso ao usuário com naturalidade, sem drama.
+The rule of this phase (the Core phase): packages from new creators are **guided process + living and cited knowledge + memory + creator support**. An **executable tool on the server** (for example, a calculator that really runs) and an **automatic result verifier** (for example, running tests) are not yet open to third parties. They are left for the Opening phase, with their own security rules, and no promised date. This is less than a full platform Solver has, but it is already well beyond an ordinary skill. Tell the user this naturally, without drama.
 
-## O que perguntar ao usuário
+## What to ask the user
 
-1. **Existe algum cálculo, consulta ou checagem que o seu método faz e que um texto não resolve bem?** (somar valores, comparar tabelas, consultar uma regra numa API, rodar um teste). Se sim, é candidato a ferramenta futura.
-2. **Que dados entrariam nessa ferramenta e o que sairia dela?** Prefira números e opções fechadas. Dados pessoais e textos livres são um problema de segurança e privacidade.
-3. **O resultado do seu Solver pode ser conferido de forma objetiva?** (soma bate, o texto cita a fonte, o código passa nos testes). Isso inspira os gates e os casos de teste.
-4. **O usuário aceitaria publicar agora sem ferramenta e acrescentar depois?** A resposta quase sempre é sim, e acrescentar depois é uma versão nova (mudança MAJOR, com revisão completa).
+1. **Is there any calculation, lookup or check that your method does and that text does not handle well?** (summing values, comparing tables, querying a rule in an API, running a test). If so, it is a candidate for a future tool.
+2. **What data would go into that tool and what would come out?** Prefer numbers and closed options. Personal data and free text are a security and privacy problem.
+3. **Can your Solver's result be checked objectively?** (the sum matches, the text cites the source, the code passes the tests). This inspires the gates and the test cases.
+4. **Would the user accept publishing now without a tool and adding one later?** The answer is almost always yes, and adding one later is a new version (a MAJOR change, with full review).
 
-## Como executar
+## How to run
 
-1. **Explique a regra da fase** em 4 frases (ver o objetivo). Se o usuário queria ferramenta ou garantia por testes como atrativo principal, ajude a decidir se vale publicar agora com os outros diferenciais ou esperar.
-2. **Se há candidatas a ferramenta futura, registre o plano** (não vai no manifesto). Para cada uma, anote num bloco como este:
-
-```
-nome: calcular_limite
-o que faz: soma as receitas do ano e diz quanto resta do limite
-entrada: receitas (lista de números), ano (número)
-saída: acumulado, restante, alerta (texto curto)
-por que um texto não resolve: erro de conta com muitas parcelas
-dados saem do servidor da plataforma? sim/não (precisaria de consentimento do usuário)
-```
-
-   Se não há nenhuma, registre a palavra **nenhuma**. Esse plano vai no `README.md` do revisor (modelo `readme-do-revisor` em `get_template`, seção "Plano para a Abertura") e no `result_summary`.
-3. **Mostre, em uma frase por item, como será na Abertura** (para o usuário saber o que esperar): ferramentas de terceiros serão chamadas por internet segura, com entrada restrita (opções e números, textos curtos), saída tipada e domínio verificado; qualquer mudança de endereço ou de campos enviados será versão MAJOR; o comprador será avisado de que os dados informados saem do servidor da plataforma. Tudo isso **ainda não está disponível**.
-4. **Defina a verificação substituta** que o pacote terá hoje:
-   - **Gates objetivos** em cada etapa (etapa 3): itens que a IA e o usuário conseguem marcar.
-   - **Conferência cruzada no texto da etapa**: "refaça a conta por outro caminho e compare", "liste as fontes citadas e a data de cada uma", "releia o resultado contra o checklist".
-   - **Modelos** (`templates/`) com a estrutura exata da entrega, para o resultado sair padronizado. **Escreva agora o arquivo de cada modelo declarado em `templates` no manifesto** (`templates/<name>.md`, em Markdown, com campos para preencher e nenhum "TROQUE" sobrando): o `get_template` do pacote só entrega o que existe, e arquivo faltando é o erro `TEMPLATE_MISSING`. Os modelos do Criador (`get_template`) servem de inspiração, não de cópia.
-   - **Casos de teste** (etapa 7) com checagens de texto e de números.
-5. **Limpe o manifesto**: sem `tools` (ou `tools: []`), `guarantee: { "available": false, "defaultCriteria": [] }`, sem `platform`, sem pasta `verifier/`. Terceiros com ferramenta recebem `TOOL_FORBIDDEN_RUNNER`; com garantia, `MANIFEST_GUARANTEE_FORBIDDEN`; com `platform` ou `verifier/`, `MANIFEST_PLATFORM_FORBIDDEN`.
-6. **Confira `differentiators`**: sem `tool` e sem `verifier`. Se constavam, retire e veja se ainda restam 2 comprovados (etapa 2).
-7. **Ajuste a vitrine ao que existe.** Revise `description`, `packageContents` e `beforeAfter` (opcional: até 5 exemplos `{ prompt, withoutSolver, withSolver }`; se não houver, deixe fora do manifesto) para não prometer cálculo no servidor, verificação automática, testes rodando ou garantia. O validador avisa quando `packageContents` fala de ferramenta ou garantia que o pacote não tem (`CONTENTS_MISMATCH`).
-8. Mostre ao usuário o resumo "Hoje / Depois" e peça um ok.
-
-## Erros comuns
-
-- **Prometer na vitrine o que só existe na Abertura.** É o erro mais comum desta etapa.
-- **Declarar uma ferramenta "só para constar".** O runner é recusado e o envio trava.
-- **Marcar garantia como disponível.** Nesta fase é erro.
-- **Entrada livre numa ferramenta futura.** Prefira opções e números; texto livre vira risco de segurança.
-- **Descartar o plano.** Anotar o que seria a ferramenta ajuda o roteiro do produto e o revisor.
-- **Tratar verificação como "a IA confere sozinha".** Sem gates objetivos, a conferência é só promessa.
-
-## Formato do result_summary
+1. **Explain the rule of the phase** in 4 sentences (see the objective). If the user wanted a tool or a test-based guarantee as the main selling point, help decide whether it is worth publishing now with the other differentiators or waiting.
+2. **If there are candidates for a future tool, record the plan** (it does not go in the manifest). For each one, note a block like this:
 
 ```
-FERRAMENTAS E VERIFICAÇÃO
-- Regra da fase explicada: sim
-- Plano para a Abertura: (nome + função) ou "nenhuma"
-- Verificação substituta: gates objetivos nas etapas X, Y; conferência cruzada na etapa Z; modelos: ...
-- Manifesto: tools vazio | guarantee.available=false | sem verifier/
-- Vitrine ajustada: packageContents e description sem promessa de ferramenta
+name: calculate_limit
+what it does: sums the year's revenue and says how much of the limit remains
+input: revenue (list of numbers), year (number)
+output: accumulated, remaining, alert (short text)
+why text is not enough: arithmetic mistakes with many installments
+does data leave the platform server? yes/no (would need the user's consent)
+```
+
+   If there are none, record the word **none**. This plan goes in the reviewer's `README.md` (template `readme-do-revisor` via `get_template`, section "Plan for the Opening phase") and in the `result_summary`.
+3. **Show, in one sentence per item, how it will work in the Opening phase** (so the user knows what to expect): third-party tools will be called over a secure connection, with restricted input (options and numbers, short texts), typed output and a verified domain; any change of address or of the fields sent will be a MAJOR version; the buyer will be told that the data they enter leaves the platform server. All of this **is not available yet**.
+4. **Define the substitute verification** the package will have today:
+   - **Objective gates** in every step (step 3): items that the AI and the user can tick off.
+   - **Cross-checking in the step text**: "redo the calculation another way and compare", "list the cited sources and the date of each", "reread the result against the checklist".
+   - **Templates** (`templates/`) with the exact structure of the deliverable, so the result comes out standardized. **Write now the file for each template declared in `templates` in the manifest** (`templates/<name>.md`, in Markdown, with fields to fill in and no leftover "REPLACE" markers): the package's `get_template` only delivers what exists, and a missing file is the error `TEMPLATE_MISSING`. The Creator's own templates (`get_template`) are for inspiration, not for copying.
+   - **Test cases** (step 7) with text and number checks.
+5. **Clean up the manifest**: no `tools` (or `tools: []`), `guarantee: { "available": false, "defaultCriteria": [] }`, no `platform`, no `verifier/` folder. Third parties with a tool get `TOOL_FORBIDDEN_RUNNER`; with a guarantee, `MANIFEST_GUARANTEE_FORBIDDEN`; with `platform` or `verifier/`, `MANIFEST_PLATFORM_FORBIDDEN`.
+6. **Check `differentiators`**: no `tool` and no `verifier`. If they were there, remove them and see whether 2 proven ones still remain (step 2).
+7. **Adjust the storefront to what exists.** Review `description`, `packageContents` and `beforeAfter` (optional: up to 5 examples `{ prompt, withoutSolver, withSolver }`; if there are none, leave it out of the manifest) so they do not promise server-side calculation, automatic verification, tests running or a guarantee. The validator warns when `packageContents` talks about a tool or guarantee the package does not have (`CONTENTS_MISMATCH`).
+8. Show the user the "Today / Later" summary and ask for an ok.
+
+## Common mistakes
+
+- **Promising on the storefront what only exists in the Opening phase.** It is the most common mistake in this step.
+- **Declaring a tool "just for the record".** The runner is rejected and the submission stalls.
+- **Marking the guarantee as available.** In this phase it is an error.
+- **Free input in a future tool.** Prefer options and numbers; free text becomes a security risk.
+- **Throwing the plan away.** Noting what the tool would be helps the product roadmap and the reviewer.
+- **Treating verification as "the AI checks it by itself".** Without objective gates, checking is only a promise.
+
+## result_summary format
+
+```
+TOOLS AND VERIFICATION
+- Phase rule explained: yes
+- Plan for the Opening phase: (name + function) or "none"
+- Substitute verification: objective gates in steps X, Y; cross-check in step Z; templates: ...
+- Manifest: tools empty | guarantee.available=false | no verifier/
+- Storefront adjusted: packageContents and description with no tool promise
 ```

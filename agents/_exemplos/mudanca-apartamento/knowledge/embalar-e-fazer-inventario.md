@@ -1,21 +1,21 @@
 ---
-title: Como embalar e fazer o inventário da mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: How to pack and make the moving inventory
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [embalagem, inventario, caixas]
+tags: [packing, inventory, boxes]
 ---
 
-# Como embalar e fazer o inventário da mudança
+# How to pack and make the moving inventory
 
-## Embalar por cômodo e por prioridade
+## Pack by room and by priority
 
-A criadora embala por cômodo, começando pelo que menos usa: livros, enfeites, roupas de outra estação. Cada caixa leva o nome do cômodo de destino e um número, e as mais pesadas ficam menores (livros em caixa pequena). Itens frágeis vão com papel ou tecido e a caixa recebe a marca "frágil" em dois lados. Uma caixa ou mala de primeira noite com documentos, remédios, carregadores, roupa de cama e itens de banho viaja com a pessoa, não no veículo da mudança.
+The creator packs by room, starting with what she uses least: books, decorations, clothes from another season. Each box gets the name of the destination room and a number, and the heaviest ones stay smaller (books go in a small box). Fragile items go with paper or cloth and the box gets a "fragile" mark on two sides. A first-night box or suitcase with documents, medication, chargers, bed linen and bathroom items travels with the person, not in the moving vehicle.
 
-## Inventário simples
+## A simple inventory
 
-Uma lista numerada com o número de cada caixa, o cômodo e o conteúdo em poucas palavras, mais uma lista à parte dos móveis e eletrodomésticos com o estado (por exemplo, "arranhão no tampo da mesa"). A criadora tira fotos dos móveis grandes antes do carregamento e usa a lista na entrega, para conferir que tudo chegou. Se a empresa tiver o próprio inventário, ela compara com o seu e assina só depois de conferir.
+A numbered list with the number of each box, the room and the contents in a few words, plus a separate list of furniture and appliances with their condition (for example, "scratch on the table top"). The creator takes photos of the large furniture before loading and uses the list at delivery, to check that everything arrived. If the company has its own inventory, she compares it with hers and signs only after checking.
 
-## Itens que não vão no caminhão
+## Items that do not go on the truck
 
-Documentos importantes, joias, dinheiro, notebook, remédios, plantas delicadas e animais costumam ir com a própria pessoa. Alguns itens, como produtos inflamáveis ou de limpeza abertos, normalmente são recusados pelas empresas: pergunte à transportadora a lista dela. Comida perecível deve ser consumida antes ou levada em caixa térmica.
+Important documents, jewelry, cash, laptop, medication, delicate plants and animals usually go with the person. Some items, such as flammable products or opened cleaning products, are normally refused by companies: ask the moving company for its list. Perishable food should be eaten beforehand or taken in a cooler.

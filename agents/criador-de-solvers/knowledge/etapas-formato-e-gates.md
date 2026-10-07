@@ -1,57 +1,57 @@
 ---
-title: Etapas e gates: formato, tamanho e varreduras
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seção 5, e regras do validador da plataforma
+title: Steps and gates: format, length and scans
+source: Solver package specification v1 (PACKAGE_SPEC), section 5, and the platform validator rules
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [etapas, gates, secoes]
+tags: [steps, gates, sections]
 ---
 
-# Etapas e gates: formato, tamanho e varreduras
+# Steps and gates: format, length and scans
 
-Esta base explica o formato exato dos arquivos de etapa do Solver: as cinco seções, o tamanho, os gates, o resumo entre etapas, as ferramentas que podem ser citadas e as varreduras automáticas que geram avisos para o revisor.
+This knowledge file explains the exact format of the Solver's step files: the five sections, the length, the gates, the summary between steps, the tools that can be mentioned and the automatic scans that raise warnings for the reviewer.
 
-## O que é uma etapa
+## What a step is
 
-Cada etapa é um arquivo `.md` em `steps/`, escrito **para a IA do comprador**, em segunda pessoa e no imperativo. O servidor entrega **uma etapa por vez** (`next_step`): a IA só avança depois de cumprir o gate e enviar o resumo da etapa. O comprador nunca vê o texto bruto das etapas.
+Each step is a `.md` file in `steps/`, written **for the buyer's AI**, in the second person and the imperative. The server delivers **one step at a time** (`next_step`): the AI only moves on after meeting the gate and sending the step summary. The buyer never sees the raw step text.
 
-## As 5 seções (títulos exatos)
+## The 5 sections (exact titles)
 
-O arquivo começa com o título `# Etapa N: <título>` e depois traz, nesta ordem, as seções `## Objetivo`, `## O que perguntar ao usuário`, `## Como executar`, `## Erros comuns` e `## Formato do result_summary` (cada uma em uma linha própria, com dois sinais de `#`).
+The file starts with the title `# Step N: <title>` and then has, in this order, the sections `## Goal`, `## What to ask the user`, `## How to run`, `## Common mistakes` and `## result_summary format` (each on its own line, with two `#` signs). These English titles are the standard. The validator still accepts the old Portuguese ones (`## Objetivo`, `## O que perguntar ao usuário`, `## Como executar`, `## Erros comuns`, `## Formato do result_summary`) so older packages keep working; use the English ones in new packages. The text under them can be in any language.
 
-- `Objetivo`, `Como executar` e `Formato do result_summary` são **obrigatórias**: faltar uma é erro em specVersion 1 (`STEP_SECTION_MISSING`).
-- `O que perguntar ao usuário` e `Erros comuns` também devem existir; sem elas há aviso.
-- O título da seção precisa ser igual ao acima (a busca é pela linha `## Título`).
+- `Goal`, `How to run` and `result_summary format` are **required**: missing one is an error in specVersion 1 (`STEP_SECTION_MISSING`).
+- `What to ask the user` and `Common mistakes` should also exist; without them there is a warning.
+- The section title must be identical to the above (the match is on the line `## Title`).
 
-## Tamanho
+## Length
 
-De 400 a 12.000 caracteres por etapa (`STEP_TOO_SHORT_LONG`, erro em specVersion 1). Etapas curtas demais costumam ser vagas e deixam a IA adivinhar; longas demais perdem foco e ficam difíceis de revisar. Mira confortável: 2.000 a 6.000 caracteres. Se passar de 12.000, divida em duas etapas.
+400 to 12,000 characters per step (`STEP_TOO_SHORT_LONG`, an error in specVersion 1). Steps that are too short tend to be vague and leave the AI guessing; ones that are too long lose focus and are hard to review. A comfortable target: 2,000 to 6,000 characters. If it goes over 12,000, split it into two steps.
 
-## Gates (checklist de saída)
+## Gates (exit checklist)
 
-O `gate` de cada etapa no manifesto tem de 0 a 6 itens de texto (mais de 6 é `GATE_TOO_MANY`, erro em specVersion 1). Na prática, escreva de 3 a 6. Cada item deve ser **verificável**: dá para responder sim ou não olhando o que a IA entregou. O servidor não confere o gate (nesta fase ele é texto); quem o cumpre é a IA, instruída pela etapa, e o comprador vê.
+Each step's `gate` in the manifest has 0 to 6 text items (more than 6 is `GATE_TOO_MANY`, an error in specVersion 1). In practice, write 3 to 6. Each item must be **verifiable**: you can answer yes or no by looking at what the AI delivered. The server does not check the gate (in this phase it is text); the AI meets it, instructed by the step, and the buyer sees it.
 
 ## result_summary
 
-O resumo da etapa (até 4.000 caracteres) é como a próxima etapa sabe o que aconteceu. A seção "Formato do result_summary" define a estrutura (por exemplo, listas curtas com decisões, números e pendências). Pense nele como o "bilhete de passagem" entre etapas.
+The step summary (up to 4,000 characters) is how the next step knows what happened. The "result_summary format" section defines the structure (for example, short lists with decisions, numbers and open items). Think of it as the "boarding pass" between steps.
 
-## Ferramentas e nomes entre crases
+## Tools and names in backticks
 
-O validador procura nomes `snake_case` entre crases, nas linhas que falam de `run_tool` ou de ferramenta, e avisa quando o nome não existe em `tools[]` (`STEP_REFERENCE_UNKNOWN`). Nomes das tools do conector (`search_knowledge`, `get_memory`, `save_memory`, `get_template`, `next_step`, `run_tool`) podem ser citados à vontade.
+The validator looks for `snake_case` names in backticks, on lines that talk about `run_tool` or about tools, and warns when the name does not exist in `tools[]` (`STEP_REFERENCE_UNKNOWN`). The connector tool names (`search_knowledge`, `get_memory`, `save_memory`, `get_template`, `next_step`, `run_tool`) can be mentioned freely.
 
-## Varreduras automáticas (avisos para o revisor)
+## Automatic scans (warnings for the reviewer)
 
-- `STEP_SENSITIVE_ASK`: a etapa manda pedir senha, número de documento, cartão, chave ou login. Remova.
-- `STEP_EXTERNAL_URL`: endereço de internet junto de um verbo de envio (enviar, postar, upload) ou com parâmetros na consulta. Etapa não manda dados do usuário para fora.
-- `STEP_INJECTION_PATTERN`: frases que tentam mandar a IA descartar regras anteriores, esconder algo do usuário ou assumir outro papel de sistema.
-- `TEXT_HIDDEN_CHARS`: caracteres invisíveis ou de direção de texto (podem esconder instruções).
-- As mesmas varreduras valem para o texto do manifesto que chega ao modelo e para as perguntas de calibragem.
+- `STEP_SENSITIVE_ASK`: the step tells the AI to ask for a password, ID number, card, key or login. Remove it.
+- `STEP_EXTERNAL_URL`: an internet address next to a sending verb (send, post, upload) or with parameters in the query. A step does not send user data outside.
+- `STEP_INJECTION_PATTERN`: phrases that try to make the AI discard previous rules, hide something from the user or take on another system role.
+- `TEXT_HIDDEN_CHARS`: invisible or text-direction characters (they can hide instructions).
+- The same scans apply to the manifest text that reaches the model and to the calibration questions.
 
-São avisos, não bloqueio automático, mas o revisor humano lê cada um e pode recusar.
+These are warnings, not an automatic block, but the human reviewer reads each one and can reject.
 
-## O que a etapa pode usar do servidor
+## What a step can use from the server
 
-`search_knowledge` (busca no conhecimento do Solver, devolve até 5 trechos com fonte e data), `get_template` (devolve um modelo declarado), `get_memory` e `save_memory` (perfil e notas do comprador) e, no fim, `next_step`. Terceiros não têm ferramentas próprias nesta fase.
+`search_knowledge` (search in the Solver's knowledge, returns up to 5 excerpts with source and date), `get_template` (returns a declared template), `get_memory` and `save_memory` (the buyer's profile and notes) and, at the end, `next_step`. Third parties have no tools of their own in this phase.
 
-## Etapa de verdade versus texto bonito
+## A real step versus nicely written text
 
-O que faz o modelo seguir o processo é: passos numerados e concretos, exemplos curtos de entrada e saída, perguntas agrupadas, o que fazer quando falta informação e um gate objetivo. Veja a base sobre como escrever etapas que o modelo segue.
+What makes the model follow the process is: numbered, concrete actions, short input and output examples, grouped questions, what to do when information is missing, and an objective gate. See the knowledge file on how to write steps the model follows.

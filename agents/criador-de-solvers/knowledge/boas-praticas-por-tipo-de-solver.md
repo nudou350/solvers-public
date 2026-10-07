@@ -1,76 +1,76 @@
 ---
-title: Boas práticas por tipo de Solver
-source: Experiência de curadoria da equipe Solvers com os pacotes da plataforma (front-end React, planejador de viagens, cópia e marketing, revisão de contratos, planilhas) e regras da especificação v1
+title: Best practices by type of Solver
+source: Solvers team curation experience with the platform's packages (React front end, trip planner, copy and marketing, contract review, spreadsheets) and the v1 specification rules
 source_date: 2026-10-02
-tags: [boas-praticas, tipos, tecnico, conteudo, consultivo, viagem, dados]
+tags: [best-practices, types, technical, content, consultative, travel, data]
 ---
 
-# Boas práticas por tipo de Solver
+# Best practices by type of Solver
 
-Use esta base na etapa 1 (tipo do Solver) e na etapa 3 (processo). Não é regra do validador: é o que costuma dar certo. Em todos os tipos valem as regras da fase: sem ferramenta, sem garantia, sem categoria de Finanças, Jurídico ou saúde.
+Use this knowledge file in step 1 (type of Solver) and step 3 (process). It is not a validator rule: it is what usually works. For every type the rules of the phase apply: no tools, no guarantee, no Finance, Legal or health category.
 
-## Técnico ou código: processo e etapas
+## Technical or code: process and steps
 
-Exemplos: componentes de interface, scripts, revisão de código, configuração de ferramentas.
+Examples: interface components, scripts, code review, tool configuration.
 
-- Etapas típicas: (1) entender o pedido e o projeto (stack, versões, restrições), (2) planejar a estrutura e os casos, (3) implementar, (4) revisar contra um checklist.
-- Gates objetivos: "stack e versão confirmadas", "lista de casos de teste aprovada pelo usuário", "nenhum aviso do linter pendente", "revisão contra o checklist feita item a item".
-- Peça o que o usuário já tem (trecho de código, mensagem de erro, versão) em vez de dados pessoais. Peça exemplos mínimos que reproduzam o problema.
-- Diferenciais naturais: `memory` (stack e estilo do usuário) e `liveData` (padrões e versões datados).
+- Typical steps: (1) understand the request and the project (stack, versions, constraints), (2) plan the structure and the cases, (3) implement, (4) review against a checklist.
+- Objective gates: "stack and version confirmed", "list of test cases approved by the user", "no pending linter warnings", "review against the checklist done item by item".
+- Ask for what the user already has (a code snippet, an error message, a version) instead of personal data. Ask for minimal examples that reproduce the problem.
+- Natural differentiators: `memory` (the user's stack and style) and `liveData` (dated patterns and versions).
 
-## Técnico ou código: conhecimento e armadilhas
+## Technical or code: knowledge and pitfalls
 
-- Conhecimento: padrões e armadilhas datados por versão ("React 19: ..."), checklists de revisão, exemplos curtos de código certo e errado. Cite a documentação oficial como fonte e a data da versão.
-- Coloque `valid_until` em tudo que depende de versão.
-- Armadilhas: prometer que o código "funciona em produção" sem testes; exemplos de código com chaves ou senhas reais; copiar documentação de terceiros sem licença; etapa que manda "rodar no servidor" algo que o Solver não executa (ele não executa nada nesta fase).
-- Casos de teste: o código sugerido contém o padrão certo (`contains`), cita a versão (`regex`) e não usa o padrão proibido (`not_contains`).
+- Knowledge: patterns and pitfalls dated by version ("React 19: ..."), review checklists, short examples of right and wrong code. Cite the official documentation as the source and the version date.
+- Put `valid_until` on everything that depends on a version.
+- Pitfalls: promising that the code "works in production" without tests; code examples with real keys or passwords; copying third-party documentation without a license; a step that tells the AI to "run on the server" something the Solver does not execute (it executes nothing in this phase).
+- Test cases: the suggested code contains the right pattern (`contains`), cites the version (`regex`) and does not use the forbidden pattern (`not_contains`).
 
-## Conteúdo e marketing: processo
+## Content and marketing: process
 
-Exemplos: textos para redes sociais, e-mails, páginas de venda, roteiros.
+Examples: social media copy, emails, sales pages, scripts.
 
-- Etapas típicas: (1) briefing (marca, público, objetivo, canal), (2) pesquisa e ângulo, (3) rascunho, (4) revisão contra o guia de tom e de claims, (5) entrega no modelo.
-- Gates: "briefing confirmado", "3 ângulos oferecidos", "texto revisado contra a lista de promessas proibidas", "versão final no modelo".
-- Calibragem útil: tom da marca, público, canal principal, o que nunca dizer. Guarde como perfil.
-- Diferenciais naturais: `memory` (marca e tom) e `liveData` (formatos e regras das plataformas, datados).
+- Typical steps: (1) briefing (brand, audience, goal, channel), (2) research and angle, (3) draft, (4) review against the tone and claims guide, (5) delivery in the template.
+- Gates: "briefing confirmed", "3 angles offered", "text reviewed against the list of forbidden promises", "final version in the template".
+- Useful calibration: brand tone, audience, main channel, what never to say. Store it as the profile.
+- Natural differentiators: `memory` (brand and tone) and `liveData` (platform formats and rules, dated).
 
-## Conteúdo e marketing: conhecimento e armadilhas
+## Content and marketing: knowledge and pitfalls
 
-- Conhecimento: guia de tom com exemplos bons e ruins, estruturas de texto (gancho, prova, chamada), regras de cada canal (limites, formatos) com data, lista de promessas que não se pode fazer (resultado garantido, cura, ganho certo).
-- Armadilhas: prometer resultado ("dobre suas vendas"); copiar textos de terceiros; reproduzir marcas e nomes protegidos como se fossem seus; depoimentos inventados; etapa que manda "esconder" que o texto foi gerado quando isso é exigido pelo canal.
-- Casos de teste: o texto traz um gancho e uma chamada (`regex`), cita o tom do perfil, não contém promessas proibidas (`not_contains`).
+- Knowledge: a tone guide with good and bad examples, text structures (hook, proof, call to action), each channel's rules (limits, formats) with a date, a list of promises that cannot be made (guaranteed result, cure, sure gain).
+- Pitfalls: promising results ("double your sales"); copying third-party text; reproducing protected brands and names as if they were yours; invented testimonials; a step that tells the AI to "hide" that the text was generated when the channel requires disclosure.
+- Test cases: the text has a hook and a call to action (`regex`), cites the profile's tone, and contains no forbidden promises (`not_contains`).
 
-## Consultivo com regras de negócio: processo
+## Consultative with business rules: process
 
-Exemplos: fechamento mensal, política de preços, diagnóstico de processo, compliance operacional (sem Finanças e Jurídico regulados).
+Examples: monthly closing, pricing policy, process diagnosis, operational compliance (excluding regulated Finance and Legal).
 
-- Etapas típicas: (1) levantar a situação com números, (2) aplicar as regras com a fonte e a data, (3) calcular e conferir, (4) entregar um relatório no modelo com a ressalva.
-- Gates: "valores levantados e confirmados", "regra citada com fonte e data", "conta refeita por outro caminho", "ressalva de conferir na fonte oficial incluída".
-- Como não há ferramenta de cálculo, escreva o cálculo passo a passo na etapa, com exemplo numérico, e mande conferir por outro caminho.
-- Diferenciais naturais: `liveData` (regras e valores datados) e `escalation` (casos complexos ao criador) ou `memory`.
+- Typical steps: (1) gather the situation with numbers, (2) apply the rules with the source and date, (3) calculate and check, (4) deliver a report in the template with the disclaimer.
+- Gates: "values collected and confirmed", "rule cited with source and date", "calculation redone another way", "reminder to check the official source included".
+- Since there is no calculation tool, write the calculation step by step in the step, with a numeric example, and tell the AI to check it another way.
+- Natural differentiators: `liveData` (dated rules and values) and `escalation` (complex cases to the creator) or `memory`.
 
-## Consultivo com regras de negócio: conhecimento e armadilhas
+## Consultative with business rules: knowledge and pitfalls
 
-- Conhecimento: cada regra em uma seção, com número, unidade, vigência, exceções e fonte oficial. Marque `valid_until` em tudo que vence.
-- Armadilhas: regra desatualizada sem `valid_until`; conteúdo fiscal ou regulatório sem ressalva; dar parecer ("você deve fazer X") em vez de orientar e mandar conferir; esquecer as exceções.
-- Casos de teste: o valor correto aparece (`contains`), a fonte e a data são citadas (`regex`), a ressalva está presente, não há "garantido" nem parecer definitivo (`not_contains`).
+- Knowledge: each rule in a section, with a number, a unit, an effective period, exceptions and the official source. Mark `valid_until` on everything that expires.
+- Pitfalls: an outdated rule without `valid_until`; tax or regulatory content without a disclaimer; giving an opinion ("you must do X") instead of guiding and telling the user to check; forgetting the exceptions.
+- Test cases: the correct value appears (`contains`), the source and date are cited (`regex`), the disclaimer is present, and there is no "guaranteed" or definitive opinion (`not_contains`).
 
-## Viagem e planejamento
+## Travel and planning
 
-Exemplos: roteiro de viagem, plano de estudos, planejamento de evento, mudança.
+Examples: trip itinerary, study plan, event planning, moving.
 
-- Etapas típicas: (1) perfil e restrições, (2) pré-requisitos e prazos (documentos, reservas), (3) orçamento realista, (4) cronograma possível de cumprir, (5) checklist final com datas.
-- O erro mais comum é o excesso: cronogramas apertados, sem folga. Escreva regras como "no máximo 2 atividades grandes por dia" e "dia de deslocamento vale meio dia".
-- Diferenciais naturais: `memory` (preferências entre viagens ou projetos) e `liveData` (regras, prazos e preços datados, sempre com aviso de conferir na fonte oficial).
-- Casos de teste: aponta o pré-requisito que costuma ser esquecido, usa as regras de ritmo, manda confirmar no site oficial, não promete preços fixos.
+- Typical steps: (1) profile and constraints, (2) prerequisites and deadlines (documents, bookings), (3) realistic budget, (4) a schedule that can actually be met, (5) final checklist with dates.
+- The most common mistake is excess: tight schedules with no slack. Write rules such as "at most 2 big activities per day" and "a travel day counts as half a day".
+- Natural differentiators: `memory` (preferences across trips or projects) and `liveData` (dated rules, deadlines and prices, always with a reminder to check the official source).
+- Test cases: points out the prerequisite that is usually forgotten, uses the pacing rules, tells the user to confirm on the official site, does not promise fixed prices.
 
-## Análise de dados e planilhas
+## Data analysis and spreadsheets
 
-Exemplos: limpeza de planilha, painel de vendas, análise de pesquisa.
+Examples: spreadsheet cleaning, sales dashboards, survey analysis.
 
-- Etapas típicas: (1) entender a base (colunas, unidades, período), (2) limpar e conferir, (3) analisar com perguntas objetivas, (4) apresentar o resultado com limites e hipóteses.
-- Peça uma **amostra fictícia ou anonimizada**, nunca a base com dados pessoais. Diga na etapa que a IA não deve repetir nomes, documentos ou contatos.
-- Gates: "colunas e unidades confirmadas", "linhas duplicadas e vazias tratadas e contadas", "cada conclusão traz o número que a sustenta", "limitações da amostra declaradas".
-- Conhecimento: guia de erros comuns de dados, definições de métricas do seu negócio, convenções de nomes. Cite a fonte das definições.
-- Armadilhas: conclusão sem número; correlação tratada como causa; misturar períodos e moedas; prometer previsão.
-- Diferenciais naturais: `memory` (tipo de planilha e objetivos) e `escalation`.
+- Typical steps: (1) understand the base (columns, units, period), (2) clean and check, (3) analyze with objective questions, (4) present the result with limits and assumptions.
+- Ask for a **made-up or anonymized sample**, never the base with personal data. Say in the step that the AI must not repeat names, documents or contacts.
+- Gates: "columns and units confirmed", "duplicate and empty rows handled and counted", "each conclusion carries the number that supports it", "sample limitations stated".
+- Knowledge: a guide to common data errors, definitions of your business's metrics, naming conventions. Cite the source of the definitions.
+- Pitfalls: a conclusion without a number; correlation treated as cause; mixing periods and currencies; promising a forecast.
+- Natural differentiators: `memory` (type of spreadsheet and goals) and `escalation`.

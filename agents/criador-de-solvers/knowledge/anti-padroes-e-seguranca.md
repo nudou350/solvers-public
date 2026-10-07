@@ -1,68 +1,68 @@
 ---
-title: Anti-padrões e segurança: o que nunca colocar num Solver
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 5.1, 14.5 e 17
+title: Anti-patterns and security: what never to put in a Solver
+source: Solver package specification v1 (PACKAGE_SPEC), sections 5.1, 14.5 and 17
 source_date: 2026-09-30
 valid_until: 2027-03-31
-tags: [seguranca, anti-padroes, privacidade, direitos, promessas]
+tags: [security, anti-patterns, privacy, rights, promises]
 ---
 
-# Anti-padrões e segurança: o que nunca colocar num Solver
+# Anti-patterns and security: what never to put in a Solver
 
-Esta base lista o que derruba um pacote na validação ou na revisão humana e o que prejudica quem compra: instruções contra o usuário, envio de dados para fora, pedido de dado sensível, promessas, direitos autorais e manipulação da vitrine.
+This knowledge file lists what brings a package down in validation or human review and what harms the people who buy: instructions against the user, sending data out, asking for sensitive data, promises, copyright and storefront manipulation.
 
-## Princípio
+## Principle
 
-Tudo o que o criador escreve chega ao modelo do comprador. Por isso o conteúdo de terceiros é tratado como **não confiável**: ele é varrido pelo validador e lido por uma pessoa na revisão. Um Solver existe para **servir o comprador**, nunca para agir contra ele.
+Everything the creator writes reaches the buyer's model. That is why third-party content is treated as **untrusted**: it is scanned by the validator and read by a person in review. A Solver exists to **serve the buyer**, never to act against them.
 
-## Instruções contra o usuário (injeção)
+## Instructions against the user (injection)
 
-Não escreva, em etapa, conhecimento, modelo ou vitrine, textos que:
+Do not write, in a step, knowledge file, template or storefront, text that:
 
-- mandem a IA descartar regras ou instruções anteriores, ou obedecer a "comandos" que apareçam em outro texto;
-- mandem esconder algo do usuário ou mentir sobre o que está fazendo;
-- mandem a IA agir como "sistema" ou "administrador" para ganhar privilégios;
-- usem caracteres invisíveis ou de direção para esconder texto;
-- escondam instruções em trechos longos de conhecimento que só aparecem em uma consulta específica.
+- tells the AI to discard previous rules or instructions, or to obey "commands" that appear in other text;
+- tells it to hide something from the user or lie about what it is doing;
+- tells the AI to act as "system" or "administrator" to gain privileges;
+- uses invisible or direction-control characters to hide text;
+- hides instructions in long knowledge excerpts that only show up in one specific query.
 
-O validador sinaliza padrões comuns (`STEP_INJECTION_PATTERN`, `TEXT_HIDDEN_CHARS`), mas a varredura é simples: o revisor humano é quem decide, e a plataforma pode desligar o Solver na hora se houver abuso.
+The validator flags common patterns (`STEP_INJECTION_PATTERN`, `TEXT_HIDDEN_CHARS`), but the scan is simple: the human reviewer decides, and the platform can switch the Solver off immediately if there is abuse.
 
-## Dados do usuário saindo para fora
+## User data leaving
 
-Nenhuma etapa pode mandar a IA copiar a conversa, o histórico, a memória ou arquivos do usuário para um endereço externo, nem montar links com dados dele (`STEP_EXTERNAL_URL`). Se você quer feedback, use as avaliações da plataforma ou o pedido de ajuda ao criador, com consentimento do comprador.
+No step may tell the AI to copy the conversation, the history, the memory or the user's files to an outside address, nor to build links carrying their data (`STEP_EXTERNAL_URL`). If you want feedback, use the platform's reviews or the request for help from the creator, with the buyer's consent.
 
-## Dado sensível
+## Sensitive data
 
-Não peça nem salve: senhas, chaves, frases de recuperação, números de documentos (CPF, CNPJ, RG, passaporte), cartão, conta bancária, endereço completo, data de nascimento completa, diagnósticos detalhados, códigos de reserva. Peça **faixas, categorias ou exemplos fictícios**. Se o usuário digitar um desses dados, a etapa deve mandar a IA não repetir nem salvar. Isso vale para etapas (`STEP_SENSITIVE_ASK`) e para calibragem (`ONBOARDING_SENSITIVE`). Na memória: só preferências duráveis.
+Do not ask for or save: passwords, keys, recovery phrases, ID numbers (CPF, CNPJ, national ID, passport; CPF and CNPJ are Brazilian individual and company tax numbers), cards, bank accounts, a full address, a full date of birth, detailed diagnoses, booking codes. Ask for **ranges, categories or made-up examples**. If the user types one of these, the step must tell the AI not to repeat or save it. This applies to steps (`STEP_SENSITIVE_ASK`) and to calibration (`ONBOARDING_SENSITIVE`). In memory: lasting preferences only.
 
-## Promessas que não se pode fazer
+## Promises that cannot be made
 
-Sem ressalva e sem base, não prometa: resultado financeiro (ganho, rendimento, "dobrar as vendas"), resultado jurídico (ganhar causa, evitar multa com certeza), resultado de saúde (emagrecer, curar, dispensar médico), aprovação em concurso ou processo, ou nota de desempenho. Conteúdo fiscal ou regulatório dentro de uma categoria permitida exige **ressalva visível**: "confira na fonte oficial; isto não substitui um profissional". Finanças, Jurídico e saúde como categoria **não são aceitas** de criadores novos nesta fase.
+Without a disclaimer and a basis, do not promise: a financial result (gain, yield, "double sales"), a legal result (winning a case, avoiding a fine with certainty), a health result (losing weight, curing, skipping the doctor), passing an exam or a selection process, or a performance rating. Tax or regulatory content inside an allowed category requires a **visible disclaimer**: "check the official source; this does not replace a professional". Finance, Legal and health as a category are **not accepted** from new creators in this phase.
 
-## Direitos autorais
+## Copyright
 
-Só use: conteúdo seu, fatos e regras públicas de fontes oficiais citadas, material com licença aberta (respeitando a licença) ou material de terceiros com autorização por escrito. Não copie cursos, livros, apostilas, conteúdo de concorrentes ou de plataformas pagas, nem reescreva trocando palavras. O `terms` do manifesto é uma declaração sua e você responde por ela; o revisor confere duplicidade com pacotes publicados.
+Only use: your own content, public facts and rules from cited official sources, material under an open license (respecting the license), or third-party material with written authorization. Do not copy courses, books, handouts, content from competitors or paid platforms, nor rewrite it by swapping words. The manifest `terms` is your declaration and you answer for it; the reviewer checks for duplication against published packages.
 
-## Marcas e identidade
+## Brands and identity
 
-Não use nomes de marcas ou de outras empresas como se fossem seus (o validador recusa slugs reservados). Não finja ser uma pessoa, empresa ou órgão real. Não use o selo da plataforma como endosso profissional.
+Do not use the names of brands or other companies as if they were yours (the validator rejects reserved slugs). Do not pretend to be a real person, company or agency. Do not use the platform's badge as a professional endorsement.
 
-## Manipulação da vitrine
+## Storefront manipulation
 
-`searchPhrases` devem refletir o conteúdo. Frases de outro assunto para aparecer em mais buscas são recusadas. Avaliações, notas ou "provas sociais" inventadas são proibidas; a plataforma não aceita notas que ela mesma não mediu.
+`searchPhrases` must reflect the content. Phrases about another topic to appear in more searches are rejected. Made-up reviews, ratings or "social proof" are forbidden; the platform does not accept ratings it did not measure itself.
 
-## Memória e privacidade
+## Memory and privacy
 
-A memória do comprador fica cifrada e ligada à conta dele, mas o servidor consegue abri-la enquanto a conexão vale: não prometa "só você lê". O Solver não pode enviar a memória para fora nem usá-la para outra coisa que o serviço combinado. Perfil não remove gates.
+The buyer's memory is encrypted and tied to their account, but the server can open it while the connection is valid: do not promise "only you can read it". The Solver cannot send memory outside or use it for anything other than the agreed service. A profile does not remove gates.
 
-## O que o comprador pode copiar
+## What the buyer can copy
 
-Quem tem a licença pode copiar os trechos que a IA lê. Não coloque no conhecimento nada que você não aceite que seja copiado, como segredos de negócio de terceiros, dados de clientes ou documentos confidenciais.
+Whoever holds the license can copy the excerpts the AI reads. Do not put in the knowledge anything you are not willing to have copied, such as third-party trade secrets, client data or confidential documents.
 
-## Checklist rápido de segurança
+## Quick security checklist
 
-- Nenhuma instrução contra o usuário ou para esconder algo dele.
-- Nenhum envio de dados para fora.
-- Nenhum pedido de dado sensível; calibragem com faixas.
-- Nenhuma promessa de resultado; ressalva presente onde há regra fiscal ou regulatória.
-- Fontes e direitos confirmados.
-- `searchPhrases` honestas.
+- No instruction against the user or to hide something from them.
+- No sending of data outside.
+- No request for sensitive data; calibration with ranges.
+- No promise of a result; a disclaimer present wherever there is a tax or regulatory rule.
+- Sources and rights confirmed.
+- Honest `searchPhrases`.

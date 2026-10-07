@@ -1,58 +1,58 @@
 ---
-title: Glossário simples do criador de Solvers
-source: Glossário da especificação do pacote Solver v1 (PACKAGE_SPEC), adaptado para linguagem simples
+title: Plain-language glossary for Solver creators
+source: Glossary of the Solver package specification v1 (PACKAGE_SPEC), adapted to plain language
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [glossario, termos, ajuda]
+tags: [glossary, terms, help]
 ---
 
-# Glossário simples do criador de Solvers
+# Plain-language glossary for Solver creators
 
-Termos usados na criação de um Solver, explicados em linguagem simples: o produto, o pacote, a qualidade e a revisão, e alguns termos técnicos que aparecem nas mensagens do validador. Use para explicar palavras novas a quem nunca criou nada.
+Terms used when creating a Solver, explained in plain language: the product, the package, quality and review, and some technical terms that show up in validator messages. Use it to explain new words to someone who has never built anything like this.
 
-## Termos do produto
+## Product terms
 
-- **Solver**: um especialista de IA em forma de pacote (método em etapas, conhecimento, modelos e testes) que o comprador usa com a própria IA, por um conector.
-- **Pacote**: a pasta do Solver, entregue em um arquivo ZIP.
-- **Criador**: quem escreve o pacote e o publica na plataforma.
-- **Comprador**: quem compra a licença e usa o Solver.
-- **Licença**: o direito vitalício do comprador de usar o Solver.
-- **Conector (MCP)**: a ligação que permite à IA do comprador (Claude ou ChatGPT) conversar com o servidor da plataforma.
-- **Vitrine**: a página pública onde os Solvers aparecem para compra.
+- **Solver**: an AI specialist in package form (a step-by-step method, knowledge, templates and tests) that the buyer uses with their own AI, through a connector.
+- **Package**: the Solver's folder, delivered as a ZIP file.
+- **Creator**: whoever writes the package and publishes it on the platform.
+- **Buyer**: whoever buys the license and uses the Solver.
+- **License**: the buyer's lifetime right to use the Solver.
+- **Connector (MCP)**: the link that lets the buyer's AI (Claude or ChatGPT) talk to the platform's server.
+- **Storefront**: the public page where Solvers appear for purchase.
 
-## Termos do pacote
+## Package terms
 
-- **Manifesto (`manifest.json`)**: o arquivo que descreve o Solver: nome, texto de vitrine, etapas, preço, calibragem e mais.
-- **Etapa**: um passo do método, em um arquivo `.md` escrito para a IA.
-- **Gate**: o checklist de saída de uma etapa; a IA só avança quando o cumpre.
-- **result_summary**: o resumo que a IA passa ao terminar uma etapa, para a próxima saber o que foi feito.
-- **Conhecimento (RAG)**: textos do criador, cortados em trechos, que a IA consulta durante o trabalho.
-- **Trecho (chunk)**: um pedaço do conhecimento devolvido por uma busca.
-- **Front-matter**: o cabeçalho no topo de um arquivo `.md`, entre duas linhas `---`, com fonte, data e validade.
-- **Modelo (template)**: um arquivo pronto que o Solver entrega ao comprador, como um relatório.
-- **Eval (caso de teste)**: um pedido de exemplo com checagens sobre a resposta esperada.
-- **Calibragem (onboarding)**: perguntas curtas no primeiro uso, que adaptam o Solver ao comprador.
-- **Perfil**: as respostas da calibragem, guardadas na memória do comprador.
-- **Memória**: o que o Solver guarda do comprador entre sessões (perfil, notas e resumo).
-- **Nota**: algo que o comprador pede para guardar ("salva isso").
+- **Manifest (`manifest.json`)**: the file that describes the Solver: name, storefront text, steps, price, calibration and more.
+- **Step**: one stage of the method, in an `.md` file written for the AI.
+- **Gate**: a step's exit checklist; the AI only moves on once it is met.
+- **result_summary**: the summary the AI passes on when it finishes a step, so the next one knows what was done.
+- **Knowledge (RAG)**: the creator's texts, split into excerpts, that the AI consults while working.
+- **Excerpt (chunk)**: a piece of the knowledge returned by a search.
+- **Front-matter**: the header at the top of an `.md` file, between two `---` lines, with source, date and validity.
+- **Template**: a ready-made file the Solver delivers to the buyer, such as a report.
+- **Eval (test case)**: a sample request with checks on the expected answer.
+- **Calibration (onboarding)**: short questions on first use, which adapt the Solver to the buyer.
+- **Profile**: the calibration answers, stored in the buyer's memory.
+- **Memory**: what the Solver keeps about the buyer between sessions (profile, notes and summary).
+- **Note**: something the buyer asks to keep ("save this").
 
-## Termos de qualidade e revisão
+## Quality and review terms
 
-- **Validador**: o programa do servidor que confere o pacote e aponta erros e avisos com o jeito de corrigir.
-- **Erro**: problema que bloqueia o envio.
-- **Aviso**: ponto que vai para o revisor decidir.
-- **Diferencial**: algo que um Solver tem e uma skill comum não tem: ferramenta, verificador, conhecimento vivo, memória, atendimento do criador.
-- **Critério 2 de 5**: o revisor só aprova com pelo menos 2 diferenciais comprovados.
-- **Revisor**: a pessoa da equipe que lê o pacote antes de publicar (meta: até 5 dias úteis).
-- **Núcleo e Abertura**: as duas fases da plataforma. Hoje vale o Núcleo (criadores convidados e regras mais restritas); a Abertura vem depois.
-- **Ferramenta (tool)**: um recurso que roda no servidor e que a IA chama para calcular ou consultar algo. Criadores novos ainda não têm.
-- **Verificador**: um teste automático do resultado entregue (só pacotes da plataforma).
+- **Validator**: the server program that checks the package and points out errors and warnings with how to fix them.
+- **Error**: a problem that blocks submission.
+- **Warning**: a point that goes to the reviewer to decide.
+- **Differentiator**: something a Solver has and an ordinary skill does not: a tool, a verifier, living knowledge, memory, creator support.
+- **2-of-5 criterion**: the reviewer only approves with at least 2 proven differentiators.
+- **Reviewer**: the team member who reads the package before it is published (target: up to 5 business days).
+- **Core and Opening**: the two phases of the platform. Today the Core phase applies (invited creators and more restricted rules); the Opening phase comes later.
+- **Tool**: a feature that runs on the server and that the AI calls to calculate or look something up. New creators do not have them yet.
+- **Verifier**: an automatic test of the delivered result (platform packages only).
 
-## Termos técnicos que aparecem
+## Technical terms that appear
 
-- **Slug**: o nome curto do Solver no endereço (`meu-solver`).
-- **Versão (semver)**: `MAJOR.MINOR.PATCH`, como `1.0.0`.
-- **ZIP**: arquivo compactado em que o pacote é entregue, com uma só pasta dentro.
-- **UTF-8**: o formato de texto que o pacote exige (aceita acentos).
-- **Regex**: expressão regular, um jeito de descrever um padrão de texto; usada nos casos de teste.
-- **Hash**: a impressão digital do pacote, que muda se qualquer arquivo mudar.
+- **Slug**: the Solver's short name in the address (`my-solver`).
+- **Version (semver)**: `MAJOR.MINOR.PATCH`, like `1.0.0`.
+- **ZIP**: the compressed file in which the package is delivered, with a single folder inside.
+- **UTF-8**: the text format the package requires (it supports accents).
+- **Regex**: a regular expression, a way of describing a text pattern; used in test cases.
+- **Hash**: the package's fingerprint, which changes if any file changes.

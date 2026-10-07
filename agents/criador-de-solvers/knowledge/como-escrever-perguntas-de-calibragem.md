@@ -1,83 +1,85 @@
 ---
-title: Como escrever perguntas de calibragem e usar a memória
-source: Especificação do pacote Solver v1 (PACKAGE_SPEC), seções 10 e 11
+title: How to write calibration questions and use memory
+source: Solver package specification v1 (PACKAGE_SPEC), sections 10 and 11
 source_date: 2026-09-30
 valid_until: 2027-03-31
-tags: [calibragem, onboarding, memoria, perfil, notas]
+tags: [calibration, onboarding, memory, profile, notes]
 ---
 
-# Como escrever perguntas de calibragem e usar a memória
+# How to write calibration questions and use memory
 
-Esta base explica o bloco `onboarding` do manifesto, o fluxo do primeiro uso, como escrever perguntas que mudam de fato o resultado, o que é perfil, nota e resumo na memória do comprador e o que nunca perguntar.
+This knowledge file explains the manifest `onboarding` block, the first-use flow, how to write questions that really change the result, what profile, notes and summary are in the buyer's memory, and what never to ask.
 
-## O que é a calibragem
+## What calibration is
 
-Poucas perguntas no **primeiro uso** do Solver, para adaptar as respostas ao comprador sem alterar nenhum modelo. As respostas viram o **perfil**, guardado na memória do comprador e lido pelas etapas. É o que comprova o diferencial `memory`, desde que alguma etapa use o perfil.
+A few questions on the Solver's **first use**, to adapt the answers to the buyer without changing any model. The answers become the **profile**, stored in the buyer's memory and read by the steps. This is what proves the `memory` differentiator, as long as some step uses the profile.
 
-## Formato no manifesto
+## Format in the manifest
 
 ```
 "usesMemory": true,
 "onboarding": {
   "questions": [
     {
-      "id": "atividade",
-      "ask": "Qual é a atividade do seu MEI: comércio, serviço ou os dois?",
-      "why": "O valor do DAS muda conforme a atividade",
-      "options": ["Comércio", "Serviço", "Os dois"]
+      "id": "activity",
+      "ask": "What is your MEI's activity: commerce, services or both?",
+      "why": "The DAS amount changes depending on the activity",
+      "options": ["Commerce", "Services", "Both"]
     }
   ]
 }
 ```
 
-- De 1 a 5 perguntas.
-- `id`: minúsculas, dígitos e sublinhado, único.
-- `ask`: de 10 a 200 caracteres.
-- `why`: de 10 a 200 caracteres; o modelo pode explicar o motivo ao comprador.
-- `options`: opcional, de 2 a 6; sem `options` a resposta é livre. Cada opção de até 80 caracteres.
-- Não existe campo "obrigatória": toda pergunta pode ser pulada.
-- `onboarding` exige `usesMemory: true`.
+(MEI is the Brazilian micro-entrepreneur tax regime and DAS its monthly tax payment slip; this is only an example.)
 
-## Como o fluxo acontece (visão do comprador)
+- 1 to 5 questions.
+- `id`: lowercase letters, digits and underscore, unique.
+- `ask`: 10 to 200 characters.
+- `why`: 10 to 200 characters; the model can explain the reason to the buyer.
+- `options`: optional, 2 to 6; without `options` the answer is free text. Each option up to 80 characters.
+- There is no "required" field: every question can be skipped.
+- `onboarding` requires `usesMemory: true`.
 
-1. O comprador ativa o Solver. Se o Solver usa memória, a IA consulta o perfil.
-2. Se não há perfil, a IA faz as perguntas em **no máximo duas mensagens**, explica o motivo e aceita pular.
-3. A IA salva as respostas como perfil. Se o comprador pular, é gravado "pulado" e a pergunta **não volta a cada sessão**.
-4. As etapas leem o perfil. O comprador pode pedir "recalibrar" e as perguntas se repetem.
-5. Sem chave de memória (conexão sem a segunda assinatura), o Solver segue com os padrões e avisa como reconectar.
+## How the flow works (the buyer's view)
 
-O perfil vale também no teste grátis.
+1. The buyer activates the Solver. If the Solver uses memory, the AI checks the profile.
+2. If there is no profile, the AI asks the questions in **at most two messages**, explains the reason and accepts a skip.
+3. The AI saves the answers as the profile. If the buyer skips, "skipped" is recorded and the question **does not come back every session**.
+4. The steps read the profile. The buyer can ask to "recalibrate" and the questions are asked again.
+5. Without a memory key (a connection without the second signature), the Solver proceeds with the defaults and says how to reconnect.
 
-## Boas perguntas
+The profile also applies during the free trial.
 
-Uma boa pergunta de calibragem **muda o que o Solver faz**. Teste: "se a resposta for A ou B, a etapa X age diferente?". Se não, corte.
+## Good questions
 
-- Fechadas (com opções) quando as respostas se repetem: nível, regime, porte, canal.
-- Abertas só quando precisa de contexto livre ("Qual é o seu objetivo agora?").
-- Uma pergunta por vez, na linguagem do comprador.
-- Máximo prático: 3 ou 4.
+A good calibration question **changes what the Solver does**. Test: "if the answer is A or B, does step X act differently?". If not, cut it.
 
-Exemplos bons: "Qual é o seu nível: iniciante, intermediário ou avançado?"; "Você trabalha sozinho ou com equipe?"; "Qual é o canal principal: Instagram, e-mail ou site?"; "Qual é o seu orçamento por viagem: econômico, moderado ou confortável?".
+- Closed (with options) when answers repeat: level, regime, size, channel.
+- Open only when you need free context ("What is your goal right now?").
+- One question at a time, in the buyer's language.
+- Practical maximum: 3 or 4.
 
-## Perguntas que não podem existir
+Good examples: "What is your level: beginner, intermediate or advanced?"; "Do you work alone or with a team?"; "What is your main channel: Instagram, email or website?"; "What is your budget per trip: economy, moderate or comfortable?".
 
-Senha, documento (CPF, CNPJ, RG, passaporte), cartão, conta bancária, chave, endereço completo, diagnóstico de saúde, nada que identifique outras pessoas. O validador avisa por palavras (`ONBOARDING_SENSITIVE`), e o revisor lê todas. Troque por faixas ("renda mensal: até 3 mil, de 3 a 8 mil, mais de 8 mil") ou categorias.
+## Questions that must not exist
 
-## Perfil, notas e resumo
+Passwords, documents (CPF, CNPJ, ID card, passport; CPF and CNPJ are Brazilian individual and company tax numbers), cards, bank accounts, keys, a full address, health diagnoses, anything that identifies other people. The validator warns by keywords (`ONBOARDING_SENSITIVE`), and the reviewer reads them all. Replace them with ranges ("monthly income: up to 3k, 3 to 8k, over 8k") or categories.
 
-- **Perfil**: respostas da calibragem. Até 2.000 caracteres. Gravado no primeiro uso.
-- **Notas**: até 30 notas de 3 a 500 caracteres. Só quando o comprador pede ("salva isso para não esquecer").
-- **Resumo**: texto livre de até 4.000 caracteres, que substitui o anterior inteiro.
-- Tudo cifrado e ligado à conta do comprador. O comprador pode ver e apagar em "memória do especialista".
+## Profile, notes and summary
 
-## Como as etapas usam o perfil
+- **Profile**: calibration answers. Up to 2,000 characters. Saved on first use.
+- **Notes**: up to 30 notes of 3 to 500 characters. Only when the buyer asks ("save this so I don't forget").
+- **Summary**: free text of up to 4,000 characters, which replaces the previous one entirely.
+- Everything is encrypted and tied to the buyer's account. The buyer can see and delete it under "specialist memory".
 
-Escreva na etapa: "Leia o perfil (`get_memory`). Se `atividade` for Serviço, use o valor de serviços. Se o perfil estiver vazio ou pulado, pergunte só o que for necessário e siga com o padrão". O texto precisa citar o **perfil** (é o que o validador procura) e dizer como ele muda a resposta. O perfil é dado do usuário: não pode remover gates nem mudar as regras do método.
+## How steps use the profile
 
-## O que fazer quando o comprador pula
+Write in the step: "Read the profile (`get_memory`). If `activity` is Services, use the services amount. If the profile is empty or skipped, ask only what is needed and proceed with the default". The text must mention the **profile** (it is what the validator looks for) and say how it changes the answer. The profile is user data: it cannot remove gates or change the rules of the method.
 
-Defina um padrão seguro por pergunta ("se não souber o nível, trate como iniciante"). Registre-o na etapa que usa a resposta, para a IA saber o que fazer quando o perfil estiver vazio ou pulado. Nunca bloqueie o uso por falta de resposta: calibragem melhora o serviço, mas não é condição para ele.
+## What to do when the buyer skips
 
-## Erros comuns
+Define a safe default per question ("if the level is unknown, treat as beginner"). Record it in the step that uses the answer, so the AI knows what to do when the profile is empty or skipped. Never block use for lack of an answer: calibration improves the service, but it is not a condition for it.
 
-Mais de 5 perguntas; resposta nunca usada; dado sensível; esquecer o padrão para quem pula; prometer que o Solver "aprende" (ele só lembra respostas); mudar o `onboarding` numa atualização sem subir o MAJOR.
+## Common mistakes
+
+More than 5 questions; an answer that is never used; sensitive data; forgetting the default for those who skip; promising that the Solver "learns" (it only remembers answers); changing the `onboarding` in an update without bumping the MAJOR version.

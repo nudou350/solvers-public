@@ -1,59 +1,59 @@
-# Etapa 6: Calibragem e memória
+# Step 6: Calibration and memory
 
-## Objetivo
+## Goal
 
-Definir como o Solver do usuário **se adapta a quem compra**, com poucas perguntas no primeiro uso, e o que ele guarda na memória do comprador. Ao fim da etapa o manifesto tem o bloco `onboarding` (de 1 a 5 perguntas), `usesMemory: true`, e pelo menos uma etapa do pacote usa o perfil para mudar de fato a resposta. Sem uso real do perfil, o diferencial `memory` não é comprovado e o revisor não o aceita.
+Define how the user's Solver **adapts to whoever buys it**, with a few questions on first use, and what it keeps in the buyer's memory. By the end of the step the manifest has the `onboarding` block (1 to 5 questions), `usesMemory: true`, and at least one step of the package uses the profile to really change the answer. Without real use of the profile, the `memory` differentiator is not proven and the reviewer does not accept it.
 
-Calibragem **não altera nenhum modelo**: é um questionário curto no primeiro uso, guardado como "perfil" na memória do comprador, e lido nas etapas seguintes. Se o usuário decidiu não usar `memory` na etapa 2, esta etapa vira uma conversa curta confirmando que o pacote não terá `onboarding` (e `usesMemory` pode ser omitido).
+Calibration **does not change any model**: it is a short questionnaire on first use, stored as a "profile" in the buyer's memory and read in the following steps. If the user decided not to use `memory` in step 2, this step becomes a short conversation confirming that the package will have no `onboarding` (and `usesMemory` can be omitted).
 
-## O que perguntar ao usuário
+## What to ask the user
 
-1. **O que muda na sua resposta conforme quem pergunta?** (nível, orçamento, tamanho da empresa, estilo, ferramentas que já usa, restrições). Cada fator que muda a resposta é candidata a pergunta.
-2. **Qual é a pergunta mínima para acertar o tom e o nível já no primeiro contato?** Comece por ela.
-3. **Isso é uma preferência durável ou um dado desta conversa?** Durável (nível, cidade de partida, regime tributário) vai para o perfil. O resto fica na conversa.
-4. **Se o comprador não quiser responder, o que o Solver faz?** Sempre há um padrão razoável (por exemplo, assumir "iniciante").
+1. **What changes in your answer depending on who is asking?** (level, budget, company size, style, tools they already use, constraints). Each factor that changes the answer is a candidate question.
+2. **What is the minimum question to get the tone and level right from the first contact?** Start with it.
+3. **Is this a lasting preference or a piece of data from this conversation?** Lasting (level, departure city, tax regime) goes into the profile. The rest stays in the conversation.
+4. **If the buyer does not want to answer, what does the Solver do?** There is always a reasonable default (for example, assume "beginner").
 
-Releia também o perfil do próprio usuário (`nivel`): para quem é iniciante, proponha as perguntas prontas e peça só aprovação.
+Also reread the user's own profile (`nivel`): for a beginner, propose ready-made questions and ask only for approval.
 
-## Como executar
+## How to run
 
-1. **Liste candidatas e corte.** Fique com **de 3 a 4 perguntas** (o limite é 5). Cada pergunta precisa passar neste teste: "se a resposta for A ou B, o Solver faz algo diferente?". Se a resposta não muda nada, corte.
-2. **Escreva cada pergunta** como objeto (modelo `pergunta-de-calibragem` em `get_template`):
-   - `id`: minúsculas, dígitos e sublinhado (`atividade`, `regime`), único.
-   - `ask`: de 10 a 200 caracteres, linguagem do comprador, uma pergunta só.
-   - `why`: de 10 a 200 caracteres, o motivo ("o valor muda conforme a atividade"). O modelo pode explicar o motivo ao comprador.
-   - `options`: opcional, de 2 a 6 opções curtas. Sem `options`, a resposta é livre. Prefira opções: respostas padronizadas são mais fáceis de usar nas etapas.
-3. **Nunca peça dado sensível na calibragem**: senha, documento, cartão, chave, número de conta, dado de saúde detalhado, endereço completo. O validador avisa (`ONBOARDING_SENSITIVE`) quando encontra termos como senha, CPF, CNPJ, cartão, token ou gov.br, mas **o aviso é só uma heurística**: o revisor lê todas as perguntas. Troque por faixas ("renda mensal: até 3 mil, de 3 a 8 mil, mais de 8 mil") ou por categorias.
-4. **Todas as perguntas podem ser puladas.** Não existe campo "obrigatória". Defina o padrão quando uma pergunta é pulada e escreva isso na etapa que a usa. A plataforma registra o pulo como `skipped` e **não pergunta de novo a cada sessão**; o comprador pode pedir "recalibrar" quando quiser.
-5. **Perfil, notas e resumo são coisas diferentes** (explique ao usuário):
-   - **Perfil** (`profile`): as respostas da calibragem, até 2.000 caracteres, gravado na calibragem do primeiro uso.
-   - **Notas** (`notes`): até 30 notas de 3 a 500 caracteres, gravadas **só quando o comprador pede** ("salva isso para não esquecer").
-   - **Resumo** (`summary`): texto livre de até 4.000 caracteres, que substitui o anterior inteiro; use só se o método precisa de continuidade entre sessões.
-   Nada de dado sensível em nenhum dos três. A memória fica cifrada e ligada à conta do comprador; o texto ao comprador não deve prometer que "só ele lê".
-6. **Faça as etapas usarem o perfil.** Em pelo menos uma etapa, escreva algo como: "Leia o perfil com `get_memory`. Se `atividade` for Serviço, use o valor de serviços; se o perfil estiver vazio ou pulado, pergunte só o necessário e siga com o padrão". O texto da etapa **precisa conter a palavra perfil** (é o que o validador procura) e dizer como ele muda a resposta. O perfil é dado do usuário e **nunca pode remover um gate** nem mudar as regras do método.
-7. **Se não houver memória disponível** (conexão sem a chave de memória), o Solver segue com os padrões e avisa como reconectar; escreva a etapa para tolerar isso.
-8. **Atualize o manifesto**: `"usesMemory": true` e o bloco `onboarding.questions[...]`. O `onboarding` exige `usesMemory: true` (erro `ONBOARDING_NEEDS_MEMORY` se faltar).
-9. **Valide**: chame `run_tool` com `tool` igual a `validate_package`, com `manifest`, `steps` e `files`. Confirme que `memory` aparece em `stats.differentiators`. Em atualizações futuras do Solver, mudar o `onboarding` é mudança MAJOR (versão 2.0.0).
+1. **List candidates and cut.** Keep **3 to 4 questions** (the limit is 5). Each question must pass this test: "if the answer is A or B, does the Solver do something different?". If the answer changes nothing, cut it.
+2. **Write each question** as an object (template `pergunta-de-calibragem` via `get_template`):
+   - `id`: lowercase letters, digits and underscore (`activity`, `regime`), unique.
+   - `ask`: 10 to 200 characters, in the buyer's language, a single question.
+   - `why`: 10 to 200 characters, the reason ("the amount changes depending on the activity"). The model can explain the reason to the buyer.
+   - `options`: optional, 2 to 6 short options. Without `options`, the answer is free text. Prefer options: standardized answers are easier to use in the steps.
+3. **Never ask for sensitive data in calibration**: passwords, documents, cards, keys, account numbers, detailed health data, a full address. The validator warns (`ONBOARDING_SENSITIVE`) when it finds terms such as password, CPF (Brazilian individual taxpayer number), CNPJ (Brazilian company number), card, token or gov.br, but **the warning is only a heuristic**: the reviewer reads every question. Replace them with ranges ("monthly income: up to 3k, 3 to 8k, over 8k") or categories.
+4. **Every question can be skipped.** There is no "required" field. Define the default for when a question is skipped and write it in the step that uses it. The platform records the skip as `skipped` and **does not ask again every session**; the buyer can ask to "recalibrate" whenever they want.
+5. **Profile, notes and summary are different things** (explain this to the user):
+   - **Profile** (`profile`): the calibration answers, up to 2,000 characters, saved during the first-use calibration.
+   - **Notes** (`notes`): up to 30 notes of 3 to 500 characters, saved **only when the buyer asks** ("save this so I don't forget").
+   - **Summary** (`summary`): free text of up to 4,000 characters, which replaces the previous one entirely; use it only if the method needs continuity between sessions.
+   No sensitive data in any of the three. The memory is encrypted and tied to the buyer's account; the text shown to the buyer must not promise that "only they can read it".
+6. **Make the steps use the profile.** In at least one step, write something like: "Read the profile with `get_memory`. If `activity` is Service, use the services amount; if the profile is empty or skipped, ask only what is needed and proceed with the default". The step text **must contain the word profile** (it is what the validator looks for) and say how it changes the answer. The profile is user data and **can never remove a gate** or change the rules of the method.
+7. **If memory is not available** (a connection without the memory key), the Solver proceeds with the defaults and says how to reconnect; write the step so it tolerates that.
+8. **Update the manifest**: `"usesMemory": true` and the `onboarding.questions[...]` block. `onboarding` requires `usesMemory: true` (error `ONBOARDING_NEEDS_MEMORY` if missing).
+9. **Validate**: call `run_tool` with `tool` equal to `validate_package`, with `manifest`, `steps` and `files`. Confirm that `memory` shows up in `stats.differentiators`. In future updates of the Solver, changing the `onboarding` is a MAJOR change (version 2.0.0).
 
-## Erros comuns
+## Common mistakes
 
-- **Perguntas demais** (6 ou mais; o limite é 5). Cansa o comprador no primeiro contato.
-- **Pergunta cuja resposta nunca é usada.**
-- **Dado sensível "porque ajuda"**. Não ajuda o bastante para o risco.
-- **Esquecer o que fazer se pular.** Vira erro em produção ("perfil indefinido").
-- **Confundir perfil com nota.** Perfil é calibragem; nota só a pedido.
-- **Etapa que não cita o perfil.** O diferencial `memory` não é comprovado e o validador avisa (`MANIFEST_DIFFERENTIATOR_UNPROVEN`).
-- **`options` com 1 ou 7 opções**, `ask` ou `why` curtos demais (menos de 10 caracteres).
-- Prometer que o Solver "aprende" ou "treina" com o comprador: ele só lembra respostas.
+- **Too many questions** (6 or more; the limit is 5). It wears the buyer out on first contact.
+- **A question whose answer is never used.**
+- **Sensitive data "because it helps".** It does not help enough for the risk.
+- **Forgetting what to do when skipped.** It becomes a production bug ("undefined profile").
+- **Confusing profile with notes.** Profile is calibration; notes only on request.
+- **A step that does not mention the profile.** The `memory` differentiator is not proven and the validator warns (`MANIFEST_DIFFERENTIATOR_UNPROVEN`).
+- **`options` with 1 or 7 options**, `ask` or `why` too short (under 10 characters).
+- Promising that the Solver "learns" or "trains" with the buyer: it only remembers answers.
 
-## Formato do result_summary
+## result_summary format
 
 ```
-CALIBRAGEM (N perguntas)
-- id=... | ask=... | opções: A/B/C | muda: (o que o Solver faz de diferente)
-PADRÃO SE PULAR: ...
-PERFIL x NOTAS: perfil = ...; notas só a pedido; sem dado sensível
-ETAPAS QUE USAM O PERFIL: steps/0X (como)
-MANIFESTO: usesMemory=true, onboarding ok
-VALIDADOR: memory comprovado: sim/não | erros: N
+CALIBRATION (N questions)
+- id=... | ask=... | options: A/B/C | changes: (what the Solver does differently)
+DEFAULT IF SKIPPED: ...
+PROFILE vs NOTES: profile = ...; notes only on request; no sensitive data
+STEPS THAT USE THE PROFILE: steps/0X (how)
+MANIFEST: usesMemory=true, onboarding ok
+VALIDATOR: memory proven: yes/no | errors: N
 ```

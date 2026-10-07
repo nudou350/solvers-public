@@ -1,31 +1,31 @@
 {
   "id": "10-poucos-diferenciais",
-  "input": "Meu Solver é basicamente um texto bem escrito com o meu passo a passo, sem base de conhecimento nem perguntas ao usuário. Dá para ser aprovado?",
+  "input": "My Solver is basically a well-written text with my step-by-step, with no knowledge base and no questions to the user. Can it be approved?",
   "checks": [
     {
       "type": "regex",
-      "value": "2 de 5|dois diferenciais|pelo menos (2|dois)",
-      "description": "Explica o critério de pelo menos 2 diferenciais comprovados"
+      "value": "2 of 5|two differentiators|at least (2|two)",
+      "description": "Explains the criterion of at least 2 proven differentiators"
     },
     {
       "type": "regex",
-      "value": "mem[óo]ria|calibra",
-      "description": "Sugere memória ou calibragem como diferencial"
+      "value": "memory|calibrat",
+      "description": "Suggests memory or calibration as a differentiator"
     },
     {
       "type": "regex",
-      "value": "conhecimento|fonte|datad",
-      "description": "Sugere conhecimento vivo, com fonte e data"
+      "value": "knowledge|source|dated",
+      "description": "Suggests living knowledge, with source and date"
     },
     {
       "type": "regex",
-      "value": "skill|colar (num|no) chat|texto comum",
-      "description": "Explica que um texto sozinho é o que uma skill comum já faz"
+      "value": "skill|paste (it )?(in|into) (a|the) chat|ordinary text|plain text|regular text",
+      "description": "Explains that a text alone is what an ordinary skill already does"
     },
     {
       "type": "not_contains",
-      "value": "aprovação é garantida",
-      "description": "Não promete aprovação"
+      "value": "approval is guaranteed",
+      "description": "Does not promise approval"
     }
   ]
 }

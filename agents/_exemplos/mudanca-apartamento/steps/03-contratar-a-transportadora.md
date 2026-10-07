@@ -1,52 +1,52 @@
-# Etapa 3: Contratar a transportadora
+# Step 3: Hire the moving company
 
-## Objetivo
+## Goal
 
-Ajudar a pessoa a pedir cotações comparáveis, comparar propostas lado a lado e escolher com segurança, ou decidir fazer a mudança sem empresa. O Solver não indica empresa nem garante preço: entrega as perguntas certas, o comparativo e os sinais de alerta. Se o usuário não vai contratar empresa (faz com amigos ou aluga só um veículo), adapte: a etapa vira "organizar o transporte" com as mesmas perguntas (horário, escada, seguro do que for quebrar).
+Help the person ask for comparable quotes, compare offers side by side and choose safely, or decide to move without a company. The Solver does not recommend companies or guarantee prices: it delivers the right questions, the comparison and the warning signs. If the user is not going to hire a company (doing it with friends or renting only a vehicle), adapt: the step becomes "organize the transport" with the same questions (timing, stairs, insurance for whatever might break).
 
-## O que perguntar ao usuário
+## What to ask the user
 
-Leia o perfil com `get_memory` e use o volume e o orçamento da ficha. Se o perfil estiver vazio ou pulado, pergunte o necessário. No máximo 5 perguntas por mensagem:
+Read the profile with `get_memory` and use the volume and the budget from the sheet. If the profile is empty or skipped, ask what is needed. At most 5 questions per message:
 
-1. **Origem e destino têm elevador, escada ou rua estreita?** Se não souber, peça que olhe a portaria e a rua; anote "a conferir".
-2. **Há itens frágeis ou grandes?** (geladeira, guarda-roupa que desmonta, piano, TV grande). Se não souber, ofereça a lista de móveis e eletrodomésticos e peça que marque.
-3. **Quer só o transporte ou também embalagem e montagem de móveis?** Se não souber, peça cotação das duas versões.
-4. **Qual a janela de horário possível?** Se não souber, use "manhã de um dia de semana" e "sábado de manhã" como opções; mudança em fim de semana costuma ser mais disputada, então avise que pode custar mais ou lotar.
-5. **Já tem indicações de amigos?** Se sim, use como ponto de partida e peça o mesmo roteiro de perguntas a todas as empresas.
+1. **Do the origin and the destination have an elevator, stairs or a narrow street?** If the person does not know, ask them to look at the entrance and the street; note it as "to check".
+2. **Are there fragile or large items?** (fridge, a wardrobe that comes apart, a piano, a big TV). If the person does not know, offer the list of furniture and appliances and ask them to tick the ones they have.
+3. **Do you want only the transport, or also packing and furniture assembly?** If the person does not know, ask for quotes for both versions.
+4. **What time window works?** If the person does not know, use "weekday morning" and "Saturday morning" as options; weekend moves tend to be more in demand, so warn that it may cost more or be fully booked.
+5. **Do you already have recommendations from friends?** If so, use them as a starting point and ask every company the same set of questions.
 
-## Como executar
+## How to run
 
-1. Monte o **pedido de cotação** com os dados da ficha e das respostas: data e janela, endereços (só bairro e cidade na conversa; o endereço completo vai apenas à empresa, escolhido pelo usuário), andares e elevador, lista de itens grandes, volume estimado, se precisa de embalagem e montagem.
-2. Aconselhe pedir **pelo menos 3 cotações por escrito** com o mesmo pedido. Se o usuário tiver só 1, diga que dá para seguir, mas que a comparação fica fraca.
-3. Consulte `search_knowledge` com "perguntas para a transportadora" e "sinais de alerta em orçamento de mudança" e **cite a fonte e a data** que vierem no trecho. Se o trecho avisar que pode estar desatualizado, diga isso ao usuário.
-4. Chame `get_template` com o nome `comparativo-de-transportadoras` e preencha com as propostas que o usuário trouxer: valor, o que inclui, seguro, prazo de pagamento, política de cancelamento e de atraso. Não invente valores: use só os números que o usuário informar. Se faltar uma resposta, marque "perguntar".
-5. Destaque no comparativo **o que o preço mais baixo não inclui** (embalagem, desmontagem, taxa por andar sem elevador, hora extra) e peça que a diferença seja somada antes de decidir.
-6. Reforce os pontos de segurança: ver o contrato ou proposta por escrito, entender o seguro e o que ele cobre, combinar quem confere o inventário no dia, anotar nome e telefone do responsável. Não afirme regras legais sobre responsabilidade; recomende ler o contrato.
-7. Mostre uma recomendação com o motivo ("a proposta B custa X a mais, mas inclui montagem e seguro") e deixe a decisão com o usuário.
+1. Build the **quote request** with the data from the sheet and the answers: date and window, addresses (only neighborhood and city in the conversation; the full address goes only to the company, chosen by the user), floors and elevator, list of large items, estimated volume, whether packing and assembly are needed.
+2. Advise asking for **at least 3 written quotes** using the same request. If the user has only 1, say it is possible to go ahead, but the comparison is weak.
+3. Query `search_knowledge` with "questions for the moving company" and "warning signs in a moving quote" and **cite the source and the date** that come with the passage. If the passage warns that it may be outdated, tell the user.
+4. Call `get_template` with the name `comparativo-de-transportadoras` and fill it in with the quotes the user brings: price, what is included, insurance, payment terms, cancellation and delay policy. Do not make up prices: use only the numbers the user provides. If an answer is missing, mark it "ask".
+5. Highlight in the comparison **what the lowest price does not include** (packing, disassembly, per-floor fee without an elevator, overtime) and ask that the difference be added up before deciding.
+6. Reinforce the safety points: see the contract or quote in writing, understand the insurance and what it covers, agree on who checks the inventory on the day, note the name and phone number of the person in charge. Do not state legal rules about liability; recommend reading the contract.
+7. Show a recommendation with the reason ("quote B costs X more, but it includes assembly and insurance") and leave the decision to the user.
 
-Checklist da etapa:
-- Pedido de cotação único escrito com data, endereços (bairro e cidade), andares e itens grandes
-- Pelo menos 2 propostas comparadas no mesmo formato, ou decisão de não contratar empresa registrada
-- Comparativo mostra o que cada proposta inclui e não inclui, com os valores informados pelo usuário
-- Seguro, cancelamento e confirmação por escrito conferidos antes de fechar
+Step checklist:
+- A single written quote request with date, addresses (neighborhood and city), floors and large items
+- At least 2 quotes compared in the same format, or a decision not to hire a registered company
+- Comparison shows what each quote includes and excludes, using the amounts provided by the user
+- Insurance, cancellation and written confirmation checked before signing
 
-## Erros comuns
+## Common mistakes
 
-- Comparar só o preço final. Propostas parecidas podem incluir coisas diferentes (embalagem, montagem, taxa de escada).
-- Pagar sinal alto sem contrato por escrito: peça confirmação por escrito antes de qualquer pagamento. Não afirme que determinado valor de sinal é normal; a base só traz perguntas para conferir.
-- Inventar preço de mercado ou nome de empresa: o Solver não indica empresa e não cita valores que o usuário não trouxe.
-- Esquecer de avisar o condomínio dos dois prédios sobre o dia e o elevador de serviço.
-- Nunca peça senhas, números de documentos ou cartão; peça faixas ou exemplos fictícios.
+- Comparing only the final price. Similar quotes may include different things (packing, assembly, stair fee).
+- Paying a large deposit without a written contract: ask for written confirmation before any payment. Do not claim that a given deposit amount is normal; the knowledge base only gives questions to check.
+- Making up a market price or a company name: the Solver does not recommend companies and does not cite amounts the user did not bring.
+- Forgetting to tell the building administration at both buildings about the day and the service elevator.
+- Never ask for passwords, ID numbers or card numbers; ask for ranges or fictional examples.
 
-## Formato do result_summary
+## result_summary format
 
-Ao chamar `next_step`, passe um resumo curto (até 1.500 caracteres) neste formato:
+When calling `next_step`, pass a short summary (up to 1,500 characters) in this format:
 
 ```
-ETAPA 3: Contratar a transportadora
-- Pedido enviado a: N empresas (sem nomes se o usuário preferir)
-- Escolha: ... | motivo: ...
-- Pendências: o que ainda falta confirmar por escrito
-- Fontes citadas: nome (data)
-- Riscos: ...
+STEP 3: Hire the moving company
+- Request sent to: N companies (no names if the user prefers)
+- Choice: ... | reason: ...
+- Open items: what is still to be confirmed in writing
+- Sources cited: name (date)
+- Risks: ...
 ```

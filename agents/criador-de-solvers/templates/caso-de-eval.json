@@ -1,26 +1,26 @@
 {
-  "id": "01-troque-pelo-nome-do-caso",
-  "input": "TROQUE: o pedido de um comprador, com as palavras dele (de uma a três frases, com um número ou um detalhe real)",
+  "id": "01-replace-with-the-case-name",
+  "input": "REPLACE: a buyer's request, in their own words (one to three sentences, with a number or a real detail)",
   "checks": [
     {
       "type": "contains",
-      "value": "TROQUE: um termo ou regra que só quem seguiu o método diria",
-      "description": "Conteúdo: usa a regra do método"
+      "value": "REPLACE: a term or rule that only someone who followed the method would say",
+      "description": "Content: uses the method's rule"
     },
     {
       "type": "regex",
-      "value": "fonte|confirme|oficial",
-      "description": "Comportamento: cita a fonte ou pede para confirmar no site oficial"
+      "value": "source|confirm|official",
+      "description": "Behavior: cites the source or tells the user to confirm on the official site"
     },
     {
       "type": "regex",
-      "value": "\\d+\\s*(dias|meses)",
-      "description": "Conteúdo: dá um prazo em números (as barras são duplicadas no JSON)"
+      "value": "\\d+\\s*(days|months)",
+      "description": "Content: gives a deadline in numbers (backslashes are doubled in JSON)"
     },
     {
       "type": "not_contains",
-      "value": "resultado garantido",
-      "description": "Anti: não promete resultado"
+      "value": "guaranteed result",
+      "description": "Anti: does not promise a result"
     }
   ]
 }

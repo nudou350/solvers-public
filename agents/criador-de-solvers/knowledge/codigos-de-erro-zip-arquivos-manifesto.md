@@ -1,64 +1,64 @@
 ---
-title: Códigos de erro do validador (ZIP, arquivos e manifesto) e como corrigir
-source: Catálogo de códigos de validação da plataforma Solvers (Apêndice A da especificação v1)
+title: Validator error codes (ZIP, files and manifest) and how to fix them
+source: Catalog of validation codes of the Solvers platform (Appendix A of the v1 specification)
 source_date: 2026-10-02
 valid_until: 2027-03-31
-tags: [erros, validador, zip, manifesto]
+tags: [errors, validator, zip, manifest]
 ---
 
-# Códigos de erro do validador (ZIP, arquivos e manifesto) e como corrigir
+# Validator error codes (ZIP, files and manifest) and how to fix them
 
-Cada resposta do validador traz `code`, `path`, `message` e `fix`. **Erro (E)** bloqueia o envio. **Aviso (A)** vai ao revisor, que decide. Em pacotes de criador novo (specVersion 1), as regras são as estritas.
+Each validator response carries `code`, `path`, `message` and `fix`. An **error (E)** blocks submission. A **warning (W)** goes to the reviewer, who decides. In new-creator packages (specVersion 1), the strict rules apply.
 
-## Erros do ZIP: tamanho, raiz e nomes
+## ZIP errors: size, root and names
 
-- `ZIP_TOO_LARGE` (E): ZIP acima de 50 MB. Reduza o conhecimento ou divida o conteúdo; textos em `.md` raramente chegam perto do limite.
-- `ZIP_EXPANDS_TOO_MUCH` (E): conteúdo descompactado acima de 150 MB. Reduza o tamanho dos arquivos.
-- `ZIP_TOO_MANY_FILES` (E): mais de 2.000 arquivos. Junte arquivos pequenos de conhecimento por tema.
-- `ZIP_BAD_ROOT` (E): o ZIP não tem exatamente uma pasta raiz com o `manifest.json`. Compacte a **pasta do Solver** (e não o conteúdo dela solto), com tudo dentro de uma só pasta.
-- `ZIP_DUPLICATE_ENTRY` (E): dois arquivos com o mesmo nome (sem diferenciar maiúsculas e acentos equivalentes). Deixe só um.
-- `ZIP_BAD_PATH` (E): caminho com `..`, barra invertida, caractere de controle, nome começando com ponto ou caractere fora de letras, dígitos, ponto, hífen, sublinhado e espaço. Renomeie. No Windows PowerShell 5.1, o `Compress-Archive` grava barras invertidas: use `tar -a -c -f arquivo.zip pasta` ou um programa de compactação.
-- `ZIP_SYMLINK` (E): atalho (link simbólico) dentro do ZIP. Troque pelo arquivo real.
-- `ZIP_IGNORED_FILE` (A): `__MACOSX/`, `.DS_Store`, `Thumbs.db` foram ignorados. Nada a fazer; evite gerá-los.
+- `ZIP_TOO_LARGE` (E): ZIP above 50 MB. Reduce the knowledge or split the content; `.md` text rarely comes close to the limit.
+- `ZIP_EXPANDS_TOO_MUCH` (E): uncompressed content above 150 MB. Reduce the file sizes.
+- `ZIP_TOO_MANY_FILES` (E): more than 2,000 files. Merge small knowledge files by topic.
+- `ZIP_BAD_ROOT` (E): the ZIP does not have exactly one root folder containing `manifest.json`. Zip the **Solver folder** (not its loose contents), with everything inside a single folder.
+- `ZIP_DUPLICATE_ENTRY` (E): two files with the same name (ignoring case and equivalent accents). Keep only one.
+- `ZIP_BAD_PATH` (E): a path with `..`, a backslash, a control character, a name starting with a dot, or a character outside letters, digits, dot, hyphen, underscore and space. Rename it. On Windows PowerShell 5.1, `Compress-Archive` writes backslashes: use `tar -a -c -f file.zip folder` or a compression program.
+- `ZIP_SYMLINK` (E): a shortcut (symbolic link) inside the ZIP. Replace it with the real file.
+- `ZIP_IGNORED_FILE` (W): `__MACOSX/`, `.DS_Store`, `Thumbs.db` were ignored. Nothing to do; avoid generating them.
 
-## Erros de arquivo
+## File errors
 
-- `FILE_TYPE_NOT_ALLOWED` (E): extensão ou pasta que não vale nesta fase (por exemplo `.pdf`, `.html`, `.csv`, imagem). Converta para `.md` ou `.txt`.
-- `FILE_NOT_UTF8` (E): arquivo de texto que não é UTF-8 válido. Salve como UTF-8 (sem outra codificação).
-- `FILE_TOO_LARGE` (E): arquivo acima de 10 MB. Divida em partes menores.
-- `MANIFEST_PLATFORM_FORBIDDEN` (E): você usou `platform` no manifesto ou incluiu a pasta `verifier/`. Remova: são só da plataforma.
+- `FILE_TYPE_NOT_ALLOWED` (E): an extension or folder that is not valid in this phase (for example `.pdf`, `.html`, `.csv`, an image). Convert to `.md` or `.txt`.
+- `FILE_NOT_UTF8` (E): a text file that is not valid UTF-8. Save as UTF-8 (no other encoding).
+- `FILE_TOO_LARGE` (E): a file above 10 MB. Split it into smaller parts.
+- `MANIFEST_PLATFORM_FORBIDDEN` (E): you used `platform` in the manifest or included the `verifier/` folder. Remove it: they are for the platform only.
 
-## Erros do manifesto: formato
+## Manifest errors: format
 
-- `MANIFEST_MISSING` (E): não há `manifest.json` na raiz do pacote. Crie com o modelo `manifest-esqueleto`.
-- `MANIFEST_INVALID_JSON` (E): JSON inválido (vírgula sobrando, aspas, chave sem fechar). A mensagem diz onde. Use um formatador de JSON.
-- `MANIFEST_SCHEMA` (E): campo com tipo ou tamanho errado; o `path` diz qual. Exemplos: tagline fora de 10 a 100 caracteres, description fora de 120 a 2.000, `packageContents` com menos de 3 ou mais de 8 itens, categoria desconhecida, `royaltyBps` fora de 0 a 1.000. Corrija o campo conforme a mensagem.
-- `MANIFEST_UNKNOWN_FIELD` (E): campo que não existe na especificação. Remova ou use um campo previsto.
-- `MANIFEST_SPEC_VERSION` (E): faltou `"specVersion": 1`. Acrescente.
-- `TERMS_MISSING` (E): faltou `"terms": { "rightsConfirmed": true, "sourcesListed": true }` (e o usuário precisa mesmo confirmar os dois).
+- `MANIFEST_MISSING` (E): there is no `manifest.json` at the package root. Create one with the `manifest-esqueleto` template.
+- `MANIFEST_INVALID_JSON` (E): invalid JSON (a stray comma, quotes, an unclosed key). The message says where. Use a JSON formatter.
+- `MANIFEST_SCHEMA` (E): a field with the wrong type or size; the `path` says which. Examples: tagline outside 10 to 100 characters, description outside 120 to 2,000, `packageContents` with fewer than 3 or more than 8 items, an unknown category, `royaltyBps` outside 0 to 1,000. Fix the field as the message says.
+- `MANIFEST_UNKNOWN_FIELD` (E): a field that does not exist in the specification. Remove it or use a supported field.
+- `MANIFEST_SPEC_VERSION` (E): `"specVersion": 1` is missing. Add it.
+- `TERMS_MISSING` (E): `"terms": { "rightsConfirmed": true, "sourcesListed": true }` is missing (and the user really must confirm both).
 
-## Erros do manifesto: identidade
+## Manifest errors: identity
 
-- `MANIFEST_ID_OWNER` (E): o `id` ou o `slug` já pertence a outro criador. Na primeira versão, remova o `id`; troque o slug por um nome próprio.
-- `MANIFEST_SLUG_RESERVED` (E): slug reservado (nomes de marcas e da plataforma). Escolha outro.
-- `MANIFEST_SLUG_LOOKS_LIKE_ID` (E): slug com 32 letras e números, igual a um `id`. Use palavras separadas por hífen.
-- `MANIFEST_NAME_TOO_LONG` (E): nome com mais de 32 bytes. Encurte (letras acentuadas contam mais).
-- `MANIFEST_VERSION_TOO_LONG` (E): versão com mais de 16 bytes. Use algo como `1.0.0`.
-- `MANIFEST_VERSION_NOT_GREATER` (E): a versão enviada não é maior que a publicada. Suba o número.
-- `MANIFEST_VERSIONS_MISSING` (E): falta uma entrada em `versions[]` para a versão atual. Acrescente `{ version, releasedAt, notes }`.
+- `MANIFEST_ID_OWNER` (E): the `id` or the `slug` already belongs to another creator. On the first version, remove the `id`; change the slug to a name of your own.
+- `MANIFEST_SLUG_RESERVED` (E): a reserved slug (brand and platform names). Choose another.
+- `MANIFEST_SLUG_LOOKS_LIKE_ID` (E): a slug with 32 letters and digits, like an `id`. Use words separated by hyphens.
+- `MANIFEST_NAME_TOO_LONG` (E): a name over 32 bytes. Shorten it (accented letters count more).
+- `MANIFEST_VERSION_TOO_LONG` (E): a version over 16 bytes. Use something like `1.0.0`.
+- `MANIFEST_VERSION_NOT_GREATER` (E): the submitted version is not greater than the published one. Raise the number.
+- `MANIFEST_VERSIONS_MISSING` (E): an entry in `versions[]` for the current version is missing. Add `{ version, releasedAt, notes }`.
 
-## Erros do manifesto: regras da fase
+## Manifest errors: phase rules
 
-- `MANIFEST_CATEGORY_FORBIDDEN` (E): categoria não aceita de criador novo (Finanças, Jurídico, saúde). Reduza o escopo para uma categoria permitida ou espere a abertura dessas categorias. Não esconda o tema trocando a categoria: o revisor lê o conteúdo.
+- `MANIFEST_CATEGORY_FORBIDDEN` (E): a category not accepted from new creators (Finance, Legal, health). Narrow the scope to an allowed category or wait for those categories to open. Do not hide the topic by switching the category: the reviewer reads the content.
 - `MANIFEST_GUARANTEE_FORBIDDEN` (E): `guarantee.available: true`. Use `{ "available": false, "defaultCriteria": [] }`.
-- `MANIFEST_PRICE_BELOW_MIN` (E): preço abaixo do mínimo da plataforma (hoje 5). Use o mínimo ou mais.
-- `MANIFEST_PATH_ESCAPE` (E): caminho do manifesto que sai da pasta ou não começa por `steps/` ou `templates/`. Use `steps/01-nome.md`.
-- `DIFF_ENDPOINT_CHANGED_MINOR` (E): numa atualização você mudou `tools`, `onboarding`, `requirements` ou a estrutura de `steps` sem subir o MAJOR. Suba (ex.: 1.4.2 para 2.0.0).
+- `MANIFEST_PRICE_BELOW_MIN` (E): a price below the platform minimum (today 5). Use the minimum or more.
+- `MANIFEST_PATH_ESCAPE` (E): a manifest path that leaves the folder or does not start with `steps/` or `templates/`. Use `steps/01-name.md`.
+- `DIFF_ENDPOINT_CHANGED_MINOR` (E): in an update you changed `tools`, `onboarding`, `requirements` or the structure of `steps` without raising the MAJOR version. Raise it (e.g. 1.4.2 to 2.0.0).
 
-## Avisos do manifesto
+## Manifest warnings
 
-- `MANIFEST_DIFFERENTIATOR_UNPROVEN` (A): você declarou um diferencial que o validador não comprova. Cumpra a condição (ver a base de diferenciais) ou retire do campo.
-- `MANIFEST_DIFFERENTIATORS_FEW` (A): menos de 2 comprovados. O revisor só aprova com 2 ou mais.
-- `SUPPLY_WITH_TRIAL` (A): teto de licenças com teste grátis ligado: o teste não consome vaga. Para exclusividade real, desligue o teste.
-- `CATALOG_ONLY_IGNORED` (A): `catalogOnly` não tem efeito. Remova.
-- `CONTENTS_MISMATCH` (A): `packageContents` promete algo que o pacote não tem (modelos, ferramenta, garantia, memória, base de conhecimento). Ajuste a lista à realidade.
+- `MANIFEST_DIFFERENTIATOR_UNPROVEN` (W): you declared a differentiator that the validator cannot prove. Meet the condition (see the differentiators knowledge file) or remove it from the field.
+- `MANIFEST_DIFFERENTIATORS_FEW` (W): fewer than 2 proven. The reviewer only approves with 2 or more.
+- `SUPPLY_WITH_TRIAL` (W): a license cap with the free trial turned on: the trial does not consume a slot. For real exclusivity, turn the trial off.
+- `CATALOG_ONLY_IGNORED` (W): `catalogOnly` has no effect. Remove it.
+- `CONTENTS_MISMATCH` (W): `packageContents` promises something the package does not have (templates, a tool, a guarantee, memory, a knowledge base). Adjust the list to reality.

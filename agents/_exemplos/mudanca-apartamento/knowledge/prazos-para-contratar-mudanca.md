@@ -1,21 +1,21 @@
 ---
-title: Prazos para contratar uma mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: Lead times for hiring a move
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [prazos, transportadora, agenda]
+tags: [lead-times, movers, scheduling]
 ---
 
-# Prazos para contratar uma mudança
+# Lead times for hiring a move
 
-## Quando começar a pedir orçamentos
+## When to start asking for quotes
 
-Na experiência da criadora, o ponto de partida seguro é pedir orçamentos de 4 a 6 semanas antes da data. Com esse prazo dá para receber três propostas, comparar com calma e ainda negociar horário. Com menos de duas semanas sobram poucas datas, principalmente em fim de semana, e a pessoa acaba aceitando a primeira proposta. Esse prazo é uma regra prática da criadora e não uma regra de mercado: confirme a disponibilidade diretamente com cada empresa.
+In the creator's experience, the safe starting point is to ask for quotes 4 to 6 weeks before the date. With that lead time you can receive three quotes, compare them calmly and still negotiate the time. With less than two weeks few dates are left, especially on weekends, and the person ends up accepting the first quote. This lead time is a rule of thumb of the creator and not a market rule: confirm availability directly with each company.
 
-## Dias e épocas mais disputados
+## The busiest days and seasons
 
-Pela experiência da criadora, fins de semana, início e fim de mês (quando vencem contratos de aluguel) e a virada do ano costumam estar mais cheios. Quando a data é flexível, perguntar o preço de um dia de semana pode mostrar uma diferença de valor ou de disponibilidade. Isso varia por cidade e por empresa; peça sempre as duas opções por escrito para comparar.
+From the creator's experience, weekends, the start and end of the month (when rental contracts expire) and the turn of the year tend to be fuller. When the date is flexible, asking for the price of a weekday can show a difference in price or availability. This varies by city and company; always ask for both options in writing to compare.
 
-## Quando a mudança está apertada
+## When the move is tight
 
-Com menos de três semanas, a ordem de prioridade que a criadora recomenda é: primeiro a transportadora, depois o aviso ao proprietário ou à imobiliária e a reserva do elevador do prédio novo, e só depois as tarefas menores. Vale ligar para as empresas em vez de esperar resposta por mensagem e deixar claro desde o início o volume e a data limite.
+With less than three weeks, the priority order the creator recommends is: first the moving company, then the notice to the landlord or the rental agency and the booking of the new building's elevator, and only then the smaller tasks. It is worth calling the companies instead of waiting for a reply by message, and making the volume and the deadline clear from the start.

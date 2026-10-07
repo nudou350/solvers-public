@@ -1,21 +1,21 @@
 ---
-title: Sinais de alerta em orçamento de mudança
-source: Experiência própria da criadora em três mudanças de apartamento
+title: Warning signs in a moving quote
+source: The creator's own experience of three apartment moves
 source_date: 2026-10-02
 valid_until: 2027-04-30
-tags: [orcamento, alerta, golpe]
+tags: [quote, warning-signs, scam]
 ---
 
-# Sinais de alerta em orçamento de mudança
+# Warning signs in a moving quote
 
-## Sinais que pedem mais perguntas
+## Signs that call for more questions
 
-Na experiência da criadora, vale desconfiar e perguntar mais quando a empresa dá o preço sem saber o volume nem os andares, quando só aceita fechar por telefone sem mandar nada por escrito, quando pede um sinal alto e rápido para "garantir a data" ou quando o valor é muito mais baixo que o das outras propostas sem explicar o que ficou de fora. Esses sinais não provam que a empresa seja ruim, mas indicam que é preciso conferir antes de pagar.
+In the creator's experience, it is worth being suspicious and asking more when the company gives a price without knowing the volume or the floors, when it only accepts closing by phone without sending anything in writing, when it asks for a large, quick deposit to "secure the date" or when the amount is much lower than the other quotes without explaining what was left out. These signs do not prove the company is bad, but they show that you need to check before paying.
 
-## O que fazer ao notar um sinal
+## What to do when you notice a sign
 
-Pedir a proposta com a lista do que está incluído, perguntar o nome completo da empresa e o endereço, conferir se o telefone e o nome da empresa aparecem em outros lugares e comparar com as outras propostas. Se a empresa recusar o pedido por escrito, a criadora prefere ficar com outra. O Solver não afirma que determinada empresa seja confiável ou não: ele mostra o que perguntar.
+Ask for the quote with the list of what is included, ask for the company's full name and address, check whether the phone number and the company name appear elsewhere and compare with the other quotes. If the company refuses the written request, the creator prefers to go with another one. The Solver does not claim that a given company is trustworthy or not: it shows what to ask.
 
-## Quando houver problema depois
+## When there is a problem afterward
 
-Guardar a proposta, as conversas e as fotos. Em caso de dano ou cobrança diferente da combinada, procurar primeiro a própria empresa, por escrito, e depois um canal de defesa do consumidor, como o Procon da cidade ou o site consumidor.gov.br, conferindo na página oficial como funciona. Questões de indenização dependem do caso e da lei: o Solver não dá parecer jurídico.
+Keep the quote, the conversations and the photos. In case of damage or a charge different from what was agreed, first contact the company itself, in writing, and then a consumer protection channel, such as the city's Procon (a Brazilian consumer protection agency) or the consumidor.gov.br website, checking on the official page how it works. Questions of compensation depend on the case and the law: the Solver does not give legal opinions.

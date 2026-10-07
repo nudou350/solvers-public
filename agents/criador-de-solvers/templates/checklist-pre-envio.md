@@ -1,52 +1,52 @@
-# Checklist de pré-envio
+# Pre-submission checklist
 
-Marque cada item com o usuário antes de subir o ZIP. Se algum item não está marcado, volte à etapa indicada.
+Tick each item with the user before uploading the ZIP. If an item is not ticked, go back to the step indicated.
 
-## Pacote e arquivos
+## Package and files
 
-- [ ] O ZIP tem uma única pasta raiz (o slug) com o manifest.json dentro (etapa 7).
-- [ ] Só existem arquivos .json, .md e .txt; nenhum nome começa com ponto; sem __MACOSX, .DS_Store ou Thumbs.db.
-- [ ] Nenhum arquivo passa de 10 MB e o ZIP não passa de 50 MB.
-- [ ] Não há pasta verifier/, não há evals/report.json e não há notas de desempenho inventadas.
+- [ ] The ZIP has a single root folder (the slug) with manifest.json inside (step 7).
+- [ ] Only .json, .md and .txt files exist; no name starts with a dot; no __MACOSX, .DS_Store or Thumbs.db.
+- [ ] No file is over 10 MB and the ZIP is not over 50 MB.
+- [ ] There is no verifier/ folder, no evals/report.json and no made-up performance scores.
 
-## Manifesto
+## Manifest
 
-- [ ] specVersion igual a 1; sem id na primeira versão; sem platform; sem tools; guarantee.available igual a false.
-- [ ] Categoria entre as permitidas (nada de Finanças, Jurídico ou saúde).
-- [ ] name de 3 a 32 bytes; tagline de 10 a 100 caracteres; description de 120 a 2.000 caracteres, com o que NÃO faz.
-- [ ] version no formato 1.0.0 e uma entrada correspondente em versions.
-- [ ] terms com rightsConfirmed e sourcesListed iguais a true, e o usuário confirmou que é verdade.
-- [ ] pricing.priceUsdc igual ou maior que 5; royaltyBps entre 0 e 1.000.
-- [ ] packageContents com 3 a 8 itens, só o que o pacote realmente tem.
-- [ ] searchPhrases com as palavras de quem compra, todas ligadas ao conteúdo real.
+- [ ] specVersion equal to 1; no id in the first version; no platform; no tools; guarantee.available equal to false.
+- [ ] Category among the allowed ones (no Finance, Legal or health).
+- [ ] name of 3 to 32 bytes; tagline of 10 to 100 characters; description of 120 to 2,000 characters, including what it does NOT do.
+- [ ] version in the 1.0.0 format and a matching entry in versions.
+- [ ] terms with rightsConfirmed and sourcesListed equal to true, and the user confirmed it is true.
+- [ ] pricing.priceUsdc equal to or greater than 5; royaltyBps between 0 and 1,000.
+- [ ] packageContents with 3 to 8 items, only what the package really has.
+- [ ] searchPhrases in the words of the buyer, all tied to the real content.
 
-## Etapas
+## Steps
 
-- [ ] De 1 a 12 etapas (ideal: 3 a 6), cada uma com as 5 seções e entre 400 e 12.000 caracteres.
-- [ ] Cada gate tem de 3 a 6 itens verificáveis.
-- [ ] Nenhuma etapa pede senha, documento, cartão ou chave; nenhuma manda dados para fora; nenhuma tenta esconder algo do usuário.
+- [ ] 1 to 12 steps (ideal: 3 to 6), each with the 5 sections and between 400 and 12,000 characters.
+- [ ] Each gate has 3 to 6 verifiable items.
+- [ ] No step asks for a password, document, card or key; none sends data outside; none tries to hide something from the user.
 
-## Conhecimento
+## Knowledge
 
-- [ ] Todo arquivo .md tem front-matter com source e source_date (AAAA-MM-DD); o que vence tem valid_until.
-- [ ] Seções de 200 a 2.000 caracteres, que se bastam sozinhas.
-- [ ] Sem dado pessoal e sem conteúdo de terceiros sem permissão.
-- [ ] knowledge.updatedAt, reviewEveryDays e sources preenchidos.
+- [ ] Every .md file has front-matter with source and source_date (YYYY-MM-DD); anything that expires has valid_until.
+- [ ] Sections of 200 to 2,000 characters that stand on their own.
+- [ ] No personal data and no third-party content without permission.
+- [ ] knowledge.updatedAt, reviewEveryDays and sources filled in.
 
-## Calibragem e diferenciais
+## Calibration and differentiators
 
-- [ ] Pelo menos 2 diferenciais comprovados em stats.differentiators do validador.
-- [ ] Perguntas de calibragem sem dado sensível; usesMemory igual a true; uma etapa usa o perfil.
-- [ ] Se escalation estiver ligado: o Telegram do criador está vinculado no perfil.
+- [ ] At least 2 differentiators proven in the validator's stats.differentiators.
+- [ ] Calibration questions without sensitive data; usesMemory equal to true; one step uses the profile.
+- [ ] If escalation is on: the creator's Telegram is linked on the profile.
 
-## Casos de teste
+## Test cases
 
-- [ ] 10 ou mais casos com checagens contains, regex ou not_contains, cada uma com description.
-- [ ] Os casos de método são específicos: uma IA qualquer, sem o Solver, não passaria neles; e um erro do Solver faria o caso falhar.
-- [ ] Há casos de borda e de segurança (pedido fora do escopo, promessa de resultado, dado sensível).
+- [ ] 10 or more cases with contains, regex or not_contains checks, each with a description.
+- [ ] The method cases are specific: any AI, without the Solver, would not pass them; and a Solver mistake would make the case fail.
+- [ ] There are edge and safety cases (out-of-scope request, promise of a result, sensitive data).
 
-## Validação e envio
+## Validation and submission
 
-- [ ] validate_package com ok igual a true e os avisos restantes justificados no README.md.
-- [ ] Script de validação do ZIP inteiro rodado (ou o usuário sabe que o site valida de novo).
-- [ ] O usuário entende: envio em /criador/publicar, revisão humana em até 5 dias úteis, sem garantia de aprovação, nenhuma nota prometida.
+- [ ] validate_package with ok equal to true and the remaining warnings justified in README.md.
+- [ ] Whole-ZIP validation script run (or the user knows the site validates again).
+- [ ] The user understands: submission at /creator/publish, human review within 5 business days, no guarantee of approval, no rating promised.

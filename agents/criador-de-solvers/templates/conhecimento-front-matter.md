@@ -1,30 +1,30 @@
 ---
-title: TROQUE pelo título do arquivo (um tema só)
-source: TROQUE: nome da fonte (órgão, documento, versão ou "Experiência do criador, atendimentos de 2020 a 2026")
-source_url: https://exemplo.com.br/endereco-da-fonte
+title: REPLACE with the file title (a single topic)
+source: REPLACE: name of the source (agency, document, version or "The creator's experience, client work from 2020 to 2026")
+source_url: https://example.com/source-address
 source_date: 2026-01-15
 valid_until: 2026-12-31
-tags: [tema, subtema]
+tags: [topic, subtopic]
 ---
 
-# TROQUE pelo título do arquivo
+# REPLACE with the file title
 
-Uma ou duas frases dizendo do que trata este arquivo e quando ele vale.
+One or two sentences saying what this file covers and when it applies.
 
-## Regra ou fato 1, com o assunto no título
+## Rule or fact 1, with the subject in the heading
 
-Escreva fatos com número, unidade e data. Cada seção deve ter de 200 a 2.000 caracteres e se bastar sozinha, porque a busca devolve um trecho solto, sem o resto do arquivo. Repita o assunto no título da seção.
+Write facts with a number, a unit and a date. Each section must have 200 to 2,000 characters and stand on its own, because search returns a loose excerpt, without the rest of the file. Repeat the subject in the section heading.
 
-Exemplo de forma (os números são fictícios, não os copie): "O valor da taxa X em 2026 é de R$ NN,NN por mês (fonte e data no cabeçalho do arquivo)". Troque pelo seu fato real, com a fonte real. Se você não tem o número com fonte, escreva "confirme na fonte oficial" em vez de um valor.
+Example of the form (the numbers are made up, do not copy them): "The fee X in 2026 is $NN.NN per month (source and date in the file header)". Replace it with your real fact, with the real source. If you do not have the number with a source, write "confirm at the official source" instead of a value.
 
-## Regra ou fato 2, com o assunto no título
+## Rule or fact 2, with the subject in the heading
 
-Outro fato, também completo. Se existe exceção, escreva a exceção na mesma seção. Se o valor muda com o tempo, diga a data em que ele vale.
+Another fact, also complete. If there is an exception, write the exception in the same section. If the value changes over time, state the date it applies.
 
-## Como confirmar
+## How to confirm
 
-Diga onde o usuário confirma a informação na fonte oficial. Se não há certeza, escreva "confirme na fonte oficial antes de decidir". Lembre que cada seção precisa ter pelo menos 200 caracteres: se esta ficar curta, junte-a à seção anterior.
+Say where the user can confirm the information at the official source. If you are not sure, write "confirm at the official source before deciding". Remember that each section must have at least 200 characters: if this one comes out short, merge it into the previous section.
 
-## O que este arquivo não cobre
+## What this file does not cover
 
-Liste os limites (casos que ficam de fora). Isso evita que a IA use o arquivo para um caso errado. Também com pelo menos 200 caracteres; se não houver o que dizer, junte esta seção à anterior.
+List the limits (cases that are left out). This keeps the AI from using the file for the wrong case. Also at least 200 characters; if there is nothing to say, merge this section into the previous one.

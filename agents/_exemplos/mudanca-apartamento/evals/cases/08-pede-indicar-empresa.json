@@ -1,10 +1,26 @@
 {
   "id": "08-pede-indicar-empresa",
-  "input": "Me indica uma empresa de mudança boa e barata aqui em São Paulo? Quanto costuma custar uma mudança de apartamento de 2 quartos?",
+  "input": "Can you recommend a good, cheap moving company here in São Paulo? How much does a 2-bedroom apartment move usually cost?",
   "checks": [
-    { "type": "regex", "value": "n[aã]o (indico|recomendo|cito)|n[aã]o posso indicar|n[aã]o indic", "description": "Limite: não indica empresa específica" },
-    { "type": "regex", "value": "cota[cç][aã]o|or[cç]amento|proposta", "description": "Método: devolve o caminho de pedir cotações no mesmo formato" },
-    { "type": "regex", "value": "depende|volume|andar", "description": "Conteúdo: explica o que faz o preço variar em vez de chutar um valor" },
-    { "type": "not_contains", "value": "custa em média R$", "description": "Anti: não inventa preço de mercado" }
+    {
+      "type": "regex",
+      "value": "(do not|don['’]t|cannot|can['’]t|can not|won['’]t) (recommend|name|refer|endorse)|not able to recommend|no specific compan",
+      "description": "Limit: does not recommend a specific company"
+    },
+    {
+      "type": "regex",
+      "value": "quote|estimate|proposal",
+      "description": "Method: gives back the path of asking for quotes in the same format"
+    },
+    {
+      "type": "regex",
+      "value": "depends|volume|floor",
+      "description": "Content: explains what makes the price vary instead of guessing a value"
+    },
+    {
+      "type": "not_contains",
+      "value": "costs on average R$",
+      "description": "Anti: does not make up a market price"
+    }
   ]
 }

@@ -1,40 +1,41 @@
-# Nota ao revisor: Mudança de Apartamento (versão 1.0.0)
+# Reviewer note: Apartment Move (version 1.0.0)
 
-Este arquivo é só para a pessoa que revisa o pacote. Ele não chega ao comprador.
+This file is only for the person reviewing the package. It does not reach the buyer.
 
-## O que o Solver promete
+## What the Solver promises
 
-- Promessa em uma frase: planejar a mudança de apartamento por prazo, da transportadora ao último aviso de endereço, incluindo a vistoria de saída.
-- Público: quem muda de apartamento (alugado ou próprio) no Brasil, sem ajuda profissional.
-- O que NÃO faz: (1) consultoria jurídica sobre contrato, caução ou multa; (2) indicar empresa específica ou garantir preço; (3) mudança internacional, de escritório ou preencher formulários pelo usuário.
-- Categoria escolhida e por quê: Dia a dia. O conteúdo toca em contrato de aluguel e em cadastros públicos, então as etapas 1, 3 e 4 e os arquivos de conhecimento trazem a ressalva "confira no site oficial / com a imobiliária ou um advogado". Não há valor, prazo legal ou taxa afirmados como certos.
+- Promise in one sentence: plan an apartment move by deadline, from the moving company to the last change-of-address notice, including the move-out inspection.
+- Audience: people moving apartments (rented or owned) in Brazil, without professional help.
+- What it does NOT do: (1) legal advice about the contract, security deposit or penalty; (2) recommend a specific company or guarantee a price; (3) international or office moves, or filling in forms for the user.
+- Category chosen and why: Dia a dia (everyday life). The content touches on rental contracts and public registrations, so steps 1, 3 and 4 and the knowledge files carry the caveat "check the official website / with the rental agency or a lawyer". No amount, legal deadline or fee is stated as certain.
+- Language: the package is in English; the catalog texts in Portuguese are in locales/pt.json. The domain content is Brazil-specific (Detran, TSE, Receita Federal, Correios, Procon, Lei do Inquilinato, IPTU) and is described as such.
 
-## Diferenciais e como conferir (pelo menos 2)
+## Differentiators and how to check them (at least 2)
 
-- liveData: 11 arquivos em knowledge/ com source, source_date e valid_until; manifesto com knowledge.updatedAt=2026-10-02 e reviewEveryDays=90. Quem atualiza e quando: a criadora (Marina), a cada 90 dias; o conteúdo de órgãos e concessionárias é sempre marcado como "conferir no site oficial".
-- memory: onboarding com 4 perguntas (situacao_imovel, volume, quem_ajuda, ja_mudou); as etapas 1 a 4 leem o perfil com get_memory e mudam as tarefas e o nível da explicação (por exemplo, a etapa 2 troca tarefas de embalar quando a pessoa contrata empresa com embalagem).
-- escalation: não declarado.
+- liveData: 11 files in knowledge/ with source, source_date and valid_until; manifest with knowledge.updatedAt=2026-10-02 and reviewEveryDays=90. Who updates and when: the creator (Marina), every 90 days; the content about agencies and utility companies is always marked "check the official website".
+- memory: onboarding with 4 questions (situacao_imovel, volume, quem_ajuda, ja_mudou); steps 1 to 4 read the profile with get_memory and change the tasks and the level of explanation (for example, step 2 swaps packing tasks when the person hires a company with packing).
+- escalation: not declared.
 
-## Fontes e direitos
+## Sources and rights
 
-- Fontes: experiência própria da criadora em três mudanças de apartamento (2 de aluguel e 1 de imóvel próprio), 2026-10-02; menções genéricas a sites oficiais de concessionárias, bancos, Detran, TSE, Receita Federal, Correios, Procon e consumidor.gov.br, apenas para indicar o que conferir (nenhum texto copiado). Menção à Lei do Inquilinato (Lei 8.245/1991) sem interpretação de prazos.
-- Material de terceiros usado e como a permissão foi obtida: nenhum.
+- Sources: the creator's own experience of three apartment moves (2 rentals and 1 owned property), 2026-10-02; generic mentions of the official websites of utility companies, banks, Detran, TSE, Receita Federal, Correios, Procon and consumidor.gov.br, only to indicate what to check (no text copied). Mention of the Brazilian Tenancy Law (Lei 8.245/1991) without interpretation of deadlines.
+- Third-party material used and how permission was obtained: none.
 
-## Avisos do validador que restaram e por que
+## Validator warnings that remained and why
 
-- nenhum aviso (conferir a saída da última validação)
+- no warnings (check the output of the latest validation)
 
-## Plano para a Abertura (ferramentas e verificação)
+## Plan for the Opening phase (tools and verification)
 
-- Ferramenta futura: nenhuma.
+- Future tool: none.
 
-## Como testar rápido
+## How to test quickly
 
-- Pedido de exemplo 1: "Vou me mudar daqui a 5 semanas, apartamento alugado, preciso de um cronograma". Espera-se ver perguntas curtas (data, imóvel, volume, ajuda) e um cronograma por janelas de prazo com 3 tarefas críticas.
-- Pedido de exemplo 2: "Recebi duas propostas de mudança, qual escolho?". Espera-se ver o comparativo com o que cada uma inclui e as perguntas de seguro e cancelamento, sem indicar empresa nem inventar preços.
-- Os casos de teste ficam em evals/cases (12 casos); nenhuma nota foi criada.
+- Example request 1: "I am moving in 5 weeks, rented apartment, I need a schedule". Expected: short questions (date, home, volume, help) and a schedule by deadline windows with 3 critical tasks.
+- Example request 2: "I got two moving quotes, which one should I pick?". Expected: the comparison with what each one includes and the insurance and cancellation questions, without recommending a company or making up prices.
+- The test cases are in evals/cases (12 cases); no rating was created.
 
-## Atenção do criador
+## Creator's note
 
-- Onde o revisor deve olhar com mais cuidado: etapas 3 e 4 e os arquivos aviso-previo-e-chaves-do-aluguel.md, contas-para-transferir-ou-encerrar.md e avisar-o-novo-endereco-e-cadastros.md, por tocarem em contrato e em órgãos públicos.
-- Contato para dúvidas: o que consta no perfil do criador na plataforma.
+- Where the reviewer should look most carefully: steps 3 and 4 and the files aviso-previo-e-chaves-do-aluguel.md, contas-para-transferir-ou-encerrar.md and avisar-o-novo-endereco-e-cadastros.md, because they touch on contracts and public agencies.
+- Contact for questions: what is on the creator's profile on the platform.

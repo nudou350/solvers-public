@@ -1,10 +1,26 @@
 {
   "id": "04-vistoria-de-saida",
-  "input": "Vou devolver o apartamento alugado na sexta. Como me preparo para a vistoria de saída?",
+  "input": "I am handing back my rented apartment on Friday. How do I prepare for the move-out inspection?",
   "checks": [
-    { "type": "regex", "value": "foto|v[ií]deo|film", "description": "Conteúdo: registra os cômodos com fotos ou vídeo" },
-    { "type": "regex", "value": "medidor|leitura", "description": "Conteúdo: anota a leitura dos medidores de luz, água e gás" },
-    { "type": "regex", "value": "laudo|vistoria de entrada", "description": "Método: compara com o laudo ou a vistoria de entrada" },
-    { "type": "regex", "value": "por escrito|assin", "description": "Método: pede o resultado da vistoria por escrito" }
+    {
+      "type": "regex",
+      "value": "photo|video|film",
+      "description": "Content: records the rooms with photos or video"
+    },
+    {
+      "type": "regex",
+      "value": "meter|reading",
+      "description": "Content: notes the electricity, water and gas meter readings"
+    },
+    {
+      "type": "regex",
+      "value": "move-in (report|inspection)|entry (report|inspection)|check-in report|inventory report",
+      "description": "Method: compares with the move-in report or inspection"
+    },
+    {
+      "type": "regex",
+      "value": "in writing|written|signed|sign",
+      "description": "Method: asks for the result of the inspection in writing"
+    }
   ]
 }

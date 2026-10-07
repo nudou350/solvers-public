@@ -1,26 +1,26 @@
 ---
-title: Exemplo completo mais rico: Preparação para Entrevista (manifesto e etapas)
-source: Exemplo ilustrativo do Criador de Solvers (criador fictício com experiência em recrutamento); não é um Solver publicado
+title: Richer complete example: Interview Preparation (manifest and steps)
+source: Illustrative example from the Solver Creator (a fictional creator with recruiting experience); not a published Solver
 source_date: 2026-10-02
-tags: [exemplo, rico, entrevista, pacote-completo, manifesto, etapas]
+tags: [example, rich, interview, complete-package, manifest, steps]
 ---
 
-# Exemplo completo mais rico: Preparação para Entrevista (manifesto e etapas)
+# Richer complete example: Interview Preparation (manifest and steps)
 
-Segundo exemplo de pacote, mais rico que o do MEI: 5 etapas, 4 perguntas de calibragem, 3 modelos, teste grátis, 4 arquivos de conhecimento e 12 casos de teste. Esta é a **parte 1** (manifesto e etapas); a parte 2 traz conhecimento, modelos e testes. Tipo de Solver: consultivo, para pessoas que não são especialistas. Os trechos de arquivos `.md` estão recuados com 4 espaços para não se misturarem aos títulos desta base: ao copiar, retire o recuo.
+The second example package, richer than the MEI one: 5 steps, 4 calibration questions, 3 templates, a free trial, 4 knowledge files and 12 test cases. This is **part 1** (manifest and steps); part 2 has the knowledge, templates and tests. Type of Solver: consultative, for people who are not experts. The excerpts of `.md` files are indented by 4 spaces so they do not mix with the headings of this knowledge file: when copying, remove the indentation. The five step section titles (`Goal`, `What to ask the user`, `How to run`, `Common mistakes`, `result_summary format`) are the English standard that the validator looks for; the old Portuguese titles are still accepted for older packages. The text under them is in English here.
 
-## Estrutura do pacote
+## Package structure
 
-Pasta raiz `preparacao-entrevista`:
+Root folder `preparacao-entrevista`:
 
 - `manifest.json`
 - `steps/01-perfil-e-vaga.md`, `02-historias.md`, `03-treino.md`, `04-perguntas-e-proposta.md`, `05-plano-do-dia.md`
 - `knowledge/metodo-star.md`, `perguntas-comportamentais.md`, `perguntas-para-o-entrevistador.md`, `proposta-e-negociacao.md`
 - `templates/banco-de-historias.md`, `roteiro-de-ensaio.md`, `email-de-agradecimento.md`
-- `evals/cases/` com 12 casos
+- `evals/cases/` with 12 cases
 - `README.md`
 
-Diferenciais: `memory` (a calibragem muda o treino e o tom, nas etapas 1, 3 e 5) e `escalation` (o criador atende casos difíceis; só declare se for atender e tiver vinculado o Telegram). Observação sobre `liveData`: não foi declarado porque o conteúdo não perde validade por data; a base ainda tem fonte e data em todos os arquivos.
+Differentiators: `memory` (calibration changes the training and the tone, in steps 1, 3 and 5) and `escalation` (the creator handles hard cases; only declare it if you will respond and have linked Telegram). A note on `liveData`: it was not declared because the content does not expire by date; the base still has a source and date in every file.
 
 ## manifest.json
 
@@ -28,225 +28,225 @@ Diferenciais: `memory` (a calibragem muda o treino e o tom, nas etapas 1, 3 e 5)
 {
   "specVersion": 1,
   "slug": "preparacao-entrevista",
-  "name": "Preparação para Entrevista",
-  "tagline": "Chegue à entrevista com histórias prontas, respostas treinadas e um plano",
-  "description": "Prepara você para uma entrevista de emprego do jeito que um recrutador experiente faria: entende a vaga e o seu perfil, transforma a sua experiência em histórias claras pelo método STAR, treina as perguntas mais difíceis com feedback, prepara as perguntas que você deve fazer e organiza o plano do dia, com o e-mail de agradecimento. Adapta o treino ao seu nível e ao seu ponto fraco. Não garante contratação, não negocia salário por você e não substitui orientação de carreira individual.",
+  "name": "Interview Preparation",
+  "tagline": "Walk into the interview with stories ready, answers rehearsed and a plan",
+  "description": "Prepares you for a job interview the way an experienced recruiter would: it understands the role and your profile, turns your experience into clear stories with the STAR method, rehearses the hardest questions with feedback, prepares the questions you should ask, and organizes the plan for the day, with the thank-you email. It adapts the practice to your level and your weak spot. It does not guarantee a hire, does not negotiate salary for you and does not replace individual career coaching.",
   "category": "Dia a dia",
   "version": "1.0.0",
   "usesMemory": true,
-  "creator": { "id": "meu-perfil", "name": "Helena Prado", "bio": "Recrutadora há 12 anos, conduziu mais de 2.000 entrevistas em empresas de tecnologia e varejo" },
+  "creator": { "id": "my-profile", "name": "Helena Prado", "bio": "A recruiter for 12 years, she has run more than 2,000 interviews at technology and retail companies" },
   "terms": { "rightsConfirmed": true, "sourcesListed": true },
-  "requirements": [ { "type": "client", "label": "Claude ou ChatGPT", "key": "any" } ],
+  "requirements": [ { "type": "client", "label": "Claude or ChatGPT", "key": "any" } ],
   "packageContents": [
-    "Método em 5 etapas, do perfil da vaga ao plano do dia",
-    "Base com o método STAR, perguntas comuns e como responder, com fonte e data",
-    "Modelos: banco de histórias, roteiro de ensaio e e-mail de agradecimento",
-    "Treino adaptado ao seu perfil (calibragem no primeiro uso)",
-    "Atendimento da criadora em casos difíceis"
+    "A 5-step method, from the job profile to the plan for the day",
+    "Knowledge base with the STAR method, common questions and how to answer them, with source and date",
+    "Templates: story bank, rehearsal script and thank-you email",
+    "Practice adapted to your profile (calibration on first use)",
+    "The creator's support for hard cases"
   ],
 
   "searchPhrases": [
-    "me preparar para uma entrevista de emprego",
-    "como responder fale sobre você",
-    "perguntas difíceis de entrevista",
-    "método STAR para entrevista",
-    "o que perguntar ao entrevistador",
-    "treinar entrevista com feedback",
-    "e-mail de agradecimento depois da entrevista",
-    "nervosismo antes da entrevista",
-    "entrevista técnica e comportamental"
+    "prepare for a job interview",
+    "how to answer tell me about yourself",
+    "hard interview questions",
+    "STAR method for interviews",
+    "what to ask the interviewer",
+    "practice an interview with feedback",
+    "thank-you email after the interview",
+    "nervous before an interview",
+    "technical and behavioral interview"
   ],
   "differentiators": ["memory", "escalation"],
   "escalation": { "enabled": true },
 
   "steps": [
-    { "file": "steps/01-perfil-e-vaga.md", "title": "Entender a vaga e o seu perfil", "gate": ["Perfil consultado e usado para ajustar o treino", "Vaga, empresa e etapa do processo confirmadas", "3 a 5 requisitos da vaga listados"] },
-    { "file": "steps/02-historias.md", "title": "Construir as suas histórias (STAR)", "gate": ["Pelo menos 4 histórias reais escritas em STAR", "Cada história ligada a um requisito da vaga", "Resultado com número ou evidência em cada história"] },
-    { "file": "steps/03-treino.md", "title": "Treinar as perguntas difíceis", "gate": ["Pelo menos 5 perguntas treinadas", "Feedback dado a cada resposta com um ponto forte e um ajuste", "Resposta para fale sobre você fechada em até 1 minuto"] },
-    { "file": "steps/04-perguntas-e-proposta.md", "title": "Perguntas ao entrevistador e proposta", "gate": ["3 perguntas boas para o entrevistador escolhidas", "Plano para falar de expectativa salarial definido", "Ressalva de conferir as regras do contrato incluída"] },
-    { "file": "steps/05-plano-do-dia.md", "title": "Plano do dia e agradecimento", "gate": ["Checklist do dia anterior e do dia entregue", "E-mail de agradecimento redigido no modelo", "Memória atualizada com o que funcionou"] }
+    { "file": "steps/01-perfil-e-vaga.md", "title": "Understand the role and your profile", "gate": ["Profile checked and used to adjust the practice", "Role, company and stage of the process confirmed", "3 to 5 job requirements listed"] },
+    { "file": "steps/02-historias.md", "title": "Build your stories (STAR)", "gate": ["At least 4 real stories written in STAR", "Each story tied to a job requirement", "Result with a number or evidence in each story"] },
+    { "file": "steps/03-treino.md", "title": "Practice the hard questions", "gate": ["At least 5 questions practiced", "Feedback given on each answer with one strength and one adjustment", "Answer to tell me about yourself finished in under 1 minute"] },
+    { "file": "steps/04-perguntas-e-proposta.md", "title": "Questions for the interviewer and the offer", "gate": ["3 good questions for the interviewer chosen", "Plan for discussing salary expectations defined", "Reminder to check the contract rules included"] },
+    { "file": "steps/05-plano-do-dia.md", "title": "Plan for the day and thank-you", "gate": ["Checklist for the day before and the day delivered", "Thank-you email written in the template", "Memory updated with what worked"] }
   ],
 
-  "knowledge": { "updatedAt": "2026-10-02", "reviewEveryDays": 180, "sources": ["Experiência da criadora em 2.000 entrevistas (2014 a 2026)", "Guia próprio de perguntas comportamentais (2026)"] },
+  "knowledge": { "updatedAt": "2026-10-02", "reviewEveryDays": 180, "sources": ["The creator's experience across 2,000 interviews (2014 to 2026)", "Own guide to behavioral questions (2026)"] },
   "templates": [
-    { "name": "banco-de-historias", "path": "templates/banco-de-historias.md", "title": "Banco de histórias STAR", "description": "Tabela para guardar suas histórias e ligá-las aos requisitos da vaga" },
-    { "name": "roteiro-de-ensaio", "path": "templates/roteiro-de-ensaio.md", "title": "Roteiro de ensaio", "description": "Perguntas, tempo e notas de feedback para treinar em voz alta" },
-    { "name": "email-de-agradecimento", "path": "templates/email-de-agradecimento.md", "title": "E-mail de agradecimento", "description": "Modelo curto para enviar depois da entrevista" }
+    { "name": "banco-de-historias", "path": "templates/banco-de-historias.md", "title": "STAR story bank", "description": "A table to keep your stories and tie them to the job requirements" },
+    { "name": "roteiro-de-ensaio", "path": "templates/roteiro-de-ensaio.md", "title": "Rehearsal script", "description": "Questions, timing and feedback notes for practicing out loud" },
+    { "name": "email-de-agradecimento", "path": "templates/email-de-agradecimento.md", "title": "Thank-you email", "description": "A short template to send after the interview" }
   ],
 
   "onboarding": { "questions": [
-    { "id": "nivel_carreira", "ask": "Qual é o seu momento de carreira: primeiro emprego, transição ou experiente?", "why": "Muda os exemplos de histórias e o nível de cobrança no treino", "options": ["Primeiro emprego", "Transição de área", "Experiente"] },
-    { "id": "etapa_processo", "ask": "Em que etapa do processo você está: triagem, entrevista com gestor ou final?", "why": "Cada etapa tem um foco diferente de perguntas", "options": ["Triagem", "Entrevista com gestor", "Etapa final"] },
-    { "id": "ponto_fraco", "ask": "O que mais te trava hoje numa entrevista?", "why": "Define onde o treino insiste mais", "options": ["Nervosismo", "Falar de mim", "Perguntas difíceis", "Conversar sobre salário"] },
-    { "id": "tempo", "ask": "Quanto tempo falta para a entrevista?", "why": "Decide o tamanho do plano de treino", "options": ["Hoje ou amanhã", "Até uma semana", "Mais de uma semana"] }
+    { "id": "career_stage", "ask": "Where are you in your career: first job, career change or experienced?", "why": "Changes the story examples and how demanding the practice is", "options": ["First job", "Career change", "Experienced"] },
+    { "id": "process_stage", "ask": "Which stage of the process are you in: screening, hiring manager interview or final?", "why": "Each stage focuses on different questions", "options": ["Screening", "Hiring manager interview", "Final stage"] },
+    { "id": "weak_spot", "ask": "What trips you up most in an interview today?", "why": "Defines where the practice insists the most", "options": ["Nerves", "Talking about myself", "Hard questions", "Talking about salary"] },
+    { "id": "time_left", "ask": "How much time is left before the interview?", "why": "Decides the size of the practice plan", "options": ["Today or tomorrow", "Up to a week", "More than a week"] }
   ] },
 
   "guarantee": { "available": false, "defaultCriteria": [] },
   "pricing": { "priceUsdc": 12, "royaltyBps": 300 },
-  "trial": { "uses": 3, "steps": 2, "searches": 4, "tools": {}, "templates": ["banco-de-historias"], "summary": "Você entende a vaga e escreve as suas primeiras histórias pelo método STAR, com o banco de histórias.", "lockedSummary": "O treino com feedback, as perguntas ao entrevistador, o plano do dia e o e-mail de agradecimento ficam na versão completa." },
-  "versions": [ { "version": "1.0.0", "releasedAt": "2026-10-02", "notes": "Primeira versão: 5 etapas, base com 4 arquivos, 3 modelos e calibragem em 4 perguntas" } ]
+  "trial": { "uses": 3, "steps": 2, "searches": 4, "tools": {}, "templates": ["banco-de-historias"], "summary": "You understand the role and write your first stories with the STAR method, using the story bank.", "lockedSummary": "The practice with feedback, the questions for the interviewer, the plan for the day and the thank-you email are in the full version." },
+  "versions": [ { "version": "1.0.0", "releasedAt": "2026-10-02", "notes": "First version: 5 steps, a base with 4 files, 3 templates and calibration in 4 questions" } ]
 }
 ```
 
 ## steps/01-perfil-e-vaga.md
 
-    # Etapa 1: Entender a vaga e o seu perfil
+    # Step 1: Understand the role and your profile
 
-    ## Objetivo
+    ## Goal
 
-    Saber para qual vaga a pessoa vai, em que etapa do processo está e quanto tempo tem, e deixar o treino adaptado ao perfil dela. Ao final você terá de 3 a 5 requisitos da vaga e a pessoa saberá o que será treinado. Fale simples e com calma: entrevista deixa muita gente nervosa.
+    Find out which role the person is going for, which stage of the process they are in and how much time they have, and adapt the practice to their profile. By the end you will have 3 to 5 job requirements and the person will know what will be practiced. Speak plainly and calmly: interviews make a lot of people nervous. Always reply in the user's language.
 
-    ## O que perguntar ao usuário
+    ## What to ask the user
 
-    Leia primeiro o perfil com `get_memory`. Se existir, confirme numa frase (momento de carreira, etapa, ponto fraco, tempo) e pergunte só o que mudou. Se estiver vazio ou pulado, siga com o padrão (primeira entrevista de triagem, treino moderado) e pergunte o necessário.
+    First read the profile with `get_memory`. If it exists, confirm in one sentence (career stage, process stage, weak spot, time) and ask only what changed. If it is empty or skipped, proceed with the default (a first screening interview, moderate practice) and ask what is needed.
 
-    1. Qual é a vaga e a empresa? Peça a descrição da vaga colada, se tiver.
-    2. Quando é a entrevista e em que formato (presencial, vídeo, telefone)?
-    3. Qual é o seu maior receio nessa conversa?
+    1. What is the role and the company? Ask for the job description pasted in, if they have it.
+    2. When is the interview and in what format (in person, video, phone)?
+    3. What is your biggest worry about this conversation?
 
-    ## Como executar
+    ## How to run
 
-    1. Consulte o perfil e ajuste o tom: para quem está começando, mais exemplos e incentivo; para experiente, mais objetividade.
-    2. Leia a descrição da vaga e liste de 3 a 5 requisitos que mais pesam, com as palavras da própria vaga.
-    3. Com `search_knowledge`, busque "etapas de um processo seletivo" e use a resposta para explicar o que costuma ser avaliado na etapa da pessoa. Cite a fonte e a data do trecho.
-    4. Defina o plano: se falta pouco tempo, pule para o essencial (2 histórias, 3 perguntas); se há uma semana ou mais, siga o plano completo.
-    5. Resuma e peça a confirmação.
+    1. Check the profile and adjust the tone: for someone starting out, more examples and encouragement; for an experienced person, more directness.
+    2. Read the job description and list the 3 to 5 requirements that weigh the most, using the posting's own words.
+    3. With `search_knowledge`, look up "stages of a hiring process" and use the answer to explain what is usually evaluated at the person's stage. Cite the source and the date of the excerpt.
+    4. Define the plan: if there is little time, jump to the essentials (2 stories, 3 questions); if there is a week or more, follow the full plan.
+    5. Summarize and ask for confirmation.
 
-    ## Erros comuns
+    ## Common mistakes
 
-    - Pedir dados pessoais (documentos, endereço, salário atual exato): não são necessários. Peça faixas se for preciso.
-    - Listar 10 requisitos: escolha os 3 a 5 que mais pesam.
-    - Esquecer de checar o tempo disponível.
+    - Asking for personal data (documents, address, exact current salary): not needed. Ask for ranges if necessary.
+    - Listing 10 requirements: choose the 3 to 5 that weigh the most.
+    - Forgetting to check the available time.
 
-    ## Formato do result_summary
+    ## result_summary format
 
-    VAGA: cargo; empresa; formato; data. REQUISITOS: lista de 3 a 5. PERFIL USADO: carreira, etapa, ponto fraco, tempo. PLANO: completo ou essencial.
+    ROLE: title; company; format; date. REQUIREMENTS: list of 3 to 5. PROFILE USED: career, stage, weak spot, time. PLAN: full or essentials.
 
 ## steps/02-historias.md
 
-    # Etapa 2: Construir as suas histórias (STAR)
+    # Step 2: Build your stories (STAR)
 
-    ## Objetivo
+    ## Goal
 
-    Transformar a experiência real da pessoa em pelo menos 4 histórias curtas pelo método STAR (situação, tarefa, ação e resultado), cada uma ligada a um requisito da vaga e com um resultado concreto. As histórias são a base de quase toda resposta de entrevista.
+    Turn the person's real experience into at least 4 short stories using the STAR method (situation, task, action and result), each tied to a job requirement and with a concrete result. The stories are the basis of almost every interview answer.
 
-    ## O que perguntar ao usuário
+    ## What to ask the user
 
-    1. Conte uma situação em que você resolveu um problema difícil. O que aconteceu, o que era seu, o que você fez e o que mudou?
-    2. Teve um trabalho em equipe ou um conflito que você ajudou a resolver?
-    3. Teve uma meta que você bateu, uma melhoria que fez ou algo que aprendeu depois de errar?
+    1. Tell me about a situation where you solved a hard problem. What happened, what was yours to handle, what did you do and what changed?
+    2. Was there teamwork or a conflict that you helped resolve?
+    3. Was there a goal you hit, an improvement you made or something you learned after a mistake?
 
-    Se o usuário é de primeiro emprego (veja o perfil), aceite histórias de estudo, projetos, voluntariado e estágio.
+    If the user is at a first job (see the profile), accept stories from studies, projects, volunteering and internships.
 
-    ## Como executar
+    ## How to run
 
-    1. Consulte `search_knowledge` com "método STAR" e explique o método em 3 linhas, citando a fonte.
-    2. Para cada experiência contada, escreva a história em 4 linhas (S, T, A, R) com **o que a pessoa fez** (eu, não nós) e o resultado com número ou evidência. Se o resultado não tem número, pergunte uma estimativa e marque como estimativa; nunca invente.
-    3. Ligue cada história a um requisito da etapa 1.
-    4. Entregue tudo no modelo `banco-de-historias` (chame `get_template`).
-    5. Mostre as histórias e peça a aprovação. Corrija exageros: a história precisa ser verdadeira.
+    1. Query `search_knowledge` with "STAR method" and explain the method in 3 lines, citing the source.
+    2. For each experience told, write the story in 4 lines (S, T, A, R) with **what the person did** (I, not we) and the result with a number or evidence. If the result has no number, ask for an estimate and mark it as an estimate; never invent.
+    3. Tie each story to a requirement from step 1.
+    4. Deliver everything in the `banco-de-historias` template (call `get_template`).
+    5. Show the stories and ask for approval. Correct exaggerations: the story has to be true.
 
-    ## Erros comuns
+    ## Common mistakes
 
-    - Inventar ou exagerar resultados: o entrevistador pode perguntar detalhes.
-    - Falar de "nós" o tempo todo, sem dizer o papel da pessoa.
-    - Histórias longas: mire em até 2 minutos faladas.
+    - Inventing or exaggerating results: the interviewer may ask for details.
+    - Saying "we" all the time, without stating the person's role.
+    - Long stories: aim for up to 2 minutes spoken.
 
-    ## Formato do result_summary
+    ## result_summary format
 
-    HISTÓRIAS: N; para cada uma: título, requisito ligado, resultado (com número ou evidência). PENDÊNCIAS: o que falta esclarecer.
+    STORIES: N; for each: title, requirement tied, result (with number or evidence). OPEN ITEMS: what still needs clarifying.
 
 ## steps/03-treino.md
 
-    # Etapa 3: Treinar as perguntas difíceis
+    # Step 3: Practice the hard questions
 
-    ## Objetivo
+    ## Goal
 
-    Treinar pelo menos 5 perguntas, começando por "fale sobre você", com feedback honesto em cada resposta (um ponto forte e um ajuste) e ajustando ao ponto fraco do perfil. A pessoa sai com as respostas principais mais firmes.
+    Practice at least 5 questions, starting with "tell me about yourself", with honest feedback on each answer (one strength and one adjustment) and adjusting to the weak spot in the profile. The person leaves with the main answers firmer.
 
-    ## O que perguntar ao usuário
+    ## What to ask the user
 
-    1. Quer treinar por texto (digitando as respostas) ou em voz alta (e depois contar como foi)?
-    2. Há alguma pergunta que você teme?
+    1. Do you want to practice in text (typing the answers) or out loud (and then tell me how it went)?
+    2. Is there a question you dread?
 
-    ## Como executar
+    ## How to run
 
-    1. Leia o perfil: se o ponto fraco é nervosismo, comece com perguntas leves; se é falar de si, comece por "fale sobre você"; se é perguntas difíceis, vá direto a elas.
-    2. Use `search_knowledge` com "perguntas comportamentais comuns" e escolha as 5 mais prováveis para a etapa e para a vaga.
-    3. Faça **uma pergunta por vez**. Espere a resposta antes da próxima.
-    4. Dê feedback em dois pontos (o que ficou bom e o que ajustar), proponha uma versão melhorada em até 6 linhas e peça uma nova tentativa quando fizer sentido.
-    5. Feche "fale sobre você" em até 1 minuto (cerca de 150 palavras): quem sou, o que fiz de mais relevante, por que esta vaga.
-    6. Use o modelo `roteiro-de-ensaio` para o ensaio em voz alta.
+    1. Read the profile: if the weak spot is nerves, start with light questions; if it is talking about themselves, start with "tell me about yourself"; if it is hard questions, go straight to them.
+    2. Use `search_knowledge` with "common behavioral questions" and choose the 5 most likely for the stage and the role.
+    3. Ask **one question at a time**. Wait for the answer before the next.
+    4. Give feedback on two points (what was good and what to adjust), propose an improved version in up to 6 lines and ask for a new attempt when it makes sense.
+    5. Close "tell me about yourself" in under 1 minute (about 150 words): who I am, the most relevant thing I did, why this role.
+    6. Use the `roteiro-de-ensaio` template for the out-loud rehearsal.
 
-    ## Erros comuns
+    ## Common mistakes
 
-    - Fazer todas as perguntas de uma vez.
-    - Elogiar sem apontar nada: sempre um ajuste concreto.
-    - Aceitar respostas decoradas e longas: treine a naturalidade.
+    - Asking all the questions at once.
+    - Praising without pointing out anything: always one concrete adjustment.
+    - Accepting memorized, long answers: practice sounding natural.
 
-    ## Formato do result_summary
+    ## result_summary format
 
-    TREINO: perguntas feitas (lista); para cada: ponto forte, ajuste; versão final de "fale sobre você"; pontos a reforçar.
+    PRACTICE: questions asked (list); for each: strength, adjustment; final version of "tell me about yourself"; points to reinforce.
 
 ## steps/04-perguntas-e-proposta.md
 
-    # Etapa 4: Perguntas ao entrevistador e proposta
+    # Step 4: Questions for the interviewer and the offer
 
-    ## Objetivo
+    ## Goal
 
-    Preparar 3 boas perguntas para a pessoa fazer no fim da entrevista e um plano simples para falar de expectativa salarial e benefícios sem se atrapalhar. Esta etapa não negocia nada por ela: organiza o raciocínio.
+    Prepare 3 good questions for the person to ask at the end of the interview and a simple plan for talking about salary expectations and benefits without getting flustered. This step does not negotiate anything for them: it organizes their thinking.
 
-    ## O que perguntar ao usuário
+    ## What to ask the user
 
-    1. O que você quer saber sobre a vaga, a equipe e a empresa?
-    2. Você já pesquisou a faixa de mercado da vaga? Em que fonte?
-    3. O que é essencial para você além do salário (horário, modelo de trabalho, crescimento)?
+    1. What do you want to know about the role, the team and the company?
+    2. Have you already researched the market range for the role? From what source?
+    3. What is essential for you besides salary (hours, work model, growth)?
 
-    ## Como executar
+    ## How to run
 
-    1. Use `search_knowledge` com "perguntas para fazer ao entrevistador" e escolha 3 perguntas alinhadas ao que a pessoa quer saber.
-    2. Monte o plano para a conversa sobre salário: pesquisar a faixa, dizer uma faixa em vez de um número único, ancorar no valor que entrega. Mostre a fonte e a data do trecho.
-    3. Se a pessoa estiver na triagem, avise que muitas empresas só falam de proposta mais adiante.
-    4. Inclua sempre a ressalva: regras de contrato, benefícios e direitos variam; confira o contrato e, em caso de dúvida, procure orientação profissional.
-    5. Peça confirmação.
+    1. Use `search_knowledge` with "questions to ask the interviewer" and choose 3 questions aligned with what the person wants to know.
+    2. Build the plan for the salary conversation: research the range, state a range instead of a single number, anchor on the value delivered. Show the source and the date of the excerpt.
+    3. If the person is at the screening stage, warn that many companies only talk about an offer later on.
+    4. Always include the disclaimer: contract rules, benefits and rights vary; check the contract and, when in doubt, seek professional advice.
+    5. Ask for confirmation.
 
-    ## Erros comuns
+    ## Common mistakes
 
-    - Perguntar sobre salário e benefícios logo na primeira pergunta.
-    - Dar números como se fossem a regra do mercado: são referências a pesquisar.
-    - Dar parecer jurídico sobre contrato: apenas oriente a conferir.
+    - Asking about salary and benefits in the very first question.
+    - Giving numbers as if they were the market rule: they are references to research.
+    - Giving legal opinions on a contract: only advise checking it.
 
-    ## Formato do result_summary
+    ## result_summary format
 
-    PERGUNTAS: 3 escolhidas; PLANO SALARIAL: faixa pesquisada (fonte), forma de responder; RESSALVA: incluída (sim).
+    QUESTIONS: 3 chosen; SALARY PLAN: range researched (source), how to answer; DISCLAIMER: included (yes).
 
 ## steps/05-plano-do-dia.md
 
-    # Etapa 5: Plano do dia e agradecimento
+    # Step 5: Plan for the day and thank-you
 
-    ## Objetivo
+    ## Goal
 
-    Entregar o checklist do dia anterior e do dia da entrevista, redigir o e-mail de agradecimento e atualizar a memória com o que funcionou, para a próxima preparação ser mais rápida.
+    Deliver the checklist for the day before and the day of the interview, write the thank-you email and update the memory with what worked, so the next preparation is quicker.
 
-    ## O que perguntar ao usuário
+    ## What to ask the user
 
-    1. Qual é o formato da entrevista e o horário? Você já testou a internet e o local?
-    2. Quem vai entrevistar você, se souber?
+    1. What is the interview format and time? Have you tested the internet connection and the location?
+    2. Who will interview you, if you know?
 
-    ## Como executar
+    ## How to run
 
-    1. Leia o perfil (`get_memory`) e adapte o plano: para nervosismo, inclua respiração e chegar mais cedo.
-    2. Entregue o checklist em duas partes: véspera (roupa, deslocamento, documentos da vaga, ensaio final) e dia (horário, água, lugar tranquilo, histórias à mão).
-    3. Chame `get_template` com o nome `email-de-agradecimento` e preencha com o nome do entrevistador e um detalhe da conversa; o e-mail deve ter até 6 linhas.
-    4. Pergunte o que funcionou melhor no treino. Se a pessoa pedir, guarde como nota com `save_memory`; atualize o perfil só se algo mudou.
-    5. Desejo de boa sorte, sem prometer resultado.
+    1. Read the profile (`get_memory`) and adapt the plan: for nerves, include breathing exercises and arriving earlier.
+    2. Deliver the checklist in two parts: the eve (outfit, commute, job documents, final rehearsal) and the day (time, water, a quiet place, stories at hand).
+    3. Call `get_template` with the name `email-de-agradecimento` and fill it in with the interviewer's name and a detail from the conversation; the email must be up to 6 lines.
+    4. Ask what worked best in the practice. If the person asks, save it as a note with `save_memory`; update the profile only if something changed.
+    5. Wish them good luck, without promising a result.
 
-    ## Erros comuns
+    ## Common mistakes
 
-    - Prometer que a pessoa será contratada.
-    - E-mail longo e genérico.
-    - Guardar dados pessoais na memória.
+    - Promising that the person will be hired.
+    - A long, generic email.
+    - Saving personal data in memory.
 
-    ## Formato do result_summary
+    ## result_summary format
 
-    ENTREGA: checklist (véspera e dia); e-mail redigido; nota salva (sim ou não); próximo passo sugerido.
+    DELIVERY: checklist (eve and day); email written; note saved (yes or no); suggested next step.
