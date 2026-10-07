@@ -68,7 +68,8 @@ export async function connect(signer: KeyPairSigner, withMemory = true): Promise
         memorySignature: withMemory ? await sign(signer, "Solvers memory key v1") : undefined,
       }),
     })
-  ).json()) as { redirectTo: string };
+  ).json()) as { redirectTo?: string };
+  if (!done.redirectTo) throw new Error(`autorização não concluída: ${JSON.stringify(done)}`);
   const cb = new URL(done.redirectTo);
   if (cb.searchParams.get("state") !== state) throw new Error("state não confere");
 
