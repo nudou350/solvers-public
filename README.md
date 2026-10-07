@@ -1,74 +1,83 @@
 # Solvers
 
-Marketplace de especialistas de IA ("solvers") que se conectam ao Claude e ao ChatGPT por um único
-conector MCP. A compra gera uma licença (NFT Metaplex Core) na carteira Solana do usuário; avaliações,
-créditos, garantias (escrow) e reputação ficam on-chain. Especificação completa: [INSTRUCTIONS.md](INSTRUCTIONS.md).
+English | [Português](README.pt-BR.md)
+
+A marketplace of AI specialists ("solvers") that plug into Claude and ChatGPT through a single MCP connector.
+Buying a solver mints a license (a Metaplex Core NFT) into the buyer's Solana wallet; reviews, credits,
+guarantees (escrow) and reputation all live on-chain. Full specification: [INSTRUCTIONS.md](INSTRUCTIONS.md) (in Portuguese).
 
 ```
-apps/server            Node 22 + Express: API da loja, conector MCP, OAuth, indexador, jobs
-programs/solvers       Programa Anchor 1.2 (licenças, créditos, avaliações, escrow)
-packages/shared        Contrato de dados (zod) usado por servidor e vitrine
-packages/solvers-client  Cliente TS gerado com Codama a partir do IDL
-packages/chain         Transações com a plataforma como fee payer, eventos, Metaplex Core
-packages/api-client    Cliente tipado da API para a vitrine (troca os mocks sem mudar telas)
-agents/                Pacotes dos solvers (6 publicados; backend-node e planilhas-dados fora da vitrine)
-scripts/               bootstrap da rede, e2e (compra, API, conector, fluxo completo)
-infra/                 PM2, nginx e scripts de deploy no padrão da VPS
+apps/server              Node 22 + Express: store API, MCP connector, OAuth, indexer, jobs
+programs/solvers         Anchor 1.2 program (licenses, credits, reviews, escrow)
+packages/shared          Data contract (zod) shared by the server and the storefront
+packages/solvers-client  TS client generated with Codama from the IDL
+packages/chain           Transactions with the platform as fee payer, events, Metaplex Core
+packages/api-client      Typed API client for the storefront (swaps out the mocks without changing screens)
+agents/                  Solver packages (6 published; backend-node and planilhas-dados are kept off the storefront)
+scripts/                 Network bootstrap, e2e (purchase, API, connector, full flow)
+infra/                   PM2, nginx and deploy scripts following the VPS conventions
 ```
 
-## Decisões que diferem do INSTRUCTIONS.md
+Solver packages are English-primary, with optional Portuguese (pt-BR) translations in `locales/pt.json`.
+The package format is documented in [PACKAGE_SPEC.md](PACKAGE_SPEC.md), the creator workflow in
+[docs/creator-guide.md](docs/creator-guide.md), and a plain-language tour of the whole system in
+[docs/concepts-guide.md](docs/concepts-guide.md).
 
-| Tema | Decisão | Motivo |
+## Decisions that differ from INSTRUCTIONS.md
+
+| Topic | Decision | Reason |
 |---|---|---|
-| Infra | PM2 + nginx + PG16 (5433) com pgvector na VPS, não docker-compose/Caddy | Respeitar a VPS compartilhada (VPS_GUIDE.md) |
-| Domínio | Um domínio só (`solvers.wondervelop.com`): vitrine em `/`, servidor em `/api`, `/mcp`, `/oauth`, `/.well-known` | Sem CORS; cookie de sessão do mesmo site |
-| Taxas | A plataforma é fee payer de toda transação (usuário não precisa de SOL) | Público leigo / login por e-mail |
-| Preço mínimo | Toda compra (licença, pacote de créditos, garantia) >= `min_price` (5 USDC) | Cobrir o rent pago pela plataforma |
-| USDC | Mint de teste próprio + faucet na API (devnet) | Faucet da Circle é limitado; demo não depende dele |
-| Avaliação | Uma licença prova uma única avaliação (PDA `license_review`), preço fixado na compra (`expected_price`) | Correções da revisão de segurança |
-| Garantia | Prazo de liberação automática por etapa (`passed_at + review_window`) | Várias etapas com prazos independentes |
-| Teste grátis | 3 usos por carteira por solver, controlado off-chain | Não existia no programa |
-| Revenda | Licença revendida pelo mercado, sem custódia, com royalty ao criador (`docs/resale.md`) | Devnet; mainnet depende dos termos com o advogado |
-| Licenças limitadas | O criador pode limitar o número de licenças de um solver (padrão: ilimitado). O limite atual é imposto pelo programa e verificável na blockchain; o criador só pode aumentá-lo, nunca reduzi-lo, e revender, transferir ou queimar uma licença não libera vaga (`docs/licencas-limitadas.md`) | Devnet, no mesmo upgrade da revenda |
-| SBPF | Build com `--arch v1` | Devnet/mainnet ainda aceitam deploy v0-v2; o validador de teste 3.x não roda v3 |
+| Infra | PM2 + nginx + PG16 (port 5433) with pgvector on the VPS, not docker-compose/Caddy | Respect the shared VPS (VPS_GUIDE.md) |
+| Domain | A single domain (`solvers.wondervelop.com`): storefront at `/`, server at `/api`, `/mcp`, `/oauth`, `/.well-known` | No CORS; same-site session cookie |
+| Fees | The platform is the fee payer of every transaction (users need no SOL) | Non-technical audience / email login |
+| Minimum price | Every purchase (license, credit pack, guarantee) must be >= `min_price` (5 USDC) | Cover the rent paid by the platform |
+| USDC | Self-minted test mint + faucet in the API (devnet) | Circle's faucet is rate-limited; the demo does not depend on it |
+| Reviews | One license proves a single review (`license_review` PDA), price locked at purchase (`expected_price`) | Fixes from the security review |
+| Guarantee | Automatic release deadline per milestone (`passed_at + review_window`) | Several milestones with independent deadlines |
+| Free trial | 3 uses per wallet per solver, tracked off-chain | Did not exist in the program |
+| Resale | A license can be resold through the marketplace, non-custodial, with a royalty to the creator (`docs/resale.md`, in Portuguese) | Devnet; mainnet depends on the terms with the lawyer |
+| Limited licenses | The creator can cap the number of licenses of a solver (default: unlimited). The current cap is enforced by the program and verifiable on the blockchain; the creator can only raise it, never lower it, and reselling, transferring or burning a license does not free a slot (`docs/licencas-limitadas.md`, in Portuguese) | Devnet, in the same upgrade as resale |
+| SBPF | Build with `--arch v1` | Devnet/mainnet still accept v0-v2 deploys; the 3.x test validator does not run v3 |
 
-## Rodando localmente
+## Running locally
 
-Pré-requisitos: Node 22+, pnpm 10, WSL com Solana CLI + Anchor 1.2 (para o programa), Postgres 16 com pgvector.
+Prerequisites: Node 22+, pnpm 10, WSL with the Solana CLI + Anchor 1.2 (for the program), Postgres 16 with pgvector.
 
 ```bash
 pnpm install
 pnpm --filter @solvers/shared --filter @solvers/client --filter @solvers/chain build
 
-# programa (no WSL)
-bash scripts/chain/build-program.sh        # anchor build --arch v1 + copia o IDL
-bash scripts/chain/test-program.sh         # 13 testes LiteSVM
-bash scripts/chain/local-validator.sh      # validador local com o programa e o Metaplex Core
+# program (in WSL)
+bash scripts/chain/build-program.sh        # anchor build --arch v1 + copies the IDL
+bash scripts/chain/test-program.sh         # 13 LiteSVM tests
+bash scripts/chain/local-validator.sh      # local validator with the program and Metaplex Core
 
-# rede + servidor
-cd scripts && npx tsx src/bootstrap-chain.ts          # mint de USDC de teste + Config
-cd apps/server && cp ../../infra/.env.example .env     # ajuste para localnet
-pnpm --filter @solvers/server cli:publish             # publica todos os pacotes (ou só os slugs passados)
-pnpm --filter @solvers/server cli:seed                # compras, avaliações, usos, garantias
+# network + server
+cd scripts && npx tsx src/bootstrap-chain.ts          # test USDC mint + Config
+cd apps/server && cp ../../infra/.env.example .env     # adjust for localnet
+pnpm --filter @solvers/server cli:publish             # publishes every package (or only the slugs you pass)
+pnpm --filter @solvers/server cli:seed                # purchases, reviews, usage, guarantees
 pnpm --filter @solvers/server dev
 
-# testes ponta a ponta (servidor rodando)
+# end-to-end tests (server running)
 cd scripts && npx tsx src/e2e-purchase.ts && npx tsx src/e2e-api.ts && npx tsx src/e2e-mcp.ts && npx tsx src/e2e-full.ts
 ```
 
-Evals dos solvers: as respostas ficam em `agents/<slug>/evals/outputs/` (geradas às cegas, com o solver ativo) e
-`cd scripts && npm run eval [slug]` aplica as checagens de `evals/cases/` e grava `evals/report.json`, cuja nota o publish leva on-chain.
+Solver evals: the answers live in `agents/<slug>/evals/outputs/` (generated blind, with the solver active), and
+`cd scripts && npm run eval [slug]` applies the checks in `evals/cases/` and writes `evals/report.json`, whose score the publish step records on-chain.
+These scores are labeled "internal team test" in the product, never "verified".
 
-Chaves de desenvolvimento ficam fora do repositório (`~/solvers-keys` no WSL, `apps/server/.keys`).
+Development keys live outside the repository (`~/solvers-keys` in WSL, `apps/server/.keys`).
 
-## Conector
+## Connector
 
-URL: `https://solvers.wondervelop.com/mcp`. O Claude/ChatGPT descobre o OAuth pelo 401 do `/mcp`, registra-se
-sozinho (DCR), abre `/oauth/authorize` (página "Conectar sua carteira"), recebe o token (PKCE) e passa a usar
-as 12 ferramentas: `list_my_solvers`, `find_solver`, `get_purchase_link`, `activate_solver`, `preflight_check`,
-`next_step`, `search_knowledge`, `run_tool`, `get_memory`, `save_memory`, `submit_deliverable`, `escalate_to_creator`.
+URL: `https://solvers.wondervelop.com/mcp`. Claude/ChatGPT discovers OAuth from the 401 on `/mcp`, registers itself
+(DCR), opens `/oauth/authorize` (the "Connect your wallet" page), receives the token (PKCE) and starts using
+the 15 tools: `list_my_solvers`, `find_solver`, `get_purchase_link`, `activate_solver`, `preflight_check`,
+`next_step`, `search_knowledge`, `run_tool`, `get_memory`, `save_memory`, `forget_memory`, `submit_deliverable`,
+`escalate_to_creator`, `list_open_guarantees`, `get_template`.
 
 ## Deploy
 
-Veja [NEXT_STEPS.md](NEXT_STEPS.md) para o que falta do seu lado (SOL de devnet, DNS, Helius, Telegram).
-Depois: `bash infra/deploy.sh` (envia o commit atual, compila, migra e recarrega o PM2).
+See [NEXT_STEPS.md](NEXT_STEPS.md) (in Portuguese) for what is still missing on your side (devnet SOL, DNS, Helius, Telegram).
+Then: `bash infra/deploy.sh` (ships the current commit, builds, migrates and reloads PM2).

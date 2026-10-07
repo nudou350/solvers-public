@@ -1,5 +1,7 @@
 # Criação de Solvers: guia do criador e do admin
 
+[English](creator-guide.md) | Português
+
 Fluxo de publicação por convite (fase "Núcleo" do `PACKAGE_SPEC.md`). Detalhes e decisões: `PACKAGE_SPEC.md` §14 a §16; subida em produção: `docs/deploy-criador-solvers.md`; roteiro de teste: `docs/teste-manual/02-criador.md` (J16).
 Atualizado em 2026-10-02 (branch `feat/criador-solvers`, ainda sem deploy).
 
@@ -10,10 +12,10 @@ Atualizado em 2026-10-02 (branch `feat/criador-solvers`, ainda sem deploy).
 ### Como funciona
 
 1. **Convite.** A equipe envia um código `SLV-XXXX-XXXX-XXXX` por e-mail. Sem convite não há envio (o convite vale uma vez e fica ligado à sua carteira).
-2. **Perfil e Telegram.** Entre no site, abra `/criador/publicar`, preencha nome, bio, aceite os termos e informe o código. Salve o cadastro e vincule o seu Telegram (veja "Vincular o Telegram" abaixo): sem isso o contato de escalonamento não fica "verificado" e o envio do ZIP não abre.
+2. **Perfil e Telegram.** Entre no site, abra `/creator/publish`, preencha nome, bio, aceite os termos e informe o código. Salve o cadastro e vincule o seu Telegram (veja "Vincular o Telegram" abaixo): sem isso o contato de escalonamento não fica "verificado" e o envio do ZIP não abre.
 3. **Monte o pacote com o Criador de Solvers.** Na sua IA (Claude ou ChatGPT, com o conector Solvers), ative o Solver gratuito "Criador de Solvers": ele guia as 7 etapas (promessa, diferenciais, etapas, conhecimento, ferramentas, calibragem, evals), consulta o validador do servidor e entrega os arquivos ou o ZIP.
 4. **ZIP.** Uma pasta raiz com o `slug` do Solver dentro do ZIP (detalhes abaixo).
-5. **Envio.** Em `/criador/publicar`, envie o ZIP (corpo `application/zip`). O servidor só guarda o arquivo e responde na hora; a extração e a validação rodam depois, num processo à parte, e o resultado aparece em `/criador/envios/<id>`.
+5. **Envio.** Em `/creator/publish`, envie o ZIP (corpo `application/zip`). O servidor só guarda o arquivo e responde na hora; a extração e a validação rodam depois, num processo à parte, e o resultado aparece em `/creator/submissions/<id>`.
 6. **Revisão.** Se o validador não achar erro, o pacote entra na fila. Meta de resposta: **até 5 dias úteis**. Você recebe o motivo se pedirmos mudanças (reenvie o ZIP na mesma submissão, mesma versão) ou se recusarmos.
 7. **Co-assinatura.** Aprovado, a tela pede a sua assinatura na carteira (`register_agent` para Solver novo; `update_version` para atualização). Você não paga taxa de rede (a plataforma é o fee payer).
 8. **Publicado.** Solver novo ainda espera a aprovação on-chain da equipe (`approve_agent`, feita com a carteira fria); atualização de Solver já aprovado termina sozinha. A vitrine só muda no último passo.
@@ -24,7 +26,7 @@ Se você não assinar ou não reenviar em **30 dias**, o envio expira (vira `rej
 
 O Telegram é por onde avisamos você (envio recebido, revisão, pedidos de ajuda de compradores). Você vincula sozinho, sem esperar a equipe:
 
-1. Em `/criador/publicar` (cadastro) clique em **Vincular Telegram**. O site mostra um código `LINK-XXXXXXXX` que vale **15 minutos** e serve **uma vez**. Dá para gerar até 5 por hora; um código novo cancela o anterior.
+1. Em `/creator/publish` (cadastro) clique em **Vincular Telegram**. O site mostra um código `LINK-XXXXXXXX` que vale **15 minutos** e serve **uma vez**. Dá para gerar até 5 por hora; um código novo cancela o anterior.
 2. Clique em **Abrir no Telegram** (já preenche o código) e toque em *Começar*. Ou abra o bot do Solvers (o site mostra o @) e envie `/vincular LINK-XXXXXXXX`.
 3. O bot responde "Pronto! Seu Telegram foi vinculado ao Solvers como ...". O site percebe sozinho em alguns segundos (ou clique em **Já vinculei**).
 
@@ -37,7 +39,7 @@ O catálogo completo de códigos está no Apêndice A do `PACKAGE_SPEC.md`; erro
 
 - `manifest.json` com `specVersion: 1`, `terms`, `versions[]` com a versão atual, nome até 32 bytes, versão `X.Y.Z` até 16 bytes e preço mínimo do programa (5 USDC).
 - `slug` fora da lista de reservados e nunca no formato de `id` (32 hex). O `id` e o `creator.id` são do servidor: ele sobrescreve o que você escrever.
-- Etapas em `steps/` (1 a 12 `.md`, 400 a 12.000 caracteres) com as seções `## Objetivo`, `## O que perguntar ao usuário`, `## Como executar`, `## Erros comuns`, `## Formato do result_summary`.
+- Etapas em `steps/` (1 a 12 `.md`, 400 a 12.000 caracteres) com as seções `## Goal`, `## What to ask the user`, `## How to run`, `## Common mistakes`, `## result_summary format` (em inglês, o padrão; os títulos antigos em português `## Objetivo`, `## O que perguntar ao usuário`, `## Como executar`, `## Erros comuns`, `## Formato do result_summary` continuam aceitos em pacotes mais antigos).
 - Pelo menos **2 dos 5 diferenciais** comprovados pelo próprio pacote. No Núcleo, terceiros só podem provar `memory` (`onboarding` mais etapa que usa o perfil), `liveData` (conhecimento datado, sem `valid_until` vencido, `source_date` em pelo menos metade dos arquivos) e `escalation` (`escalation.enabled` com o seu Telegram vinculado). `tool` e `verifier` ficam para a Abertura. Declarar um que o pacote não prova gera aviso e o revisor não aprova com menos de 2 comprovados.
 - Conhecimento `.md`/`.txt` com `source` e datas `AAAA-MM-DD` (front-matter em `.md`, `nome.txt.meta.json` em `.txt`); até 10.000 trechos.
 - Pelo menos **10 casos** em `evals/cases/` (menos que isso é aviso hoje e erro em pacote v1).
@@ -76,7 +78,7 @@ Os comandos rodam em `apps/server` (ou com `pnpm --filter @solvers/server <scrip
 
 ### Quem é admin
 
-`ADMIN_WALLETS` (carteiras separadas por vírgula, no `.env` do servidor) define quem vê `/admin/revisoes` e as rotas `/api/admin/submissions/*`. É só permissão do site: **não assina nada on-chain**. A assinatura on-chain é do `ADMIN_KEYPAIR`, a carteira fria, que só existe na máquina do time.
+`ADMIN_WALLETS` (carteiras separadas por vírgula, no `.env` do servidor) define quem vê `/admin/reviews` e as rotas `/api/admin/submissions/*`. É só permissão do site: **não assina nada on-chain**. A assinatura on-chain é do `ADMIN_KEYPAIR`, a carteira fria, que só existe na máquina do time.
 
 ### Convites e Telegram
 
@@ -92,7 +94,7 @@ pnpm --filter @solvers/server cli:invite set-chat <carteira> <chatId>           
 
 O criador normalmente vincula sozinho pelo bot (veja "Vincular o Telegram", na parte do criador): `POST /api/creator/telegram-link` gera o código e o processo `solvers-worker` (o único que faz `getUpdates`) trata `/vincular` e `/start` no bot. `set-chat` continua como atalho e exige que o criador já tenha cadastrado o perfil. O bot precisa de `TELEGRAM_BOT_TOKEN` no `.env` do servidor e **não pode ter webhook ativo** (se tiver, o worker o remove uma vez, com log). Os avisos vão ao Telegram do criador; sem vínculo, os de revisão ficam só com o admin.
 
-### Revisão em `/admin/revisoes`
+### Revisão em `/admin/reviews`
 
 A fila mostra os envios `pending_review` do mais antigo ao mais novo. A tela do envio traz: validador (erros e avisos), manifesto, diff de todos os arquivos contra a versão publicada, conhecimento (trechos, vencidos, busca de teste na ingestão de staging), varreduras automáticas e diferenciais declarados x comprovados. Todo conteúdo do criador aparece como texto escapado.
 
@@ -136,7 +138,7 @@ Vale para os pacotes listados em `PLATFORM_AGENTS` (`runtime/platform-agents.ts`
 
 O estado significa que um passo da publicação (conhecimento, cadeia ou catálogo) falhou; a vitrine não mudou. Para retomar, uma das opções (idempotentes):
 
-- Botão "Concluir" em `/admin/revisoes`, ou `POST /api/admin/submissions/:id/finish` com a sessão de admin.
+- Botão "Concluir" em `/admin/reviews`, ou `POST /api/admin/submissions/:id/finish` com a sessão de admin.
 - `cli:approve <submissionId>` de novo (também termina a finalização se a cadeia já estiver Active).
 
 Se a causa for de ambiente (RPC, disco), corrija e repita; o erro fica no campo `error` da submissão. O worker tenta de novo sozinho as falhas de sistema na validação (intervalo de 1 minuto, até 3 tentativas em `package_submissions.attempts`; esgotadas, o envio vira `rejected_validation` com aviso ao admin) e avisa o admin no Telegram na primeira falha.
