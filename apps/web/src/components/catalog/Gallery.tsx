@@ -2,15 +2,17 @@
 // Imagens do especialista: imagem principal grande com miniaturas embaixo (as capturas do criador) e miniaturas
 // das fotos que o comprador anexou à avaliação. Clicar na imagem principal ou nas fotos abre o Lightbox.
 import type { ImageRef } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Lightbox } from "@/components/ui/Lightbox";
 
-const GALLERY_LABEL = "Capturas do especialista";
 const SWIPE_MIN_PX = 40;
 
 /** Galeria do criador. Sem imagens, não renderiza nada. */
 export function Gallery({ images, name }: { images: ImageRef[]; name: string }) {
+  const t = useTranslations("catalog.gallery");
+  const GALLERY_LABEL = t("label");
   const [cur, setCur] = useState(0);
   const [open, setOpen] = useState<number | null>(null);
   const touchX = useRef<number | null>(null);
@@ -43,15 +45,15 @@ export function Gallery({ images, name }: { images: ImageRef[]; name: string }) 
           go(end < start ? 1 : -1);
         }}
       >
-        <button type="button" className="gal-main" onClick={() => setOpen(cur)} aria-label={`Ampliar captura ${cur + 1} de ${n} de ${name}`}>
+        <button type="button" className="gal-main" onClick={() => setOpen(cur)} aria-label={t("enlarge", { n: cur + 1, total: n, name })}>
           <img key={main.id} src={main.url} alt="" width={main.width} height={main.height} decoding="async" />
         </button>
         {n > 1 ? (
           <>
-            <button type="button" className="gal-nav gal-prev" onClick={() => go(-1)} aria-label="Captura anterior">
+            <button type="button" className="gal-nav gal-prev" onClick={() => go(-1)} aria-label={t("prev")}>
               <Icon name="arrow-left" />
             </button>
-            <button type="button" className="gal-nav gal-next" onClick={() => go(1)} aria-label="Próxima captura">
+            <button type="button" className="gal-nav gal-next" onClick={() => go(1)} aria-label={t("next")}>
               <Icon name="arrow-right" />
             </button>
             <span className="gal-count" aria-hidden>
@@ -64,7 +66,7 @@ export function Gallery({ images, name }: { images: ImageRef[]; name: string }) 
         <ul className="gal-thumbs">
           {images.map((im, i) => (
             <li key={im.id}>
-              <button type="button" className="gal-thumb" aria-current={i === cur} onClick={() => setCur(i)} aria-label={`Ver captura ${i + 1} de ${n}`}>
+              <button type="button" className="gal-thumb" aria-current={i === cur} onClick={() => setCur(i)} aria-label={t("view", { n: i + 1, total: n })}>
                 <img src={im.thumbUrl} alt="" width={im.width} height={im.height} loading="lazy" decoding="async" />
               </button>
             </li>
@@ -78,15 +80,16 @@ export function Gallery({ images, name }: { images: ImageRef[]; name: string }) 
 
 /** Miniaturas das fotos de uma avaliação (até 3). */
 export function ReviewPhotos({ images, who }: { images: ImageRef[]; who: string }) {
+  const t = useTranslations("catalog.gallery");
   const [open, setOpen] = useState<number | null>(null);
   if (images.length === 0) return null;
-  const label = `Fotos de ${who}`;
+  const label = t("photosOf", { who });
   return (
     <>
       <ul className="row wrapx" style={{ gap: 8, listStyle: "none", padding: 0, margin: 0 }} aria-label={label}>
         {images.map((im, i) => (
           <li key={im.id}>
-            <button type="button" className="photo-thumb" onClick={() => setOpen(i)} aria-label={`Ampliar foto ${i + 1} de ${images.length} de ${who}`}>
+            <button type="button" className="photo-thumb" onClick={() => setOpen(i)} aria-label={t("enlargePhoto", { n: i + 1, total: images.length, who })}>
               <img src={im.thumbUrl} alt="" width={72} height={72} loading="lazy" decoding="async" />
             </button>
           </li>

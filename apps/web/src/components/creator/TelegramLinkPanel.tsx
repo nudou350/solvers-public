@@ -3,33 +3,43 @@
 // código e a alternativa de digitar `/vincular CODIGO`, e confere sozinho (a cada 4 s) enquanto o código vale.
 import type { CreatorMe, TelegramLink } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Toast";
+import { INTL_LOCALE, type Locale } from "@/i18n/routing";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 
 const POLL_MS = 4000;
 
-function linkErrorText(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 401) return "Sua sessão expirou. Entre de novo e tente outra vez.";
-    if (e.code === "telegram_unavailable") return "A vinculação pelo Telegram está fora do ar agora. Tente de novo em alguns minutos ou fale com a equipe.";
-    if (e.code === "profile_required") return "Salve o seu cadastro (nome, apresentação e termos) antes de vincular o Telegram.";
-    if (e.code === "too_many_codes" || e.status === 429) return e.message || "Você gerou muitos códigos seguidos. Espere um pouco e tente de novo.";
-    if (e.status >= 500) return "O servidor não respondeu bem. Tente de novo em instantes.";
-    return e.message;
-  }
-  return e instanceof Error ? e.message : "Não deu para gerar o código agora.";
+/** Texto do erro ao gerar o código, no idioma da página (códigos do servidor: telegram_unavailable, profile_required, too_many_codes). */
+function useLinkErrorText(): (e: unknown) => string {
+  const t = useTranslations("creator.telegram.errors");
+  const errorText = useErrorText();
+  return (e) => {
+    if (e instanceof ApiError) {
+      if (e.status === 401) return t("sessionExpired");
+      if (e.code === "telegram_unavailable") return t("unavailable");
+      if (e.code === "profile_required") return t("profileRequired");
+      if (e.code === "too_many_codes" || e.status === 429) return e.message || t("tooMany");
+      if (e.status >= 500) return t("server");
+      return errorText(e);
+    }
+    return e instanceof Error && e.message ? e.message : t("generic");
+  };
 }
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
-const hhmm = (d: Date) => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinked: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
+  const t = useTranslations("creator.telegram");
+  const locale = useLocale() as Locale;
+  const linkErrorText = useLinkErrorText();
   const { api } = useSession();
   const [link, setLink] = useState<TelegramLink | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,15 +57,15 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
   // Relógio da contagem: só enquanto há um código na tela e ele ainda vale.
   useEffect(() => {
     if (!live) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, [live]);
 
   // Confere o vínculo de tempos em tempos enquanto o código vale; ao ver o Telegram vinculado, avisa a tela.
   useEffect(() => {
     if (!live) return;
     let off = false;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       api
         .getCreatorMe()
         .then((me) => {
@@ -65,7 +75,7 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
     }, POLL_MS);
     return () => {
       off = true;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [live, api]);
 
@@ -87,7 +97,7 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, linkErrorText]);
 
   async function copy() {
     if (!link) return;
@@ -99,59 +109,61 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
     }
   }
 
-  const status = !link ? "" : expired ? "O código venceu. Gere um novo para continuar." : copied ? "Comando copiado. Cole no chat com o bot." : "Esperando você enviar o código ao bot. Vamos avisar aqui assim que chegar.";
+  const status = !link ? "" : expired ? t("statusExpired") : copied ? t("statusCopied") : t("statusWaiting");
+  // Hora local de quem está vendo o código.
+  const hhmm = (d: Date) => new Intl.DateTimeFormat(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit" }).format(d);
 
   return (
     <div className="col" style={gap(12)}>
       {!link ? (
         <div className="row wrapx" style={gap(10)}>
           <Button size="sm" icon="message" loading={loading} onClick={() => void generate()}>
-            Vincular Telegram
+            {t("link")}
           </Button>
           <Button variant="secondary" size="sm" icon="refresh" loading={rechecking} onClick={onRecheck}>
-            Já vinculei, verificar
+            {t("recheck")}
           </Button>
         </div>
       ) : (
-        <div ref={box} tabIndex={-1} className="col" style={gap(12, { outline: "none" })} aria-label="Código para vincular o Telegram">
+        <div ref={box} tabIndex={-1} className="col" style={gap(12, { outline: "none" })} aria-label={t("boxLabel")}>
           {!expired ? (
             <>
               <ol className="col small" style={gap(8, { paddingLeft: 18, listStyle: "decimal" })}>
-                <li>
-                  Toque em <b>Abrir no Telegram</b> e depois em <b>Começar</b>. O código já vai preenchido.
-                </li>
-                <li>
-                  Se preferir, procure <span className="mono">@{link.botUsername}</span> no Telegram e envie:
-                </li>
+                <li>{t.rich("step1", { b: (c) => <b>{c}</b> })}</li>
+                <li>{t.rich("step2", { username: link.botUsername, handle: (c) => <span className="mono">{c}</span> })}</li>
               </ol>
               <div className="row wrapx" style={gap(10)}>
                 <code className="mono bold" style={{ fontSize: 18, letterSpacing: "0.04em", userSelect: "all" }}>
                   /vincular {link.code}
                 </code>
-                <Button variant="ghost" size="sm" icon="copy" onClick={() => void copy()} aria-label="Copiar o comando de vinculação">
-                  Copiar
+                <Button variant="ghost" size="sm" icon="copy" onClick={() => void copy()} aria-label={t("copyLabel")}>
+                  {t("copy")}
                 </Button>
               </div>
               <div className="row wrapx" style={gap(10)}>
                 <Button href={link.deepLink} icon="external">
-                  Abrir no Telegram
+                  {t("open")}
                 </Button>
                 <Button variant="secondary" icon="refresh" loading={rechecking} onClick={onRecheck}>
-                  Já vinculei, verificar
+                  {t("recheck")}
                 </Button>
               </div>
               <p className="tiny faint">
-                O código vale até {hhmm(new Date(expiresAt))} (<span aria-hidden>{clock(expiresAt - now)}</span>
-                <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}> restantes</span>) e só funciona uma vez.
+                {t.rich("validUntil", {
+                  time: hhmm(new Date(expiresAt)),
+                  clock: clock(expiresAt - now),
+                  tick: (c) => <span aria-hidden>{c}</span>,
+                  sr: (c) => <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{c}</span>,
+                })}
               </p>
             </>
           ) : (
             <div className="row wrapx" style={gap(10)}>
               <Button size="sm" icon="refresh" loading={loading} onClick={() => void generate()}>
-                Gerar um código novo
+                {t("newCode")}
               </Button>
               <Button variant="secondary" size="sm" icon="refresh" loading={rechecking} onClick={onRecheck}>
-                Já vinculei, verificar
+                {t("recheck")}
               </Button>
             </div>
           )}
@@ -161,7 +173,7 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
         {status}
       </p>
       {error ? (
-        <Notice tone="bad" title="Não deu para gerar o código" role="alert">
+        <Notice tone="bad" title={t("failTitle")} role="alert">
           {error}
         </Notice>
       ) : null}

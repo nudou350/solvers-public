@@ -3,8 +3,8 @@
 // (reenviar corrigido, co-assinar o registro ou a atualização, esperar, ver o especialista no ar).
 import type { SubmissionView } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
-import { Link } from "@/i18n/navigation";
-import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { Ago } from "@/components/ui/Ago";
@@ -14,9 +14,11 @@ import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
 import { Untrusted } from "@/components/ui/Untrusted";
+import { useErrorText } from "@/lib/error-text";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { canResubmit, fileSizeText, loadErrorText, statusInfo, type Tone } from "@/lib/submissions-ui";
+import { canResubmit, loadErrorText, statusInfo, type Tone } from "@/lib/submissions-ui";
 import { CreatorHead } from "./CreatorHead";
 import { CoSign } from "./CoSign";
 import { StatusChip, Timeline, ValidationList } from "./SubmissionParts";
@@ -29,6 +31,8 @@ const MOVING = new Set(["submitted", "validating", "publishing"]);
 const NOTICE_TONE: Record<Tone, "ok" | "warn" | "bad" | "brand" | "info"> = { ok: "ok", warn: "warn", bad: "bad", brand: "brand", plain: "info" };
 
 export function SubmissionDetailView({ id }: { id: string }) {
+  const t = useTranslations("submissions");
+  const errorText = useErrorText();
   const { api, status, me } = useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,10 +45,10 @@ export function SubmissionDetailView({ id }: { id: string }) {
       } catch (e) {
         if (silent) return;
         if (e instanceof ApiError && e.status === 404) setState({ kind: "missing" });
-        else setState({ kind: "error", message: loadErrorText(e) });
+        else setState({ kind: "error", message: loadErrorText(t, e, errorText) });
       }
     },
-    [api, id],
+    [api, id, t, errorText],
   );
 
   useEffect(() => {
@@ -64,20 +68,20 @@ export function SubmissionDetailView({ id }: { id: string }) {
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <CreatorHead tab="submissions" />
-      <AuthGate icon="pen" title="Entre para ver este envio" text="Só quem enviou o pacote vê o andamento dele.">
+      <AuthGate icon="pen" title={t("detail.authTitle")} text={t("detail.authText")}>
         <div style={{ marginBottom: 16 }}>
           <Link className="link small" href="/creator/submissions">
-            <Icon name="arrow-left" size="s" /> Todos os meus envios
+            <Icon name="arrow-left" size="s" /> {t("detail.back")}
           </Link>
         </div>
-        {state.kind === "loading" ? <Loading text="Carregando o envio…" /> : null}
+        {state.kind === "loading" ? <Loading text={t("detail.loading")} /> : null}
         {state.kind === "missing" ? (
-          <Empty icon="search" title="Envio não encontrado" action={<Button href="/creator/submissions">Ver meus envios</Button>}>
-            Este envio não existe ou não é da sua conta.
+          <Empty icon="search" title={t("detail.missingTitle")} action={<Button href="/creator/submissions">{t("detail.missingCta")}</Button>}>
+            {t("detail.missingText")}
           </Empty>
         ) : null}
         {state.kind === "error" ? (
-          <Empty icon="warning" title="Não deu para carregar o envio" action={<Button onClick={() => void load()}>Tentar de novo</Button>}>
+          <Empty icon="warning" title={t("detail.loadFailed")} action={<Button onClick={() => void load()}>{t("detail.retry")}</Button>}>
             {state.message}
           </Empty>
         ) : null}
@@ -88,8 +92,10 @@ export function SubmissionDetailView({ id }: { id: string }) {
 }
 
 function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<void> }) {
+  const t = useTranslations("submissions");
+  const f = useFormat();
   const router = useRouter();
-  const info = statusInfo(sub.status, sub.nextAction);
+  const info = statusInfo(t, sub.status, sub.nextAction);
   const errors = sub.validation?.errors.length ?? 0;
   const published = sub.status === "published";
 
@@ -98,14 +104,20 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
       <div className="col" style={gap(24)}>
         <div className="col" style={gap(10)}>
           <div className="row wrapx" style={gap(10)}>
-            <span className="eyebrow">Envio</span>
+            <span className="eyebrow">{t("detail.eyebrow")}</span>
             <StatusChip status={sub.status} nextAction={sub.nextAction} />
           </div>
           <h1 className="display h2s" style={{ overflowWrap: "anywhere" }}>
             <Untrusted>{sub.name || sub.slug}</Untrusted>
           </h1>
           <p className="small muted">
-            <span className="mono" style={{ overflowWrap: "anywhere" }}>{sub.slug}</span> · versão {sub.version} · {fileSizeText(sub.sizeBytes)} · enviado <Ago iso={sub.createdAt} /> · atualizado <Ago iso={sub.updatedAt} />
+            {t.rich("detail.meta", {
+              slug: () => <span className="mono" style={{ overflowWrap: "anywhere" }}>{sub.slug}</span>,
+              version: sub.version,
+              size: f.fileSize(sub.sizeBytes),
+              sent: () => <Ago iso={sub.createdAt} />,
+              updated: () => <Ago iso={sub.updatedAt} />,
+            })}
           </p>
         </div>
 
@@ -116,7 +128,7 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
         {sub.reviewerNotes ? (
           <div className="card pad-s col" style={gap(8)}>
             <h2 className="h4">
-              {sub.status === "rejected" ? "Motivo da recusa" : sub.status === "changes_requested" ? "O que a equipe pediu" : "Recado da equipe"}
+              {sub.status === "rejected" ? t("detail.notesRejected") : sub.status === "changes_requested" ? t("detail.notesChanges") : t("detail.notesDefault")}
             </h2>
             {/* Texto do revisor, exibido como texto (nunca como HTML). */}
             <p className={s.untrusted} style={{ whiteSpace: "pre-wrap" }}>
@@ -126,7 +138,7 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
         ) : null}
 
         {sub.error ? (
-          <Notice tone="warn" title="Houve um problema técnico" role="status">
+          <Notice tone="warn" title={t("detail.technicalTitle")} role="status">
             <span className={s.untrusted}><Untrusted>{sub.error}</Untrusted></span>
           </Notice>
         ) : null}
@@ -140,12 +152,12 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
                 <Icon name="check" />
               </span>
               <span className="col" style={gap(0)}>
-                <b>O especialista está na vitrine</b>
-                <span className="small muted">Compradores já podem encontrar e usar esta versão.</span>
+                <b>{t("detail.liveTitle")}</b>
+                <span className="small muted">{t("detail.liveText")}</span>
               </span>
             </span>
             <Button href={`/solvers/${encodeURIComponent(sub.slug)}`} iconRight="arrow-right">
-              Ver o especialista
+              {t("detail.liveCta")}
             </Button>
           </div>
         ) : null}
@@ -153,44 +165,42 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
         <section className="card pad col" style={gap(16)} aria-labelledby="val-title">
           <div className="row between wrapx" style={gap(10)}>
             <h2 className="h3" id="val-title">
-              Conferência automática
+              {t("detail.validationTitle")}
             </h2>
             {sub.validation ? (
-              <span className={errors ? "chip chip-red" : "chip chip-ok"}>{errors ? `${errors} ${errors === 1 ? "erro" : "erros"}` : "Sem erros"}</span>
+              <span className={errors ? "chip chip-red" : "chip chip-ok"}>{errors ? t("errorCount", { n: errors }) : t("detail.noErrors")}</span>
             ) : null}
           </div>
           {sub.validation ? (
             <ValidationList report={sub.validation} />
           ) : (
-            <p className="small muted">{sub.status === "submitted" || sub.status === "validating" ? "O resultado aparece aqui assim que a conferência terminar." : "Este envio ainda não tem resultado de conferência."}</p>
+            <p className="small muted">{sub.status === "submitted" || sub.status === "validating" ? t("detail.validationPending") : t("detail.validationNone")}</p>
           )}
         </section>
 
         {canResubmit(sub) ? (
           <div className="card pad col" style={gap(16)}>
             <div className="col" style={gap(4)}>
-              <h2 className="h3">{sub.status === "changes_requested" ? "Enviar o pacote corrigido" : "Enviar de novo"}</h2>
+              <h2 className="h3">{sub.status === "changes_requested" ? t("detail.resubmitChanges") : t("detail.resubmitDefault")}</h2>
               <p className="small muted">
-                {sub.status === "changes_requested"
-                  ? "O pacote corrigido entra na mesma versão e volta para a conferência automática."
-                  : "Corrija os erros abaixo, gere o ZIP de novo e envie. Se a versão já existir, aumente o número no manifest.json."}
+                {sub.status === "changes_requested" ? t("detail.resubmitChangesText") : t("detail.resubmitDefaultText")}
               </p>
             </div>
             <ZipUploader
               resubmit={sub.status === "changes_requested" ? sub.id : undefined}
-              action="Enviar pacote corrigido"
+              action={t("detail.uploadAction")}
               onDone={(newId) => (newId === sub.id ? void reload() : router.push(`/creator/submissions/${encodeURIComponent(newId)}`))}
             />
           </div>
         ) : null}
       </div>
 
-      <aside className="sticky col" style={gap(16)} aria-label="Andamento">
+      <aside className="sticky col" style={gap(16)} aria-label={t("detail.progressAria")}>
         <div className="card pad col" style={gap(18)}>
-          <h2 className="h3">Andamento</h2>
+          <h2 className="h3">{t("detail.progressTitle")}</h2>
           <Timeline status={sub.status} nextAction={sub.nextAction} />
         </div>
-        <div className="card-flat pad-s small muted">Prazo: nossa meta é responder em até 5 dias úteis depois que o pacote passar na conferência automática.</div>
+        <div className="card-flat pad-s small muted">{t("detail.deadline")}</div>
       </aside>
     </div>
   );

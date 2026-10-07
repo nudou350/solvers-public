@@ -2,11 +2,13 @@
 // Etapa "Cadastro" do fluxo de publicação: convite, nome, bio, termos e contato de escalonamento (PACKAGE_SPEC.md 14.1).
 import type { CreatorMe } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Toast";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { TelegramLinkPanel } from "./TelegramLinkPanel";
@@ -18,23 +20,29 @@ const BIO_MAX = 500;
 const INVITE_MIN = 6;
 const INVITE_MAX = 64;
 
-function saveErrorText(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.status === 401) return "Sua sessão expirou. Entre de novo e salve outra vez.";
-    // Códigos do servidor: invite_required (falta o código), invite_invalid (não existe) e invite_used (409, já é de outra conta).
-    if (e.code === "invite_required") return "Cole o código de convite que a equipe enviou para você.";
-    if (e.code === "invite_used") return "Esse convite já foi usado por outra conta. Peça outro à equipe.";
-    if (e.code === "invite_invalid") return "Esse código de convite não existe. Confira se copiou inteiro ou peça outro à equipe.";
-    if (e.status === 403) return e.message || "Esse código de convite não vale. Confira se copiou inteiro ou peça outro à equipe.";
-    if (e.status === 409) return e.message || "Esse convite já foi usado por outra conta.";
-    if (e.status === 429) return "Muitas tentativas seguidas. Espere um minuto e tente de novo.";
-    if (e.status >= 500) return "O servidor não respondeu bem. Tente de novo em instantes.";
-    return e.message;
-  }
-  return e instanceof Error ? e.message : "Não deu para salvar agora.";
+/** Texto do erro ao salvar, no idioma da página. Códigos do servidor: invite_required, invite_invalid, invite_used (409). */
+function useSaveErrorText(): (e: unknown) => string {
+  const t = useTranslations("creator.profile.errors");
+  const errorText = useErrorText();
+  return (e) => {
+    if (e instanceof ApiError) {
+      if (e.status === 401) return t("sessionExpired");
+      if (e.code === "invite_required") return t("inviteRequired");
+      if (e.code === "invite_used") return t("inviteUsed");
+      if (e.code === "invite_invalid") return t("inviteInvalid");
+      if (e.status === 403) return e.message || t("forbidden");
+      if (e.status === 409) return e.message || t("conflict");
+      if (e.status === 429) return t("tooMany");
+      if (e.status >= 500) return t("server");
+      return errorText(e);
+    }
+    return e instanceof Error && e.message ? e.message : t("generic");
+  };
 }
 
 export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rechecking }: { creator: CreatorMe; onSaved: (me: CreatorMe) => void; onLinked?: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
+  const t = useTranslations("creator.profile");
+  const saveErrorText = useSaveErrorText();
   const { api } = useSession();
   const [name, setName] = useState(creator.name ?? "");
   const [bio, setBio] = useState(creator.bio ?? "");
@@ -46,10 +54,10 @@ export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rech
 
   const needInvite = !creator.invited;
   const errors = {
-    name: name.trim().length < NAME_MIN ? `Escreva o nome que vai aparecer na vitrine (pelo menos ${NAME_MIN} letras).` : null,
-    bio: bio.trim().length < BIO_MIN ? `Conte em poucas frases quem você é e o que sabe fazer (pelo menos ${BIO_MIN} caracteres).` : null,
-    invite: needInvite && (invite.trim().length < INVITE_MIN || invite.trim().length > INVITE_MAX) ? "Cole o código de convite que a equipe enviou para você." : null,
-    terms: !terms ? "Para continuar, você precisa aceitar os termos." : null,
+    name: name.trim().length < NAME_MIN ? t("validation.name", { min: NAME_MIN }) : null,
+    bio: bio.trim().length < BIO_MIN ? t("validation.bio", { min: BIO_MIN }) : null,
+    invite: needInvite && (invite.trim().length < INVITE_MIN || invite.trim().length > INVITE_MAX) ? t("validation.invite") : null,
+    terms: !terms ? t("validation.terms") : null,
   };
   const valid = !errors.name && !errors.bio && !errors.invite && !errors.terms;
 
@@ -74,20 +82,20 @@ export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rech
   return (
     <form className="col" style={gap(20)} onSubmit={submit} noValidate>
       {needInvite ? (
-        <Field id="cr-convite" label="Código de convite" hint="Por enquanto, só criadores convidados enviam especialistas. O código vem por e-mail, da equipe do Solvers." error={touched ? errors.invite : null}>
+        <Field id="cr-convite" label={t("invite.label")} hint={t("invite.hint")} error={touched ? errors.invite : null}>
           <input id="cr-convite" className="input mono" value={invite} onChange={set(setInvite)} maxLength={INVITE_MAX} autoComplete="off" spellCheck={false} aria-invalid={touched && !!errors.invite} />
         </Field>
       ) : (
         <div>
           <Chip tone="ok" icon="check-circle">
-            Convite confirmado
+            {t("invite.confirmed")}
           </Chip>
         </div>
       )}
-      <Field id="cr-nome" label="Nome na vitrine" hint="O nome que os compradores veem em “por …”. Pode ser o seu ou o da sua marca." error={touched ? errors.name : null}>
+      <Field id="cr-nome" label={t("name.label")} hint={t("name.hint")} error={touched ? errors.name : null}>
         <input id="cr-nome" className="input" value={name} onChange={set(setName)} maxLength={NAME_MAX} autoComplete="name" aria-invalid={touched && !!errors.name} />
       </Field>
-      <Field id="cr-bio" label="Sobre você" hint={`${bio.trim().length}/${BIO_MAX} · Experiência, área e o tipo de problema que você resolve.`} error={touched ? errors.bio : null}>
+      <Field id="cr-bio" label={t("bio.label")} hint={t("bio.hint", { count: bio.trim().length, max: BIO_MAX })} error={touched ? errors.bio : null}>
         <textarea id="cr-bio" className="textarea" value={bio} onChange={set(setBio)} maxLength={BIO_MAX} aria-invalid={touched && !!errors.bio} />
       </Field>
 
@@ -95,20 +103,20 @@ export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rech
 
       <details className="card-flat pad-s">
         <summary className="bold" style={{ cursor: "pointer", minHeight: 32, display: "flex", alignItems: "center" }}>
-          Resumo do que você aceita
+          {t("summary.title")}
         </summary>
         <ul className="col small" style={gap(8, { marginTop: 10 })}>
-          <Bullet>Você é responsável pelo conteúdo do pacote e tem o direito de usar tudo o que está nele. Conteúdo de terceiros precisa de fonte e permissão.</Bullet>
-          <Bullet>A equipe revisa cada versão antes de ir ao ar e pode pedir mudanças, recusar, suspender ou retirar um especialista.</Bullet>
-          <Bullet>A taxa da plataforma sai de cada venda. O restante vai para a sua carteira.</Bullet>
-          <Bullet>O especialista não pode prometer resultado financeiro, jurídico ou médico sem ressalvas, nem agir contra o usuário ou mandar os dados dele para fora.</Bullet>
+          <Bullet>{t("summary.b1")}</Bullet>
+          <Bullet>{t("summary.b2")}</Bullet>
+          <Bullet>{t("summary.b3")}</Bullet>
+          <Bullet>{t("summary.b4")}</Bullet>
         </ul>
       </details>
 
       <div className="col" style={gap(6)}>
         <label className="row start" style={gap(12, { cursor: "pointer", minHeight: 44 })} htmlFor="cr-termos">
           <input id="cr-termos" type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: "var(--brand)", flex: "none" }} aria-invalid={touched && !!errors.terms} aria-describedby={touched && errors.terms ? "cr-termos-erro" : undefined} />
-          <span>Li o resumo e aceito os termos para criadores do Solvers.</span>
+          <span>{t("terms")}</span>
         </label>
         {touched && errors.terms ? (
           <span id="cr-termos-erro" className="hint" style={{ color: "var(--red)" }} role="alert">
@@ -118,13 +126,13 @@ export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rech
       </div>
 
       {error ? (
-        <Notice tone="bad" title="Não deu para salvar o cadastro" role="alert">
+        <Notice tone="bad" title={t("saveFailTitle")} role="alert">
           {error}
         </Notice>
       ) : null}
       <div className="row wrapx" style={gap(12)}>
         <Button type="submit" size="lg" loading={saving} iconRight="arrow-right">
-          {creator.hasProfile ? "Salvar e continuar" : "Salvar cadastro"}
+          {creator.hasProfile ? t("saveContinue") : t("save")}
         </Button>
       </div>
     </form>
@@ -132,33 +140,32 @@ export function CreatorProfileForm({ creator, onSaved, onLinked, onRecheck, rech
 }
 
 function ContactBlock({ verified, hasProfile, onLinked, onRecheck, rechecking }: { verified: boolean; hasProfile: boolean; onLinked: (me: CreatorMe) => void; onRecheck: () => void; rechecking: boolean }) {
+  const t = useTranslations("creator.profile.contact");
   return (
     <div className="card-flat pad-s col" style={gap(10)}>
       <div className="row between wrapx" style={gap(10)}>
-        <b>Contato para avisos e pedidos de ajuda</b>
+        <b>{t("title")}</b>
         {verified ? (
           <Chip tone="ok" icon="check-circle">
-            Telegram vinculado
+            {t("linked")}
           </Chip>
         ) : (
           <Chip tone="warn" icon="warning">
-            Falta vincular
+            {t("missing")}
           </Chip>
         )}
       </div>
       {verified ? (
-        <p className="small muted">Tudo certo: avisamos você por lá quando a equipe responder a um envio ou quando um comprador pedir ajuda.</p>
+        <p className="small muted">{t("okText")}</p>
       ) : (
         <>
-          <p className="small muted">
-            Antes de enviar um especialista, vincule o seu Telegram. É por ele que avisamos você sobre os envios e que os compradores pedem ajuda, sem ver o seu contato. Clique em <b>Vincular Telegram</b>: o site gera um código e você o envia ao bot do Solvers.
-          </p>
+          <p className="small muted">{t.rich("text", { b: (c) => <b>{c}</b> })}</p>
           {hasProfile ? (
             <TelegramLinkPanel onLinked={onLinked} onRecheck={onRecheck} rechecking={rechecking} />
           ) : (
-            <p className="small muted">Salve o cadastro primeiro (nome, apresentação e termos): o botão para vincular aparece logo depois.</p>
+            <p className="small muted">{t("saveFirst")}</p>
           )}
-          <p className="tiny faint">Você pode salvar o cadastro agora e vincular depois, mas o envio do pacote só abre com o contato vinculado.</p>
+          <p className="tiny faint">{t("later")}</p>
         </>
       )}
     </div>

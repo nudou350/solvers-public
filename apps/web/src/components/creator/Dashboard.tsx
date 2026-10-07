@@ -1,7 +1,9 @@
 "use client";
 import type { CreatorDashboard } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { Chip, RepBadge } from "@/components/ui/Chip";
@@ -10,8 +12,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Tile } from "@/components/ui/Tile";
 import { ApiError } from "@/lib/api";
-import { EVAL_METHOD_NOTE, hasEvalScore } from "@/lib/eval-label";
-import { brl, brl0, date, dec1, int, usdc } from "@/lib/format";
+import { evalMethodNote, hasEvalScore } from "@/lib/eval-label";
+import { useFormat } from "@/lib/format";
 import { useRate, useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { CreatorHead } from "./CreatorHead";
@@ -21,27 +23,31 @@ import { OpenSubmissions } from "./OpenSubmissions";
 type Dash = CreatorDashboard;
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; data: Dash };
 
-const STATUS_LABEL: Record<Dash["agents"][number]["status"], string> = { active: "no ar", pending: "em revisão", suspended: "suspenso", retired: "Aposentado" };
-const RESULT: Record<Dash["disputes"][number]["result"], { label: string; chip: "warn" | "red" | "ok"; tone: string }> = {
-  open: { label: "Em análise", chip: "warn", tone: "warn" },
-  buyer: { label: "Favorável ao comprador", chip: "red", tone: "bad" },
-  creator: { label: "Favorável ao criador", chip: "ok", tone: "ok" },
+const RESULT: Record<Dash["disputes"][number]["result"], { chip: "warn" | "red" | "ok"; tone: string }> = {
+  open: { chip: "warn", tone: "warn" },
+  buyer: { chip: "red", tone: "bad" },
+  creator: { chip: "ok", tone: "ok" },
 };
 
 /** Painel do criador (/creator): exige login; sem especialistas publicados, mostra como começar. */
 export function CreatorDashboardView() {
+  const t = useTranslations("creator.dashboard");
   const { api, status, me } = useSession();
+  const lang = useLocale() as Locale;
   const [state, setState] = useState<State>({ kind: "loading" });
+  // Tradutor por ref: não deve refazer a busca do painel a cada render.
+  const expired = useRef(t("sessionExpired"));
+  expired.current = t("sessionExpired");
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      const data = await api.getCreatorDashboard();
+      const data = await api.getCreatorDashboard(lang);
       setState({ kind: "ok", data });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof ApiError && e.status === 401 ? "Sua sessão expirou. Entre de novo." : (e as Error).message });
+      setState({ kind: "error", message: e instanceof ApiError && e.status === 401 ? expired.current : (e as Error).message });
     }
-  }, [api]);
+  }, [api, lang]);
 
   useEffect(() => {
     if (status === "authed") void load();
@@ -53,23 +59,23 @@ export function CreatorDashboardView() {
         <CreatorHead tab="overview" />
         <AuthGate
           icon="pen"
-          title="Entre para ver seu painel"
-          text="Vendas, usos, receita e contestações dos seus especialistas ficam aqui."
+          title={t("gate.title")}
+          text={t("gate.text")}
           actions={
             <Button variant="secondary" href="/creator/publish">
-              Como publicar
+              {t("gate.howTo")}
             </Button>
           }
         />
       </Section>
     );
 
-  if (state.kind === "loading") return <Section><CreatorHead tab="overview" /><Loading text="Carregando seu painel…" /></Section>;
+  if (state.kind === "loading") return <Section><CreatorHead tab="overview" /><Loading text={t("loading")} /></Section>;
   if (state.kind === "error")
     return (
       <Section>
         <CreatorHead tab="overview" />
-        <Empty icon="warning" title="Não deu para carregar o painel" action={<Button onClick={() => void load()}>Tentar de novo</Button>}>
+        <Empty icon="warning" title={t("loadFailTitle")} action={<Button onClick={() => void load()}>{t("retry")}</Button>}>
           {state.message}
         </Empty>
       </Section>
@@ -102,17 +108,19 @@ function Section({ children }: { children: ReactNode }) {
 }
 
 function NotCreator({ sharePct }: { sharePct: number }) {
+  const t = useTranslations("creator.dashboard.notCreator");
+  const f = useFormat();
   const points = [
-    { icon: "gift" as const, title: "Publicar é grátis", text: "Sem depósito e sem mensalidade. Você monta o pacote com o Criador de Solvers, envia o ZIP e a equipe revisa antes de ir ao ar." },
-    { icon: "coin" as const, title: `Você recebe ${dec1(sharePct).replace(",0", "")}% de cada venda`, text: "O valor cai na sua carteira a cada licença vendida. A taxa da plataforma já está descontada." },
-    { icon: "shield-check" as const, title: "Qualidade pela bateria de testes", text: "Cada pacote passa por uma conferência automática e pela revisão da equipe. Quando houver nota dos testes internos da equipe, ela aparece para os compradores." },
+    { icon: "gift" as const, title: t("free.title"), text: t("free.text") },
+    { icon: "coin" as const, title: t("share.title", { pct: f.num(sharePct, 0, 1) }), text: t("share.text") },
+    { icon: "shield-check" as const, title: t("quality.title"), text: t("quality.text") },
   ];
   return (
     <div className="card pad-l col" style={gap(28)}>
       <div className="col" style={gap(10, { maxWidth: 680 })}>
-        <span className="eyebrow">Comece por aqui</span>
-        <h2 className="display h2s">Você ainda não publicou especialistas</h2>
-        <p className="lead">Transforme o que você sabe fazer num especialista que as pessoas usam com o Claude e o ChatGPT que já têm.</p>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h2 className="display h2s">{t("title")}</h2>
+        <p className="lead">{t("lead")}</p>
       </div>
       <div className="g3 m1" style={gap(16)}>
         {points.map((p) => (
@@ -127,10 +135,10 @@ function NotCreator({ sharePct }: { sharePct: number }) {
       </div>
       <div className="row wrapx" style={gap(12)}>
         <Button href="/creator/publish" size="lg" iconRight="arrow-right">
-          Publicar especialista
+          {t("publish")}
         </Button>
         <Button href="/creator/submissions" size="lg" variant="secondary">
-          Meus envios
+          {t("mySubmissions")}
         </Button>
       </div>
     </div>
@@ -138,57 +146,59 @@ function NotCreator({ sharePct }: { sharePct: number }) {
 }
 
 function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["creator"]> }) {
+  const t = useTranslations("creator.dashboard");
+  const f = useFormat();
+  const lang = useLocale() as Locale;
   const rate = useRate();
   const resaleOn = !!useSession().config?.resaleEnabled;
-  const money0 = (v: number) => (rate != null ? brl0(v, rate) : usdc(v));
-  const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
-  const lost = data.totals.disputesLost;
-  const lostText = lost === 0 ? "Nenhuma contestação perdida" : `${int(lost)} ${lost === 1 ? "contestação perdida" : "contestações perdidas"}`;
+  const money0 = (v: number) => (rate != null ? f.brl0(v, rate) : f.usdc(v));
+  const money = (v: number) => (rate != null ? f.brl(v, rate) : f.usdc(v));
+  const lostText = t("reputation.lost", { n: data.totals.disputesLost });
   const kpiN = { fontSize: 44, lineHeight: 1 } as CSSProperties;
   const kpiMoney = { fontSize: 40, lineHeight: 1, whiteSpace: "nowrap" } as CSSProperties;
   // Total desde o início, só quando difere dos últimos 30 dias.
-  const allTime = (total: number, last: number) => (total > last ? ` · ${int(total)} no total` : "");
+  const allTime = (total: number, last: number) => (total > last ? t("kpi.allTime", { n: f.int(total) }) : "");
   const nameOf = new Map(data.agents.map((a) => [a.agentId, a.name]));
 
   return (
     <>
       <div className="g5" style={gap(16, { marginBottom: 24 })}>
         <div className="card pad-s col" style={gap(6)}>
-          <span className="small muted">Vendas em 30 dias</span>
-          <span className="display num" style={kpiN}>{int(data.last30.sales)}</span>
-          <span className="tiny ok">licenças novas{allTime(data.totals.sales, data.last30.sales)}</span>
+          <span className="small muted">{t("kpi.sales30")}</span>
+          <span className="display num" style={kpiN}>{f.int(data.last30.sales)}</span>
+          <span className="tiny ok">{t("kpi.newLicenses")}{allTime(data.totals.sales, data.last30.sales)}</span>
         </div>
         <div className="card pad-s col" style={gap(6)}>
-          <span className="small muted">Usos verificados</span>
-          <span className="display num" style={kpiN}>{int(data.last30.uses)}</span>
-          <span className="tiny faint">nos últimos 30 dias{allTime(data.totals.uses, data.last30.uses)}</span>
+          <span className="small muted">{t("kpi.uses")}</span>
+          <span className="display num" style={kpiN}>{f.int(data.last30.uses)}</span>
+          <span className="tiny faint">{t("kpi.usesSub")}{allTime(data.totals.uses, data.last30.uses)}</span>
         </div>
         <div className="card pad-s col" style={gap(6)}>
-          <span className="small muted">Receita de vendas</span>
+          <span className="small muted">{t("kpi.revenue")}</span>
           <span className="display num kpi-n" style={kpiMoney}>{money0(data.last30.revenueUsdc)}</span>
           <span className="tiny faint">
-            {usdc(data.last30.revenueUsdc)}
-            {data.totals.salesRevenueUsdc > data.last30.revenueUsdc ? ` · ${money0(data.totals.salesRevenueUsdc)} no total` : ""}
+            {f.usdc(data.last30.revenueUsdc)}
+            {data.totals.salesRevenueUsdc > data.last30.revenueUsdc ? t("kpi.allTime", { n: money0(data.totals.salesRevenueUsdc) }) : ""}
           </span>
         </div>
         <div className="card pad-s col" style={gap(6)}>
-          <span className="small muted">Royalties de revenda</span>
+          <span className="small muted">{t("kpi.royalties")}</span>
           {resaleOn ? (
             <>
               <span className="display num kpi-n" style={kpiMoney}>{money0(data.totals.royaltiesUsdc)}</span>
-              <span className="tiny faint">{usdc(data.totals.royaltiesUsdc)} · em revendas feitas no mercado</span>
+              <span className="tiny faint">{f.usdc(data.totals.royaltiesUsdc)} · {t("kpi.royaltiesSub")}</span>
             </>
           ) : (
             <>
-              <span className="display kpi-n faint" style={kpiMoney}>Em breve</span>
-              <span className="tiny faint">quando o mercado de revenda abrir</span>
+              <span className="display kpi-n faint" style={kpiMoney}>{t("kpi.soon")}</span>
+              <span className="tiny faint">{t("kpi.soonSub")}</span>
             </>
           )}
         </div>
         <div className="card pad-s col" style={gap(6)}>
-          <span className="small muted">Contestações</span>
-          <span className="display num" style={kpiN}>{int(data.totals.disputesOpened)}</span>
-          <span className={data.totals.disputesOpen ? "tiny warn" : "tiny faint"}>{int(data.totals.disputesOpen)} em análise</span>
+          <span className="small muted">{t("kpi.disputes")}</span>
+          <span className="display num" style={kpiN}>{f.int(data.totals.disputesOpened)}</span>
+          <span className={data.totals.disputesOpen ? "tiny warn" : "tiny faint"}>{t("kpi.disputesOpen", { n: f.int(data.totals.disputesOpen) })}</span>
         </div>
       </div>
 
@@ -197,7 +207,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
           <DailyChart daily={data.daily} />
         </div>
         <div className="card pad col" style={gap(16, { alignItems: "flex-start" })}>
-          <h2 className="h3">Seu selo de reputação</h2>
+          <h2 className="h3">{t("reputation.title")}</h2>
           <div className="row" style={gap(20)}>
             <div className="ring" style={{ "--p": Math.round(creator.reputationScore) } as CSSProperties}>
               <div>
@@ -209,38 +219,35 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
               <span className="small muted">{lostText}</span>
             </div>
           </div>
-          <p className="small muted">
-            A reputação sobe com boas notas, testes aprovados e contestações resolvidas a favor do comprador. Contestações perdidas descontam pontos e reduzem a
-            visibilidade.
-          </p>
+          <p className="small muted">{t("reputation.text")}</p>
           <Link className="link small" href={`/creators/${encodeURIComponent(creator.id)}`}>
-            Ver meu perfil público
+            {t("reputation.profile")}
           </Link>
         </div>
       </div>
 
       <div className="card pad-s" style={{ padding: "8px 24px", marginBottom: 24 }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
-          <h2 className="h3">Seus especialistas</h2>
+          <h2 className="h3">{t("agents.title")}</h2>
           <Button variant="secondary" href="/creator/publish" icon="plus">
-            Publicar novo
+            {t("agents.publishNew")}
           </Button>
         </div>
         {data.agents.length === 0 ? (
           <div style={{ borderTop: "1px solid var(--line)" }}>
-            <Empty bare icon="pen" title="Nenhum especialista ainda">
-              Publique o primeiro: é grátis e sem depósito.
+            <Empty bare icon="pen" title={t("agents.emptyTitle")}>
+              {t("agents.emptyText")}
             </Empty>
           </div>
         ) : (
           <>
             <div className="cr-table cr-head hide-m" aria-hidden>
-              <span>Especialista</span>
-              <span>Vendidas / Teto</span>
-              <span>Usos</span>
-              <span>Nota</span>
-              <span>Desempenho</span>
-              <span>Receita</span>
+              <span>{t("agents.cols.agent")}</span>
+              <span>{t("agents.cols.sold")}</span>
+              <span>{t("agents.cols.uses")}</span>
+              <span>{t("agents.cols.rating")}</span>
+              <span>{t("agents.cols.performance")}</span>
+              <span>{t("agents.cols.revenue")}</span>
             </div>
             {data.agents.map((a) => {
               return (
@@ -252,44 +259,44 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                         {a.name}
                       </Link>
                       <span className="tiny faint">
-                        v{a.version} · {STATUS_LABEL[a.status]}
+                        {t("agents.version", { version: a.version, status: t(`agents.status.${a.status}`) })}
                       </span>
                       {!a.listed ? (
                         <span>
-                          <Chip tone="warn" icon="eye">Fora da vitrine (nota baixa)</Chip>
+                          <Chip tone="warn" icon="eye">{t("agents.hidden")}</Chip>
                         </span>
                       ) : null}
                     </span>
                   </span>
                   <span className="num">
-                    <span className="only-m tiny faint">Vendidas / Teto </span>
-                    {int(a.sales)}
+                    <span className="only-m tiny faint">{t("agents.cols.sold")} </span>
+                    {f.int(a.sales)}
                     {a.supply.max != null ? (
                       <span className={a.supply.left === 0 ? "warn" : "faint"}>
                         {" / "}
-                        {int(a.supply.max)}
-                        {a.supply.left === 0 ? " esgotado" : ""}
+                        {f.int(a.supply.max)}
+                        {a.supply.left === 0 ? t("agents.soldOut") : ""}
                       </span>
                     ) : (
-                      <span className="faint" title="Sem limite de licenças">
+                      <span className="faint" title={t("agents.unlimited")}>
                         {" / ∞"}
                       </span>
                     )}
                   </span>
                   <span className="num">
-                    <span className="only-m tiny faint">Usos </span>
-                    {int(a.uses)}
+                    <span className="only-m tiny faint">{t("agents.cols.uses")} </span>
+                    {f.int(a.uses)}
                   </span>
                   <span className="num">
-                    <span className="only-m tiny faint">Nota </span>
-                    {a.userRating > 0 ? dec1(a.userRating) : "—"}
+                    <span className="only-m tiny faint">{t("agents.cols.rating")} </span>
+                    {a.userRating > 0 ? f.dec1(a.userRating) : "—"}
                   </span>
-                  <span className={["num", !hasEvalScore(a.evalScore) ? "faint" : a.evalScore >= 80 ? "ok" : "warn"].join(" ")} title={hasEvalScore(a.evalScore) ? EVAL_METHOD_NOTE : undefined}>
-                    <span className="only-m tiny faint">Desempenho </span>
-                    {hasEvalScore(a.evalScore) ? `${Math.round(a.evalScore)}%` : "Sem avaliações ainda"}
+                  <span className={["num", !hasEvalScore(a.evalScore) ? "faint" : a.evalScore >= 80 ? "ok" : "warn"].join(" ")} title={hasEvalScore(a.evalScore) ? evalMethodNote(lang) : undefined}>
+                    <span className="only-m tiny faint">{t("agents.cols.performance")} </span>
+                    {hasEvalScore(a.evalScore) ? `${Math.round(a.evalScore)}%` : t("agents.noEvals")}
                   </span>
                   <b className="num">
-                    <span className="only-m tiny faint">Receita </span>
+                    <span className="only-m tiny faint">{t("agents.cols.revenue")} </span>
                     {money0(a.revenueUsdc)}
                   </b>
                 </div>
@@ -302,30 +309,30 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
       {data.guarantee ? (
         <div className="card pad-s" style={{ padding: "8px 24px", marginBottom: 24 }}>
           <div className="row between wrapx" style={{ padding: "14px 0" }}>
-            <h2 className="h3">Ganhos de tarefas com garantia</h2>
-            <span className="small muted">Já sem a taxa da plataforma, à parte das vendas</span>
+            <h2 className="h3">{t("guarantee.title")}</h2>
+            <span className="small muted">{t("guarantee.subtitle")}</span>
           </div>
           <div className="g3 m1" style={gap(16, { padding: "4px 0 18px", borderTop: "1px solid var(--line)" })}>
             <div className="col" style={gap(4, { paddingTop: 14 })}>
-              <span className="small muted">Recebido no total</span>
+              <span className="small muted">{t("guarantee.total")}</span>
               <span className="display num" style={{ fontSize: 34, lineHeight: 1, whiteSpace: "nowrap" }}>{money0(data.guarantee.earnedUsdc)}</span>
-              <span className="tiny faint">{usdc(data.guarantee.earnedUsdc)}</span>
+              <span className="tiny faint">{f.usdc(data.guarantee.earnedUsdc)}</span>
             </div>
             <div className="col" style={gap(4, { paddingTop: 14 })}>
-              <span className="small muted">Últimos 30 dias</span>
+              <span className="small muted">{t("guarantee.last30")}</span>
               <span className="display num" style={{ fontSize: 34, lineHeight: 1, whiteSpace: "nowrap" }}>{money0(data.guarantee.last30Usdc)}</span>
-              <span className="tiny faint">{usdc(data.guarantee.last30Usdc)}</span>
+              <span className="tiny faint">{f.usdc(data.guarantee.last30Usdc)}</span>
             </div>
             <div className="col" style={gap(4, { paddingTop: 14 })}>
-              <span className="small muted">Etapas liberadas</span>
-              <span className="display num" style={{ fontSize: 34, lineHeight: 1 }}>{int(data.guarantee.releases)}</span>
-              <span className="tiny faint">aprovadas pelo comprador, automáticas ou a seu favor</span>
+              <span className="small muted">{t("guarantee.releases")}</span>
+              <span className="display num" style={{ fontSize: 34, lineHeight: 1 }}>{f.int(data.guarantee.releases)}</span>
+              <span className="tiny faint">{t("guarantee.releasesSub")}</span>
             </div>
           </div>
           {data.guarantee.recent.length === 0 ? (
             <div style={{ borderTop: "1px solid var(--line)" }}>
-              <Empty bare icon="shield-check" title="Nenhum pagamento de garantia ainda">
-                Quando uma etapa de tarefa com garantia for liberada para você, ela aparece aqui.
+              <Empty bare icon="shield-check" title={t("guarantee.emptyTitle")}>
+                {t("guarantee.emptyText")}
               </Empty>
             </div>
           ) : (
@@ -335,8 +342,8 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                   <Icon name="shield-check" size="s" />
                 </span>
                 <div className="grow col" style={gap(2, { minWidth: 0 })}>
-                  <b className="trunc">{(r.agentId && nameOf.get(r.agentId)) || "Tarefa com garantia"}</b>
-                  <span className="tiny faint">{date(r.at)}</span>
+                  <b className="trunc">{(r.agentId && nameOf.get(r.agentId)) || t("guarantee.fallbackTask")}</b>
+                  <span className="tiny faint">{f.date(r.at)}</span>
                 </div>
                 <b className="num">{money(r.amountUsdc)}</b>
               </div>
@@ -347,36 +354,38 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
 
       <div className="card pad-s" style={{ padding: "8px 24px" }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
-          <h2 className="h3">Contestações recentes</h2>
+          <h2 className="h3">{t("disputes.title")}</h2>
           <span className="small muted">{lostText}</span>
         </div>
         {data.disputes.length === 0 ? (
           <div style={{ borderTop: "1px solid var(--line)" }}>
-            <Empty bare icon="flag" title="Nenhuma contestação até agora">
-              Quando um comprador contestar uma etapa de garantia, o critério e o motivo aparecem aqui.
+            <Empty bare icon="flag" title={t("disputes.emptyTitle")}>
+              {t("disputes.emptyText")}
             </Empty>
           </div>
         ) : (
           data.disputes.map((d) => {
             const r = RESULT[d.result];
+            const resultLabel = t(`disputes.result.${d.result}`);
             return (
               <div key={`${d.escrowId}-${d.index}`} className="rowline start" style={{ alignItems: "flex-start" }}>
                 <span className={r.tone} style={{ marginTop: 2 }}>
                   <Icon name="flag" size="s" />
                 </span>
                 <div className="grow col" style={gap(3, { minWidth: 0 })}>
-                  <span className="only-m" style={{ marginBottom: 4 }}><Chip tone={r.chip}>{r.label}</Chip></span>
+                  <span className="only-m" style={{ marginBottom: 4 }}><Chip tone={r.chip}>{resultLabel}</Chip></span>
                   <b>{d.taskTitle}</b>
                   <div className="small muted">
-                    {nameOf.get(d.agentId) ? `${nameOf.get(d.agentId)} · ` : ""}Etapa {d.index + 1}: {d.milestoneTitle}
+                    {nameOf.get(d.agentId) ? `${nameOf.get(d.agentId)} · ` : ""}
+                    {t("disputes.milestone", { n: d.index + 1, title: d.milestoneTitle })}
                   </div>
-                  <div className="small muted">Critério apontado: {d.criterion ?? "não informado"}</div>
+                  <div className="small muted">{t("disputes.criterion", { criterion: d.criterion ?? t("disputes.criterionNone") })}</div>
                   {d.reason ? <div className="small" style={{ color: "var(--ink-2)" }}>“{d.reason}”</div> : null}
                   <div className="tiny faint">
-                    {d.openedAt ? date(d.openedAt) : "Data não informada"} · {money(d.amountUsdc)}
+                    {d.openedAt ? f.date(d.openedAt) : t("disputes.dateNone")} · {money(d.amountUsdc)}
                   </div>
                 </div>
-                <span className="hide-m"><Chip tone={r.chip}>{r.label}</Chip></span>
+                <span className="hide-m"><Chip tone={r.chip}>{resultLabel}</Chip></span>
               </div>
             );
           })

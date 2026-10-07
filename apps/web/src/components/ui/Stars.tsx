@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
-import { dec1, int, starPct } from "@/lib/format";
+import { useTranslations } from "next-intl";
+import { starPct, useFormat } from "@/lib/format";
 
 export type StarsProps = {
   /** Nota de 0 a 5. */
   rating: number;
-  /** Mostra a nota ao lado ("4,8"). */
+  /** Mostra a nota ao lado ("4.8"). */
   showValue?: boolean;
   /** Total de avaliações, mostrado como "(120)". */
   count?: number;
@@ -13,7 +14,9 @@ export type StarsProps = {
 
 /** Estrelas preenchidas proporcionalmente (máscara SVG do design). */
 export function Stars({ rating, showValue, count, className }: StarsProps) {
-  const label = `Nota ${dec1(rating)} de 5${count != null ? `, ${int(count)} avaliações` : ""}`;
+  const f = useFormat();
+  const t = useTranslations("common.ui");
+  const label = count != null ? t("ratingLabelWithCount", { rating: f.dec1(rating), count }) : t("ratingLabel", { rating: f.dec1(rating) });
   const stars = <span className="stars" style={{ "--p": `${starPct(rating)}%` } as CSSProperties} role="img" aria-label={label} />;
   if (!showValue && count == null) return <span className={className}>{stars}</span>;
   return (
@@ -21,12 +24,12 @@ export function Stars({ rating, showValue, count, className }: StarsProps) {
       {stars}
       {showValue ? (
         <span className="bold num" aria-hidden>
-          {dec1(rating)}
+          {f.dec1(rating)}
         </span>
       ) : null}
       {count != null ? (
         <span className="small faint num" aria-hidden>
-          ({int(count)})
+          ({f.int(count)})
         </span>
       ) : null}
     </span>

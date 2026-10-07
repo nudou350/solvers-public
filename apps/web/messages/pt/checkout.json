@@ -1,1 +1,272 @@
-{}
+{
+  "meta": { "title": "Finalizar compra" },
+  "agentMissing": {
+    "unavailable": {
+      "title": "Não deu para carregar o especialista",
+      "text": "O servidor não respondeu agora. Tente de novo em instantes.",
+      "action": "Voltar para o início"
+    },
+    "notFound": {
+      "title": "Especialista não encontrado",
+      "text": "O link pode estar incompleto. Escolha um especialista na vitrine para continuar.",
+      "action": "Explorar especialistas"
+    }
+  },
+  "listingMissing": {
+    "unavailable": {
+      "title": "Não deu para carregar o anúncio",
+      "text": "O servidor não respondeu agora. Tente de novo em instantes.",
+      "action": "Ver o mercado de revenda"
+    },
+    "disabled": {
+      "title": "A revenda não está aberta agora",
+      "text": "O mercado de revenda está fechado por enquanto. Você ainda pode comprar a licença de um especialista novo.",
+      "action": "Explorar especialistas"
+    },
+    "gone": {
+      "title": "Esse anúncio não está mais disponível",
+      "text": "Ele foi vendido, cancelado ou mudou. Nada foi cobrado.",
+      "action": "Ver outros anúncios"
+    }
+  },
+  "platformFree": {
+    "title": "{name} é gratuito",
+    "text": "Este especialista já está incluído na plataforma: não tem preço nem licença. É só conectar o Solvers à sua IA e usar.",
+    "action": "Instalar na minha IA"
+  },
+  "fakeQr": { "label": "QR Code de teste (não pode ser pago)" },
+  "sodaxQuote": {
+    "groupLabel": "Rede e moeda de pagamento",
+    "loginHint": "Entre na sua conta para ver a cotação ao vivo.",
+    "balanceSufficient": {
+      "title": "Sem necessidade de pagar",
+      "text": "Seu saldo já cobre esta compra, não precisa pagar com SODAX."
+    },
+    "unavailable": {
+      "title": "Cotação indisponível agora",
+      "text": "Não foi possível consultar a cotação agora."
+    },
+    "retry": "Tentar de novo",
+    "youWouldPay": "Você pagaria, na outra rede",
+    "arrives": "chegam <b>{amount}</b> na sua carteira",
+    "minNote": "O SODAX só aceita trocas a partir de cerca de US$ 1; por isso a cotação usa esse mínimo.",
+    "liveNote": "Cotação ao vivo do SODAX · atualiza sozinha",
+    "updating": " · atualizando…",
+    "consulting": "Consultando o SODAX…"
+  },
+  "sodaxPanel": {
+    "restart": "Começar de novo",
+    "received": { "title": "Pagamento recebido", "text": "{amount} de teste chegaram na sua carteira. Concluindo a compra…" },
+    "gone": { "title": "Não encontramos este pagamento nesta conta", "text": "Ele pode ter sido criado por outra conta. Comece de novo para continuar aqui." },
+    "sessionEnded": { "title": "Sua sessão terminou", "login": "Entrar de novo", "text": "Entre na mesma conta para continuar este pagamento." },
+    "crediting": { "title": "Pagamento recebido, creditando saldo…", "text": " Não precisa pagar de novo. A compra continua sozinha." },
+    "failed": "O pagamento não foi aprovado",
+    "expired": "Este pagamento expirou",
+    "nothingCharged": "Nada foi cobrado. Comece de novo para continuar.",
+    "label": "Pagamento com SODAX",
+    "youReceive": "Você recebe {amount} de teste na sua carteira",
+    "demo": {
+      "title": "Demonstração",
+      "text": "Nenhum dinheiro real é movido aqui. Na versão real, você confirma o pagamento na carteira da outra rede (como a MetaMask) e o SODAX entrega o USDC na sua conta. A cotação acima é a real, feita agora pelo SODAX."
+    },
+    "confirm": "Confirmar pagamento (teste)",
+    "disabled": "O pagamento de teste está desativado neste servidor.",
+    "cancel": "Cancelar e escolher outra forma"
+  },
+  "pix": {
+    "received": { "title": "Pix recebido", "text": "{amount} de teste chegaram na sua carteira. Concluindo a compra…" },
+    "restart": "Gerar outro Pix",
+    "gone": {
+      "title": "Não encontramos este Pix nesta conta",
+      "text": "Ele pode ter sido gerado por outra conta. Se você já pagou, o valor entra na conta que gerou o Pix. Gere um novo código para continuar aqui."
+    },
+    "sessionEnded": {
+      "title": "Sua sessão terminou",
+      "login": "Entrar de novo",
+      "text": "Entre na mesma conta para continuar acompanhando este Pix. Se você já pagou, o saldo entra na conta quando o pagamento for confirmado."
+    },
+    "slowCredit": {
+      "title": "Seu pagamento foi recebido",
+      "leave": "Sair desta tela",
+      "text": "O saldo pode demorar um pouco mais; você pode fechar esta tela, ele entra sozinho."
+    },
+    "crediting": {
+      "title": "Pagamento recebido, creditando saldo…",
+      "text": " Não precisa pagar de novo. A compra continua sozinha."
+    },
+    "offline": "Não conseguimos confirmar agora; tentando de novo.",
+    "failed": "O Pix não foi aprovado",
+    "expired": "Este Pix expirou",
+    "nothingCharged": "Nada foi cobrado. Gere um novo código para continuar.",
+    "due": {
+      "title": "O prazo deste Pix terminou",
+      "text": "Se você já pagou, o saldo entra em instantes e a compra continua aqui. Se ainda não pagou, gere um novo código."
+    },
+    "qrAlt": "QR Code do Pix",
+    "stamp": "TESTE",
+    "amountLabel": "Valor do Pix",
+    "youReceive": "Você recebe {amount} de teste na sua carteira",
+    "partial": "O seu saldo já cobre uma parte: o Pix completa só o que falta.",
+    "waiting": "Aguardando o pagamento",
+    "expiresIn": " · expira em {time}",
+    "copyLabel": "Pix copia e cola",
+    "copied": "Copiado",
+    "copy": "Copiar código",
+    "simulatedNote": "Cobrança de teste: este código não pode ser pago num banco. Use o botão abaixo para simular o pagamento.",
+    "realNote": "Abra o app do seu banco, escolha Pix e leia o QR Code ou cole o código. A confirmação aparece aqui sozinha.",
+    "simulate": "Simular pagamento (teste)",
+    "openMp": "Abrir o Pix no Mercado Pago",
+    "cancel": "Cancelar e escolher outra forma"
+  },
+  "view": {
+    "back": { "resale": "Voltar para o mercado de revenda", "solver": "Voltar para o especialista" },
+    "title": { "used": "Comprar licença usada", "new": "Finalizar compra" },
+    "login": {
+      "title": "Entrar",
+      "wallet": "Carteira {wallet}",
+      "connected": "Conectada",
+      "cancelToSwitch": "Cancele o pagamento para trocar de conta.",
+      "devText": "Entre para receber a licença na sua carteira. Nesta versão de teste, o navegador cria uma carteira de desenvolvimento para você.",
+      "devButton": "Entrar",
+      "privyButton": "Continuar com e-mail",
+      "privyText": "Enviamos um código de acesso. Sem carteira? Criamos uma para você automaticamente, e você pode exportá-la depois.",
+      "failed": "Não deu para entrar"
+    },
+    "owned": {
+      "title": "Você já tem este especialista",
+      "text": "A licença permanente já está na sua conta. Não é preciso comprar de novo.",
+      "connect": "Conectar à minha IA",
+      "library": "Ver minha biblioteca"
+    },
+    "soldOut": {
+      "title": "Acabaram as vagas",
+      "viewUsed": "Ver licenças usadas",
+      "viewOthers": "Ver outros especialistas",
+      "paid": "As últimas licenças foram vendidas antes de a sua compra terminar. O valor que você pagou já virou saldo em USDC na sua carteira e não foi gasto: nada se perdeu, e você pode usá-lo em outra compra.",
+      "none": "Todas as licenças deste especialista já foram vendidas. Nada foi cobrado."
+    },
+    "listingGone": {
+      "title": "Esse anúncio não está mais disponível",
+      "text": "Ele foi vendido, cancelado ou mudou. Nada foi cobrado.",
+      "viewOthers": "Ver outros anúncios"
+    },
+    "myListing": {
+      "title": "Este anúncio é seu",
+      "text": "Você não pode comprar a própria licença. Para tirá-la do mercado, cancele o anúncio na sua biblioteca.",
+      "library": "Ver minha biblioteca"
+    },
+    "task": {
+      "title": "Descreva a tarefa e os critérios",
+      "titleLabel": "Título da tarefa",
+      "titlePlaceholder": "Ex: Formulário de login acessível",
+      "titleHelp": "De {min} a {max} caracteres.",
+      "descLabel": "O que você quer receber",
+      "descPlaceholder": "Conte o que o componente precisa fazer, para quem é e qualquer detalhe que importe.",
+      "descMin": "Mínimo de {min} caracteres · ",
+      "deliveryLabel": "Prazo de entrega",
+      "deliveryDays": "{n, plural, one {# dia} other {# dias}}",
+      "deliveryHelp": "Se o especialista não entregar dentro do prazo, você pode cancelar a etapa e receber o valor dela de volta, sem taxa.",
+      "criteriaLabel": "Critérios combinados, etapa por etapa",
+      "manual": "Revisão manual",
+      "tested": "Verificada por testes",
+      "criteriaNote": "As etapas e os critérios são definidos pelo criador do especialista e valem para toda tarefa com garantia."
+    },
+    "how": {
+      "title": "Como a garantia funciona",
+      "intro": "Seu pagamento fica guardado e só é liberado para o criador quando o resultado passa nos critérios combinados acima. Assim você só paga por resultado.",
+      "s1": { "title": "1. Você paga e o valor fica guardado", "text": "O dinheiro ainda não vai para o criador. Ele fica protegido até o fim da tarefa." },
+      "s2": { "title": "2. O especialista entrega por etapas", "text": "Cada etapa é conferida contra os critérios que você viu. As de revisão manual, como o plano, você mesmo confere." },
+      "s3": { "title": "3. Você confere uma prévia", "text": "A prévia vem com marca d'água. A versão final só é liberada depois da sua aprovação." },
+      "s4": {
+        "title": "4. Aprovou? O pagamento é liberado. Não passou? Você contesta.",
+        "text": "Ao contestar, você aponta qual critério falhou. Se a contestação for procedente, o valor volta para você. Sem resposta em {window}, a aprovação é automática."
+      }
+    },
+    "level": {
+      "newAccounts": "Contas novas podem ter até <b>{limited}</b> em garantias abertas. O nível completo vai até <b>{full}</b> e sobe conforme você compra e conclui tarefas sem disputas.",
+      "generic": "Seu limite de garantias sobe conforme você compra e conclui tarefas sem disputas.",
+      "overTitle": "Esta tarefa passa do seu limite de garantias",
+      "overText": "Seu nível é <b>{level}</b>: até {limit} em garantias abertas, e você já tem {open} em andamento. Cabem mais {available} e esta tarefa custa {total}.",
+      "toFullMax": " {n, plural, one {Falta # compra} other {Faltam # compras}} para o nível completo (até {full}).",
+      "reduced": " O limite fica reduzido por causa de disputas perdidas.",
+      "wait": " Espere uma tarefa em andamento terminar para abrir outra.",
+      "info": "Seu nível de garantia é <b>{level}</b>: até <b>{limit}</b> em garantias abertas (cabem mais {available}). Ele sobe conforme você compra e conclui tarefas sem disputas.",
+      "toFull": " {n, plural, one {Falta # compra} other {Faltam # compras}} para o nível completo."
+    },
+    "singleTooBig": {
+      "title": "Esta garantia precisa de pelo menos 2 etapas",
+      "text": "Contas no nível limitado só abrem garantias de uma etapa até {max}, e esta custa {total}. Faça mais compras para chegar ao nível completo."
+    },
+    "limitsFailed": {
+      "title": "Não deu para conferir seu limite de garantias",
+      "text": "O pagamento fica liberado assim que o limite for conferido.",
+      "retry": "Tentar de novo"
+    },
+    "pay": {
+      "title": "Como você quer pagar",
+      "pixName": "Pix",
+      "test": "Teste",
+      "pixText": "Você paga em reais e nós convertemos para USDC automaticamente.",
+      "pixSoonName": "Pix (em breve)",
+      "pixSoonText": "Em breve você poderá pagar em reais.",
+      "walletName": "Saldo em USDC",
+      "walletText": "Use o saldo da sua carteira, se você já tiver.",
+      "balance": "Seu saldo: ",
+      "usedOnly": "Na compra de licença usada, o pagamento é só com saldo em USDC.",
+      "sodaxText": "Para quem já tem cripto em outra rede (como Ethereum, Base ou Arbitrum). Você vê a cotação e o valor chega aqui em USDC.",
+      "lowTitle": "Saldo de USDC insuficiente",
+      "faucet": "Receber {amount} de teste",
+      "faucetAnyAmount": "USDC",
+      "payWithPix": "Pagar com Pix",
+      "lowText": "Você tem {balance} e esta compra custa {total}."
+    },
+    "review": {
+      "titleSodax": "Pague com SODAX",
+      "titlePix": "Pague com Pix",
+      "title": "Revisar e pagar",
+      "agreeGuarantee": "Li e concordo com os critérios combinados e com a liberação automática em {window}.",
+      "agreeUsed": "Concordo com os termos de uso e entendo que é uma licença usada: as memórias de quem vende não vêm junto, e a nota do especialista é a mesma.",
+      "agreeNew": "Concordo com os termos de uso e com a emissão da licença em meu nome.",
+      "needTask": "Dê um título e descreva o que você quer receber (mínimo de {min} caracteres).",
+      "payUsed": "Comprar licença usada por {price}",
+      "pay": "Pagar {price}",
+      "protected": "Pagamento protegido.",
+      "protectedGuarantee": "O valor fica guardado até você aprovar cada etapa.",
+      "protectedLicense": "Você recebe a licença assim que ele for confirmado.",
+      "signing": "Assinando e registrando a compra na rede…",
+      "priceTitle": "O preço do especialista mudou",
+      "priceChanged": "O preço do especialista mudou de {from} para {to}. Confira o novo valor e confirme de novo.",
+      "priceChangedGeneric": "O preço do especialista mudou. Confira o novo valor e confirme de novo.",
+      "confirmPay": "Confirmar e pagar {price}",
+      "listingChanged": "O vendedor mudou o preço para {price} ({usdc}). Confira o novo valor e confirme de novo.",
+      "viewOthers": "Ver outros anúncios",
+      "getFaucet": "Receber USDC de teste",
+      "loginAgain": "Entrar de novo",
+      "retry": "Tentar de novo"
+    },
+    "summary": {
+      "typeLabel": "Tipo de compra",
+      "license": "Licença",
+      "withGuarantee": "Com garantia",
+      "by": "por {creator}",
+      "usedLicense": "Licença usada",
+      "guaranteeTask": "Tarefa com garantia",
+      "permanent": "Licença permanente",
+      "soldBy": "Vendido por",
+      "newPrice": "Preço de um novo",
+      "networkFee": "Taxa de rede",
+      "networkFeeValue": "Por conta do Solvers",
+      "total": "Total",
+      "usdcPrice": "Preço em USDC",
+      "rateNote": "Valor em reais pela cotação de referência. 1 USDC = R$ {rate}.",
+      "usedNote": "Licença usada: a nota do especialista é a mesma, mas as memórias de quem vende não vêm junto. O criador recebe uma parte desta revenda.",
+      "chipGuarantee": "O valor fica guardado até você aprovar",
+      "chipLicense": "Licença registrada em seu nome"
+    },
+    "toast": {
+      "chargeClosed": { "title": "A cobrança anterior foi fechada", "text": "Ela era de outra conta. Gere uma nova para esta." },
+      "balanceCovers": { "title": "Seu saldo já cobre esta compra", "text": "Seguimos direto com o saldo em USDC." },
+      "faucetGot": "Você recebeu {amount} de teste"
+    }
+  }
+}

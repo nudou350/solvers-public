@@ -3,13 +3,15 @@
 // USDC na Arbitrum...) para receber o USDC que falta. É a cotação real da API do SODAX; o pagamento da demo é
 // simulado (ver SodaxPanel). Atualiza sozinha a cada 20 s.
 import type { PublicConfig, SodaxQuote as Quote } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
-import { brl, cryptoAmount, usdc } from "@/lib/format";
+import { useErrorText } from "@/lib/error-text";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import s from "./checkout.module.css";
@@ -37,6 +39,9 @@ export function SodaxQuoteCard({
   disabled?: boolean;
 }) {
   const { api, config, status, me } = useSession();
+  const t = useTranslations("checkout.sodaxQuote");
+  const f = useFormat();
+  const errorText = useErrorText();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState<{ code: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,23 +78,24 @@ export function SodaxQuoteCard({
         // Mantém a última cotação na tela só se a falha for passageira; ela some do pagamento de qualquer jeito.
         cb.current(null);
         setQuote(null);
-        if (e instanceof ApiError && e.code === "balance_sufficient") setError({ code: "balance_sufficient", text: "Seu saldo já cobre esta compra, não precisa pagar com SODAX." });
-        else setError({ code: e instanceof ApiError ? e.code : "error", text: e instanceof ApiError && e.status < 500 ? e.message : "Não foi possível consultar a cotação agora." });
+        if (e instanceof ApiError && e.code === "balance_sufficient") setError({ code: "balance_sufficient", text: t("balanceSufficient.text") });
+        else setError({ code: e instanceof ApiError ? e.code : "error", text: e instanceof ApiError && e.status < 500 ? errorText(e) : t("unavailable.text") });
       } finally {
         if (alive) setLoading(false);
       }
     };
     void load();
-    const t = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, REFRESH_MS);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, agentId, type, source, logged, wallet, tick]);
 
   return (
     <div className="col" style={gap(14)}>
-      <div className="row wrapx" role="group" aria-label="Rede e moeda de pagamento" style={gap(8)}>
+      <div className="row wrapx" role="group" aria-label={t("groupLabel")} style={gap(8)}>
         {sources.map((src) => (
           <Button
             key={src.key}
@@ -105,15 +111,15 @@ export function SodaxQuoteCard({
       </div>
 
       {!logged ? (
-        <p className="small muted">Entre na sua conta para ver a cotação ao vivo.</p>
+        <p className="small muted">{t("loginHint")}</p>
       ) : error ? (
         <Notice
           tone={error.code === "balance_sufficient" ? "info" : "warn"}
-          title={error.code === "balance_sufficient" ? "Sem necessidade de pagar" : "Cotação indisponível agora"}
+          title={error.code === "balance_sufficient" ? t("balanceSufficient.title") : t("unavailable.title")}
           actions={
             error.code === "balance_sufficient" ? null : (
               <Button size="sm" variant="secondary" icon="refresh" onClick={() => setTick((n) => n + 1)}>
-                Tentar de novo
+                {t("retry")}
               </Button>
             )
           }
@@ -122,26 +128,27 @@ export function SodaxQuoteCard({
         </Notice>
       ) : quote ? (
         <div className="col" style={gap(4)} aria-live="polite">
-          <span className="muted small">Você pagaria, na outra rede</span>
+          <span className="muted small">{t("youWouldPay")}</span>
           <span className="display num" style={{ fontSize: 32, lineHeight: 1.1 }}>
-            ≈ {cryptoAmount(quote.payAmount, quote.source.symbol)}
+            ≈ {f.cryptoAmount(quote.payAmount, quote.source.symbol)}
           </span>
           <span className="small num">
-            {rate != null ? <span>≈ {brl(credited, rate)} · </span> : null}
-            chegam <b>{usdc(Math.round(credited * 100) / 100)}</b> na sua carteira
+            {rate != null && f.locale === "pt" ? <span>≈ {f.brl(credited, rate)} · </span> : null}
+            {t.rich("arrives", { amount: f.usdc(Math.round(credited * 100) / 100), b: (c) => <b>{c}</b> })}
           </span>
           {quote.minApplied ? (
             <span className="tiny faint">
-              <Icon name="info" size="s" /> O SODAX só aceita trocas a partir de cerca de US$ 1; por isso a cotação usa esse mínimo.
+              <Icon name="info" size="s" /> {t("minNote")}
             </span>
           ) : null}
           <span className="tiny faint">
-            Cotação ao vivo do SODAX · atualiza sozinha{loading ? " · atualizando…" : ""}
+            {t("liveNote")}
+            {loading ? t("updating") : ""}
           </span>
         </div>
       ) : (
         <div className={`${s.status} small muted`} role="status" aria-live="polite">
-          <Spinner size="s" /> Consultando o SODAX…
+          <Spinner size="s" /> {t("consulting")}
         </div>
       )}
     </div>

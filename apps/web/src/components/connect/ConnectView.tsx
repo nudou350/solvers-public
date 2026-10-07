@@ -2,7 +2,8 @@
 // Consentimento do conector (OAuth): o Claude/ChatGPT abre /oauth/authorize, o servidor guarda o pedido e
 // redireciona para cá. A pessoa entra (e-mail/Privy ou carteira de dev), a carteira da sessão assina o
 // login do pedido e a chave das memórias, e voltamos para o assistente com o código de autorização.
-import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
@@ -19,25 +20,47 @@ const toB64 = (bytes: Uint8Array) => {
   return btoa(s);
 };
 
-async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+/** Erro do /oauth/authorize/*: guarda o código (RFC 6749) e a descrição em inglês do servidor, para traduzir na tela. */
+class OAuthFailure extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+async function getJson<T>(url: string, fallback: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const body = (await res.json().catch(() => ({}))) as T & { error?: string; error_description?: string };
-  if (!res.ok) throw new Error(body.error_description ?? body.error ?? "Não deu para continuar.");
+  if (!res.ok) throw new OAuthFailure(body.error_description ?? body.error ?? fallback, body.error);
   return body;
 }
 
 export function ConnectView({ req }: { req: string | null }) {
   const { status, me, login, logout, loggingIn, requireWallet } = useSession();
+  const t = useTranslations("connect");
   const [info, setInfo] = useState<Info | null>(null);
-  const [error, setError] = useState<string | null>(req ? null : "Pedido de conexão inválido. Volte ao Claude ou ChatGPT e conecte de novo.");
+  const [error, setError] = useState<string | null>(req ? null : t("invalidRequest"));
   const [step, setStep] = useState<string | null>(null);
+  // Texto de reserva em ref: `t` muda de identidade a cada render e não pode reiniciar o efeito de carregamento.
+  const genericError = useRef(t("genericError"));
+  genericError.current = t("genericError");
+  // Mensagens conhecidas do servidor (em inglês) viram texto do idioma da página; o resto aparece como veio.
+  const localize = (e: Error) => {
+    const code = e instanceof OAuthFailure ? e.code : undefined;
+    if (code === "too_many_requests") return t("errTooMany");
+    if (code === "access_denied") return t("errMemoryKey");
+    if (code === "invalid_request") return /expired/i.test(e.message) ? t("errExpired") : t("errSignature");
+    return e.message;
+  };
 
   useEffect(() => {
     if (!req) return;
     let alive = true;
-    getJson<Info>(`/oauth/authorize/info?req=${encodeURIComponent(req)}`)
+    getJson<Info>(`/oauth/authorize/info?req=${encodeURIComponent(req)}`, genericError.current)
       .then((i) => alive && setInfo(i))
-      .catch((e: Error) => alive && setError(e.message));
+      .catch((e: Error) => alive && setError(localize(e)));
     return () => {
       alive = false;
     };
@@ -48,24 +71,24 @@ export function ConnectView({ req }: { req: string | null }) {
     setError(null);
     try {
       const wallet = await requireWallet();
-      if (wallet.address !== me.wallet) throw new Error("A carteira não é a da sessão. Saia e entre de novo.");
-      setStep("Confirmando que a carteira é sua…");
-      const n = await getJson<{ message: string }>(`/oauth/authorize/nonce?req=${encodeURIComponent(req)}&wallet=${wallet.address}`);
+      if (wallet.address !== me.wallet) throw new Error(t("walletMismatch"));
+      setStep(t("stepConfirming"));
+      const n = await getJson<{ message: string }>(`/oauth/authorize/nonce?req=${encodeURIComponent(req)}&wallet=${wallet.address}`, t("genericError"));
       const enc = new TextEncoder();
       const signature = toB64(await wallet.signMessage(enc.encode(n.message)));
-      setStep("Protegendo suas memórias…");
+      setStep(t("stepMemories"));
       const memorySignature = toB64(await wallet.signMessage(enc.encode(info.memoryMessage)));
-      setStep("Conectando…");
-      const done = await getJson<{ redirectTo: string }>("/oauth/authorize/complete", {
+      setStep(t("stepConnecting"));
+      const done = await getJson<{ redirectTo: string }>("/oauth/authorize/complete", t("genericError"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ req, wallet: wallet.address, message: n.message, signature, memorySignature }),
       });
-      setStep(`Pronto! Voltando para o ${info.clientName}…`);
+      setStep(t("stepDone", { client: info.clientName }));
       window.location.href = done.redirectTo;
     } catch (e) {
       setStep(null);
-      setError((e as Error).message || "Algo deu errado. Tente de novo.");
+      setError(localize(e as Error) || t("somethingWrong"));
     }
   }
 
@@ -77,24 +100,21 @@ export function ConnectView({ req }: { req: string | null }) {
         <div style={{ display: "grid", gap: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Icon name="shield-check" size="l" />
-            <h1 style={{ margin: 0, fontSize: 24 }}>Conectar sua conta do Solvers</h1>
+            <h1 style={{ margin: 0, fontSize: 24 }}>{t("title")}</h1>
           </div>
 
-          {!info && !error ? <Loading text="Carregando o pedido de conexão…" /> : null}
+          {!info && !error ? <Loading text={t("loadingRequest")} /> : null}
 
           {info ? (
             <>
-              <p style={{ margin: 0 }}>
-                <strong>{info.clientName}</strong> quer usar os seus especialistas do Solvers. Ele vai ver as suas licenças e poderá
-                usar as suas memórias. <strong>Isto não autoriza pagamentos.</strong>
-              </p>
+              <p style={{ margin: 0 }}>{t.rich("intro", { client: info.clientName, b: (c) => <strong>{c}</strong> })}</p>
               <p style={{ margin: 0, fontSize: 14 }}>
-                Volta para: <code>{info.redirectHost}</code>{" "}
-                {info.verified ? "(verificado)" : null}
+                {t("returnsTo")} <code>{info.redirectHost}</code>{" "}
+                {info.verified ? t("verified") : null}
               </p>
               {!info.verified ? (
-                <Notice tone="warn" title="Aplicativo não verificado">
-                  Só continue se foi você quem iniciou esta conexão agora.
+                <Notice tone="warn" title={t("unverifiedTitle")}>
+                  {t("unverifiedBody")}
                 </Notice>
               ) : null}
 
@@ -102,9 +122,9 @@ export function ConnectView({ req }: { req: string | null }) {
 
               {status === "anon" ? (
                 <>
-                  <p style={{ margin: 0 }}>Entre com o seu e-mail para escolher a conta que será conectada.</p>
-                  <Button block loading={loggingIn} onClick={() => login().catch((e: Error) => setError(e.message))}>
-                    Entrar
+                  <p style={{ margin: 0 }}>{t("signInPrompt")}</p>
+                  <Button block loading={loggingIn} onClick={() => login().catch((e: Error) => setError(localize(e)))}>
+                    {t("signIn")}
                   </Button>
                 </>
               ) : null}
@@ -112,7 +132,7 @@ export function ConnectView({ req }: { req: string | null }) {
               {status === "authed" && me ? (
                 <>
                   <p style={{ margin: 0 }}>
-                    Conectando como <strong>{who}</strong>{" "}
+                    {t("connectingAs")} <strong>{who}</strong>{" "}
                     <button
                       type="button"
                       className="link"
@@ -120,11 +140,11 @@ export function ConnectView({ req }: { req: string | null }) {
                       disabled={!!step}
                       style={{ background: "none", border: 0, padding: 0, color: "var(--brand)", cursor: "pointer" }}
                     >
-                      (não é você? trocar conta)
+                      {t("switchAccount")}
                     </button>
                   </p>
                   <Button block loading={!!step} onClick={authorize}>
-                    Autorizar {info.clientName}
+                    {t("authorize", { client: info.clientName })}
                   </Button>
                 </>
               ) : null}
@@ -136,15 +156,14 @@ export function ConnectView({ req }: { req: string | null }) {
           ) : null}
 
           {error ? (
-            <Notice tone="bad" title="Não deu para conectar" role="alert">
+            <Notice tone="bad" title={t("failedTitle")} role="alert">
               {error}
             </Notice>
           ) : null}
 
           {info ? (
             <p style={{ margin: 0, fontSize: 13, color: "var(--ink-3)" }}>
-              Usa Phantom, Solflare ou Backpack? <a href={info.extensionUrl}>Conectar com a carteira do navegador</a>. Atenção:
-              é outra conta, com outras compras.
+              {t.rich("walletHint", { link: (c) => <a href={info.extensionUrl}>{c}</a> })}
             </p>
           ) : null}
         </div>

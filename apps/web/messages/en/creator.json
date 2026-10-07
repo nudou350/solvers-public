@@ -1,1 +1,476 @@
-{}
+{
+  "meta": {
+    "dashboard": "Creator dashboard",
+    "publish": "Publish a solver",
+    "privateWithdraw": "Private withdrawal"
+  },
+  "head": {
+    "eyebrow": "Creator dashboard",
+    "hello": "Hi, {name}",
+    "forCreators": "For creators",
+    "tabsLabel": "Creator dashboard sections",
+    "repBadge": "{label} · {score}/100",
+    "tabs": {
+      "overview": "Overview",
+      "submissions": "My submissions",
+      "publish": "Publish a solver",
+      "private": "Private withdrawal"
+    }
+  },
+  "dashboard": {
+    "sessionExpired": "Your session expired. Sign in again.",
+    "loading": "Loading your dashboard…",
+    "loadFailTitle": "Couldn't load the dashboard",
+    "retry": "Try again",
+    "gate": {
+      "title": "Sign in to see your dashboard",
+      "text": "Sales, uses, revenue and disputes for your solvers live here.",
+      "howTo": "How to publish"
+    },
+    "notCreator": {
+      "eyebrow": "Start here",
+      "title": "You haven't published any solvers yet",
+      "lead": "Turn what you know how to do into a solver that people use with the Claude and ChatGPT they already have.",
+      "publish": "Publish a solver",
+      "mySubmissions": "My submissions",
+      "free": {
+        "title": "Publishing is free",
+        "text": "No deposit and no monthly fee. You build the package with Solver Builder, upload the ZIP, and our team reviews it before it goes live."
+      },
+      "share": {
+        "title": "You get {pct}% of every sale",
+        "text": "The money lands in your wallet with every license sold. The platform fee is already deducted."
+      },
+      "quality": {
+        "title": "Quality through a test suite",
+        "text": "Every package goes through an automated check and a review by our team. When there is a score from the team's internal tests, buyers can see it."
+      }
+    },
+    "kpi": {
+      "sales30": "Sales in 30 days",
+      "newLicenses": "new licenses",
+      "allTime": " · {n} total",
+      "uses": "Verified uses",
+      "usesSub": "in the last 30 days",
+      "revenue": "Sales revenue",
+      "royalties": "Resale royalties",
+      "royaltiesSub": "from resales made on the marketplace",
+      "soon": "Coming soon",
+      "soonSub": "when the resale marketplace opens",
+      "disputes": "Disputes",
+      "disputesOpen": "{n} under review"
+    },
+    "reputation": {
+      "title": "Your reputation badge",
+      "text": "Reputation goes up with good ratings, passed tests and disputes resolved in the buyer's favor. Lost disputes cost points and reduce your visibility.",
+      "profile": "View my public profile",
+      "lost": "{n, plural, =0 {No disputes lost} one {# dispute lost} other {# disputes lost}}"
+    },
+    "agents": {
+      "title": "Your solvers",
+      "publishNew": "Publish new",
+      "emptyTitle": "No solvers yet",
+      "emptyText": "Publish your first one: it's free, with no deposit.",
+      "cols": {
+        "agent": "Solver",
+        "sold": "Sold / Cap",
+        "uses": "Uses",
+        "rating": "Rating",
+        "performance": "Performance",
+        "revenue": "Revenue"
+      },
+      "version": "v{version} · {status}",
+      "status": {
+        "active": "live",
+        "pending": "in review",
+        "suspended": "suspended",
+        "retired": "retired"
+      },
+      "hidden": "Hidden from the storefront (low rating)",
+      "soldOut": " sold out",
+      "unlimited": "No license limit",
+      "noEvals": "No evaluations yet"
+    },
+    "guarantee": {
+      "title": "Earnings from guaranteed tasks",
+      "subtitle": "Net of the platform fee, separate from sales",
+      "total": "Total received",
+      "last30": "Last 30 days",
+      "releases": "Milestones released",
+      "releasesSub": "approved by the buyer, automatic, or in your favor",
+      "emptyTitle": "No guarantee payments yet",
+      "emptyText": "When a guaranteed task milestone is released to you, it shows up here.",
+      "fallbackTask": "Guaranteed task"
+    },
+    "disputes": {
+      "title": "Recent disputes",
+      "emptyTitle": "No disputes so far",
+      "emptyText": "When a buyer disputes a guarantee milestone, the criterion and the reason show up here.",
+      "milestone": "Milestone {n}: {title}",
+      "criterion": "Criterion cited: {criterion}",
+      "criterionNone": "not provided",
+      "dateNone": "Date not provided",
+      "result": {
+        "open": "Under review",
+        "buyer": "In the buyer's favor",
+        "creator": "In the creator's favor"
+      }
+    }
+  },
+  "chart": {
+    "title": "Sales and uses per day",
+    "sales": "Sales",
+    "uses": "Uses",
+    "label": "Sales and uses per day over the last 30 days: {sales, plural, one {# sale} other {# sales}} and {uses, plural, one {# use} other {# uses}}.",
+    "tip": "{day}: {sales, plural, one {# sale} other {# sales}}, {uses, plural, one {# use} other {# uses}}",
+    "daysAgo": "30 days ago",
+    "max": "Peak in one day: {sales, plural, one {# sale} other {# sales}} · {uses, plural, one {# use} other {# uses}}",
+    "today": "Today"
+  },
+  "publish": {
+    "ariaSteps": "Steps to publish",
+    "stepDone": " (completed)",
+    "stepOf": "Step {n} of {total}",
+    "back": "Back",
+    "steps": {
+      "signIn": {
+        "title": "Sign in",
+        "text": "Sign in with your email. Your account is your creator identity."
+      },
+      "profile": {
+        "title": "Registration",
+        "text": "Invite, name, introduction, terms and contact."
+      },
+      "build": {
+        "title": "Build the package",
+        "text": "Use Solver Builder to prepare the ZIP."
+      },
+      "upload": {
+        "title": "Upload the ZIP",
+        "text": "Send the package for checking and review."
+      },
+      "track": {
+        "title": "Track progress",
+        "text": "See where your submission stands and what is missing."
+      }
+    },
+    "loginFail": "Couldn't sign in",
+    "linked": {
+      "title": "Telegram linked",
+      "text": "Your contact was confirmed."
+    },
+    "notYet": {
+      "title": "We don't see the link yet",
+      "text": "Send the command to the bot and try again in a few seconds."
+    },
+    "loadingProfile": "Loading your registration…",
+    "loadFailTitle": "Couldn't load your registration",
+    "retry": "Try again",
+    "saved": "Registration saved",
+    "incomplete": {
+      "title": "Registration is incomplete",
+      "back": "Back to registration",
+      "notInvited": "Your invite hasn't been confirmed yet.",
+      "needProfile": "You still need to save your name and introduction and accept the terms.",
+      "needContact": "You still need to link your Telegram. That's how we notify you about your submissions.",
+      "notReady": "Your registration isn't cleared to submit yet."
+    },
+    "signIn": {
+      "alreadyIn": "You're already signed in",
+      "account": "Account: {email}.",
+      "accountActive": "Your account is active.",
+      "noWallet": "You don't need a wallet or a balance: Solvers takes care of that.",
+      "next": "Continue to registration",
+      "p1": "Sign in with your email. We send you an access code and create your account on the spot.",
+      "p2": "Publishing is free, with no deposit and no monthly fee.",
+      "p3": "Every version goes through an automated check and a review by our team before it goes live.",
+      "login": "Sign in"
+    },
+    "build": {
+      "toolTitle": "Use Solver Builder",
+      "toolSub": "A free solver, included in the platform",
+      "toolText": "It walks you through seven steps: the promise and the audience, what sets it apart, the process, the knowledge, the tools, the first conversation and the test cases. At the end it hands you the finished package, already checked by the same validator the site uses.",
+      "install": "Install on my AI",
+      "learn": "Learn about Solver Builder",
+      "installNote": "Installing takes about two minutes and works with Claude and ChatGPT. After that, just ask: “Use Solver Builder to build a solver about [your topic]”.",
+      "zipTitle": "What the ZIP should look like",
+      "zipTreeLabel": "Package folder structure",
+      "zipTree": "my-solver.zip\n├─ manifest.json\n├─ steps/       (3 to 6 steps, .md)\n├─ knowledge/   (knowledge, .md)\n├─ templates/   (ready-made templates)\n└─ evals/cases/ (test cases, .json)",
+      "zipNote": "manifest.json goes at the root, not inside an extra folder. Up to {size}.",
+      "noZipTitle": "If your AI can't generate the ZIP",
+      "noZipText": "Some AIs only show the files in the chat. In that case, Solver Builder hands you each file in its own block, with step-by-step instructions to save each one in a folder and compress it. The site checks everything again when you upload.",
+      "refs": "References",
+      "schema": "manifest.json schema (JSON)",
+      "guide": "Complete format guide, inside Solver Builder",
+      "haveZip": "I have the ZIP, upload it",
+      "locked": "Uploading opens once your registration and contact are complete"
+    },
+    "track": {
+      "text": "After you upload, each package goes through these stages. You can follow everything in <b>My submissions</b> and you'll be notified when our team replies.",
+      "view": "View my submissions"
+    }
+  },
+  "profile": {
+    "errors": {
+      "sessionExpired": "Your session expired. Sign in again and save once more.",
+      "inviteRequired": "Paste the invite code our team sent you.",
+      "inviteUsed": "That invite was already used by another account. Ask our team for a new one.",
+      "inviteInvalid": "That invite code doesn't exist. Check that you copied all of it, or ask our team for a new one.",
+      "forbidden": "That invite code isn't valid. Check that you copied all of it, or ask our team for a new one.",
+      "conflict": "That invite was already used by another account.",
+      "tooMany": "Too many attempts in a row. Wait a minute and try again.",
+      "server": "The server didn't respond properly. Try again in a moment.",
+      "generic": "Couldn't save right now."
+    },
+    "validation": {
+      "name": "Enter the name that will appear on the storefront (at least {min} letters).",
+      "bio": "Tell us in a few sentences who you are and what you can do (at least {min} characters).",
+      "invite": "Paste the invite code our team sent you.",
+      "terms": "To continue, you need to accept the terms."
+    },
+    "invite": {
+      "label": "Invite code",
+      "hint": "For now, only invited creators can submit solvers. The code comes by email from the Solvers team.",
+      "confirmed": "Invite confirmed"
+    },
+    "name": {
+      "label": "Storefront name",
+      "hint": "The name buyers see in “by …”. It can be yours or your brand's."
+    },
+    "bio": {
+      "label": "About you",
+      "hint": "{count}/{max} · Experience, field, and the kind of problem you solve."
+    },
+    "summary": {
+      "title": "Summary of what you accept",
+      "b1": "You are responsible for the package's content and have the right to use everything in it. Third-party content needs a source and permission.",
+      "b2": "Our team reviews every version before it goes live and may ask for changes, reject, suspend or remove a solver.",
+      "b3": "The platform fee comes out of each sale. The rest goes to your wallet.",
+      "b4": "A solver may not promise financial, legal or medical results without caveats, act against the user, or send their data elsewhere."
+    },
+    "terms": "I've read the summary and accept the Solvers terms for creators.",
+    "saveFailTitle": "Couldn't save your registration",
+    "save": "Save registration",
+    "saveContinue": "Save and continue",
+    "contact": {
+      "title": "Contact for notices and help requests",
+      "linked": "Telegram linked",
+      "missing": "Not linked yet",
+      "okText": "All set: we'll notify you there when our team replies to a submission or when a buyer asks for help.",
+      "text": "Before you submit a solver, link your Telegram. That's how we notify you about submissions and how buyers ask for help, without seeing your contact. Click <b>Link Telegram</b>: the site generates a code and you send it to the Solvers bot.",
+      "saveFirst": "Save your registration first (name, introduction and terms): the button to link appears right after.",
+      "later": "You can save your registration now and link later, but uploading a package only opens once your contact is linked."
+    }
+  },
+  "telegram": {
+    "errors": {
+      "sessionExpired": "Your session expired. Sign in again and try once more.",
+      "unavailable": "Telegram linking is down right now. Try again in a few minutes or contact our team.",
+      "profileRequired": "Save your registration (name, introduction and terms) before linking Telegram.",
+      "tooMany": "You've generated too many codes in a row. Wait a bit and try again.",
+      "server": "The server didn't respond properly. Try again in a moment.",
+      "generic": "Couldn't generate the code right now."
+    },
+    "statusExpired": "The code expired. Generate a new one to continue.",
+    "statusCopied": "Command copied. Paste it in the chat with the bot.",
+    "statusWaiting": "Waiting for you to send the code to the bot. We'll let you know here as soon as it arrives.",
+    "link": "Link Telegram",
+    "recheck": "I've linked it, check",
+    "boxLabel": "Code to link Telegram",
+    "step1": "Tap <b>Open in Telegram</b> and then <b>Start</b>. The code is already filled in.",
+    "step2": "Or search for <handle>@{username}</handle> on Telegram and send:",
+    "copy": "Copy",
+    "copyLabel": "Copy the link command",
+    "open": "Open in Telegram",
+    "validUntil": "The code is valid until {time} (<tick>{clock}</tick><sr> left</sr>) and works only once.",
+    "newCode": "Generate a new code",
+    "failTitle": "Couldn't generate the code"
+  },
+  "zip": {
+    "notZip": "“{name}” isn't a ZIP file. Compress the package folder into a .zip and choose again.",
+    "empty": "That file is empty.",
+    "tooBig": "The file is {size} and the limit is {max}. Remove anything that isn't part of the package and compress again.",
+    "picked": "Package selected",
+    "drop": "Drag the package ZIP here",
+    "pickedHint": "Check the file below and upload it.",
+    "hint": "A .zip file up to {max}, with manifest.json at the root.",
+    "inputLabel": "Choose the package ZIP file",
+    "chooseOther": "Choose another file",
+    "choose": "Choose file",
+    "badFileTitle": "That file won't work",
+    "remove": "Remove {name}",
+    "progressLabel": "Upload progress",
+    "uploading": "Uploading… {pct}%",
+    "uploaded": "Uploaded. Waiting for the server to confirm receipt…",
+    "send": "Send for review",
+    "cancel": "Cancel upload",
+    "note": "The server checks the package again, even if you've already validated it on your computer. If there are errors, you'll see everything on the tracking screen and nothing goes to the team's review."
+  },
+  "cosign": {
+    "button": {
+      "register-agent": "Confirm registration",
+      "update-version": "Confirm the update",
+      "update-pricing": "Confirm the new price"
+    },
+    "toast": {
+      "title": "Confirmation recorded",
+      "text": "Our team handles the rest. Follow along here."
+    },
+    "planFailTitle": "Couldn't check what's missing",
+    "retry": "Try again",
+    "checking": "Checking what's left before publishing…",
+    "blockedTitle": "This solver is blocked on the network",
+    "blockedText": "It is suspended or registered by another account. Contact our team.",
+    "awaitTitle": "Final approval from our team is pending",
+    "doneTitle": "All good on the network",
+    "awaitText": "You've already confirmed. As soon as our team gives the final approval, the solver goes on the storefront.",
+    "doneText": "Publishing is being completed. This page updates by itself.",
+    "title": {
+      "register": "Confirm the solver's registration",
+      "pricing": "Confirm the new price",
+      "version": "Confirm the new version"
+    },
+    "text": {
+      "register": "Our team approved the package. You just need to confirm with your account, once, to register the solver as yours.",
+      "pricing": "The version is already on the network. You just need to confirm the approved price.",
+      "version": "Our team approved the new version. You just need to confirm the update with your account."
+    },
+    "li": {
+      "fee": "Solvers covers the network fee.",
+      "approved": "Price, name and version come from what our team approved ({name} v{version}, {price} USDC). You don't need to type anything.",
+      "approvedShort": "Price, name and version come from what our team approved. You don't need to type anything.",
+      "stake": "The program requires a deposit of {stake} USDC at registration. Your balance: {balance} USDC.",
+      "afterRegister": "After you confirm, our team gives the final approval and the solver goes on the storefront.",
+      "afterUpdate": "After you confirm, the new version goes live."
+    },
+    "lowTitle": "Not enough USDC for the deposit",
+    "lowText": "You're short {missing} USDC for the deposit.",
+    "faucet": "Get test USDC",
+    "relogin": "Sign in again",
+    "retryBtn": "Try again",
+    "footnote": "A window from your sign-in may open for you to confirm. The confirmation is valid for a few minutes: if it takes too long, just try again."
+  },
+  "resale": {
+    "value": {
+      "own": {
+        "title": "The license is yours.",
+        "text": "The permanent license is recorded on the Solana network, in your wallet."
+      },
+      "resell": {
+        "title": "Resell what you don't use.",
+        "text": "Finished the project? List the license and get part of the price back."
+      },
+      "creator": {
+        "title": "The creator earns on every resale on Solvers.",
+        "text": "A share of each sale made through the marketplace goes to whoever created the solver."
+      }
+    },
+    "how": {
+      "list": {
+        "title": "List the license",
+        "text": "In your library, pick the permanent license you no longer use and set the price."
+      },
+      "buy": {
+        "title": "Someone buys it",
+        "text": "The buyer pays and the license moves to their wallet right away, and you lose access. The solver's rating stays with it; personal reviews stay with whoever wrote them."
+      },
+      "paid": {
+        "title": "Everyone gets paid",
+        "text": "Through the Solvers marketplace, you receive the sale price and the creator receives the royalty, automatically."
+      }
+    },
+    "eyebrow": "Resale marketplace",
+    "soon": "Coming soon",
+    "title": "Resell the license you no longer use",
+    "lead": "The permanent license is yours. When the resale marketplace opens, you'll be able to sell the license for a solver you no longer use, and the creator earns a share of every resale made through Solvers.",
+    "howTitle": "How it will work",
+    "meanwhileTitle": "In the meantime",
+    "meanwhileText": "Your permanent licenses are already recorded in your wallet. When resale opens, the option to list appears in your library, next to each license.",
+    "library": "View my library"
+  },
+  "cloak": {
+    "title": "Withdraw privately",
+    "gateTitle": "Sign in to withdraw privately",
+    "gateText": "Use the same account as your creator dashboard.",
+    "steps": {
+      "keys": "Preparing your keys",
+      "deposit": "Shielding the amount (takes about 1 minute)",
+      "withdraw": "Sending to the destination address",
+      "done": "Done"
+    },
+    "copyFail": "Couldn't copy. Select the text and copy it by hand.",
+    "liveBadge": "Live network · real money",
+    "lead": "Your earnings arrive in your wallet and anyone can see them. Here you move part of them to another address <b>without the explorer showing the link between the two</b>.",
+    "leadNote": "It works on the live network (mainnet), separate from the test network used in the rest of Solvers. Sales stay public on purpose: that's what gives buyers confidence. What stays protected is what you do with the money afterwards.",
+    "walletTitle": "Your wallet on the live network",
+    "refresh": "Refresh",
+    "copied": "Copied",
+    "copy": "Copy",
+    "balanceFailTitle": "Couldn't read the balances",
+    "rpcHint": " The default read endpoint limits browsers: set NEXT_PUBLIC_CLOAK_RPC_URL.",
+    "solLabel": "SOL (network fees)",
+    "reading": "Reading the balances…",
+    "emptyTitle": "No balance on the live network",
+    "emptyText": "To withdraw, send USDC and about 0.005 SOL (for network fees) to the address above, on the live network. Solvers' test USDC isn't valid here.",
+    "newWithdrawal": "New withdrawal",
+    "amountLabel": "Amount (USDC)",
+    "amountHint": "Minimum 1 USDC. Cloak fee: 0.45 USDC + 0.3%.",
+    "destLabel": "Destination address",
+    "destPlaceholder": "Paste the address that will receive",
+    "destHint": "Use an address just for this: the accountant's report lists the withdrawals that arrived there.",
+    "problems": {
+      "amount_invalid": "Enter an amount in USDC, for example 2 or 2.50.",
+      "amount_too_small": "The minimum amount is 1 USDC.",
+      "amount_too_large": "For safety, private withdrawals are limited to 1,000 USDC at a time while the feature is new.",
+      "destination_invalid": "That destination address doesn't look valid.",
+      "destination_same_as_wallet": "Use an address different from your wallet's, otherwise there's nothing to hide.",
+      "usdc_insufficient": "You don't have that USDC balance on the live network.",
+      "sol_insufficient": "You're short on SOL (0.005) on the live network for network fees."
+    },
+    "youWithdraw": "You withdraw",
+    "estFee": "Estimated fee",
+    "destReceives": "The destination receives",
+    "submit": "Withdraw privately",
+    "failTitle": "The withdrawal didn't finish",
+    "failNote": " If the amount was already shielded, it shows up below so you can complete it.",
+    "halfTitle": "Half-finished withdrawal",
+    "halfLine": "{amount} to {dest}",
+    "finish": "Finish withdrawal",
+    "doneTitle": "Withdrawals made in this browser",
+    "deposit": "deposit",
+    "withdrawal": "withdrawal",
+    "doneNote": "On the explorer, the deposit shows up in your wallet and the withdrawal shows up at the destination (<a>view destination</a>), with nothing linking one to the other.",
+    "hides": {
+      "title": "What this hides, and what it doesn't",
+      "hidden": "<b>Hidden:</b> the link between your wallet and the destination address, and the balance you keep.",
+      "from": "<b>From whom:</b> competitors, customers and anyone looking at the explorer.",
+      "notHidden": "<b>Not hidden:</b> your sales and revenue (public on purpose), the fact that you use Cloak, the amount and the time (in a small pool, similar amounts and times can suggest the link) and what Cloak sees: it receives the accountant key when it registers the wallet.",
+      "gain": "<b>Upside:</b> you choose who sees the history. Give the key to your accountant and they see everything; the public sees nothing.",
+      "alpha": "Cloak is new (alpha), the code isn't open source and the audit hasn't been published. Start with small amounts."
+    },
+    "acct": {
+      "title": "Accountant key",
+      "text": "It's a read-only key: whoever has it can see the history of your private withdrawals, but can't touch the money. It's rebuilt from your wallet, so you don't need to store it.",
+      "copyKey": "Copy accountant key",
+      "keyCopied": "Key copied",
+      "destLabel": "Report destination",
+      "download": "Download report (CSV)",
+      "afterFirst": "The report becomes available after your first withdrawal.",
+      "reading": "Reading the history (takes a few minutes)…",
+      "retrying": "{missing, plural, one {# transaction is} other {# transactions are}} missing; reading again ({attempt}/{attempts})…",
+      "partial": "File generated, but {missing, plural, one {# transaction} other {# transactions}} didn't show up (the network refused some reads). Try again in a moment.",
+      "ready": "Done: {count, plural, one {# transaction} other {# transactions}} in the file.",
+      "fileName": "private-withdrawals-receipt.csv"
+    },
+    "errors": {
+      "rateLimited": "The live network is busy (request limit). Wait a minute and try again.",
+      "cancelled": "The signature was canceled.",
+      "network": "Couldn't reach the live network. Check your connection and the configured RPC.",
+      "rpcNotMainnet": "The configured RPC isn't the live network (mainnet). Private withdrawal only works there.",
+      "badSignature": "The wallet returned an unexpected signature. Sign in again and try once more.",
+      "noNote": "This withdrawal has no shielded amount to resume.",
+      "noNoteReturned": "The deposit didn't return the note. Don't repeat it: check the history.",
+      "nothingPending": "There is no pending withdrawal to resume."
+    }
+  }
+}

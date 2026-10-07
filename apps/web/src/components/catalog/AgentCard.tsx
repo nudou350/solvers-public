@@ -1,39 +1,44 @@
 import type { Agent } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Stars } from "@/components/ui/Stars";
 import { Tile } from "@/components/ui/Tile";
-import { EVAL_METHOD_NOTE, evalShort, hasEvalScore } from "@/lib/eval-label";
-import { brl0, usdc } from "@/lib/format";
+import { hasEvalScore } from "@/lib/eval-label";
+import { useFormat } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref } from "./data";
+import { useEvalText } from "./eval-text";
 import { DifferentiatorBadges, FreeTag } from "./PlatformBits";
 import { SupplyTag } from "./SupplyTag";
 import { TrialTag } from "./TrialTag";
 
 /** Cartão de especialista da home ("Mais bem avaliados"). */
 export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creatorName?: string; rate: number }) {
+  const t = useTranslations("catalog.card");
+  const f = useFormat();
+  const ev = useEvalText();
   return (
     <Link className="card pad-s" href={agentHref(a.slug)} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="row start" style={gap("14px")}>
         <Tile category={a.category} />
         <div className="grow" style={{ minWidth: 0 }}>
           <h3 className="h4 clamp2">{a.name}</h3>
-          {creatorName ? <div className="small muted trunc">por {creatorName}</div> : null}
+          {creatorName ? <div className="small muted trunc">{t("by", { name: creatorName })}</div> : null}
         </div>
       </div>
       <p className="small muted clamp3" style={{ minHeight: 40 }}>
         {a.tagline}
       </p>
       <div className="row wrapx" style={gap("6px 14px")}>
-        {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue count={a.reviewsCount} /> : <span className="tiny faint">Ainda sem avaliações</span>}
+        {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue count={a.reviewsCount} /> : <span className="tiny faint">{t("noReviews")}</span>}
         {hasEvalScore(a.evalScore) ? (
-          <span className="verified" title={EVAL_METHOD_NOTE}>
+          <span className="verified" title={ev.note}>
             <Icon name="shield-check" size="s" />
-            {evalShort(a.evalScore)}
+            {ev.short(a.evalScore)}
           </span>
         ) : (
-          <span className="tiny faint">{evalShort(a.evalScore)}</span>
+          <span className="tiny faint">{ev.short(a.evalScore)}</span>
         )}
         {a.trialAvailable ? <TrialTag agentId={a.id} /> : null}
         <SupplyTag supply={a.supply} />
@@ -45,13 +50,13 @@ export function AgentCard({ agent: a, creatorName, rate }: { agent: Agent; creat
         ) : (
           <div>
             <div className="bold num" style={{ fontSize: 20 }}>
-              {brl0(a.priceUsdc, rate)}
+              {f.brl0(a.priceUsdc, rate)}
             </div>
-            <div className="tiny faint">ou {usdc(a.priceUsdc)}</div>
+            <div className="tiny faint">{t("orUsdc", { usdc: f.usdc(a.priceUsdc) })}</div>
           </div>
         )}
         <span className="btn btn-secondary" style={{ minHeight: 44 }}>
-          Ver detalhes
+          {t("details")}
         </span>
       </div>
     </Link>

@@ -2,6 +2,7 @@
 // Aba "Memórias" da biblioteca (minhas-memorias.html). As memórias são criptografadas: até a carteira
 // confirmar a chave, a API responde 409 memory_key_required.
 import type { Memory } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -9,17 +10,17 @@ import { Loading } from "@/components/ui/Spinner";
 import { Tile } from "@/components/ui/Tile";
 import { Notice, useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
-import { ago } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import { txErrorMessage } from "@/lib/tx";
+import { useTxErrorMessage } from "@/lib/tx";
 import { useLibrary } from "./LibraryShell";
 import { useAgentsIndex } from "@/lib/hooks";
 import { LoadError } from "./shared";
 
 /** Perfil da calibragem em uma linha ("" se não há): `pergunta: resposta` ou "calibragem pulada". */
-function profileLine(profile: Memory["profile"]): string {
+function profileLine(profile: Memory["profile"], skipped: string): string {
   if (!profile || Object.keys(profile).length === 0) return "";
-  if (profile.skipped === true) return "calibragem pulada";
+  if (profile.skipped === true) return skipped;
   return Object.entries(profile)
     .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
     .join("; ");
@@ -43,6 +44,7 @@ function ConfirmDelete({
   iconOnlyMobile?: boolean;
   ariaLabel?: string;
 }) {
+  const t = useTranslations("account.memories");
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!asking)
@@ -73,7 +75,7 @@ function ConfirmDelete({
         {confirmLabel}
       </Button>
       <Button variant="ghost" size="sm" onClick={() => setAsking(false)} disabled={busy}>
-        Cancelar
+        {t("cancel")}
       </Button>
     </div>
   );
@@ -82,6 +84,9 @@ function ConfirmDelete({
 export function Memories() {
   const { setMemCount } = useLibrary();
   const { api, requireWallet } = useSession();
+  const t = useTranslations("account");
+  const f = useFormat();
+  const errorInfo = useTxErrorMessage();
   const toast = useToast();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [unlocking, setUnlocking] = useState(false);
@@ -109,8 +114,8 @@ export function Memories() {
       await api.unlockMemories(w);
       load();
     } catch (e) {
-      const info = txErrorMessage(e);
-      setUnlockError(info.code === "cancelled" ? "A confirmação foi cancelada na carteira." : info.text);
+      const info = errorInfo(e);
+      setUnlockError(info.code === "cancelled" ? t("memories.unlockCancelled") : info.text);
     } finally {
       setUnlocking(false);
     }
@@ -126,8 +131,8 @@ export function Memories() {
   }, [count, setMemCount]);
 
   const fail = (e: unknown) => {
-    const info = txErrorMessage(e);
-    toast({ tone: "bad", title: "Não deu para apagar", text: info.text });
+    const info = errorInfo(e);
+    toast({ tone: "bad", title: t("memories.deleteFailed"), text: info.text });
   };
 
   const intro = (
@@ -146,21 +151,21 @@ export function Memories() {
         <Icon name="lock" size="l" />
       </span>
       <div className="col grow" style={{ "--gap": "4px" } as React.CSSProperties}>
-        <b style={{ fontSize: 17 }}>Suas memórias são criptografadas e pertencem a você</b>
+        <b style={{ fontSize: 17 }}>{t("memories.introTitle")}</b>
         <p className="muted">
-          A memória do especialista (resumo, perfil e notas) fica guardada com criptografia no servidor, não na blockchain, e só é aberta quando você usa o especialista na sua IA. O criador não tem acesso a ela. Você pode ver e apagar tudo quando quiser.
+          {t("memories.introText")}
         </p>
       </div>
       {items.length > 0 ? (
         <ConfirmDelete
-          label="Apagar tudo"
-          question={items.length === 1 ? "Apagar a única memória?" : `Apagar as ${items.length} memórias?`}
-          confirmLabel="Apagar tudo"
+          label={t("memories.deleteAll")}
+          question={t("memories.deleteAllQuestion", { n: items.length })}
+          confirmLabel={t("memories.deleteAll")}
           onConfirm={async () => {
             try {
               await api.deleteAllMemories();
               removed(items.map((m) => m.id));
-              toast({ tone: "ok", title: "Memórias apagadas", text: "Os especialistas começam do zero na próxima conversa." });
+              toast({ tone: "ok", title: t("memories.deletedAllTitle"), text: t("memories.deletedAllText") });
             } catch (e) {
               fail(e);
             }
@@ -170,18 +175,18 @@ export function Memories() {
     </div>
   );
 
-  if (state.kind === "loading") return <Loading text="Carregando suas memórias…" />;
-  if (state.kind === "error") return <LoadError onRetry={load} text="Não conseguimos carregar suas memórias agora." />;
+  if (state.kind === "loading") return <Loading text={t("memories.loading")} />;
+  if (state.kind === "error") return <LoadError onRetry={load} text={t("memories.loadError")} />;
   if (state.kind === "locked")
     return (
       <div className="empty card">
         <span className="empty-ic" style={{ background: "var(--mint-soft)", color: "var(--mint)" }}>
           <Icon name="lock" />
         </span>
-        <h3 className="h4">Suas memórias são criptografadas</h3>
-        <p className="muted small">Confirme na sua carteira para ver. É só uma assinatura: nada é cobrado e nenhuma transação é enviada.</p>
+        <h3 className="h4">{t("memories.lockedTitle")}</h3>
+        <p className="muted small">{t("memories.lockedText")}</p>
         <Button icon="key" loading={unlocking} onClick={unlock}>
-          Confirmar na carteira
+          {t("memories.confirmWallet")}
         </Button>
         {unlockError ? (
           <Notice tone="bad" role="alert">
@@ -205,12 +210,12 @@ export function Memories() {
               <div className="row" style={{ "--gap": "14px", padding: "20px 24px", borderBottom: "1px solid var(--line)" } as React.CSSProperties}>
                 {a ? <Tile category={a.category} size="s" /> : <span className="tile tile-s" aria-hidden />}
                 <div className="grow">
-                  <b className="trunc" style={{ display: "block" }}>{a?.name ?? "Especialista"}</b>
-                  <div className="small muted">{g.items.length === 1 ? "1 memória" : `${g.items.length} memórias`}</div>
+                  <b className="trunc" style={{ display: "block" }}>{a?.name ?? t("shared.unnamedSolver")}</b>
+                  <div className="small muted">{t("memories.count", { n: g.items.length })}</div>
                 </div>
                 {a ? (
                   <Button variant="ghost" size="sm" href={`/solvers/${encodeURIComponent(a.slug)}`} className="hide-m">
-                    Ver especialista
+                    {t("memories.viewSolver")}
                   </Button>
                 ) : null}
               </div>
@@ -219,9 +224,9 @@ export function Memories() {
                   <div key={m.id} className="rowline start m-col-x">
                     <div className="grow">
                       {m.summary ? <p style={{ whiteSpace: "pre-line" }}>{m.summary}</p> : null}
-                      {profileLine(m.profile) ? (
+                      {profileLine(m.profile, t("memories.profileSkipped")) ? (
                         <p className="small" style={{ whiteSpace: "pre-line", marginTop: m.summary ? 6 : 0 }}>
-                          <b>Perfil:</b> {profileLine(m.profile)}
+                          <b>{t("memories.profileLabel")}</b> {profileLine(m.profile, t("memories.profileSkipped"))}
                         </p>
                       ) : null}
                       {m.notes.length ? (
@@ -232,20 +237,20 @@ export function Memories() {
                         </ul>
                       ) : null}
                       <div className="tiny faint" style={{ marginTop: 2 }}>
-                        Atualizada {ago(m.updatedAt)}
+                        {t("memories.updated", { when: f.ago(m.updatedAt) })}
                       </div>
                     </div>
                     <ConfirmDelete
-                      label="Apagar"
-                      ariaLabel="Apagar esta memória"
-                      question="Apagar esta memória?"
-                      confirmLabel="Apagar"
+                      label={t("memories.delete")}
+                      ariaLabel={t("memories.deleteAria")}
+                      question={t("memories.deleteQuestion")}
+                      confirmLabel={t("memories.delete")}
                       iconOnlyMobile
                       onConfirm={async () => {
                         try {
                           await api.deleteMemory(m.id);
                           removed([m.id]);
-                          toast({ tone: "ok", title: "Memória apagada" });
+                          toast({ tone: "ok", title: t("memories.deletedTitle") });
                         } catch (e) {
                           fail(e);
                         }
@@ -259,8 +264,8 @@ export function Memories() {
         })}
         {!groups.length ? (
           <div className="card-flat pad-l center col" style={{ "--gap": "6px", alignItems: "center" } as React.CSSProperties}>
-            <b>Nenhuma memória guardada</b>
-            <p className="muted">Os especialistas vão anotando o que aprendem sobre você aqui. Você sempre poderá conferir.</p>
+            <b>{t("memories.emptyTitle")}</b>
+            <p className="muted">{t("memories.emptyText")}</p>
           </div>
         ) : null}
       </div>

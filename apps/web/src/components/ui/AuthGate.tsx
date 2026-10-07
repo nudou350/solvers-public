@@ -1,5 +1,7 @@
 "use client";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import { Button } from "./Button";
 import { Empty } from "./Empty";
@@ -20,6 +22,8 @@ export type AuthGateProps = {
 export function AuthGate({ icon = "lock", title, text, actions, children }: AuthGateProps) {
   const { status, login, loggingIn } = useSession();
   const toast = useToast();
+  const t = useTranslations("common.ui");
+  const errorText = useErrorText();
   if (status === "loading") return <Loading />;
   if (status === "anon")
     return (
@@ -30,9 +34,9 @@ export function AuthGate({ icon = "lock", title, text, actions, children }: Auth
           <>
             <Button
               loading={loggingIn}
-              onClick={() => login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }))}
+              onClick={() => login().catch((e: unknown) => toast({ tone: "bad", title: t("signInFailed"), text: errorText(e) }))}
             >
-              Entrar
+              {t("signIn")}
             </Button>
             {actions}
           </>

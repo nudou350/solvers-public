@@ -2,48 +2,43 @@
 // /revenda: vitrine do conceito "em breve" (revenda é fase futura, FRONT_PLAN.md).
 // Não chama getResaleListings (os anúncios da API são simulados) e não mostra anúncios de exemplo.
 // Sem API de lista de interesse, também não pede e-mail: nada de prometer um aviso que não sai.
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { gap } from "@/lib/style";
 
-const VALUE: { icon: IconName; tone: string; title: string; text: string }[] = [
-  { icon: "key", tone: "ok", title: "A licença é sua.", text: "A licença permanente fica registrada na rede Solana, na sua carteira." },
-  { icon: "repeat", tone: "brand", title: "Revenda o que não usa.", text: "Terminou o projeto? Anuncie a licença e recupere parte do valor." },
-  { icon: "coin", tone: "warn", title: "O criador ganha em cada revenda no Solvers.", text: "Uma parte de cada venda feita pelo mercado vai para quem criou o especialista." },
+const VALUE: { key: "own" | "resell" | "creator"; icon: IconName; tone: string }[] = [
+  { key: "own", icon: "key", tone: "ok" },
+  { key: "resell", icon: "repeat", tone: "brand" },
+  { key: "creator", icon: "coin", tone: "warn" },
 ];
 
-const HOW = [
-  { title: "Anuncie a licença", text: "Na sua biblioteca, escolha a licença permanente que não usa mais e defina o preço." },
-  { title: "Alguém compra", text: "O comprador paga e a licença passa para a carteira dele na hora, e você deixa de ter acesso. A nota do especialista segue a mesma; avaliações pessoais continuam de quem as escreveu." },
-  { title: "Todo mundo recebe", text: "Pelo mercado do Solvers, você recebe o valor da venda e o criador recebe o royalty, automaticamente." },
-];
+const HOW = ["list", "buy", "paid"] as const;
 
 export function ResaleSoon() {
+  const t = useTranslations("creator.resale");
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <div className="col" style={gap(12, { maxWidth: 760, marginBottom: 32 })}>
         <div className="row wrapx" style={gap(10)}>
-          <span className="eyebrow">Mercado de revenda</span>
+          <span className="eyebrow">{t("eyebrow")}</span>
           <Chip tone="brand" icon="clock">
-            Em breve
+            {t("soon")}
           </Chip>
         </div>
-        <h1 className="display h1s">Revenda a licença que você não usa mais</h1>
-        <p className="lead">
-          A licença permanente é sua. Quando o mercado de revenda abrir, você poderá vender a de um especialista que não usa mais, e o criador ganha uma parte de cada
-          revenda feita pelo Solvers.
-        </p>
+        <h1 className="display h1s">{t("title")}</h1>
+        <p className="lead">{t("lead")}</p>
       </div>
 
       <div className="g3 m1" style={gap(16, { marginBottom: 40 })}>
         {VALUE.map((v) => (
-          <div key={v.title} className="card-flat pad-s row start" style={gap(12)}>
+          <div key={v.key} className="card-flat pad-s row start" style={gap(12)}>
             <span className={v.tone}>
               <Icon name={v.icon} />
             </span>
             <span className="small grow">
-              <b>{v.title}</b> {v.text}
+              <b>{t(`value.${v.key}.title`)}</b> {t(`value.${v.key}.text`)}
             </span>
           </div>
         ))}
@@ -51,16 +46,16 @@ export function ResaleSoon() {
 
       <div className="g2 gs1" style={gap(24, { marginBottom: 40, alignItems: "start" })}>
         <div className="col" style={gap(16)}>
-          <h2 className="h3">Como vai funcionar</h2>
+          <h2 className="h3">{t("howTitle")}</h2>
           <ol className="col" style={gap(12, { listStyle: "none", margin: 0, padding: 0 })}>
-            {HOW.map((s, i) => (
-              <li key={s.title} className="card pad-s row start" style={gap(16)}>
+            {HOW.map((k, i) => (
+              <li key={k} className="card pad-s row start" style={gap(16)}>
                 <span className="dot dot-now" aria-hidden>
                   {i + 1}
                 </span>
                 <div className="col grow" style={gap(4)}>
-                  <b>{s.title}</b>
-                  <span className="small muted">{s.text}</span>
+                  <b>{t(`how.${k}.title`)}</b>
+                  <span className="small muted">{t(`how.${k}.text`)}</span>
                 </div>
               </li>
             ))}
@@ -69,15 +64,12 @@ export function ResaleSoon() {
 
         <div className="card pad col" style={gap(16)}>
           <div className="col" style={gap(6)}>
-            <h2 className="h3">Enquanto isso</h2>
-            <p className="small muted">
-              Suas licenças permanentes já ficam registradas na sua carteira. Quando a revenda abrir, a opção de anunciar aparece na sua biblioteca, ao lado de cada
-              licença.
-            </p>
+            <h2 className="h3">{t("meanwhileTitle")}</h2>
+            <p className="small muted">{t("meanwhileText")}</p>
           </div>
           <div>
             <Button variant="secondary" icon="library" href="/library">
-              Ver minha biblioteca
+              {t("library")}
             </Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 // Cabeçalho e abas da biblioteca (/library e /biblioteca/memorias), com base em minha-biblioteca.html.
 import type { License } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { Chip } from "@/components/ui/Chip";
@@ -27,6 +28,7 @@ export function useLibrary(): LibraryCtx {
 
 function Inner({ tab, children }: { tab: "lic" | "mem"; children: ReactNode }) {
   const { api } = useSession();
+  const t = useTranslations("account.library");
   const [licenses, setLicenses] = useState<LibraryCtx["licenses"]>(null);
   const [memCount, setMemCount] = useState<number | null>(null);
 
@@ -48,22 +50,22 @@ function Inner({ tab, children }: { tab: "lic" | "mem"; children: ReactNode }) {
   return (
     <>
       <PageHead
-        title="Minha biblioteca"
-        lead="Seus especialistas, quanto você usou cada um e o que eles aprenderam sobre você."
+        title={t("title")}
+        lead={t("lead")}
         aside={
           Array.isArray(licenses) ? (
             <div className="row wrapx" style={{ "--gap": "10px" } as React.CSSProperties}>
-              <Chip>{list.length === 1 ? "1 especialista" : `${list.length} especialistas`}</Chip>
+              <Chip>{t("count", { n: list.length })}</Chip>
             </div>
           ) : null
         }
       />
       <Tabs
-        aria-label="Seções da biblioteca"
+        aria-label={t("tabsLabel")}
         value={tab}
         tabs={[
-          { id: "lic", label: "Especialistas", href: "/library" },
-          { id: "mem", label: "Memórias", href: "/library/memories", count: memCount ?? undefined },
+          { id: "lic", label: t("tabSolvers"), href: "/library" },
+          { id: "mem", label: t("tabMemories"), href: "/library/memories", count: memCount ?? undefined },
         ]}
       />
       <div style={{ marginTop: 28 }}>
@@ -75,17 +77,14 @@ function Inner({ tab, children }: { tab: "lic" | "mem"; children: ReactNode }) {
 
 /** Layout de /biblioteca: cabeçalho, abas e o contexto com as licenças e o contador de memórias. */
 export function LibraryShell({ children }: { children: ReactNode }) {
+  const t = useTranslations("account.library");
   const tab = (usePathname() ?? "").startsWith("/library/memories") ? "mem" : "lic";
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <AuthGate
         icon="library"
-        title="Entre para ver sua biblioteca"
-        text={
-          tab === "lic"
-            ? "Seus especialistas e quanto você usou cada um ficam aqui."
-            : "As memórias que os especialistas guardam sobre você ficam aqui, criptografadas."
-        }
+        title={t("gateTitle")}
+        text={tab === "lic" ? t("gateSolvers") : t("gateMemories")}
       >
         <Inner tab={tab}>{children}</Inner>
       </AuthGate>

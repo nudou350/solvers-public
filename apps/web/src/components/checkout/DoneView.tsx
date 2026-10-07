@@ -1,14 +1,17 @@
 "use client";
 // Compra concluída (design: compra-concluida): licença ou tarefa com garantia.
 import type { AgentDetail } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
-import { brl, date, usdc } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { clusterName, explorerLink, trustedExplorerUrl } from "@/lib/explorer";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import { useToast } from "@/components/ui/Toast";
 import { gap } from "@/lib/style";
@@ -40,7 +43,11 @@ const RETRY_DELAYS_MS = [0, 2000, 3000, 5000, 5000, 5000, 10_000];
 
 export function DoneView({ detail, kind, resale = false, sig, escrow, asset, paidUsdc, explorer }: DoneProps) {
   const { api, config, status, login, loggingIn } = useSession();
+  const lang = useLocale() as Locale;
   const toast = useToast();
+  const t = useTranslations("install");
+  const f = useFormat();
+  const errorText = useErrorText();
   const [check, setCheck] = useState<Check>("checking");
   // Valor guardado confirmado pelo servidor (garantia); o da URL não conta como prova.
   const [escrowUsdc, setEscrowUsdc] = useState<number | null>(null);
@@ -53,7 +60,7 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
     const once = async (): Promise<boolean> => {
       if (kind === "escrow") {
         if (!escrow) return false;
-        const d = await api.getMyEscrow(escrow);
+        const d = await api.getMyEscrow(escrow, lang);
         // A garantia precisa ser deste especialista, não só da conta.
         if (d.agent.slug !== detail.agent.slug) return false;
         if (alive) setEscrowUsdc(d.escrow.amountUsdc);
@@ -79,7 +86,8 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
   const [tech, setTech] = useState(false);
   // Data de hoje só no navegador (evita divergência de hidratação por fuso).
   const [today, setToday] = useState<string | null>(null);
-  useEffect(() => setToday(date(new Date().toISOString())), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setToday(f.date(new Date().toISOString())), [f.locale]);
 
   const confirmed = check === "ok";
   // Garantia: o valor vem do servidor. Licença: o da URL só aparece com a posse confirmada.
@@ -90,21 +98,21 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
   const txLink = sig ? (trustedExplorerUrl(explorer) ?? (config ? explorerLink(config, "tx", sig) : null)) : null;
 
   const heading = !confirmed
-    ? `Sua compra do ${agent.name}`
+    ? t("done.heading.pending", { name: agent.name })
     : isEscrow
-      ? `Pronto! Sua tarefa com o ${agent.name} começou.`
-      : `Pronto! O ${agent.name} é seu.`;
+      ? t("done.heading.escrow", { name: agent.name })
+      : t("done.heading.license", { name: agent.name });
   const lead = check === "unknown"
-    ? "Entre com a conta que você usou na compra para a gente conferir. Só confirmamos depois de ver na sua conta."
+    ? t("done.lead.unknown")
     : check === "missing"
       ? null
       : check === "checking"
-        ? "Só um instante, estamos conferindo na sua conta."
+        ? t("done.lead.checking")
         : isEscrow
-    ? "O pagamento está guardado e só vai para o criador quando você aprovar cada etapa. Conecte o especialista à sua IA para ele começar a trabalhar na tarefa."
-    : resale
-      ? "Sua licença usada já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo. As memórias de quem vendeu ficaram com ele, então o especialista começa a conhecer você do zero."
-      : "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo.";
+          ? t("done.lead.escrow")
+          : resale
+            ? t("done.lead.resale")
+            : t("done.lead.license");
 
   return (
     <section className="wrap" style={{ position: "relative", paddingTop: 56, paddingBottom: 72 }}>
@@ -134,39 +142,39 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
         {check === "missing" ? (
           <Notice
             tone="warn"
-            title="Ainda não encontramos esta compra na sua conta"
+            title={t("done.missing.title")}
             actions={
               <>
                 <Button size="sm" variant="secondary" icon="refresh" onClick={() => setRecheck((n) => n + 1)}>
-                  Conferir de novo
+                  {t("done.missing.recheck")}
                 </Button>
                 <Button size="sm" variant="ghost" href={isEscrow ? "/guarantees" : "/library"}>
-                  {isEscrow ? "Ver minhas garantias" : "Ver minha biblioteca"}
+                  {isEscrow ? t("done.missing.goGuarantees") : t("done.missing.goLibrary")}
                 </Button>
               </>
             }
           >
-            Se você acabou de pagar, ela pode levar mais alguns instantes para aparecer. Se entrou com outra conta, confira na conta usada na compra.
+            {t("done.missing.body")}
           </Notice>
         ) : check === "unknown" ? (
           <Notice
             tone="info"
-            title="Entre para conferir a compra"
+            title={t("done.unknown.title")}
             actions={
               <Button
                 size="sm"
                 loading={loggingIn}
-                onClick={() => void login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }))}
+                onClick={() => void login().catch((e: unknown) => toast({ tone: "bad", title: t("done.unknown.loginFailed"), text: errorText(e) }))}
               >
-                Entrar para conferir
+                {t("done.unknown.login")}
               </Button>
             }
           >
-            Esta página só confirma depois de ver a compra na sua conta.
+            {t("done.unknown.body")}
           </Notice>
         ) : (
           <span className="chip chip-ok" aria-live="polite">
-            {check === "checking" ? "Conferindo o pagamento…" : isEscrow ? "Pagamento guardado" : "Pagamento confirmado"}
+            {check === "checking" ? t("done.chip.checking") : isEscrow ? t("done.chip.escrow") : t("done.chip.license")}
           </span>
         )}
         <h1 className="display h1s" style={{ fontSize: 60 }}>
@@ -178,10 +186,10 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
         <div className="ticket" style={{ width: "100%", maxWidth: 520, textAlign: "left", padding: 26 }}>
           <div className="sol-line" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 4, borderRadius: 0 }} />
           <div className="row between">
-            <span className="eyebrow">{isEscrow ? "Sua tarefa" : "Sua licença"}</span>
+            <span className="eyebrow">{isEscrow ? t("done.ticket.eyebrowTask") : t("done.ticket.eyebrowLicense")}</span>
             <span className={`chip ${isEscrow ? "chip-brand" : "chip-ok"}`}>
               <Icon name={isEscrow ? "shield-check" : "check"} size="s" />
-              {isEscrow ? "Em andamento" : "Ativa"}
+              {isEscrow ? t("done.ticket.statusTask") : t("done.ticket.statusActive")}
             </span>
           </div>
           <div className="row" style={{ ...gap(16), margin: "18px 0" }}>
@@ -192,18 +200,18 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
               </div>
               <div className="small muted" style={{ marginTop: 6 }}>
                 {isEscrow
-                  ? `Tarefa com garantia · ${detail.guarantee?.milestones.length ?? 0} etapas`
-                  : `${resale ? "Licença permanente usada" : "Licença permanente"} · versão ${agent.version}`}
+                  ? t("done.ticket.taskLine", { n: detail.guarantee?.milestones.length ?? 0 })
+                  : t(resale ? "done.ticket.licenseLineResale" : "done.ticket.licenseLine", { version: agent.version })}
               </div>
             </div>
           </div>
           <div className="cut" style={{ margin: "0 -26px 16px" }} />
           <div className="row between small">
-            <span className="muted">{today ? `${isEscrow ? "Criada" : "Emitida"} em ${today}` : " "}</span>
+            <span className="muted">{today ? t(isEscrow ? "done.ticket.createdOn" : "done.ticket.issuedOn", { date: today }) : " "}</span>
             <span className="muted">
-              {isEscrow ? "Guardado" : "Pago"}:{" "}
+              {isEscrow ? t("done.ticket.held") : t("done.ticket.paid")}:{" "}
               <b className="num" style={{ color: "var(--ink)" }}>
-                {rate != null ? brl(paid, rate) : usdc(paid)}
+                {rate != null ? f.brl(paid, rate) : f.usdc(paid)}
               </b>
             </span>
           </div>
@@ -213,15 +221,15 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
         {confirmed ? (
         <div className="row wrapx m-col" style={{ ...gap(12), justifyContent: "center", width: "100%" }}>
           <Button size="lg" href={`/install?agent=${agent.slug}`} iconRight="arrow-right">
-            Conectar à minha IA
+            {t("done.actions.connect")}
           </Button>
           {isEscrow ? (
             <Button size="lg" variant="secondary" href="/guarantees" icon="shield-check">
-              Acompanhar em Garantias
+              {t("done.actions.trackGuarantees")}
             </Button>
           ) : (
             <Button size="lg" variant="secondary" href="/library">
-              Ver minha biblioteca
+              {t("done.actions.library")}
             </Button>
           )}
         </div>
@@ -229,39 +237,42 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
 
         {confirmed && !isEscrow ? (
           <p className="small muted">
-            Depois de usar o especialista, conte como foi:{" "}
-            <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
-              avaliar o {agent.name}
-            </Link>
-            .
-            {resale ? " Se quem vendeu já avaliou com esta licença, talvez você não consiga avaliar com ela." : ""}
+            {t.rich("done.review.intro", {
+              name: agent.name,
+              link: (chunks) => (
+                <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
+                  {chunks}
+                </Link>
+              ),
+            })}
+            {resale ? t("done.review.resaleNote") : ""}
           </p>
         ) : null}
 
         {confirmed && sig ? (
           <>
             <button type="button" className="link-btn small" onClick={() => setTech((v) => !v)} aria-expanded={tech} aria-controls="detalhes-tecnicos">
-              {tech ? "Ocultar detalhes técnicos" : isEscrow ? "Ver detalhes técnicos da tarefa" : "Ver detalhes técnicos da licença"}
+              {tech ? t("done.tech.hide") : isEscrow ? t("done.tech.showTask") : t("done.tech.showLicense")}
             </button>
             {tech ? (
               <dl id="detalhes-tecnicos" className="tech" style={{ marginTop: 14, textAlign: "left", width: "100%", maxWidth: 520 }}>
                 {account ? (
                   <>
-                    <dt>{isEscrow ? "Tarefa registrada na rede" : "Licença registrada na rede"}</dt>
+                    <dt>{isEscrow ? t("done.tech.taskRecorded") : t("done.tech.licenseRecorded")}</dt>
                     <dd className="mono">{account}</dd>
                   </>
                 ) : null}
-                <dt>Comprovante do pagamento</dt>
+                <dt>{t("done.tech.receipt")}</dt>
                 <dd className="mono">{sig}</dd>
                 {config ? (
                   <>
-                    <dt>Rede</dt>
-                    <dd>{clusterName(config.cluster)}</dd>
+                    <dt>{t("done.tech.network")}</dt>
+                    <dd>{clusterName(config.cluster, lang)}</dd>
                   </>
                 ) : null}
                 {txLink ? (
                   <a className="link small" href={txLink} target="_blank" rel="noopener noreferrer">
-                    Abrir no explorador da rede <Icon name="external" size="s" />
+                    {t("done.tech.openExplorer")} <Icon name="external" size="s" />
                   </a>
                 ) : null}
               </dl>

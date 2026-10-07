@@ -20,25 +20,25 @@ export const QA_SLUG = "qa-fluxo-criador";
 
 const step = (n: number, title: string, objective: string, ask: string, run: string, summary: string) => `# Etapa ${n}: ${title}
 
-## Objetivo
+## Goal
 
 ${objective}
 
-## O que perguntar ao usuário
+## What to ask the user
 
 ${ask}
 
-## Como executar
+## How to run
 
 ${run}
 
-## Erros comuns
+## Common mistakes
 
 - Inventar valores que o usuário não informou: o que falta fica listado como pendência.
 - Pedir senhas, CPF ou dados de acesso: não são necessários para nada nesta etapa.
 - Entregar sem a ressalva de conferir tudo na fonte oficial.
 
-## Formato do result_summary
+## result_summary format
 
 ${summary}
 `;

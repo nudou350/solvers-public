@@ -1,12 +1,14 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useId, useState, type CSSProperties } from "react";
 import { gap } from "@/lib/style";
 import { Icon } from "./Icon";
 
 export type TechRow = { label: string; value: string; mono?: boolean };
 
-/** "Quer conferir os detalhes técnicos?": abre a lista de contas na rede e o link do explorador. */
+/** "Want to check the technical details?": abre a lista de contas na rede e o link do explorador. */
 export function TechCard({ text, rows, explorer, style }: { text: string; rows: TechRow[]; explorer?: string | null; style?: CSSProperties }) {
+  const t = useTranslations("common.ui");
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
@@ -16,12 +18,12 @@ export function TechCard({ text, rows, explorer, style }: { text: string; rows: 
           <Icon name="shield-check" size="l" />
         </span>
         <div>
-          <b>Quer conferir os detalhes técnicos?</b>
+          <b>{t("techTitle")}</b>
           <div className="small muted">{text}</div>
         </div>
       </div>
       <button type="button" className="link-btn" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
-        {open ? "Ocultar detalhes técnicos" : "Verificar na blockchain"}
+        {open ? t("techHide") : t("techShow")}
       </button>
       {open ? (
         <dl className="tech" id={id} style={{ width: "100%" }}>
@@ -34,7 +36,7 @@ export function TechCard({ text, rows, explorer, style }: { text: string; rows: 
           {explorer ? (
             <dd>
               <a className="link small" href={explorer} target="_blank" rel="noopener noreferrer">
-                Abrir no explorador da rede <Icon name="external" size="s" />
+                {t("techExplorer")} <Icon name="external" size="s" />
               </a>
             </dd>
           ) : null}

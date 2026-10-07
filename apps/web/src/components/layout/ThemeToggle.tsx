@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 
@@ -22,6 +23,7 @@ export function setTheme(t: Theme) {
 
 /** Botão sol/lua do cabeçalho. Persiste a escolha no localStorage. */
 export function ThemeToggle() {
+  const t = useTranslations("common.theme");
   const [theme, setState] = useState<Theme | null>(null);
   useEffect(() => {
     // Acompanha o atributo do <body>, para ficar certo se outro lugar trocar o tema.
@@ -36,8 +38,8 @@ export function ThemeToggle() {
     <button
       type="button"
       className="icon-btn"
-      aria-label={dark ? "Usar tema claro" : "Usar tema escuro"}
-      title={dark ? "Usar tema claro" : "Usar tema escuro"}
+      aria-label={dark ? t("useLight") : t("useDark")}
+      title={dark ? t("useLight") : t("useDark")}
       onClick={() => {
         const next: Theme = dark ? "light" : "dark";
         setTheme(next);

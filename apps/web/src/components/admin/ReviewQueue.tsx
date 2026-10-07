@@ -1,6 +1,7 @@
 "use client";
 // Fila de revisão (/admin/reviews). Todo texto que vem do criador (nome, slug) entra como texto escapado, sem links.
 import type { AdminSubmissionRow, SubmissionStatus } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { StatusChip } from "@/components/creator/SubmissionParts";
@@ -13,17 +14,17 @@ import { Untrusted, untrusted } from "@/components/ui/Untrusted";
 import { Loading } from "@/components/ui/Spinner";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { loadErrorText } from "@/lib/submissions-ui";
+import { useErrorText } from "@/lib/error-text";
 import { AdminGate } from "./AdminGate";
 
-const FILTERS: { id: SubmissionStatus | "all"; label: string }[] = [
-  { id: "pending_review", label: "Na fila" },
-  { id: "awaiting_onchain_approval", label: "Aprovação final" },
-  { id: "publish_failed", label: "Publicação travada" },
-  { id: "awaiting_creator_signature", label: "Esperando o criador" },
-  { id: "changes_requested", label: "Mudanças pedidas" },
-  { id: "published", label: "Publicados" },
-  { id: "all", label: "Todos" },
+const FILTERS: (SubmissionStatus | "all")[] = [
+  "pending_review",
+  "awaiting_onchain_approval",
+  "publish_failed",
+  "awaiting_creator_signature",
+  "changes_requested",
+  "published",
+  "all",
 ];
 
 /** Dias úteis (seg a sex) desde `iso`, para o prazo de 5 dias úteis da PACKAGE_SPEC.md 14.5. */
@@ -37,7 +38,7 @@ export function businessDaysSince(iso: string, now = Date.now()): number {
   return n;
 }
 
-type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; items: AdminSubmissionRow[] };
+type State = { kind: "loading" } | { kind: "error"; error: unknown } | { kind: "ok"; items: AdminSubmissionRow[] };
 
 export function ReviewQueueView() {
   return (
@@ -48,6 +49,8 @@ export function ReviewQueueView() {
 }
 
 function Queue() {
+  const t = useTranslations("admin.queue");
+  const errorText = useErrorText();
   const { api } = useSession();
   const [filter, setFilter] = useState<SubmissionStatus | "all">("pending_review");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -58,7 +61,7 @@ function Queue() {
       const items = await api.adminListSubmissions(filter === "all" ? undefined : filter);
       setState({ kind: "ok", items });
     } catch (e) {
-      setState({ kind: "error", message: loadErrorText(e) });
+      setState({ kind: "error", error: e });
     }
   }, [api, filter]);
 
@@ -69,30 +72,30 @@ function Queue() {
   return (
     <div className="col" style={gap(24)}>
       <div className="col" style={gap(8)}>
-        <span className="eyebrow">Equipe</span>
-        <h1 className="display h1s">Revisões</h1>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h1 className="display h1s">{t("title")}</h1>
         <p className="muted" style={{ maxWidth: 640 }}>
-          Pacotes enviados por criadores. Todo conteúdo aparece como texto puro: nada do pacote é executado nem aberto como página.
+          {t("intro")}
         </p>
       </div>
 
-      <div className="row wrapx" style={gap(8)} role="group" aria-label="Filtrar por estado">
+      <div className="row wrapx" style={gap(8)} role="group" aria-label={t("filterLabel")}>
         {FILTERS.map((f) => (
-          <button key={f.id} type="button" className={["chip", filter === f.id ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
-            {f.label}
+          <button key={f} type="button" className={["chip", filter === f ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+            {t(`filters.${f}`)}
           </button>
         ))}
       </div>
 
-      {state.kind === "loading" ? <Loading text="Carregando a fila…" /> : null}
+      {state.kind === "loading" ? <Loading text={t("loading")} /> : null}
       {state.kind === "error" ? (
-        <Empty icon="warning" title="Não deu para carregar a fila" action={<Button onClick={() => void load()}>Tentar de novo</Button>}>
-          {state.message}
+        <Empty icon="warning" title={t("errorTitle")} action={<Button onClick={() => void load()}>{t("retry")}</Button>}>
+          {errorText(state.error)}
         </Empty>
       ) : null}
       {state.kind === "ok" && state.items.length === 0 ? (
-        <Empty icon="check-circle" title="Nada por aqui">
-          Nenhum envio neste estado.
+        <Empty icon="check-circle" title={t("emptyTitle")}>
+          {t("emptyText")}
         </Empty>
       ) : null}
       {state.kind === "ok" && state.items.length > 0 ? (
@@ -110,14 +113,14 @@ function Queue() {
                       <Untrusted>{r.slug}</Untrusted> · v{r.version}
                     </span>
                     <span className="row wrapx" style={gap(6)}>
-                      <Chip tone={r.isNewAgent ? "brand" : "default"}>{r.isNewAgent ? "Especialista novo" : "Nova versão"}</Chip>
-                      {r.errors ? <Chip tone="red">{r.errors} {r.errors === 1 ? "erro" : "erros"}</Chip> : null}
-                      {r.warnings ? <Chip tone="warn">{r.warnings} {r.warnings === 1 ? "aviso" : "avisos"}</Chip> : null}
+                      <Chip tone={r.isNewAgent ? "brand" : "default"}>{r.isNewAgent ? t("newSolver") : t("newVersion")}</Chip>
+                      {r.errors ? <Chip tone="red">{t("errors", { n: r.errors })}</Chip> : null}
+                      {r.warnings ? <Chip tone="warn">{t("warnings", { n: r.warnings })}</Chip> : null}
                     </span>
                   </div>
                   <div className="col" style={gap(2, { minWidth: 0 })}>
                     <span className="small" style={{ overflowWrap: "anywhere" }}>
-                      <Untrusted>{r.creatorName || "Sem nome"}</Untrusted>
+                      <Untrusted>{r.creatorName || t("noName")}</Untrusted>
                     </span>
                     <span className="tiny faint mono" style={{ overflowWrap: "anywhere" }}>
                       {r.creatorWallet}
@@ -128,16 +131,16 @@ function Queue() {
                       <StatusChip status={r.status} />
                     </span>
                     <span className="tiny faint">
-                      Enviado <Ago iso={r.createdAt} />
+                      {t.rich("sent", { ago: () => <Ago iso={r.createdAt} /> })}
                     </span>
                     {days !== null ? (
                       <span className={days >= 5 ? "tiny warn" : "tiny faint"}>
-                        {days >= 5 ? "Passou da meta de 5 dias úteis" : `${days} de 5 dias úteis`}
+                        {days >= 5 ? t("overdue") : t("businessDays", { days })}
                       </span>
                     ) : null}
                   </div>
-                  <Button variant="secondary" size="sm" href={`/admin/reviews/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={`Revisar ${untrusted(r.name || r.slug)}`}>
-                    Revisar
+                  <Button variant="secondary" size="sm" href={`/admin/reviews/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={t("reviewAria", { name: untrusted(r.name || r.slug) })}>
+                    {t("review")}
                   </Button>
                 </li>
               );

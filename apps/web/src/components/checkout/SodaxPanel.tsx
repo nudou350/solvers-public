@@ -3,13 +3,14 @@
 // Nenhum dinheiro real é movido: o SODAX só tem mainnet. Na versão real, a pessoa confirma o pagamento na carteira
 // da outra rede e o SODAX entrega o USDC aqui; o resto do fluxo (compra com o saldo) é o mesmo.
 import type { PixCharge, SodaxQuote } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
-import { brl, cryptoAmount, usdc } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { txErrorMessage, type TxErrorInfo } from "@/lib/tx";
@@ -35,6 +36,8 @@ export function SodaxPanel({
   onRestart: () => void;
 }) {
   const { api, config, me, login, loggingIn } = useSession();
+  const t = useTranslations("checkout.sodaxPanel");
+  const f = useFormat();
   const [simulating, setSimulating] = useState(false);
   const [error, setError] = useState<TxErrorInfo | null>(null);
   const [gone, setGone] = useState(false);
@@ -43,6 +46,8 @@ export function SodaxPanel({
   const walletNow = useRef(me?.wallet ?? null);
   walletNow.current = me?.wallet ?? null;
   const rate = config?.brlPerUsd ?? null;
+  // Em reais só no português; no inglês o valor local é o próprio USDC.
+  const showLocal = rate != null && f.locale === "pt";
   const sessionOk = me?.wallet === ownerWallet;
   const approved = charge.status === "approved";
 
@@ -50,7 +55,7 @@ export function SodaxPanel({
   useEffect(() => {
     if (!approved || !sessionOk || gone) return;
     let alive = true;
-    const t = setInterval(async () => {
+    const timer = setInterval(async () => {
       try {
         const c = await api.getPixCharge(charge.id);
         if (!alive) return;
@@ -62,7 +67,7 @@ export function SodaxPanel({
     }, POLL_MS);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [api, charge.id, approved, sessionOk, gone]);
 
@@ -75,7 +80,7 @@ export function SodaxPanel({
       onUpdate(c);
       if (c.status === "credited") onCredited(c);
     } catch (e) {
-      setError(txErrorMessage(e));
+      setError(txErrorMessage(e, f.locale));
     } finally {
       setSimulating(false);
     }
@@ -83,20 +88,20 @@ export function SodaxPanel({
 
   const restart = (
     <Button variant="secondary" size="sm" icon="refresh" onClick={onRestart}>
-      Começar de novo
+      {t("restart")}
     </Button>
   );
 
   if (charge.status === "credited")
     return (
-      <Notice tone="ok" title="Pagamento recebido">
-        {usdc(charge.amountUsdc)} de teste chegaram na sua carteira. Concluindo a compra…
+      <Notice tone="ok" title={t("received.title")}>
+        {t("received.text", { amount: f.usdc(charge.amountUsdc) })}
       </Notice>
     );
   if (gone)
     return (
-      <Notice tone="warn" role="alert" title="Não encontramos este pagamento nesta conta" actions={restart}>
-        Ele pode ter sido criado por outra conta. Comece de novo para continuar aqui.
+      <Notice tone="warn" role="alert" title={t("gone.title")} actions={restart}>
+        {t("gone.text")}
       </Notice>
     );
   if (!sessionOk && (charge.status === "pending" || approved))
@@ -104,17 +109,17 @@ export function SodaxPanel({
       <Notice
         tone="warn"
         role="alert"
-        title="Sua sessão terminou"
+        title={t("sessionEnded.title")}
         actions={
           <>
             <Button size="sm" loading={loggingIn} onClick={() => void login().catch(() => {})}>
-              Entrar de novo
+              {t("sessionEnded.login")}
             </Button>
             {restart}
           </>
         }
       >
-        Entre na mesma conta para continuar este pagamento.
+        {t("sessionEnded.text")}
       </Notice>
     );
   if (approved)
@@ -122,43 +127,42 @@ export function SodaxPanel({
       <div className={s.status} role="status" aria-live="polite">
         <Spinner size="s" />
         <span className="small">
-          <b>Pagamento recebido, creditando saldo…</b>
-          <span className="muted"> Não precisa pagar de novo. A compra continua sozinha.</span>
+          <b>{t("crediting.title")}</b>
+          <span className="muted">{t("crediting.text")}</span>
         </span>
       </div>
     );
   if (charge.status === "expired" || charge.status === "failed")
     return (
-      <Notice tone="warn" title={charge.status === "failed" ? "O pagamento não foi aprovado" : "Este pagamento expirou"} actions={restart}>
-        Nada foi cobrado. Comece de novo para continuar.
+      <Notice tone="warn" title={charge.status === "failed" ? t("failed") : t("expired")} actions={restart}>
+        {t("nothingCharged")}
       </Notice>
     );
 
   return (
     <div className="col" style={gap(16)}>
       <div className="col" style={gap(2)}>
-        <span className="muted small">Pagamento com SODAX</span>
+        <span className="muted small">{t("label")}</span>
         {quote ? (
           <>
             <span className="display num" style={{ fontSize: 36, lineHeight: 1.05 }}>
-              ≈ {cryptoAmount(quote.payAmount, quote.source.symbol)}
+              ≈ {f.cryptoAmount(quote.payAmount, quote.source.symbol)}
             </span>
             <span className="small muted num">
               {quote.source.label}
-              {rate != null ? ` · ≈ ${brl(charge.amountUsdc, rate)}` : ""}
+              {showLocal ? ` · ≈ ${f.brl(charge.amountUsdc, rate ?? 0)}` : ""}
             </span>
           </>
         ) : (
           <span className="display num" style={{ fontSize: 36, lineHeight: 1.05 }}>
-            {rate != null ? brl(charge.amountUsdc, rate) : usdc(charge.amountUsdc)}
+            {showLocal ? f.brl(charge.amountUsdc, rate ?? 0) : f.usdc(charge.amountUsdc)}
           </span>
         )}
-        <span className="small muted num">Você recebe {usdc(charge.amountUsdc)} de teste na sua carteira</span>
+        <span className="small muted num">{t("youReceive", { amount: f.usdc(charge.amountUsdc) })}</span>
       </div>
 
-      <Notice tone="info" title="Demonstração">
-        Nenhum dinheiro real é movido aqui. Na versão real, você confirma o pagamento na carteira da outra rede (como a MetaMask) e o SODAX
-        entrega o USDC na sua conta. A cotação acima é a real, feita agora pelo SODAX.
+      <Notice tone="info" title={t("demo.title")}>
+        {t("demo.text")}
       </Notice>
 
       {error ? (
@@ -170,15 +174,15 @@ export function SodaxPanel({
       <div className="row wrapx" style={gap(10)}>
         {config?.sodax?.simulate ? (
           <Button variant="primary" icon="bolt" loading={simulating} onClick={pay}>
-            Confirmar pagamento (teste)
+            {t("confirm")}
           </Button>
         ) : (
           <p className="tiny faint">
-            <Icon name="info" size="s" /> O pagamento de teste está desativado neste servidor.
+            <Icon name="info" size="s" /> {t("disabled")}
           </p>
         )}
         <button type="button" className="link-btn small" onClick={onRestart}>
-          Cancelar e escolher outra forma
+          {t("cancel")}
         </button>
       </div>
     </div>

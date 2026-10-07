@@ -1,5 +1,7 @@
 "use client";
 import type { Agent } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -7,13 +9,13 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Stars } from "@/components/ui/Stars";
 import { Tile } from "@/components/ui/Tile";
 import { api } from "@/lib/api";
-import { brl0 } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { gap } from "@/lib/style";
 import { agentHref, type CreatorMap } from "./data";
 import { DifferentiatorBadges, FreeInline } from "./PlatformBits";
 import { TrialTag } from "./TrialTag";
 
-const EXAMPLES = ["Criar as telas do meu app no Figma", "Revisar um contrato de prestação de serviço", "Planejar 10 dias na Itália", "Organizar as minhas finanças do mês"];
+const EXAMPLE_KEYS = ["ex1", "ex2", "ex3", "ex4"] as const;
 const MIN_CHARS = 3;
 const DEBOUNCE_MS = 450;
 
@@ -21,6 +23,10 @@ type Result = { status: "idle" } | { status: "loading"; q: string } | { status: 
 
 /** Hero com a busca por necessidade (search(need) devolve os 3 melhores) e a seção de sugestões. */
 export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; rate: number; aside: ReactNode }) {
+  const t = useTranslations("catalog.search");
+  const tc = useTranslations("catalog.card");
+  const f = useFormat();
+  const lang = useLocale() as Locale;
   const [q, setQ] = useState("");
   const [res, setRes] = useState<Result>({ status: "idle" });
   const seq = useRef(0);
@@ -37,7 +43,7 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
     }
     const id = ++seq.current;
     setRes({ status: "loading", q: text });
-    api.search(text).then(
+    api.search(text, lang).then(
       (agents) => id === seq.current && setRes({ status: "done", q: text, agents }),
       () => id === seq.current && setRes({ status: "error", q: text }),
     );
@@ -72,17 +78,17 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
           <div className="col" style={gap("26px")}>
             <span className="chip chip-brand" style={{ alignSelf: "flex-start" }}>
               <Icon name="sparkles" size="s" />
-              Especialistas para a IA que você já usa
+              {t("chip")}
             </span>
             <h1 className="display h1">
-              Peça a quem entende, direto no seu <em>Claude</em> ou <em>ChatGPT</em>.
+              {t.rich("h1", { em: (chunks) => <em>{chunks}</em> })}
             </h1>
             <p className="lead" style={{ maxWidth: 600 }}>
-              Escolha um especialista, pague uma vez e conecte à sua IA. Ele lembra de você e pode entregar com garantia de resultado.
+              {t("lead")}
             </p>
             <form className="col" style={gap("14px", { marginTop: 6 })} onSubmit={submit} role="search">
               <label className="label" htmlFor="busca">
-                Descreva o que você precisa
+                {t("label")}
               </label>
               <div className="searchbar">
                 <span className="faint">
@@ -94,19 +100,19 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                   type="search"
                   value={q}
                   onChange={(e) => onChange(e.target.value)}
-                  placeholder="Ex.: preciso criar as telas do meu app no Figma"
+                  placeholder={t("placeholder")}
                   autoComplete="off"
                   aria-controls="sugestoes"
                 />
                 <button className="btn btn-primary btn-lg" type="submit">
-                  Encontrar especialista
+                  {t("submit")}
                 </button>
               </div>
               <div className="row wrapx" style={gap("8px")}>
-                <span className="small faint">Tente:</span>
-                {EXAMPLES.map((ex) => (
-                  <button key={ex} type="button" className="chip" onClick={() => pick(ex)}>
-                    {ex}
+                <span className="small faint">{t("try")}</span>
+                {EXAMPLE_KEYS.map((k) => (
+                  <button key={k} type="button" className="chip" onClick={() => pick(t(k))}>
+                    {t(k)}
                   </button>
                 ))}
               </div>
@@ -124,26 +130,26 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                 <span className="dot dot-now">
                   <Icon name="sparkles" />
                 </span>
-                <h2 className="h3">Sugerimos para o que você descreveu</h2>
+                <h2 className="h3">{t("suggestTitle")}</h2>
               </div>
               <span className="small muted">
-                Baseado em: <em>{qShort}</em>
+                {t.rich("basedOn", { q: qShort, em: (chunks) => <em>{chunks}</em> })}
               </span>
             </div>
             {res.status === "loading" ? (
               <div className="loading-block" role="status" style={{ padding: "28px 0" }}>
                 <Spinner />
-                <span className="small">Procurando os especialistas certos…</span>
+                <span className="small">{t("searching")}</span>
               </div>
             ) : res.status === "error" ? (
               <p className="muted" role="alert">
-                Não deu para buscar agora. Tente de novo em instantes.{" "}
+                {t("error")}{" "}
                 <button type="button" className="link-btn" onClick={() => run(res.q)}>
-                  Tentar de novo
+                  {t("retry")}
                 </button>
               </p>
             ) : res.agents.length === 0 ? (
-              <p className="muted">Ainda não há um especialista para isso. Tente descrever de outro jeito ou explore as categorias abaixo.</p>
+              <p className="muted">{t("none")}</p>
             ) : (
               <div className="g3 gn" style={{ "--n": res.agents.length } as CSSProperties}>
                 {res.agents.map((a) => (
@@ -152,7 +158,7 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                       <Tile category={a.category} />
                       <div className="grow" style={{ minWidth: 0 }}>
                         <h3 className="h4 clamp2">{a.name}</h3>
-                        {creators[a.creatorId] ? <div className="small muted trunc">por {creators[a.creatorId]?.name}</div> : null}
+                        {creators[a.creatorId] ? <div className="small muted trunc">{tc("by", { name: creators[a.creatorId]?.name ?? "" })}</div> : null}
                       </div>
                     </div>
                     <p className="small muted clamp3">{a.tagline}</p>
@@ -163,8 +169,8 @@ export function SearchHero({ creators, rate, aside }: { creators: CreatorMap; ra
                       </div>
                     ) : null}
                     <div className="row between wrapx" style={{ marginTop: "auto" }}>
-                      {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue /> : <span className="tiny faint">Ainda sem avaliações</span>}
-                      {a.platform ? <FreeInline /> : <b className="num">{brl0(a.priceUsdc, rate)}</b>}
+                      {a.reviewsCount > 0 ? <Stars rating={a.userRating} showValue /> : <span className="tiny faint">{tc("noReviews")}</span>}
+                      {a.platform ? <FreeInline /> : <b className="num">{f.brl0(a.priceUsdc, rate)}</b>}
                     </div>
                   </Link>
                 ))}

@@ -2,6 +2,7 @@
 // /perfil (perfil-e-reputacao.html, aba do usuário): nome editável, reputação, limite de garantia,
 // histórico real (com link do explorer) e detalhes técnicos.
 import type { GuaranteeStatus, Profile as ProfileData } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip, RepBadge } from "@/components/ui/Chip";
@@ -10,9 +11,10 @@ import { Loading } from "@/components/ui/Spinner";
 import { TechCard } from "@/components/ui/TechCard";
 import { useToast } from "@/components/ui/Toast";
 import { clusterName, explorerTx, explorerWallet } from "@/lib/explorer";
-import { ago, date, GUARANTEE_LEVEL_LABEL, initials, REP_LEVELS, repLevel, short, usdc } from "@/lib/format";
+import { initials, short, useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import { txErrorMessage } from "@/lib/tx";
+import { useTxErrorMessage } from "@/lib/tx";
+import type { Locale } from "@/i18n/routing";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { LoadError } from "./shared";
 
@@ -26,6 +28,8 @@ const HISTORY_MARK: Record<string, { dot: string; mark: string }> = {
 
 function NameEditor({ current, onSaved }: { current: string | null; onSaved: (name: string) => void }) {
   const { api, refresh } = useSession();
+  const t = useTranslations("account.profile");
+  const errorInfo = useTxErrorMessage();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(current ?? "");
   const [busy, setBusy] = useState(false);
@@ -34,7 +38,7 @@ function NameEditor({ current, onSaved }: { current: string | null; onSaved: (na
   const save = async (e: FormEvent) => {
     e.preventDefault();
     const name = value.trim();
-    if (!name) return setErr("Escreva um nome.");
+    if (!name) return setErr(t("nameRequired"));
     setBusy(true);
     setErr(null);
     try {
@@ -43,7 +47,7 @@ function NameEditor({ current, onSaved }: { current: string | null; onSaved: (na
       setEditing(false);
       void refresh(); // atualiza o nome no cabeçalho
     } catch (e2) {
-      setErr(txErrorMessage(e2).text);
+      setErr(errorInfo(e2).text);
     } finally {
       setBusy(false);
     }
@@ -61,13 +65,13 @@ function NameEditor({ current, onSaved }: { current: string | null; onSaved: (na
         }}
       >
         <Icon name="pen" size="s" />
-        {current ? "Editar nome" : "Adicionar seu nome"}
+        {current ? t("editName") : t("addName")}
       </button>
     );
   return (
     <form className="col" style={{ "--gap": "8px", width: "100%", maxWidth: 420 } as React.CSSProperties} onSubmit={save}>
       <label className="label" htmlFor="nome">
-        Como quer ser chamado?
+        {t("nameLabel")}
       </label>
       <div className="row wrapx" style={{ "--gap": "8px" } as React.CSSProperties}>
         <input
@@ -82,10 +86,10 @@ function NameEditor({ current, onSaved }: { current: string | null; onSaved: (na
           onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
         />
         <Button type="submit" loading={busy}>
-          Salvar
+          {t("save")}
         </Button>
         <Button variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
-          Cancelar
+          {t("cancel")}
         </Button>
       </div>
       {err ? (
@@ -99,6 +103,9 @@ function NameEditor({ current, onSaved }: { current: string | null; onSaved: (na
 
 function Inner() {
   const { api, config } = useSession();
+  const t = useTranslations("account.profile");
+  const f = useFormat();
+  const locale = useLocale() as Locale;
   const [p, setP] = useState<ProfileData | null | "error">(null);
   const [g, setG] = useState<GuaranteeStatus | null>(null);
   const [allHistory, setAllHistory] = useState(false);
@@ -106,20 +113,20 @@ function Inner() {
 
   const load = useCallback(() => {
     setP(null);
-    api.getProfile().then(setP, () => setP("error"));
+    api.getProfile(locale).then(setP, () => setP("error"));
     api.getMyGuarantee().then(setG, () => setG(null));
-  }, [api]);
+  }, [api, locale]);
   useEffect(load, [load]);
 
-  if (p === "error") return <LoadError onRetry={load} text="Não conseguimos carregar seu perfil agora." />;
-  if (!p) return <Loading text="Carregando seu perfil…" />;
+  if (p === "error") return <LoadError onRetry={load} text={t("loadError")} />;
+  if (!p) return <Loading text={t("loading")} />;
 
   const rep = p.reputation;
   const score = Math.round(rep.score);
-  const lv = repLevel(rep.score);
+  const lv = f.repLevel(rep.score);
   const name = p.displayName ?? short(p.wallet);
   const level = g?.level ?? rep.guaranteeLevel;
-  const levelText = GUARANTEE_LEVEL_LABEL[level].toLowerCase();
+  const levelText = f.guaranteeLevel(level).toLowerCase();
   // Progresso até o nível completo: compras feitas / compras necessárias (a API diz quantas faltam).
   const toFull = g?.purchasesToFull ?? 0;
   const needed = rep.purchases + toFull;
@@ -127,12 +134,12 @@ function Inner() {
   const tooManyDisputes = !!g && g.disputesLost > g.maxDisputesLost;
   const next =
     level === "full"
-      ? "Você já tem o nível de garantia completo."
+      ? t("nextFull")
       : tooManyDisputes
-        ? "Contestações perdidas demais para o nível completo."
+        ? t("nextTooMany")
         : toFull > 0
-          ? `${toFull === 1 ? "Falta 1 compra" : `Faltam ${toFull} compras`} para o nível de garantia completo.`
-          : "Continue comprando sem perder contestações para chegar ao nível completo.";
+          ? t("nextToFull", { n: toFull })
+          : t("nextKeep");
 
   return (
     <>
@@ -146,31 +153,31 @@ function Inner() {
               {name}
             </h1>
             <span className="small muted">
-              Membro desde {date(p.memberSince)}
+              {t("memberSince", { date: f.date(p.memberSince) })}
               {p.email ? ` · ${p.email}` : ""}
             </span>
             <NameEditor
               current={p.displayName}
               onSaved={(n) => {
                 setP({ ...p, displayName: n });
-                toast({ tone: "ok", title: "Nome atualizado" });
+                toast({ tone: "ok", title: t("nameUpdated") });
               }}
             />
             <div className="row wrapx" style={{ "--gap": "8px", marginTop: 2 } as React.CSSProperties}>
               <RepBadge score={rep.score}>
-                <span>Comprador {lv.label.toLowerCase()}</span>
+                <span>{t("buyerBadge", { level: lv.label.toLowerCase() })}</span>
               </RepBadge>
-              <Chip>Garantia {levelText}</Chip>
+              <Chip>{t("guaranteeChip", { level: levelText })}</Chip>
               {p.creator ? (
                 <Button variant="secondary" size="sm" icon="pen" href="/creator">
-                  Painel do criador
+                  {t("creatorPanel")}
                 </Button>
               ) : null}
             </div>
           </div>
         </div>
         <div className="score-card score-verified row" style={{ "--gap": "22px" } as React.CSSProperties}>
-          <div className="ring" style={{ "--p": score } as React.CSSProperties} role="img" aria-label={`Reputação ${score} de 100`}>
+          <div className="ring" style={{ "--p": score } as React.CSSProperties} role="img" aria-label={t("ringLabel", { score })}>
             <div>
               <span className="display num" style={{ fontSize: 38 }}>
                 {score}
@@ -178,9 +185,9 @@ function Inner() {
             </div>
           </div>
           <div className="col" style={{ "--gap": "6px" } as React.CSSProperties}>
-            <b style={{ fontSize: 17 }}>Selo de confiança</b>
+            <b style={{ fontSize: 17 }}>{t("trustSeal")}</b>
             <span className="small muted">{next}</span>
-            <div className="bar mint" style={{ width: 180, maxWidth: "100%" }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Progresso até o nível completo">
+            <div className="bar mint" style={{ width: 180, maxWidth: "100%" }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("progressLabel")}>
               <i style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -189,25 +196,25 @@ function Inner() {
 
       <div className="g3 m1" style={{ "--gap": "16px", marginBottom: 24 } as React.CSSProperties}>
         <div className="card pad-s col" style={{ "--gap": "4px" } as React.CSSProperties}>
-          <span className="small muted">Compras</span>
+          <span className="small muted">{t("purchases")}</span>
           <span className="display num" style={{ fontSize: 48, lineHeight: 1 }}>
             {rep.purchases}
           </span>
         </div>
         <div className="card pad-s col" style={{ "--gap": "4px" } as React.CSSProperties}>
-          <span className="small muted">Contestações perdidas</span>
+          <span className="small muted">{t("disputesLost")}</span>
           <span className="display num" style={{ fontSize: 48, lineHeight: 1 }}>
             {rep.disputesLost}
           </span>
         </div>
         <div className="card pad-s col" style={{ "--gap": "4px" } as React.CSSProperties}>
-          <span className="small muted">Nível de garantia</span>
+          <span className="small muted">{t("guaranteeLevel")}</span>
           <span className="display" style={{ fontSize: 48, lineHeight: 1 }}>
             {levelText}
           </span>
           {g ? (
             <span className="tiny faint">
-              Até {usdc(g.limitUsdc)} em garantias abertas · disponível {usdc(g.availableUsdc)}
+              {t("levelLimit", { limit: f.usdc(g.limitUsdc), available: f.usdc(g.availableUsdc) })}
             </span>
           ) : null}
         </div>
@@ -216,7 +223,7 @@ function Inner() {
       <div className="g2 gs2" style={{ "--gap": "24px", marginBottom: 24, alignItems: "start" } as React.CSSProperties}>
         <div className="card pad-s" style={{ padding: "8px 24px" }}>
           <h2 className="h3" style={{ padding: "16px 0 4px" }}>
-            Histórico resumido
+            {t("historyTitle")}
           </h2>
           {p.history.length ? (
             (allHistory ? p.history : p.history.slice(0, 6)).map((h, i) => {
@@ -231,13 +238,13 @@ function Inner() {
                     {h.signature ? (
                       <div className="small">
                         <a className="muted row" style={{ "--gap": "4px", display: "inline-flex" } as React.CSSProperties} href={explorerTx(p.explorerUrl, h.signature)} target="_blank" rel="noopener noreferrer">
-                          Ver na rede <Icon name="external" size="s" />
+                          {t("viewOnNetwork")} <Icon name="external" size="s" />
                         </a>
                       </div>
                     ) : null}
                   </div>
-                  <span className="tiny faint" title={new Date(h.at).toLocaleString("pt-BR")}>
-                    {ago(h.at)}
+                  <span className="tiny faint" title={f.dateTime(h.at)}>
+                    {f.ago(h.at)}
                   </span>
                 </div>
               );
@@ -246,43 +253,43 @@ function Inner() {
           {p.history.length > 6 ? (
             <div className="rowline">
               <button type="button" className="link-btn small" aria-expanded={allHistory} onClick={() => setAllHistory(!allHistory)}>
-                {allHistory ? "Mostrar menos" : `Ver histórico completo (${p.history.length})`}
+                {allHistory ? t("showLess") : t("showAll", { n: p.history.length })}
               </button>
             </div>
           ) : null}
           {!p.history.length ? (
             <p className="muted small" style={{ padding: "12px 0 20px" }}>
-              Suas compras, avaliações e garantias aparecem aqui, com o registro na rede Solana.
+              {t("historyEmpty")}
             </p>
           ) : null}
         </div>
         <div className="card pad col" style={{ "--gap": "14px" } as React.CSSProperties}>
-          <h2 className="h3">Como sua reputação sobe</h2>
+          <h2 className="h3">{t("howTitle")}</h2>
           <div className="row start" style={{ "--gap": "12px" } as React.CSSProperties}>
             <span className="ok">
               <Icon name="check-circle" size="s" />
             </span>
-            <span className="small">Concluir tarefas com garantia sem disputas.</span>
+            <span className="small">{t("how1")}</span>
           </div>
           <div className="row start" style={{ "--gap": "12px" } as React.CSSProperties}>
             <span className="ok">
               <Icon name="check-circle" size="s" />
             </span>
-            <span className="small">Avaliar as compras com honestidade.</span>
+            <span className="small">{t("how2")}</span>
           </div>
           <div className="divider" />
-          <span className="small muted">Contestações perdidas descontam pontos. Contestar com critério claro e de boa fé não prejudica você.</span>
+          <span className="small muted">{t("howNote")}</span>
         </div>
       </div>
 
       <div className="card-flat" style={{ padding: "26px 28px", marginBottom: 24 }}>
         <div className="row between wrapx" style={{ "--gap": "16px" } as React.CSSProperties}>
           <div className="col" style={{ "--gap": "4px" } as React.CSSProperties}>
-            <h2 className="h3">Níveis de reputação</h2>
-            <span className="small muted">O selo aparece no perfil e nas garantias.</span>
+            <h2 className="h3">{t("levelsTitle")}</h2>
+            <span className="small muted">{t("levelsNote")}</span>
           </div>
           <div className="row wrapx" style={{ "--gap": "8px" } as React.CSSProperties}>
-            {REP_LEVELS.map((l) => {
+            {f.repLevels().map((l) => {
               const cur = l.key === lv.key;
               return (
                 <span
@@ -302,10 +309,10 @@ function Inner() {
       </div>
 
       <TechCard
-        text="Tudo o que aparece aqui também fica registrado na rede Solana, e qualquer pessoa pode verificar."
+        text={t("techText")}
         rows={[
-          { label: "Carteira", value: p.wallet, mono: true },
-          { label: "Rede", value: config ? clusterName(config.cluster) : "Solana" },
+          { label: t("techWallet"), value: p.wallet, mono: true },
+          { label: t("techNetwork"), value: config ? clusterName(config.cluster, locale) : "Solana" },
         ]}
         explorer={config ? explorerWallet(config, p.wallet) : p.explorerUrl}
       />
@@ -314,9 +321,10 @@ function Inner() {
 }
 
 export function ProfileScreen() {
+  const t = useTranslations("account.profile");
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
-      <AuthGate icon="user" title="Entre para ver seu perfil" text="Sua reputação, o limite de garantia e o histórico das suas compras ficam aqui.">
+      <AuthGate icon="user" title={t("gateTitle")} text={t("gateText")}>
         <Inner />
       </AuthGate>
     </section>

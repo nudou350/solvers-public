@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { PublishFlow } from "@/components/creator/PublishFlow";
 
-export const metadata: Metadata = { title: "Publicar especialista" };
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "creator.meta" });
+  return { title: t("publish") };
+}
 
 export default function PublishPage() {
   return <PublishFlow />;

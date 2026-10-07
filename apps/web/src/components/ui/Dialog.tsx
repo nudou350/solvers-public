@@ -1,6 +1,7 @@
 "use client";
 // Janela modal sobre o <dialog> nativo: showModal() cuida do foco preso, do Esc e de deixar a página inerte.
 // Montar o componente abre a janela; `onClose` pede para quem montou desmontá-la (Esc, clique fora, botão X).
+import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Icon } from "./Icon";
 
@@ -26,6 +27,7 @@ export function Dialog({ title, onClose, children, locked = false, width }: Dial
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
   const titleId = useId();
+  const t = useTranslations("common.ui");
 
   useEffect(() => {
     const dlg = ref.current;
@@ -79,7 +81,7 @@ export function Dialog({ title, onClose, children, locked = false, width }: Dial
           <h2 id={titleId} className="h3" style={{ margin: 0 }}>
             {title}
           </h2>
-          <button type="button" className="dlg-x" onClick={requestClose} aria-label="Fechar" disabled={locked}>
+          <button type="button" className="dlg-x" onClick={requestClose} aria-label={t("close")} disabled={locked}>
             <Icon name="x" />
           </button>
         </div>

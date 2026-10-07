@@ -2,10 +2,12 @@
 // Pedido de ajuda ao criador. A mensagem vai pelo servidor (o criador é avisado e recebe um protocolo);
 // o contato do criador nunca aparece aqui. O contato do cliente é opcional, para a resposta chegar.
 import { ApiError } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Notice } from "@/components/ui/Toast";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import s from "./checkout.module.css";
 
@@ -15,6 +17,8 @@ const CONTACT_MAX = 200;
 
 export function HelpDialog({ slug, creatorName, onClose }: { slug: string; creatorName: string; onClose: () => void }) {
   const { api } = useSession();
+  const t = useTranslations("install");
+  const errorText = useErrorText();
   const [message, setMessage] = useState("");
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,22 +38,22 @@ export function HelpDialog({ slug, creatorName, onClose }: { slug: string; creat
       const r = await api.requestHelp(slug, trimmed, contact.trim() || undefined);
       setProtocol(r.protocol);
     } catch (e) {
-      // Erros da API vêm em português (limite, validação); o resto (rede, proxy) ganha um texto nosso.
-      setError(e instanceof ApiError && e.code !== "error" && e.code !== "internal" ? e.message : "Não deu para enviar agora. Tente de novo em instantes.");
+      // Erros da API (limite, validação) são traduzidos por code; o resto (rede, proxy) ganha um texto nosso.
+      setError(e instanceof ApiError && e.code !== "error" && e.code !== "internal" ? errorText(e) : t("help.sendFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Dialog title={protocol ? "Pedido enviado" : `Pedir ajuda a ${creatorName}`} onClose={onClose}>
+    <Dialog title={protocol ? t("help.titleSent") : t("help.title", { name: creatorName })} onClose={onClose}>
       {protocol ? (
         <>
-          <Notice tone="ok" title={`Protocolo ${protocol}`}>
-            {creatorName} foi avisado.{" "}
-            {contact.trim() ? "A resposta vai para o contato que você informou." : "Você não informou um contato, então a resposta pode demorar a chegar até você."}
+          <Notice tone="ok" title={t("help.protocol", { protocol })}>
+            {t("help.notified", { name: creatorName })}{" "}
+            {contact.trim() ? t("help.withContact") : t("help.withoutContact")}
           </Notice>
-          <Button onClick={() => onClose()}>Fechar</Button>
+          <Button onClick={() => onClose()}>{t("help.close")}</Button>
         </>
       ) : (
         <form
@@ -61,14 +65,14 @@ export function HelpDialog({ slug, creatorName, onClose }: { slug: string; creat
         >
           <div className="field">
             <label className="label" htmlFor={messageId}>
-              O que aconteceu?
+              {t("help.label")}
             </label>
             <textarea
               id={messageId}
               className="textarea"
               value={message}
               maxLength={MESSAGE_MAX}
-              placeholder="Em que passo você parou e o que apareceu na tela."
+              placeholder={t("help.placeholder")}
               disabled={busy}
               data-autofocus
               onChange={(e) => setMessage(e.target.value)}
@@ -79,14 +83,14 @@ export function HelpDialog({ slug, creatorName, onClose }: { slug: string; creat
           </div>
           <div className="field">
             <label className="label" htmlFor={contactId}>
-              Como {creatorName} pode te responder? (opcional)
+              {t("help.contactLabel", { name: creatorName })}
             </label>
             <input
               id={contactId}
               className="input"
               value={contact}
               maxLength={CONTACT_MAX}
-              placeholder="E-mail ou @ do Telegram"
+              placeholder={t("help.contactPlaceholder")}
               disabled={busy}
               autoComplete="email"
               onChange={(e) => setContact(e.target.value)}
@@ -99,10 +103,10 @@ export function HelpDialog({ slug, creatorName, onClose }: { slug: string; creat
           ) : null}
           <div className="row end" style={{ gap: 8 }}>
             <Button type="button" variant="ghost" onClick={() => onClose()} disabled={busy}>
-              Cancelar
+              {t("help.cancel")}
             </Button>
             <Button type="submit" loading={busy} disabled={tooShort} icon="message">
-              Enviar pedido
+              {t("help.send")}
             </Button>
           </div>
         </form>

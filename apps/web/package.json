@@ -7,7 +7,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "node start.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node scripts/check-messages.mjs"
   },
   "dependencies": {
     "@cloak.dev/sdk": "^0.2.5",

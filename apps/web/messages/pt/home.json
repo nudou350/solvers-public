@@ -1,1 +1,53 @@
-{}
+{
+  "loadFailed": {
+    "title": "Não deu para carregar a vitrine",
+    "body": "O servidor não respondeu agora. Tente de novo em instantes.",
+    "retry": "Tentar de novo"
+  },
+  "trending": {
+    "title": "Tendência da semana",
+    "body": "Especialistas cuja procura mais subiu nos últimos 7 dias.",
+    "empty": "Ainda não há movimento suficiente para montar a tendência.",
+    "meta": "{category} · {n, plural, =0 {# usos verificados} one {# uso verificado} other {# usos verificados}}"
+  },
+  "fresh": {
+    "title": "Novos por aqui",
+    "body": "Publicados nas últimas semanas, já passados pela revisão da equipe.",
+    "published": "publicado {ago}",
+    "badge": "Novo"
+  },
+  "eval": {
+    "internal": "{score}% nos testes internos",
+    "none": "Sem avaliações ainda"
+  },
+  "freeTrial": "teste grátis",
+  "how": {
+    "eyebrow": "Como funciona",
+    "title": "Escolha, pague, use na sua IA",
+    "step1Title": "Escolha um especialista",
+    "step1Body": "Compare notas de usuários, os testes da equipe e o antes e depois. Muitos têm teste grátis para você experimentar antes de decidir.",
+    "step2Title": "Pague uma vez",
+    "step2Body": "Você recebe uma licença só sua. Se a tarefa tiver garantia, o pagamento fica guardado e só é liberado quando o resultado passa nos critérios.",
+    "step3Title": "Use na sua IA",
+    "step3Body": "Copie um endereço, cole no Claude ou no ChatGPT e pronto. Um passo a passo com ilustrações leva menos de cinco minutos.",
+    "guide": "Ver o passo a passo",
+    "security": "Como a segurança funciona"
+  },
+  "cta": {
+    "title": "Sabe fazer algo muito bem? Publique o seu especialista.",
+    "body": "Defina o preço e ganhe em cada venda. Publicar é grátis: o filtro é a bateria de testes.",
+    "button": "Publicar especialista"
+  },
+  "ticket": {
+    "view": "Ver {name}",
+    "yourLicense": "Sua licença",
+    "active": "Ativa",
+    "permanent": "Licença permanente",
+    "onSolana": "Registrada na rede Solana",
+    "updates": "Atualizações incluídas",
+    "paymentConfirmed": "Pagamento confirmado",
+    "tested": "Testado pela equipe",
+    "casesSolved": "{score}% dos casos de teste internos resolvidos",
+    "noReviews": "Sem avaliações ainda"
+  }
+}

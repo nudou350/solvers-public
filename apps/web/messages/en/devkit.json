@@ -1,1 +1,136 @@
-{}
+{
+  "meta": { "title": "Component kit" },
+  "eyebrow": "Development",
+  "title": "Component kit",
+  "intro": "Visual base (sv.css), components from src/components/ui and wallet sign-in.",
+  "themeLight": "Light theme",
+  "themeDark": "Dark theme",
+  "sections": {
+    "session": "Session and purchase",
+    "typography": "Typography",
+    "buttons": "Buttons",
+    "chips": "Chips, badges and reputation",
+    "cards": "Cards, stars and price",
+    "tabs": "Tabs",
+    "form": "Form",
+    "notices": "Notices, empty state and loading",
+    "dialog": "Dialog",
+    "format": "Formatting (lib/format)",
+    "icons": "Icons ({n})"
+  },
+  "session": {
+    "title": "Session ({kind})",
+    "kindPrivy": "Privy",
+    "kindDev": "development wallet",
+    "loading": "Loading…",
+    "loggedIn": "Signed in: {wallet}",
+    "loggedOut": "Not signed in",
+    "walletMissing": "This session's wallet isn't in this browser. Sign in again to sign transactions.",
+    "signOut": "Sign out",
+    "signInWallet": "Sign in with wallet",
+    "signInFailed": "Couldn't sign in",
+    "network": "Network {cluster} · R$ {rate} per dollar · faucet {faucet}",
+    "faucetOff": "off",
+    "faucetAmount": "{amount} USDC",
+    "balance": "Balance:",
+    "getTestUsdc": "Get test USDC",
+    "gotTestUsdc": "You received {amount} in test funds",
+    "pickSolver": "Solver (test purchase)",
+    "alreadyOwned": "(already owned)",
+    "buy": "Buy license",
+    "purchaseDone": "Purchase complete",
+    "purchaseDoneText": "{name}: license recorded.",
+    "txConfirmed": "Transaction confirmed",
+    "myLicenses": "My licenses",
+    "noLicenses": "None yet."
+  },
+  "typography": {
+    "display": "Display serif",
+    "h3": "Heading h3",
+    "h4": "Heading h4",
+    "lead": "Lead text.",
+    "normal": "Normal text with <link>a link</link>.",
+    "small": "Small and soft.",
+    "ok": "ok",
+    "warn": "warning",
+    "bad": "error"
+  },
+  "buttons": {
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "ghost": "Ghost",
+    "ok": "Ok",
+    "delete": "Delete",
+    "loading": "Loading",
+    "disabled": "Disabled",
+    "large": "Large",
+    "small": "Small"
+  },
+  "chips": {
+    "default": "Default",
+    "guarantee": "Guarantee",
+    "new": "New",
+    "review": "Under review",
+    "disputed": "Disputed",
+    "plain": "Plain"
+  },
+  "cards": {
+    "solverName": "React front-end",
+    "flat": "Flat card",
+    "perTask": "per task",
+    "link": "Link card",
+    "hover": "Hover over it.",
+    "newCategory": "New category"
+  },
+  "tabs": {
+    "example": "Example",
+    "solvers": "Solvers",
+    "memories": "Memories",
+    "history": "History",
+    "active": "Active tab: {tab}"
+  },
+  "form": {
+    "taskTitle": "Task title",
+    "taskPlaceholder": "E.g. landing page for my shop",
+    "hint": "Up to 80 characters.",
+    "description": "Description",
+    "descriptionPlaceholder": "Tell us what you need"
+  },
+  "notices": {
+    "infoTitle": "Information",
+    "infoText": "Pix shows as “coming soon” until phase B.",
+    "okTitle": "All good",
+    "okText": "The license is already in your library.",
+    "warnTitle": "Heads up",
+    "warnText": "Your balance doesn't cover this purchase.",
+    "badTitle": "Error",
+    "networkFailure": "Network failure",
+    "toastOk": "Toast ok",
+    "toastOkTitle": "Purchase complete",
+    "toastOkText": "The license was recorded on the network.",
+    "toastError": "Toast error",
+    "toastErrorTitle": "Couldn't finish",
+    "toastErrorText": "Please try again.",
+    "toastRetry": "Try again",
+    "emptyTitle": "Your library is empty",
+    "emptyAction": "Explore solvers",
+    "emptyText": "The solvers you buy show up here, ready to use in Claude or ChatGPT."
+  },
+  "dialog": {
+    "open": "Open dialog",
+    "title": "Dialog title",
+    "body": "Esc, the X and a click outside close it. Focus stays trapped in the dialog and returns to the button on close. Mark a field with data-autofocus so focus starts there.",
+    "field": "Field with initial focus",
+    "placeholder": "Type here",
+    "unlock": "Unlock",
+    "lock": "Lock (as when signing)",
+    "close": "Close"
+  },
+  "format": {
+    "ago": "ago(3 days ago) = {value}",
+    "date": "date(today) = {value}",
+    "countdown": "countdown(+5h12) = {text} · urgent: {urgent}",
+    "repLevel": "repLevel(91) = {label}",
+    "short": "short(wallet) = {value}"
+  }
+}

@@ -1,8 +1,10 @@
 "use client";
 // Parágrafo longo recolhido em poucas linhas, com "Ver mais" só quando o texto realmente passa do limite.
+import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 
 export function ClampedText({ text, style }: { text: string; style?: React.CSSProperties }) {
+  const t = useTranslations("common.ui");
   const ref = useRef<HTMLParagraphElement>(null);
   const id = useId();
   const [expanded, setExpanded] = useState(false);
@@ -28,7 +30,7 @@ export function ClampedText({ text, style }: { text: string; style?: React.CSSPr
       </p>
       {overflows || expanded ? (
         <button type="button" className="clamp-btn" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded((v) => !v)}>
-          {expanded ? "Ver menos" : "Ver mais"}
+          {expanded ? t("seeLess") : t("seeMore")}
         </button>
       ) : null}
     </div>

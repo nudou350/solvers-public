@@ -1,20 +1,45 @@
 import type { IconName } from "@/components/ui/Icon";
+import type { Locale } from "@/i18n/routing";
+import { localText } from "./local-text";
 
 // Diferenciais comprovados de um especialista (PACKAGE_SPEC.md 4.2 e 20), em linguagem simples.
 // Valores desconhecidos (um diferencial novo no servidor) são ignorados em vez de aparecer cru.
-export const DIFFERENTIATORS: Record<string, { label: string; text: string; icon: IconName }> = {
-  memory: { label: "Memória", text: "Aprende as suas preferências e lembra de você na próxima conversa.", icon: "history" },
-  escalation: { label: "Atendimento do criador", text: "Se travar, você pode pedir ajuda ao próprio criador.", icon: "message" },
-  liveData: { label: "Dado vivo", text: "Conhecimento datado e mantido em dia, com fonte e data.", icon: "refresh" },
-  tool: { label: "Ferramenta própria", text: "Executa uma ferramenta no servidor, além de conversar.", icon: "wrench" },
-  verifier: { label: "Resultado verificado", text: "A entrega é conferida automaticamente por testes.", icon: "shield-check" },
+// Textos em messages/<locale>/errors.json (differentiators.<chave>.label|text); aqui ficam só os ícones.
+// `label` e `text` do mapa seguem o idioma da página no navegador; em componente de servidor use as funções
+// com `locale`.
+const ICONS: Record<string, IconName> = {
+  memory: "history",
+  escalation: "message",
+  liveData: "refresh",
+  tool: "wrench",
+  verifier: "shield-check",
 };
 
-export function differentiatorLabel(key: string): string {
-  return DIFFERENTIATORS[key]?.label ?? key;
+export const DIFFERENTIATORS: Record<string, { readonly label: string; readonly text: string; icon: IconName }> = Object.fromEntries(
+  Object.entries(ICONS).map(([k, icon]) => [
+    k,
+    {
+      icon,
+      get label() {
+        return localText(`differentiators.${k}.label`);
+      },
+      get text() {
+        return localText(`differentiators.${k}.text`);
+      },
+    },
+  ]),
+);
+
+export function differentiatorLabel(key: string, locale?: Locale): string {
+  return key in ICONS ? localText(`differentiators.${key}.label`, undefined, locale) : key;
+}
+
+/** Frase curta do diferencial no idioma pedido (vazio se a vitrine não conhece a chave). */
+export function differentiatorText(key: string, locale?: Locale): string {
+  return key in ICONS ? localText(`differentiators.${key}.text`, undefined, locale) : "";
 }
 
 /** Só os diferenciais que a vitrine sabe nomear, na ordem em que vieram. */
 export function knownDifferentiators(keys: readonly string[]): string[] {
-  return keys.filter((k) => k in DIFFERENTIATORS);
+  return keys.filter((k) => k in ICONS);
 }

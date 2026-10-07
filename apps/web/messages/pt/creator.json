@@ -1,1 +1,476 @@
-{}
+{
+  "meta": {
+    "dashboard": "Painel do criador",
+    "publish": "Publicar especialista",
+    "privateWithdraw": "Saque privado"
+  },
+  "head": {
+    "eyebrow": "Painel do criador",
+    "hello": "Olá, {name}",
+    "forCreators": "Para criadores",
+    "tabsLabel": "Seções do painel do criador",
+    "repBadge": "{label} · {score}/100",
+    "tabs": {
+      "overview": "Visão geral",
+      "submissions": "Meus envios",
+      "publish": "Publicar especialista",
+      "private": "Saque privado"
+    }
+  },
+  "dashboard": {
+    "sessionExpired": "Sua sessão expirou. Entre de novo.",
+    "loading": "Carregando seu painel…",
+    "loadFailTitle": "Não deu para carregar o painel",
+    "retry": "Tentar de novo",
+    "gate": {
+      "title": "Entre para ver seu painel",
+      "text": "Vendas, usos, receita e contestações dos seus especialistas ficam aqui.",
+      "howTo": "Como publicar"
+    },
+    "notCreator": {
+      "eyebrow": "Comece por aqui",
+      "title": "Você ainda não publicou especialistas",
+      "lead": "Transforme o que você sabe fazer num especialista que as pessoas usam com o Claude e o ChatGPT que já têm.",
+      "publish": "Publicar especialista",
+      "mySubmissions": "Meus envios",
+      "free": {
+        "title": "Publicar é grátis",
+        "text": "Sem depósito e sem mensalidade. Você monta o pacote com o Criador de Solvers, envia o ZIP e a equipe revisa antes de ir ao ar."
+      },
+      "share": {
+        "title": "Você recebe {pct}% de cada venda",
+        "text": "O valor cai na sua carteira a cada licença vendida. A taxa da plataforma já está descontada."
+      },
+      "quality": {
+        "title": "Qualidade pela bateria de testes",
+        "text": "Cada pacote passa por uma conferência automática e pela revisão da equipe. Quando houver nota dos testes internos da equipe, ela aparece para os compradores."
+      }
+    },
+    "kpi": {
+      "sales30": "Vendas em 30 dias",
+      "newLicenses": "licenças novas",
+      "allTime": " · {n} no total",
+      "uses": "Usos verificados",
+      "usesSub": "nos últimos 30 dias",
+      "revenue": "Receita de vendas",
+      "royalties": "Royalties de revenda",
+      "royaltiesSub": "em revendas feitas no mercado",
+      "soon": "Em breve",
+      "soonSub": "quando o mercado de revenda abrir",
+      "disputes": "Contestações",
+      "disputesOpen": "{n} em análise"
+    },
+    "reputation": {
+      "title": "Seu selo de reputação",
+      "text": "A reputação sobe com boas notas, testes aprovados e contestações resolvidas a favor do comprador. Contestações perdidas descontam pontos e reduzem a visibilidade.",
+      "profile": "Ver meu perfil público",
+      "lost": "{n, plural, =0 {Nenhuma contestação perdida} one {# contestação perdida} other {# contestações perdidas}}"
+    },
+    "agents": {
+      "title": "Seus especialistas",
+      "publishNew": "Publicar novo",
+      "emptyTitle": "Nenhum especialista ainda",
+      "emptyText": "Publique o primeiro: é grátis e sem depósito.",
+      "cols": {
+        "agent": "Especialista",
+        "sold": "Vendidas / Teto",
+        "uses": "Usos",
+        "rating": "Nota",
+        "performance": "Desempenho",
+        "revenue": "Receita"
+      },
+      "version": "v{version} · {status}",
+      "status": {
+        "active": "no ar",
+        "pending": "em revisão",
+        "suspended": "suspenso",
+        "retired": "Aposentado"
+      },
+      "hidden": "Fora da vitrine (nota baixa)",
+      "soldOut": " esgotado",
+      "unlimited": "Sem limite de licenças",
+      "noEvals": "Sem avaliações ainda"
+    },
+    "guarantee": {
+      "title": "Ganhos de tarefas com garantia",
+      "subtitle": "Já sem a taxa da plataforma, à parte das vendas",
+      "total": "Recebido no total",
+      "last30": "Últimos 30 dias",
+      "releases": "Etapas liberadas",
+      "releasesSub": "aprovadas pelo comprador, automáticas ou a seu favor",
+      "emptyTitle": "Nenhum pagamento de garantia ainda",
+      "emptyText": "Quando uma etapa de tarefa com garantia for liberada para você, ela aparece aqui.",
+      "fallbackTask": "Tarefa com garantia"
+    },
+    "disputes": {
+      "title": "Contestações recentes",
+      "emptyTitle": "Nenhuma contestação até agora",
+      "emptyText": "Quando um comprador contestar uma etapa de garantia, o critério e o motivo aparecem aqui.",
+      "milestone": "Etapa {n}: {title}",
+      "criterion": "Critério apontado: {criterion}",
+      "criterionNone": "não informado",
+      "dateNone": "Data não informada",
+      "result": {
+        "open": "Em análise",
+        "buyer": "Favorável ao comprador",
+        "creator": "Favorável ao criador"
+      }
+    }
+  },
+  "chart": {
+    "title": "Vendas e usos por dia",
+    "sales": "Vendas",
+    "uses": "Usos",
+    "label": "Vendas e usos por dia nos últimos 30 dias: {sales, plural, one {# venda} other {# vendas}} e {uses, plural, one {# uso} other {# usos}}.",
+    "tip": "{day}: {sales, plural, one {# venda} other {# vendas}}, {uses, plural, one {# uso} other {# usos}}",
+    "daysAgo": "30 dias atrás",
+    "max": "Máximo em um dia: {sales, plural, one {# venda} other {# vendas}} · {uses, plural, one {# uso} other {# usos}}",
+    "today": "Hoje"
+  },
+  "publish": {
+    "ariaSteps": "Etapas para publicar",
+    "stepDone": " (concluída)",
+    "stepOf": "Etapa {n} de {total}",
+    "back": "Voltar",
+    "steps": {
+      "signIn": {
+        "title": "Entrar",
+        "text": "Entre com o seu e-mail. A conta é a sua identidade de criador."
+      },
+      "profile": {
+        "title": "Cadastro",
+        "text": "Convite, nome, apresentação, termos e contato."
+      },
+      "build": {
+        "title": "Montar o pacote",
+        "text": "Use o Criador de Solvers para preparar o ZIP."
+      },
+      "upload": {
+        "title": "Enviar o ZIP",
+        "text": "Envie o pacote para a conferência e a revisão."
+      },
+      "track": {
+        "title": "Acompanhar",
+        "text": "Veja onde o envio está e o que falta."
+      }
+    },
+    "loginFail": "Não deu para entrar",
+    "linked": {
+      "title": "Telegram vinculado",
+      "text": "Seu contato foi confirmado."
+    },
+    "notYet": {
+      "title": "Ainda não vimos o vínculo",
+      "text": "Envie o comando ao bot e tente de novo em alguns segundos."
+    },
+    "loadingProfile": "Carregando o seu cadastro…",
+    "loadFailTitle": "Não deu para carregar o seu cadastro",
+    "retry": "Tentar de novo",
+    "saved": "Cadastro salvo",
+    "incomplete": {
+      "title": "Falta completar o cadastro",
+      "back": "Voltar ao cadastro",
+      "notInvited": "Seu convite ainda não foi confirmado.",
+      "needProfile": "Falta salvar o nome, a apresentação e aceitar os termos.",
+      "needContact": "Falta vincular o seu Telegram. É por ele que avisamos você sobre os envios.",
+      "notReady": "Seu cadastro ainda não está liberado para enviar."
+    },
+    "signIn": {
+      "alreadyIn": "Você já entrou",
+      "account": "Conta: {email}.",
+      "accountActive": "Sua conta está ativa.",
+      "noWallet": "Não precisa de carteira nem de saldo: o Solvers cuida disso.",
+      "next": "Continuar para o cadastro",
+      "p1": "Entre com o seu e-mail. Mandamos um código de acesso e criamos a sua conta na hora.",
+      "p2": "Publicar é grátis, sem depósito e sem mensalidade.",
+      "p3": "Cada versão passa pela conferência automática e pela revisão da equipe antes de ir ao ar.",
+      "login": "Entrar"
+    },
+    "build": {
+      "toolTitle": "Use o Criador de Solvers",
+      "toolSub": "Especialista gratuito, incluído na plataforma",
+      "toolText": "Ele conversa com você em sete etapas: a promessa e o público, os diferenciais, o processo, o conhecimento, as ferramentas, a primeira conversa e os casos de teste. No fim, entrega o pacote pronto e já conferido pelo mesmo validador do site.",
+      "install": "Instalar na minha IA",
+      "learn": "Conhecer o Criador de Solvers",
+      "installNote": "Instalar leva uns dois minutos e vale para o Claude e o ChatGPT. Depois é só pedir: “Use o Criador de Solvers para montar um especialista de [o seu tema]”.",
+      "zipTitle": "Como o ZIP deve ficar",
+      "zipTreeLabel": "Estrutura de pastas do pacote",
+      "zipTree": "meu-especialista.zip\n├─ manifest.json\n├─ steps/       (3 a 6 etapas, .md)\n├─ knowledge/   (conhecimento, .md)\n├─ templates/   (modelos prontos)\n└─ evals/cases/ (casos de teste, .json)",
+      "zipNote": "O manifest.json fica na raiz, não dentro de uma pasta extra. Até {size}.",
+      "noZipTitle": "Se a sua IA não gerar o ZIP",
+      "noZipText": "Algumas IAs só mostram os arquivos na conversa. Nesse caso, o Criador entrega cada arquivo em um bloco, com o passo a passo para você salvar cada um numa pasta e compactar. O site confere tudo de novo no envio.",
+      "refs": "Referências",
+      "schema": "Esquema do manifest.json (JSON)",
+      "guide": "Guia completo do formato, dentro do Criador de Solvers",
+      "haveZip": "Já tenho o ZIP, enviar",
+      "locked": "O envio abre quando o cadastro e o contato estiverem completos"
+    },
+    "track": {
+      "text": "Depois do envio, cada pacote passa por estas etapas. Você acompanha tudo em <b>Meus envios</b> e recebe aviso quando a equipe responder.",
+      "view": "Ver meus envios"
+    }
+  },
+  "profile": {
+    "errors": {
+      "sessionExpired": "Sua sessão expirou. Entre de novo e salve outra vez.",
+      "inviteRequired": "Cole o código de convite que a equipe enviou para você.",
+      "inviteUsed": "Esse convite já foi usado por outra conta. Peça outro à equipe.",
+      "inviteInvalid": "Esse código de convite não existe. Confira se copiou inteiro ou peça outro à equipe.",
+      "forbidden": "Esse código de convite não vale. Confira se copiou inteiro ou peça outro à equipe.",
+      "conflict": "Esse convite já foi usado por outra conta.",
+      "tooMany": "Muitas tentativas seguidas. Espere um minuto e tente de novo.",
+      "server": "O servidor não respondeu bem. Tente de novo em instantes.",
+      "generic": "Não deu para salvar agora."
+    },
+    "validation": {
+      "name": "Escreva o nome que vai aparecer na vitrine (pelo menos {min} letras).",
+      "bio": "Conte em poucas frases quem você é e o que sabe fazer (pelo menos {min} caracteres).",
+      "invite": "Cole o código de convite que a equipe enviou para você.",
+      "terms": "Para continuar, você precisa aceitar os termos."
+    },
+    "invite": {
+      "label": "Código de convite",
+      "hint": "Por enquanto, só criadores convidados enviam especialistas. O código vem por e-mail, da equipe do Solvers.",
+      "confirmed": "Convite confirmado"
+    },
+    "name": {
+      "label": "Nome na vitrine",
+      "hint": "O nome que os compradores veem em “por …”. Pode ser o seu ou o da sua marca."
+    },
+    "bio": {
+      "label": "Sobre você",
+      "hint": "{count}/{max} · Experiência, área e o tipo de problema que você resolve."
+    },
+    "summary": {
+      "title": "Resumo do que você aceita",
+      "b1": "Você é responsável pelo conteúdo do pacote e tem o direito de usar tudo o que está nele. Conteúdo de terceiros precisa de fonte e permissão.",
+      "b2": "A equipe revisa cada versão antes de ir ao ar e pode pedir mudanças, recusar, suspender ou retirar um especialista.",
+      "b3": "A taxa da plataforma sai de cada venda. O restante vai para a sua carteira.",
+      "b4": "O especialista não pode prometer resultado financeiro, jurídico ou médico sem ressalvas, nem agir contra o usuário ou mandar os dados dele para fora."
+    },
+    "terms": "Li o resumo e aceito os termos para criadores do Solvers.",
+    "saveFailTitle": "Não deu para salvar o cadastro",
+    "save": "Salvar cadastro",
+    "saveContinue": "Salvar e continuar",
+    "contact": {
+      "title": "Contato para avisos e pedidos de ajuda",
+      "linked": "Telegram vinculado",
+      "missing": "Falta vincular",
+      "okText": "Tudo certo: avisamos você por lá quando a equipe responder a um envio ou quando um comprador pedir ajuda.",
+      "text": "Antes de enviar um especialista, vincule o seu Telegram. É por ele que avisamos você sobre os envios e que os compradores pedem ajuda, sem ver o seu contato. Clique em <b>Vincular Telegram</b>: o site gera um código e você o envia ao bot do Solvers.",
+      "saveFirst": "Salve o cadastro primeiro (nome, apresentação e termos): o botão para vincular aparece logo depois.",
+      "later": "Você pode salvar o cadastro agora e vincular depois, mas o envio do pacote só abre com o contato vinculado."
+    }
+  },
+  "telegram": {
+    "errors": {
+      "sessionExpired": "Sua sessão expirou. Entre de novo e tente outra vez.",
+      "unavailable": "A vinculação pelo Telegram está fora do ar agora. Tente de novo em alguns minutos ou fale com a equipe.",
+      "profileRequired": "Salve o seu cadastro (nome, apresentação e termos) antes de vincular o Telegram.",
+      "tooMany": "Você gerou muitos códigos seguidos. Espere um pouco e tente de novo.",
+      "server": "O servidor não respondeu bem. Tente de novo em instantes.",
+      "generic": "Não deu para gerar o código agora."
+    },
+    "statusExpired": "O código venceu. Gere um novo para continuar.",
+    "statusCopied": "Comando copiado. Cole no chat com o bot.",
+    "statusWaiting": "Esperando você enviar o código ao bot. Vamos avisar aqui assim que chegar.",
+    "link": "Vincular Telegram",
+    "recheck": "Já vinculei, verificar",
+    "boxLabel": "Código para vincular o Telegram",
+    "step1": "Toque em <b>Abrir no Telegram</b> e depois em <b>Começar</b>. O código já vai preenchido.",
+    "step2": "Se preferir, procure <handle>@{username}</handle> no Telegram e envie:",
+    "copy": "Copiar",
+    "copyLabel": "Copiar o comando de vinculação",
+    "open": "Abrir no Telegram",
+    "validUntil": "O código vale até {time} (<tick>{clock}</tick><sr> restantes</sr>) e só funciona uma vez.",
+    "newCode": "Gerar um código novo",
+    "failTitle": "Não deu para gerar o código"
+  },
+  "zip": {
+    "notZip": "“{name}” não é um arquivo ZIP. Compacte a pasta do pacote em um .zip e escolha de novo.",
+    "empty": "Esse arquivo está vazio.",
+    "tooBig": "O arquivo tem {size} e o limite é {max}. Tire o que não faz parte do pacote e compacte de novo.",
+    "picked": "Pacote escolhido",
+    "drop": "Arraste o ZIP do pacote até aqui",
+    "pickedHint": "Confira o arquivo abaixo e envie.",
+    "hint": "Um arquivo .zip de até {max}, com o manifest.json na raiz.",
+    "inputLabel": "Escolher o arquivo ZIP do pacote",
+    "chooseOther": "Escolher outro arquivo",
+    "choose": "Escolher arquivo",
+    "badFileTitle": "Esse arquivo não serve",
+    "remove": "Remover {name}",
+    "progressLabel": "Progresso do envio",
+    "uploading": "Enviando… {pct}%",
+    "uploaded": "Enviado. Aguardando o servidor confirmar o recebimento…",
+    "send": "Enviar para revisão",
+    "cancel": "Cancelar envio",
+    "note": "O servidor confere o pacote de novo, mesmo que você já tenha validado no seu computador. Se houver erros, você vê tudo na tela de acompanhamento e nada vai para a revisão da equipe."
+  },
+  "cosign": {
+    "button": {
+      "register-agent": "Confirmar o cadastro",
+      "update-version": "Confirmar a atualização",
+      "update-pricing": "Confirmar o novo preço"
+    },
+    "toast": {
+      "title": "Confirmação registrada",
+      "text": "A equipe faz o resto. Acompanhe por aqui."
+    },
+    "planFailTitle": "Não deu para ver o que falta",
+    "retry": "Tentar de novo",
+    "checking": "Conferindo o que falta para publicar…",
+    "blockedTitle": "Este especialista está bloqueado na rede",
+    "blockedText": "Ele está suspenso ou registrado por outra conta. Fale com a equipe.",
+    "awaitTitle": "Falta a aprovação final da equipe",
+    "doneTitle": "Tudo certo na rede",
+    "awaitText": "Você já confirmou. Assim que a equipe fizer a aprovação final, o especialista entra na vitrine.",
+    "doneText": "A publicação está sendo concluída. Esta página se atualiza sozinha.",
+    "title": {
+      "register": "Confirme o cadastro do especialista",
+      "pricing": "Confirme o novo preço",
+      "version": "Confirme a nova versão"
+    },
+    "text": {
+      "register": "A equipe aprovou o pacote. Falta você confirmar com a sua conta, uma única vez, para registrar o especialista como seu.",
+      "pricing": "A versão já está na rede. Falta confirmar o preço aprovado.",
+      "version": "A equipe aprovou a nova versão. Falta você confirmar a atualização com a sua conta."
+    },
+    "li": {
+      "fee": "A taxa da rede é do Solvers.",
+      "approved": "Preço, nome e versão vêm do que a equipe aprovou ({name} v{version}, {price} USDC). Você não precisa digitar nada.",
+      "approvedShort": "Preço, nome e versão vêm do que a equipe aprovou. Você não precisa digitar nada.",
+      "stake": "O programa cobra um depósito de {stake} USDC no cadastro. Seu saldo: {balance} USDC.",
+      "afterRegister": "Depois da sua confirmação, a equipe faz a aprovação final e o especialista entra na vitrine.",
+      "afterUpdate": "Depois da sua confirmação, a nova versão entra no ar."
+    },
+    "lowTitle": "Saldo de USDC insuficiente para o depósito",
+    "lowText": "Faltam {missing} USDC para o depósito.",
+    "faucet": "Receber USDC de teste",
+    "relogin": "Entrar de novo",
+    "retryBtn": "Tentar de novo",
+    "footnote": "Uma janela do seu login pode abrir para você confirmar. A confirmação vale por poucos minutos: se demorar, é só tentar de novo."
+  },
+  "resale": {
+    "value": {
+      "own": {
+        "title": "A licença é sua.",
+        "text": "A licença permanente fica registrada na rede Solana, na sua carteira."
+      },
+      "resell": {
+        "title": "Revenda o que não usa.",
+        "text": "Terminou o projeto? Anuncie a licença e recupere parte do valor."
+      },
+      "creator": {
+        "title": "O criador ganha em cada revenda no Solvers.",
+        "text": "Uma parte de cada venda feita pelo mercado vai para quem criou o especialista."
+      }
+    },
+    "how": {
+      "list": {
+        "title": "Anuncie a licença",
+        "text": "Na sua biblioteca, escolha a licença permanente que não usa mais e defina o preço."
+      },
+      "buy": {
+        "title": "Alguém compra",
+        "text": "O comprador paga e a licença passa para a carteira dele na hora, e você deixa de ter acesso. A nota do especialista segue a mesma; avaliações pessoais continuam de quem as escreveu."
+      },
+      "paid": {
+        "title": "Todo mundo recebe",
+        "text": "Pelo mercado do Solvers, você recebe o valor da venda e o criador recebe o royalty, automaticamente."
+      }
+    },
+    "eyebrow": "Mercado de revenda",
+    "soon": "Em breve",
+    "title": "Revenda a licença que você não usa mais",
+    "lead": "A licença permanente é sua. Quando o mercado de revenda abrir, você poderá vender a de um especialista que não usa mais, e o criador ganha uma parte de cada revenda feita pelo Solvers.",
+    "howTitle": "Como vai funcionar",
+    "meanwhileTitle": "Enquanto isso",
+    "meanwhileText": "Suas licenças permanentes já ficam registradas na sua carteira. Quando a revenda abrir, a opção de anunciar aparece na sua biblioteca, ao lado de cada licença.",
+    "library": "Ver minha biblioteca"
+  },
+  "cloak": {
+    "title": "Sacar em privado",
+    "gateTitle": "Entre para sacar em privado",
+    "gateText": "Use a mesma conta do painel do criador.",
+    "steps": {
+      "keys": "Preparando as suas chaves",
+      "deposit": "Protegendo o valor (leva cerca de 1 minuto)",
+      "withdraw": "Enviando ao endereço de destino",
+      "done": "Concluído"
+    },
+    "copyFail": "Não deu para copiar. Selecione o texto e copie à mão.",
+    "liveBadge": "Rede real · dinheiro de verdade",
+    "lead": "Seus ganhos chegam à sua carteira e qualquer pessoa pode ver. Aqui você move uma parte para outro endereço <b>sem que o explorador mostre a ligação entre os dois</b>.",
+    "leadNote": "Funciona na rede real, separada da rede de teste usada no resto do Solvers. As vendas continuam públicas de propósito: é o que dá confiança aos compradores. O que fica protegido é o que você faz com o dinheiro depois.",
+    "walletTitle": "Sua carteira na rede real",
+    "refresh": "Atualizar",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "balanceFailTitle": "Não deu para ler os saldos",
+    "rpcHint": " O endereço de leitura padrão limita navegadores: configure NEXT_PUBLIC_CLOAK_RPC_URL.",
+    "solLabel": "SOL (taxas de rede)",
+    "reading": "Lendo os saldos…",
+    "emptyTitle": "Sem saldo na rede real",
+    "emptyText": "Para sacar, envie USDC e uns 0,005 SOL (para as taxas de rede) para o endereço acima, na rede real. O USDC de teste do Solvers não vale aqui.",
+    "newWithdrawal": "Novo saque",
+    "amountLabel": "Valor (USDC)",
+    "amountHint": "Mínimo de 1 USDC. Taxa do Cloak: 0,45 USDC + 0,3%.",
+    "destLabel": "Endereço de destino",
+    "destPlaceholder": "Cole o endereço que vai receber",
+    "destHint": "Use um endereço só para isso: o relatório do contador lista os saques que chegaram nele.",
+    "problems": {
+      "amount_invalid": "Digite um valor em USDC, por exemplo 2 ou 2,50.",
+      "amount_too_small": "O valor mínimo é 1 USDC.",
+      "amount_too_large": "Por segurança, o saque privado está limitado a 1.000 USDC por vez enquanto o recurso é novo.",
+      "destination_invalid": "Esse endereço de destino não parece válido.",
+      "destination_same_as_wallet": "Use um endereço diferente do da sua carteira, senão não há o que esconder.",
+      "usdc_insufficient": "Você não tem esse saldo em USDC na rede real.",
+      "sol_insufficient": "Falta um pouco de SOL (0,005) na rede real para as taxas de rede."
+    },
+    "youWithdraw": "Você retira",
+    "estFee": "Taxa estimada",
+    "destReceives": "O destino recebe",
+    "submit": "Sacar em privado",
+    "failTitle": "O saque não terminou",
+    "failNote": " Se o valor já tinha sido protegido, ele aparece abaixo para você concluir.",
+    "halfTitle": "Saque pela metade",
+    "halfLine": "{amount} para {dest}",
+    "finish": "Concluir saque",
+    "doneTitle": "Saques feitos neste navegador",
+    "deposit": "depósito",
+    "withdrawal": "saque",
+    "doneNote": "No explorador, o depósito aparece na sua carteira e o saque aparece no destino (<a>ver destino</a>), sem nada que ligue um ao outro.",
+    "hides": {
+      "title": "O que isso esconde, e o que não esconde",
+      "hidden": "<b>Escondido:</b> a ligação entre a sua carteira e o endereço de destino, e o saldo que você guarda.",
+      "from": "<b>De quem:</b> de concorrentes, clientes e qualquer pessoa olhando o explorador.",
+      "notHidden": "<b>Não escondido:</b> suas vendas e receita (são públicas de propósito), o fato de você usar o Cloak, o valor e o horário (num pool pequeno, valor e horário parecidos podem sugerir a ligação) e o que o Cloak enxerga: ele recebe a chave do contador ao registrar a carteira.",
+      "gain": "<b>Ganho:</b> você escolhe quem vê o histórico. Dê a chave ao contador e ele enxerga tudo; o público, nada.",
+      "alpha": "O Cloak é novo (alfa), o código não é aberto e a auditoria não foi publicada. Comece com valores pequenos."
+    },
+    "acct": {
+      "title": "Chave do contador",
+      "text": "É uma chave só de leitura: quem a tem enxerga o histórico dos seus saques privados, mas não consegue mexer no dinheiro. Ela é refeita a partir da sua carteira, então você não precisa guardá-la.",
+      "copyKey": "Copiar chave do contador",
+      "keyCopied": "Chave copiada",
+      "destLabel": "Destino do relatório",
+      "download": "Baixar relatório (CSV)",
+      "afterFirst": "O relatório fica disponível depois do primeiro saque.",
+      "reading": "Lendo o histórico (leva alguns minutos)…",
+      "retrying": "Faltam {missing} movimentações; lendo de novo ({attempt}/{attempts})…",
+      "partial": "Arquivo gerado, mas {missing} movimentação(ões) não apareceram (a rede recusou algumas leituras). Tente de novo em instantes.",
+      "ready": "Pronto: {count} movimentações no arquivo.",
+      "fileName": "comprovante-saques-privados.csv"
+    },
+    "errors": {
+      "rateLimited": "A rede real está ocupada (limite de requisições). Espere um minuto e tente de novo.",
+      "cancelled": "A assinatura foi cancelada.",
+      "network": "Não deu para falar com a rede real. Confira a conexão e o RPC configurado.",
+      "rpcNotMainnet": "O RPC configurado não é o da rede real (mainnet). O saque privado só funciona nela.",
+      "badSignature": "A carteira devolveu uma assinatura inesperada. Entre de novo e tente outra vez.",
+      "noNote": "Esse saque não tem o valor depositado no pool para retomar.",
+      "noNoteReturned": "O depósito não devolveu a nota. Não repita: veja o histórico.",
+      "nothingPending": "Não há saque pendente para retomar."
+    }
+  }
+}

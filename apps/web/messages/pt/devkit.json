@@ -1,1 +1,136 @@
-{}
+{
+  "meta": { "title": "Kit de componentes" },
+  "eyebrow": "Desenvolvimento",
+  "title": "Kit de componentes",
+  "intro": "Base visual (sv.css), componentes de src/components/ui e o login com a carteira.",
+  "themeLight": "Tema claro",
+  "themeDark": "Tema escuro",
+  "sections": {
+    "session": "Sessão e compra",
+    "typography": "Tipografia",
+    "buttons": "Botões",
+    "chips": "Chips, selos e reputação",
+    "cards": "Cartões, estrelas e preço",
+    "tabs": "Abas",
+    "form": "Formulário",
+    "notices": "Avisos, vazio e carregamento",
+    "dialog": "Janela (Dialog)",
+    "format": "Formatação (lib/format)",
+    "icons": "Ícones ({n})"
+  },
+  "session": {
+    "title": "Sessão ({kind})",
+    "kindPrivy": "Privy",
+    "kindDev": "carteira de desenvolvimento",
+    "loading": "Carregando…",
+    "loggedIn": "Logado: {wallet}",
+    "loggedOut": "Não logado",
+    "walletMissing": "A carteira desta sessão não está neste navegador. Entre de novo para assinar.",
+    "signOut": "Sair",
+    "signInWallet": "Entrar com a carteira",
+    "signInFailed": "Não deu para entrar",
+    "network": "Rede {cluster} · R$ {rate} por dólar · faucet {faucet}",
+    "faucetOff": "desligado",
+    "faucetAmount": "{amount} USDC",
+    "balance": "Saldo:",
+    "getTestUsdc": "Receber USDC de teste",
+    "gotTestUsdc": "Você recebeu {amount} de teste",
+    "pickSolver": "Especialista (compra de teste)",
+    "alreadyOwned": "(já tem)",
+    "buy": "Comprar licença",
+    "purchaseDone": "Compra concluída",
+    "purchaseDoneText": "{name}: licença registrada.",
+    "txConfirmed": "Transação confirmada",
+    "myLicenses": "Minhas licenças",
+    "noLicenses": "Nenhuma ainda."
+  },
+  "typography": {
+    "display": "Display serif",
+    "h3": "Título h3",
+    "h4": "Título h4",
+    "lead": "Texto de abertura (lead).",
+    "normal": "Texto normal com <link>um link</link>.",
+    "small": "Pequeno e suave.",
+    "ok": "ok",
+    "warn": "atenção",
+    "bad": "erro"
+  },
+  "buttons": {
+    "primary": "Primário",
+    "secondary": "Secundário",
+    "ghost": "Fantasma",
+    "ok": "Ok",
+    "delete": "Apagar",
+    "loading": "Carregando",
+    "disabled": "Desabilitado",
+    "large": "Grande",
+    "small": "Pequeno"
+  },
+  "chips": {
+    "default": "Padrão",
+    "guarantee": "Garantia",
+    "new": "Novo",
+    "review": "Em análise",
+    "disputed": "Contestada",
+    "plain": "Simples"
+  },
+  "cards": {
+    "solverName": "Front-end React",
+    "flat": "Cartão plano",
+    "perTask": "por tarefa",
+    "link": "Cartão com link",
+    "hover": "Passe o mouse.",
+    "newCategory": "Categoria nova"
+  },
+  "tabs": {
+    "example": "Exemplo",
+    "solvers": "Especialistas",
+    "memories": "Memórias",
+    "history": "Histórico",
+    "active": "Aba ativa: {tab}"
+  },
+  "form": {
+    "taskTitle": "Título da tarefa",
+    "taskPlaceholder": "Ex: landing page da minha loja",
+    "hint": "Até 80 caracteres.",
+    "description": "Descrição",
+    "descriptionPlaceholder": "Conte o que você precisa"
+  },
+  "notices": {
+    "infoTitle": "Informação",
+    "infoText": "Pix aparece como “em breve” até a fase B.",
+    "okTitle": "Tudo certo",
+    "okText": "A licença já está na sua biblioteca.",
+    "warnTitle": "Atenção",
+    "warnText": "Seu saldo não cobre esta compra.",
+    "badTitle": "Erro",
+    "networkFailure": "Falha de rede",
+    "toastOk": "Toast ok",
+    "toastOkTitle": "Compra concluída",
+    "toastOkText": "A licença foi registrada na rede.",
+    "toastError": "Toast erro",
+    "toastErrorTitle": "Não deu para concluir",
+    "toastErrorText": "Tente de novo.",
+    "toastRetry": "Tentar de novo",
+    "emptyTitle": "Sua biblioteca está vazia",
+    "emptyAction": "Explorar especialistas",
+    "emptyText": "Os especialistas que você comprar aparecem aqui, prontos para usar no Claude ou no ChatGPT."
+  },
+  "dialog": {
+    "open": "Abrir janela",
+    "title": "Título da janela",
+    "body": "Esc, o X e o clique fora fecham. O foco fica preso na janela e volta para o botão ao fechar. Marque um campo com data-autofocus para o foco começar nele.",
+    "field": "Campo com foco inicial",
+    "placeholder": "Digite aqui",
+    "unlock": "Destravar",
+    "lock": "Travar (como ao assinar)",
+    "close": "Fechar"
+  },
+  "format": {
+    "ago": "ago(3 dias atrás) = {value}",
+    "date": "date(hoje) = {value}",
+    "countdown": "countdown(+5h12) = {text} · urgente: {urgent}",
+    "repLevel": "repLevel(91) = {label}",
+    "short": "short(carteira) = {value}"
+  }
+}

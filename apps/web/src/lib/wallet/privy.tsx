@@ -12,6 +12,7 @@ import {
   type ConnectedStandardSolanaWallet,
 } from "@privy-io/react-auth/solana";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { localText } from "../local-text";
 import type { WalletAdapter, WalletLike } from "./types";
 
 type Pending = { resolve: (w: WalletLike) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
@@ -53,7 +54,7 @@ function Bridge({ onAdapter, chain }: { onAdapter: (a: WalletAdapter) => void; c
   const { login } = useLogin({
     onError: (err) => {
       wantLogin.current = false;
-      settle((p) => p.reject(new Error(err === "exited_auth_flow" ? "Login cancelado" : `Falha no login: ${err}`)));
+      settle((p) => p.reject(new Error(err === "exited_auth_flow" ? localText("wallet.loginCancelled") : localText("wallet.loginFailed", { detail: String(err) }))));
     },
   });
 
@@ -77,13 +78,13 @@ function Bridge({ onAdapter, chain }: { onAdapter: (a: WalletAdapter) => void; c
     if (!address) return null;
     const current = () => {
       const w = rawRef.current;
-      if (!w || w.address !== address) throw new Error("A carteira mudou. Entre de novo.");
+      if (!w || w.address !== address) throw new Error(localText("wallet.walletChanged"));
       return w;
     };
     return {
       address,
       async signMessage(message) {
-        const { signature } = await fns.current.signMessage({ message, wallet: current(), options: { uiOptions: { title: "Entrar no Solvers" } } });
+        const { signature } = await fns.current.signMessage({ message, wallet: current(), options: { uiOptions: { title: localText("wallet.signInTitle") } } });
         return signature;
       },
       async signTransaction(transaction, opts) {
@@ -113,14 +114,14 @@ function Bridge({ onAdapter, chain }: { onAdapter: (a: WalletAdapter) => void; c
     const t = setTimeout(() => {
       if (rawRef.current || !pending.current.length) return;
       fns.current.createWallet().catch((e: unknown) => {
-        if (!rawRef.current) settle((p) => p.reject(new Error(`Não deu para criar a sua carteira: ${(e as Error).message}`)));
+        if (!rawRef.current) settle((p) => p.reject(new Error(localText("wallet.createWalletFailed", { detail: (e as Error).message }))));
       });
     }, CREATE_WALLET_AFTER_MS);
     return () => clearTimeout(t);
   }, [ready, walletsReady, authenticated, wallet, tick]);
 
   // Desmontou (ex: troca de página inteira): ninguém fica esperando para sempre.
-  useEffect(() => () => settle((p) => p.reject(new Error("Login interrompido"))), []);
+  useEffect(() => () => settle((p) => p.reject(new Error(localText("wallet.loginInterrupted")))), []);
 
   const email = user?.email?.address ?? null;
   const walletRef = useRef(wallet);
@@ -140,7 +141,7 @@ function Bridge({ onAdapter, chain }: { onAdapter: (a: WalletAdapter) => void; c
           const timer = setTimeout(() => {
             pending.current = pending.current.filter((p) => p.timer !== timer);
             wantLogin.current = false;
-            reject(new Error("O login demorou demais. Tente de novo."));
+            reject(new Error(localText("wallet.loginTimeout")));
           }, LOGIN_TIMEOUT_MS);
           pending.current.push({ resolve, reject, timer });
           if (!state.current.authenticated) {

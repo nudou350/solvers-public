@@ -13,5 +13,83 @@
     "label": "Language",
     "en": "English",
     "pt": "Português"
+  },
+  "nav": {
+    "explore": "Explore",
+    "exploreShort": "Explore",
+    "resale": "Resale",
+    "resaleShort": "Resale",
+    "library": "My library",
+    "libraryShort": "Library",
+    "guarantees": "Guarantees",
+    "guaranteesShort": "Guarantees",
+    "creators": "For creators",
+    "creatorsShort": "Creator"
+  },
+  "header": {
+    "logoLabel": "Solvers, home page",
+    "mainNav": "Main",
+    "tabbar": "Navigation",
+    "signIn": "Sign in",
+    "signInFailed": "Couldn't sign in",
+    "myAccount": "My account: {name}",
+    "testWallet": "Test wallet",
+    "yourAccount": "Your account",
+    "myProfile": "My profile",
+    "myLibrary": "My library",
+    "useOtherTestWallet": "Use another test wallet",
+    "switchWalletFailed": "Couldn't switch wallets",
+    "signOut": "Sign out",
+    "signOutFailed": "Couldn't sign out"
+  },
+  "footer": {
+    "tagline": "AI specialists for the Claude and ChatGPT you already use. Buy once, use anywhere.",
+    "explore": "Explore",
+    "solvers": "Solvers",
+    "resale": "Resale marketplace",
+    "guarantees": "Guarantees",
+    "creators": "Creators",
+    "publish": "Publish a solver",
+    "dashboard": "Creator dashboard",
+    "trust": "Trust",
+    "profile": "Profile and reputation",
+    "solana": "Licenses recorded on the Solana network"
+  },
+  "theme": {
+    "useLight": "Switch to light theme",
+    "useDark": "Switch to dark theme"
+  },
+  "switchAccount": {
+    "label": "Switch account",
+    "group": "Switch test wallet",
+    "newWallet": "New test wallet",
+    "signedInWith": "You signed in with wallet {wallet}.",
+    "switchFailed": "Couldn't switch wallets",
+    "explain": "In this test version, wallet {wallet} was created by this browser. Using another one deletes the current one from here: anything bought with it stops showing up.",
+    "useOther": "Use another test wallet",
+    "justSignOut": "Just sign out",
+    "cancel": "Cancel"
+  },
+  "ui": {
+    "loading": "Loading…",
+    "close": "Close",
+    "closeNotice": "Close notice",
+    "signIn": "Sign in",
+    "signInFailed": "Couldn't sign in",
+    "seeMore": "See more",
+    "seeLess": "See less",
+    "images": "Images",
+    "imageCount": "{i} of {n}",
+    "imageAlt": "{label}: {i} of {n}",
+    "previousImage": "Previous image",
+    "nextImage": "Next image",
+    "reputationTitle": "Reputation {score}/100",
+    "verifiedPurchase": "Verified purchase",
+    "ratingLabel": "Rating {rating} out of 5",
+    "ratingLabelWithCount": "Rating {rating} out of 5, {count, plural, one {# review} other {# reviews}}",
+    "techTitle": "Want to check the technical details?",
+    "techHide": "Hide technical details",
+    "techShow": "Verify on the blockchain",
+    "techExplorer": "Open in the network explorer"
   }
 }

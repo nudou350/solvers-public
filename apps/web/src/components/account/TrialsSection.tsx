@@ -1,27 +1,31 @@
 "use client";
 // Seção "Em teste grátis" da biblioteca: o saldo de cada teste em andamento, para ver o que resta sem abrir o especialista.
 import type { Agent, MyTrial } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
-import { date, int } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { gap } from "@/lib/style";
 
 export function TrialsSection({ trials, agents }: { trials: MyTrial[]; agents: Map<string, Agent> }) {
+  const t = useTranslations("account.trials");
   return (
-    <section className="col" style={gap("14px")} aria-label="Testes grátis em andamento">
-      <h2 className="h4">Em teste grátis</h2>
-      {trials.map((t) => (
-        <TrialCard key={t.agentId} trial={t} agent={agents.get(t.agentId)} />
+    <section className="col" style={gap("14px")} aria-label={t("region")}>
+      <h2 className="h4">{t("heading")}</h2>
+      {trials.map((tr) => (
+        <TrialCard key={tr.agentId} trial={tr} agent={agents.get(tr.agentId)} />
       ))}
     </section>
   );
 }
 
-function TrialCard({ trial: t, agent: a }: { trial: MyTrial; agent: Agent | undefined }) {
-  const done = t.usesLeft <= 0;
-  const used = t.uses - t.usesLeft;
+function TrialCard({ trial: tr, agent: a }: { trial: MyTrial; agent: Agent | undefined }) {
+  const t = useTranslations("account");
+  const f = useFormat();
+  const done = tr.usesLeft <= 0;
+  const used = tr.uses - tr.usesLeft;
   const slug = a ? encodeURIComponent(a.slug) : null;
   return (
     <article className="card pad-s col" style={gap("16px")}>
@@ -29,46 +33,46 @@ function TrialCard({ trial: t, agent: a }: { trial: MyTrial; agent: Agent | unde
         <div className="row" style={gap("14px", { minWidth: 0 })}>
           {a ? <Tile category={a.category} /> : <span className="tile" aria-hidden />}
           <div className="grow" style={{ minWidth: 0 }}>
-            <h3 className="h4 trunc">{a?.name ?? "Especialista"}</h3>
-            <div className="tiny faint">último uso em {date(t.lastUsedAt)}</div>
+            <h3 className="h4 trunc">{a?.name ?? t("shared.unnamedSolver")}</h3>
+            <div className="tiny faint">{t("trials.lastUsed", { date: f.date(tr.lastUsedAt) })}</div>
           </div>
         </div>
         {done ? (
           <Chip tone="warn" icon="lock">
-            Teste esgotado
+            {t("trials.exhausted")}
           </Chip>
         ) : (
           <Chip tone="brand" icon="gift">
-            Teste grátis
+            {t("trials.chip")}
           </Chip>
         )}
       </div>
 
       <div className="col" style={gap("8px")}>
         <div className="row between" style={gap("12px")}>
-          <b>{done ? `Você usou os ${int(t.uses)} usos grátis` : `${used} de ${int(t.uses)} usos gastos`}</b>
-          {done ? null : <span className="small muted">{t.usesLeft === 1 ? "Resta 1 uso" : `Restam ${int(t.usesLeft)} usos`}</span>}
+          <b>{done ? t("trials.usedAll", { n: f.int(tr.uses) }) : t("trials.spent", { used, total: f.int(tr.uses) })}</b>
+          {done ? null : <span className="small muted">{t("trials.left", { n: tr.usesLeft })}</span>}
         </div>
         <div
           className={done ? "bar amber" : "bar"}
           role="progressbar"
-          aria-label="Usos grátis gastos"
+          aria-label={t("trials.progress")}
           aria-valuemin={0}
-          aria-valuemax={t.uses}
+          aria-valuemax={tr.uses}
           aria-valuenow={used}
         >
-          <i style={{ width: `${Math.min(100, (used / t.uses) * 100)}%` }} />
+          <i style={{ width: `${Math.min(100, (used / tr.uses) * 100)}%` }} />
         </div>
       </div>
 
       {done ? (
-        <p className="small muted">O teste acabou. Com a licença vitalícia você usa sem esses limites.</p>
+        <p className="small muted">{t("trials.ended")}</p>
       ) : (
         <ul className="small row wrapx" style={gap("8px 20px")}>
-          {t.searches > 0 ? <Left icon="search">{int(t.searchesLeft)} de {int(t.searches)} consultas à base</Left> : null}
-          {t.tools.map((x) => (
+          {tr.searches > 0 ? <Left icon="search">{t("trials.searches", { left: f.int(tr.searchesLeft), total: f.int(tr.searches) })}</Left> : null}
+          {tr.tools.map((x) => (
             <Left key={x.name} icon="wrench">
-              {x.name}: {int(x.left)} de {int(x.limit)}×
+              {t("trials.toolLeft", { name: x.name, left: f.int(x.left), limit: f.int(x.limit) })}
             </Left>
           ))}
         </ul>
@@ -78,11 +82,11 @@ function TrialCard({ trial: t, agent: a }: { trial: MyTrial; agent: Agent | unde
         <div className="row wrapx" style={gap("8px", { justifyContent: "flex-end" })}>
           {done ? null : (
             <Button variant="secondary" icon="play" href={`/install?agent=${slug}`}>
-              Continuar testando
+              {t("trials.keepTesting")}
             </Button>
           )}
           <Button variant={done ? "primary" : "ghost"} href={`/checkout?agent=${slug}&type=permanent`}>
-            Comprar licença
+            {t("trials.buy")}
           </Button>
         </div>
       ) : null}

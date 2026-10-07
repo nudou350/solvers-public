@@ -137,7 +137,8 @@ async function main() {
   const act = await call(token, "activate_solver", { agent_id: agentId });
   const sessionId = /session_id: (ses_[0-9a-f]+)/.exec(act)?.[1];
   if (!sessionId) throw new Error(`activate_solver não abriu sessão:\n${act}`);
-  if (!act.includes(`Teste grátis (uso 1 de ${trial.uses})`) || !act.includes("Avise o usuário desses limites")) {
+  // Aceita inglês (padrão) e português: os textos do teste grátis vêm de runtime/trial.ts.
+  if (!new RegExp(`(Free trial|Teste grátis) \((use|uso) 1 (of|de) ${trial.uses}\)`, "i").test(act) || !/(Tell the user about these limits|Avise o usuário desses limites)/i.test(act)) {
     throw new Error(`activate_solver deveria dizer os limites do teste:\n${act}`);
   }
   log("activate_solver", act.split("\n")[1]);
@@ -148,20 +149,20 @@ async function main() {
   // Etapas liberadas no teste; a seguinte devolve o texto de fim do teste (não é erro) e não avança.
   for (let i = 1; i <= trial.steps; i++) {
     const st = await call(token, "next_step", { session_id: sessionId, result_summary: i > 1 ? `Resumo da etapa ${i - 1}.` : undefined });
-    if (!st.startsWith(`# Etapa ${i} de ${trial.totalSteps}`)) throw new Error(`esperava a etapa ${i}:\n${st.slice(0, 300)}`);
+    if (!new RegExp(`^# (Step|Etapa) ${i} (of|de) ${trial.totalSteps}`, "i").test(st)) throw new Error(`esperava a etapa ${i}:\n${st.slice(0, 300)}`);
     log(`next_step (etapa ${i})`, st.split("\n")[0]);
   }
   if (trial.steps < trial.totalSteps) {
     for (let k = 0; k < 2; k++) {
       const locked = await call(token, "next_step", { session_id: sessionId, result_summary: "Resumo." });
-      if (!locked.startsWith("O teste grátis de") || !locked.includes("/checkout?agent=")) throw new Error(`esperava o fim do teste:\n${locked}`);
+      if (!/^(The free trial of|O teste grátis de)/i.test(locked) || !locked.includes("/checkout?agent=")) throw new Error(`esperava o fim do teste:\n${locked}`);
     }
     log("next_step além do teste", "texto de fim do teste com link de compra");
   }
 
   if (trial.searches > 0) {
     const kb = await call(token, "search_knowledge", { session_id: sessionId, query: "como associar mensagens de erro ao campo" });
-    if (kb.startsWith("As consultas à base do teste grátis acabaram")) throw new Error("a primeira consulta deveria passar");
+    if (/^(The free trial's knowledge searches|As consultas à base do teste grátis)/i.test(kb)) throw new Error("a primeira consulta deveria passar");
     log("search_knowledge", `${kb.length} caracteres`);
   }
 
@@ -173,7 +174,7 @@ async function main() {
     if (i === 0) log("run_tool a11y_check", `${JSON.parse(a11y).issues.length} problemas encontrados (esperado > 0)`);
   }
   const over = await call(token, "run_tool", { session_id: sessionId, tool: "a11y_check", input: a11yInput });
-  if (!over.includes("O teste grátis de")) throw new Error(`a11y_check além do limite deveria encerrar o teste:\n${over}`);
+  if (!/(The free trial of|O teste grátis de)/i.test(over)) throw new Error(`a11y_check além do limite deveria encerrar o teste:\n${over}`);
   log(`run_tool a11y_check além do limite (${a11yLimit})`, "texto de fim do teste");
 
   await call(token, "save_memory", { agent_id: agentId, content: "Prefere TypeScript estrito e Vitest." });

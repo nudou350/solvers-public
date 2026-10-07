@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { Guarantees } from "@/components/account/Guarantees";
 
-export const metadata: Metadata = { title: "Garantias em andamento", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("account.meta");
+  return { title: t("guarantees"), robots: { index: false } };
+}
 
-export default function GarantiasPage() {
+export default function GuaranteesPage() {
   return <Guarantees />;
 }

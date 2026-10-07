@@ -1,6 +1,7 @@
 "use client";
 // Lista de envios do criador (/creator/submissions): cada pacote enviado, em que ponto está e o que falta.
 import type { SubmissionView } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthGate } from "@/components/ui/AuthGate";
@@ -10,10 +11,12 @@ import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
-import { Untrusted } from "@/components/ui/Untrusted";
+import { Untrusted, untrusted } from "@/components/ui/Untrusted";
+import { useErrorText } from "@/lib/error-text";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { fileSizeText, loadErrorText, REVIEW_SLA_TEXT, statusInfo } from "@/lib/submissions-ui";
+import { loadErrorText, reviewSlaText, statusInfo } from "@/lib/submissions-ui";
 import { CreatorHead } from "./CreatorHead";
 import { StatusChip } from "./SubmissionParts";
 
@@ -22,13 +25,12 @@ type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: 
 /** Estados que mudam sozinhos em poucos segundos: a lista se atualiza enquanto algum envio estiver neles. */
 const MOVING = new Set(["submitted", "validating", "publishing"]);
 
-const ACTION_TEXT: Partial<Record<SubmissionView["nextAction"], string>> = {
-  fix_and_resubmit: "Corrigir e enviar de novo",
-  sign_register: "Confirmar o cadastro",
-  sign_update: "Confirmar a atualização",
-};
+/** Ações com botão de destaque (textos em action.<chave>). */
+const ACTION_KEYS: ReadonlySet<SubmissionView["nextAction"]> = new Set(["fix_and_resubmit", "sign_register", "sign_update"]);
 
 export function SubmissionsView() {
+  const t = useTranslations("submissions");
+  const errorText = useErrorText();
   const { api, status, me } = useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,10 +42,10 @@ export function SubmissionsView() {
         const items = await api.listMySubmissions();
         setState({ kind: "ok", items });
       } catch (e) {
-        if (!silent) setState({ kind: "error", message: loadErrorText(e) });
+        if (!silent) setState({ kind: "error", message: loadErrorText(t, e, errorText) });
       }
     },
-    [api],
+    [api, t, errorText],
   );
 
   useEffect(() => {
@@ -62,10 +64,10 @@ export function SubmissionsView() {
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <CreatorHead tab="submissions" />
-      <AuthGate icon="pen" title="Entre para ver os seus envios" text="Aqui você acompanha cada pacote enviado: conferência, revisão e publicação.">
-        {state.kind === "loading" ? <Loading text="Carregando os seus envios…" /> : null}
+      <AuthGate icon="pen" title={t("list.authTitle")} text={t("list.authText")}>
+        {state.kind === "loading" ? <Loading text={t("list.loading")} /> : null}
         {state.kind === "error" ? (
-          <Empty icon="warning" title="Não deu para carregar os envios" action={<Button onClick={() => void load()}>Tentar de novo</Button>}>
+          <Empty icon="warning" title={t("list.loadFailed")} action={<Button onClick={() => void load()}>{t("list.retry")}</Button>}>
             {state.message}
           </Empty>
         ) : null}
@@ -76,28 +78,30 @@ export function SubmissionsView() {
 }
 
 function List({ items }: { items: SubmissionView[] }) {
+  const t = useTranslations("submissions");
+  const f = useFormat();
   if (items.length === 0)
     return (
-      <Empty icon="upload" title="Você ainda não enviou nenhum pacote" action={<Button href="/creator/publish" iconRight="arrow-right">Publicar especialista</Button>}>
-        Monte o pacote com o Criador de Solvers e envie o ZIP. O andamento aparece aqui.
+      <Empty icon="upload" title={t("list.emptyTitle")} action={<Button href="/creator/publish" iconRight="arrow-right">{t("list.publish")}</Button>}>
+        {t("list.emptyText")}
       </Empty>
     );
   return (
     <div className="col" style={gap(20)}>
       <Notice tone="brand" icon="clock" role="note">
-        {REVIEW_SLA_TEXT} Você recebe um aviso quando a equipe responder.
+        {t("list.notice", { sla: reviewSlaText(t) })}
       </Notice>
       <div className="card pad-s" style={{ padding: "8px 24px" }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
-          <h2 className="h3">Seus envios</h2>
+          <h2 className="h3">{t("list.heading")}</h2>
           <Button variant="secondary" href="/creator/publish" icon="plus">
-            Enviar novo pacote
+            {t("list.sendNew")}
           </Button>
         </div>
         <ul>
           {items.map((it) => {
-            const info = statusInfo(it.status, it.nextAction);
-            const act = ACTION_TEXT[it.nextAction];
+            const info = statusInfo(t, it.status, it.nextAction);
+            const act = ACTION_KEYS.has(it.nextAction) ? t(`action.${it.nextAction}`) : null;
             const errors = it.validation?.errors.length ?? 0;
             return (
               <li key={it.id} className="rowline start" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -111,12 +115,12 @@ function List({ items }: { items: SubmissionView[] }) {
                   </div>
                   <span className="small muted">{info.text}</span>
                   <span className="tiny faint">
-                    Enviado <Ago iso={it.createdAt} /> · atualizado <Ago iso={it.updatedAt} /> · {fileSizeText(it.sizeBytes)}
-                    {errors ? ` · ${errors} ${errors === 1 ? "erro" : "erros"}` : ""}
+                    {t.rich("list.meta", { sent: () => <Ago iso={it.createdAt} />, updated: () => <Ago iso={it.updatedAt} />, size: f.fileSize(it.sizeBytes) })}
+                    {errors ? ` · ${t("errorCount", { n: errors })}` : ""}
                   </span>
                 </div>
-                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/creator/submissions/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={`${act ?? "Ver detalhes"}: $<Untrusted>{it.name || it.slug}</Untrusted>`}>
-                  {act ?? "Ver detalhes"}
+                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/creator/submissions/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={t("list.actionAria", { action: act ?? t("action.view"), name: untrusted(it.name || it.slug) })}>
+                  {act ?? t("action.view")}
                 </Button>
               </li>
             );
@@ -124,7 +128,7 @@ function List({ items }: { items: SubmissionView[] }) {
         </ul>
       </div>
       <p className="small muted">
-        <Icon name="info" size="s" /> Quer um especialista novo ou uma nova versão? Cada envio passa pelas mesmas etapas.
+        <Icon name="info" size="s" /> {t("list.footer")}
       </p>
     </div>
   );

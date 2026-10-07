@@ -1,4 +1,6 @@
 // QR de mentira para o Pix simulado (qrCodeBase64 vem null): parece um QR, mas não é legível.
+import { useTranslations } from "next-intl";
+
 const N = 29;
 
 function seedOf(s: string): number {
@@ -17,6 +19,7 @@ function finder(x: number, y: number, i: number, j: number) {
 }
 
 export function FakeQr({ text, size = 200 }: { text: string; size?: number }) {
+  const t = useTranslations("checkout.fakeQr");
   let s = seedOf(text);
   const rnd = () => {
     s ^= s << 13;
@@ -33,7 +36,7 @@ export function FakeQr({ text, size = 200 }: { text: string; size?: number }) {
       if (on) d += `M${i} ${j}h1v1h-1z`;
     }
   return (
-    <svg width={size} height={size} viewBox={`-2 -2 ${N + 4} ${N + 4}`} role="img" aria-label="QR Code de teste (não pode ser pago)" shapeRendering="crispEdges">
+    <svg width={size} height={size} viewBox={`-2 -2 ${N + 4} ${N + 4}`} role="img" aria-label={t("label")} shapeRendering="crispEdges">
       <rect x={-2} y={-2} width={N + 4} height={N + 4} fill="#fff" />
       <path d={d} fill="#111" />
     </svg>

@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 export type SpinnerProps = { size?: "s" | "m" | "l"; label?: string; className?: string };
 
 /** Indicador de carregamento. Com `label`, anuncia o texto para leitores de tela. */
@@ -13,11 +15,12 @@ export function Spinner({ size = "m", label, className }: SpinnerProps) {
 }
 
 /** Bloco de carregamento de uma seção inteira: spinner + texto. */
-export function Loading({ text = "Carregando…" }: { text?: string }) {
+export function Loading({ text }: { text?: string }) {
+  const t = useTranslations("common.ui");
   return (
     <div className="loading-block" role="status" aria-live="polite">
       <Spinner />
-      <span className="small">{text}</span>
+      <span className="small">{text ?? t("loading")}</span>
     </div>
   );
 }

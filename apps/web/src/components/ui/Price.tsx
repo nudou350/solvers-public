@@ -1,4 +1,4 @@
-import { brl, brl0, brlValue, usdc as fmtUsdc } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 
 export type PriceProps = {
   /** Valor em USDC (fonte da verdade). */
@@ -12,15 +12,28 @@ export type PriceProps = {
   round?: boolean;
   /** R$ e USDC na mesma linha. */
   inline?: boolean;
-  /** Texto depois do USDC, ex: "por tarefa". */
+  /** Texto depois do USDC, ex: "per task". */
   suffix?: string;
   className?: string;
 };
 
-/** Preço: R$ em destaque e USDC como informação secundária, como no design. */
+/** Preço: R$ (pt) ou $ (en) em destaque e USDC como informação secundária, como no design. */
 export function Price({ usdc, rate, brl: reais, size = "m", round, inline, suffix, className }: PriceProps) {
-  const main = reais != null ? brlValue(reais, round ? 0 : 2) : rate != null ? (round ? brl0(usdc, rate) : brl(usdc, rate)) : null;
-  const sub = `${fmtUsdc(usdc)}${suffix ? ` ${suffix}` : ""}`;
+  const f = useFormat();
+  // pt: reais (valor da API ou pela cotação). en: dólar 1:1 com o USDC, sem precisar da cotação.
+  const main =
+    f.locale === "en"
+      ? round
+        ? f.brl0(usdc, rate ?? 0)
+        : f.brl(usdc, rate ?? 0)
+      : reais != null
+        ? f.brlValue(reais, round ? 0 : 2)
+        : rate != null
+          ? round
+            ? f.brl0(usdc, rate)
+            : f.brl(usdc, rate)
+          : null;
+  const sub = `${f.usdc(usdc)}${suffix ? ` ${suffix}` : ""}`;
   const cls = ["price", `price-${size}`, inline ? "inline" : "", className ?? ""].filter(Boolean).join(" ");
   return (
     <span className={cls}>

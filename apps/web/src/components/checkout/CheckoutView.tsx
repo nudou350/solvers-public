@@ -3,8 +3,9 @@
 // Entrar → (garantia: descrever a tarefa) → forma de pagamento (saldo em USDC ou Pix) → revisar e pagar.
 // Com `listing` é a compra de uma licença usada do mercado de revenda (/checkout?listing=<licença>): só saldo em USDC.
 import type { AgentDetail, GuaranteeStatus, PixCharge, ResaleListing, SodaxQuote } from "@solvers/api-client";
-import { Link } from "@/i18n/navigation";
-import { useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { SwitchAccount } from "@/components/layout/SwitchAccount";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +14,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Tile } from "@/components/ui/Tile";
 import { Notice, useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
-import { brl, durationText, GUARANTEE_LEVEL_LABEL, initials, short, usdc } from "@/lib/format";
+import { useErrorText } from "@/lib/error-text";
+import { initials, short, useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { txErrorMessage, useFaucet, useTx, type TxErrorInfo } from "@/lib/tx";
@@ -39,7 +41,11 @@ function StepDot({ n, done }: { n: number; done?: boolean }) {
 export function CheckoutView({ detail, type, listing = null }: { detail: AgentDetail; type: CheckoutType; listing?: ResaleListing | null }) {
   const router = useRouter();
   const toast = useToast();
+  const t = useTranslations("checkout.view");
+  const f = useFormat();
+  const errorText = useErrorText();
   const { api, config, status, me, walletKind, loggingIn, login, requireWallet } = useSession();
+  const lang = useLocale() as Locale;
   // O preço pode mudar enquanto a pessoa está aqui (409 price_changed): guardamos a versão relida do especialista.
   const [fresh, setFresh] = useState<AgentDetail | null>(null);
   const cur = fresh ?? detail;
@@ -54,7 +60,8 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
   const [listingPrice, setListingPrice] = useState(listing?.priceUsdc ?? 0);
   const [listingGone, setListingGone] = useState(false);
   const total = isR ? listingPrice : isG ? (guarantee?.priceUsdc ?? agent.priceUsdc) : agent.priceUsdc;
-  const money = (v: number) => (rate != null ? brl(v, rate) : usdc(v));
+  // Em inglês o preço local é o dólar (1:1 com o USDC); em português, reais pela cotação.
+  const money = (v: number) => (f.locale === "en" ? f.brl(v, 1) : rate != null ? f.brl(v, rate) : f.usdc(v));
   const totalText = money(total);
 
   // ----- dados da conta -----
@@ -138,7 +145,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     setChargeWallet(null);
     setPixError(null);
     creditedOnce.current = null;
-    toast({ tone: "info", title: "A cobrança anterior foi fechada", text: "Ela era de outra conta. Gere uma nova para esta." });
+    toast({ tone: "info", title: t("toast.chargeClosed.title"), text: t("toast.chargeClosed.text") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meWallet, chargeWallet, charge]);
 
@@ -180,7 +187,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     if (priceChange) setFresh((f) => ({ ...(f ?? detail), agent: { ...(f ?? detail).agent, priceUsdc: priceChange.usdc } }));
     setAgree(false);
     let alive = true;
-    api.getAgent(detail.agent.slug).then(
+    api.getAgent(detail.agent.slug, lang).then(
       (d) => alive && setFresh(d),
       () => {},
     );
@@ -194,7 +201,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
   useEffect(() => {
     if (tx.error?.code !== "sold_out" && pixError?.code !== "sold_out") return;
     let alive = true;
-    api.getAgent(detail.agent.slug).then(
+    api.getAgent(detail.agent.slug, lang).then(
       (d) => alive && setFresh(d),
       () => {},
     );
@@ -220,7 +227,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
       return;
     }
     let alive = true;
-    api.getResaleListing(listing.id).then(
+    api.getResaleListing(listing.id, lang).then(
       (now) => {
         if (!alive) return;
         if (now) setListingPrice(now.priceUsdc);
@@ -262,9 +269,9 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
         // O saldo já cobre: pula o Pix e compra direto.
         setMethod("wallet");
         void loadAccount();
-        toast({ tone: "info", title: "Seu saldo já cobre esta compra", text: "Seguimos direto com o saldo em USDC." });
+        toast({ tone: "info", title: t("toast.balanceCovers.title"), text: t("toast.balanceCovers.text") });
         await purchase();
-      } else setPixError(txErrorMessage(e));
+      } else setPixError(txErrorMessage(e, f.locale));
     } finally {
       setPixPending(false);
     }
@@ -273,7 +280,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
   async function getFaucet() {
     const got = await faucet.receive();
     if (got != null) {
-      toast({ tone: "ok", title: `Você recebeu ${usdc(got)} de teste` });
+      toast({ tone: "ok", title: t("toast.faucetGot", { amount: f.usdc(got) }) });
       await loadAccount();
     }
   }
@@ -296,21 +303,17 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     else void purchase();
   }
 
-  const doLogin = () => login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }));
-  const switchType = (t: CheckoutType) => router.replace(`/checkout?agent=${encodeURIComponent(agent.slug)}&type=${t}`, { scroll: false });
+  const doLogin = () => login().catch((e: unknown) => toast({ tone: "bad", title: t("login.failed"), text: errorText(e) }));
+  const switchType = (next: CheckoutType) => router.replace(`/checkout?agent=${encodeURIComponent(agent.slug)}&type=${next}`, { scroll: false });
 
   const modes: { id: CheckoutType; label: string }[] = [
-    { id: "permanent", label: "Licença" },
-    ...(guarantee ? [{ id: "guarantee" as const, label: "Com garantia" }] : []),
+    { id: "permanent", label: t("summary.license") },
+    ...(guarantee ? [{ id: "guarantee" as const, label: t("summary.withGuarantee") }] : []),
   ];
 
-  const reviewWin = guarantee ? durationText(guarantee.reviewWindowSecs) : "";
-  const lineLabel = isR ? "Licença usada" : isG ? "Tarefa com garantia" : "Licença permanente";
-  const agreeText = isG
-    ? `Li e concordo com os critérios combinados e com a liberação automática em ${reviewWin}.`
-    : isR
-      ? "Concordo com os termos de uso e entendo que é uma licença usada: as memórias de quem vende não vêm junto, e a nota do especialista é a mesma."
-      : "Concordo com os termos de uso e com a emissão da licença em meu nome.";
+  const reviewWin = guarantee ? f.durationText(guarantee.reviewWindowSecs) : "";
+  const lineLabel = isR ? t("summary.usedLicense") : isG ? t("summary.guaranteeTask") : t("summary.permanent");
+  const agreeText = isG ? t("review.agreeGuarantee", { window: reviewWin }) : isR ? t("review.agreeUsed") : t("review.agreeNew");
 
   let n = 1;
   const stepLogin = n++;
@@ -328,17 +331,84 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     tx.reset();
   };
 
+  // Opções de pagamento. Em português o Pix vem primeiro; em inglês, USDC e cripto vêm antes do Pix.
+  const pixOption = isR ? null : pixOn ? (
+    <button type="button" key="pix" className={`opt ${effMethod === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")} aria-pressed={effMethod === "pix"} disabled={busy || showCharge}>
+      <span className="dot-r" />
+      <span className="col grow" style={gap(2)}>
+        <span className="row wrapx" style={gap(8)}>
+          <b>{t("pay.pixName")}</b>
+          {config?.pix.provider === "simulated" || config?.cluster !== "mainnet-beta" ? <Chip tone="warn">{t("pay.test")}</Chip> : null}
+        </span>
+        <span className="small muted">{t("pay.pixText")}</span>
+      </span>
+    </button>
+  ) : f.locale === "pt" ? (
+    <div className="opt" key="pix" aria-disabled style={{ opacity: 0.6 }}>
+      <span className="dot-r" />
+      <span className="col" style={gap(2)}>
+        <b>{t("pay.pixSoonName")}</b>
+        <span className="small muted">{t("pay.pixSoonText")}</span>
+      </span>
+    </div>
+  ) : null;
+  const walletOption = (
+    <div className="col" key="wallet" style={gap(18)}>
+      <button type="button" className={`opt ${effMethod === "wallet" ? "on" : ""}`} onClick={() => setMethod("wallet")} aria-pressed={effMethod === "wallet"} disabled={busy || showCharge}>
+        <span className="dot-r" />
+        <span className="col grow" style={gap(2)}>
+          <b>{t("pay.walletName")}</b>
+          <span className="small muted">{t("pay.walletText")}</span>
+          {logged && balance != null ? (
+            <span className="small num" style={{ marginTop: 4 }}>
+              {t("pay.balance")}
+              <b>{f.usdc(balance)}</b>
+              {rate != null && f.locale === "pt" ? <span className="muted"> ({f.brl(balance, rate)})</span> : null}
+            </span>
+          ) : null}
+        </span>
+      </button>
+      {isR ? <p className="tiny faint">{t("pay.usedOnly")}</p> : null}
+    </div>
+  );
+  const sodaxOption = sodaxCfg ? (
+    <div className="col" key="sodax" style={gap(18)}>
+      <button type="button" className={`opt ${effMethod === "sodax" ? "on" : ""}`} onClick={() => setMethod("sodax")} aria-pressed={effMethod === "sodax"} disabled={busy || showCharge}>
+        <span className="dot-r" />
+        <span className="col grow" style={gap(2)}>
+          <span className="row wrapx" style={gap(8)}>
+            <b>SODAX</b>
+            <Chip tone="warn">{t("pay.test")}</Chip>
+          </span>
+          <span className="small muted">{t("pay.sodaxText")}</span>
+        </span>
+      </button>
+      {effMethod === "sodax" && !showCharge ? (
+        <SodaxQuoteCard
+          agentId={agent.id}
+          type={type}
+          sources={sodaxCfg.sources}
+          source={sodaxSource}
+          onSource={setSodaxPick}
+          onQuote={setSodaxQuote}
+          disabled={busy}
+        />
+      ) : null}
+    </div>
+  ) : null;
+  const payOptions = f.locale === "en" ? [walletOption, sodaxOption, pixOption] : [pixOption, walletOption, sodaxOption];
+
   return (
     <>
       <div className="wrap" style={{ paddingTop: 28 }}>
         <Link className="link-btn" href={isR ? "/resale" : `/solvers/${agent.slug}`}>
           <Icon name="arrow-left" size="s" />
-          {isR ? "Voltar para o mercado de revenda" : "Voltar para o especialista"}
+          {isR ? t("back.resale") : t("back.solver")}
         </Link>
       </div>
       <section className="wrap" style={{ paddingTop: 8, paddingBottom: 56 }}>
         <h1 className="display h2" style={{ marginBottom: 28 }}>
-          {isR ? "Comprar licença usada" : "Finalizar compra"}
+          {isR ? t("title.used") : t("title.new")}
         </h1>
         <div className="split">
           <div className="col" style={gap(22)}>
@@ -346,7 +416,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
             <div className="card pad col" style={gap(18)}>
               <div className="row" style={gap(14)}>
                 <StepDot n={stepLogin} done={logged} />
-                <h2 className="h3">Entrar</h2>
+                <h2 className="h3">{t("login.title")}</h2>
               </div>
               {status === "loading" ? (
                 <div className="skel-box" style={{ height: 72 }} aria-hidden />
@@ -354,22 +424,22 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 <div className="row wrapx card-flat pad-s" style={gap(14)}>
                   <span className="av">{me.displayName ? initials(me.displayName) : me.wallet.slice(0, 2).toUpperCase()}</span>
                   <div className={`grow ${s.idLine}`}>
-                    <b>{me.displayName ?? `Carteira ${short(me.wallet)}`}</b>
-                    <div className="small muted">{me.email ?? (me.displayName ? `Carteira ${short(me.wallet)}` : "Conectada")}</div>
+                    <b>{me.displayName ?? t("login.wallet", { wallet: short(me.wallet) })}</b>
+                    <div className="small muted">{me.email ?? (me.displayName ? t("login.wallet", { wallet: short(me.wallet) }) : t("login.connected"))}</div>
                   </div>
                   <div className="col" style={gap(4, { alignItems: "flex-end" })}>
                     <SwitchAccount disabled={busy || showCharge} />
-                    {showCharge ? <span className="tiny faint">Cancele o pagamento para trocar de conta.</span> : null}
+                    {showCharge ? <span className="tiny faint">{t("login.cancelToSwitch")}</span> : null}
                   </div>
                 </div>
               ) : walletKind === "privy" ? (
                 <PrivyLogin loading={loggingIn} onLogin={doLogin} />
               ) : (
                 <div className="col" style={gap(14)}>
-                  <p className="muted">Entre para receber a licença na sua carteira. Nesta versão de teste, o navegador cria uma carteira de desenvolvimento para você.</p>
+                  <p className="muted">{t("login.devText")}</p>
                   <div>
                     <Button size="lg" icon="wallet" loading={loggingIn} onClick={doLogin}>
-                      Entrar
+                      {t("login.devButton")}
                     </Button>
                   </div>
                 </div>
@@ -379,19 +449,19 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
             {alreadyOwned ? (
               <Notice
                 tone="ok"
-                title="Você já tem este especialista"
+                title={t("owned.title")}
                 actions={
                   <>
                     <Button size="sm" href={`/install?agent=${agent.slug}`}>
-                      Conectar à minha IA
+                      {t("owned.connect")}
                     </Button>
                     <Button size="sm" variant="secondary" href="/library">
-                      Ver minha biblioteca
+                      {t("owned.library")}
                     </Button>
                   </>
                 }
               >
-                A licença permanente já está na sua conta. Não é preciso comprar de novo.
+                {t("owned.text")}
               </Notice>
             ) : null}
 
@@ -399,22 +469,20 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
               <Notice
                 tone="warn"
                 role="alert"
-                title="Acabaram as vagas"
+                title={t("soldOut.title")}
                 actions={
                   config?.resaleEnabled ? (
                     <Button size="sm" href="/resale">
-                      Ver licenças usadas
+                      {t("soldOut.viewUsed")}
                     </Button>
                   ) : (
                     <Button size="sm" variant="secondary" href="/solvers">
-                      Ver outros especialistas
+                      {t("soldOut.viewOthers")}
                     </Button>
                   )
                 }
               >
-                {paidBeforeSoldOut
-                  ? "As últimas licenças foram vendidas antes de a sua compra terminar. O valor que você pagou já virou saldo em USDC na sua carteira e não foi gasto: nada se perdeu, e você pode usá-lo em outra compra."
-                  : "Todas as licenças deste especialista já foram vendidas. Nada foi cobrado."}
+                {paidBeforeSoldOut ? t("soldOut.paid") : t("soldOut.none")}
               </Notice>
             ) : null}
 
@@ -422,27 +490,27 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
               <Notice
                 tone="warn"
                 role="alert"
-                title="Esse anúncio não está mais disponível"
+                title={t("listingGone.title")}
                 actions={
                   <Button size="sm" href="/resale">
-                    Ver outros anúncios
+                    {t("listingGone.viewOthers")}
                   </Button>
                 }
               >
-                Ele foi vendido, cancelado ou mudou. Nada foi cobrado.
+                {t("listingGone.text")}
               </Notice>
             ) : null}
             {myListing ? (
               <Notice
                 tone="info"
-                title="Este anúncio é seu"
+                title={t("myListing.title")}
                 actions={
                   <Button size="sm" variant="secondary" href="/library">
-                    Ver minha biblioteca
+                    {t("myListing.library")}
                   </Button>
                 }
               >
-                Você não pode comprar a própria licença. Para tirá-la do mercado, cancele o anúncio na sua biblioteca.
+                {t("myListing.text")}
               </Notice>
             ) : null}
 
@@ -452,50 +520,50 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 <div className="card pad col" style={gap(20)}>
                   <div className="row" style={gap(14)}>
                     <StepDot n={stepTask} done={titleOk && descOk} />
-                    <h2 className="h3">Descreva a tarefa e os critérios</h2>
+                    <h2 className="h3">{t("task.title")}</h2>
                   </div>
                   <div className="field">
                     <label className="label" htmlFor="tarefa-titulo">
-                      Título da tarefa
+                      {t("task.titleLabel")}
                     </label>
                     <input
                       id="tarefa-titulo"
                       className="input"
                       value={title}
                       maxLength={TITLE_MAX}
-                      placeholder="Ex: Formulário de login acessível"
+                      placeholder={t("task.titlePlaceholder")}
                       onChange={(e) => setTitle(e.target.value)}
                       aria-invalid={touched && !titleOk}
                       aria-describedby="tarefa-titulo-ajuda"
                       disabled={busy || showCharge}
                     />
                     <span id="tarefa-titulo-ajuda" className={`tiny ${touched && !titleOk ? "warn" : "faint"}`}>
-                      De {TITLE_MIN} a {TITLE_MAX} caracteres.
+                      {t("task.titleHelp", { min: TITLE_MIN, max: TITLE_MAX })}
                     </span>
                   </div>
                   <div className="field">
                     <label className="label" htmlFor="tarefa">
-                      O que você quer receber
+                      {t("task.descLabel")}
                     </label>
                     <textarea
                       id="tarefa"
                       className="textarea"
                       value={desc}
                       maxLength={DESC_MAX}
-                      placeholder="Conte o que o componente precisa fazer, para quem é e qualquer detalhe que importe."
+                      placeholder={t("task.descPlaceholder")}
                       onChange={(e) => setDesc(e.target.value)}
                       aria-invalid={touched && !descOk}
                       aria-describedby="tarefa-ajuda"
                       disabled={busy || showCharge}
                     />
                     <span id="tarefa-ajuda" className={`tiny num ${s.counter} ${touched && !descOk ? "warn" : "faint"}`}>
-                      {desc.trim().length < DESC_MIN ? `Mínimo de ${DESC_MIN} caracteres · ` : ""}
+                      {desc.trim().length < DESC_MIN ? t("task.descMin", { min: DESC_MIN }) : ""}
                       {desc.length}/{DESC_MAX}
                     </span>
                   </div>
                   <div className="field">
                     <span className="label" id="tarefa-prazo">
-                      Prazo de entrega
+                      {t("task.deliveryLabel")}
                     </span>
                     <div className="seg" role="radiogroup" aria-labelledby="tarefa-prazo" style={{ alignSelf: "flex-start" }}>
                       {DELIVERY_OPTIONS.map((d) => (
@@ -508,16 +576,16 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                           onClick={() => setDeliveryDays(d)}
                           disabled={busy || showCharge}
                         >
-                          {d} dias
+                          {t("task.deliveryDays", { n: d })}
                         </button>
                       ))}
                     </div>
                     <span className="tiny faint">
-                      Se o especialista não entregar dentro do prazo, você pode cancelar a etapa e receber o valor dela de volta, sem taxa.
+                      {t("task.deliveryHelp")}
                     </span>
                   </div>
                   <div className="col" style={gap(12)}>
-                    <span className="label">Critérios combinados, etapa por etapa</span>
+                    <span className="label">{t("task.criteriaLabel")}</span>
                     {guarantee.milestones.map((ms, i) => (
                       <div key={ms.title} className="row start card-flat pad-s" style={gap(12)}>
                         <span className="dot" style={{ width: 28, height: 28 }}>
@@ -529,16 +597,16 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                               <b>{ms.title}</b>
                               {ms.verify === "manual" ? (
                                 <Chip tone="brand" icon="eye">
-                                  Revisão manual
+                                  {t("task.manual")}
                                 </Chip>
                               ) : (
                                 <Chip tone="ok" icon="check-circle">
-                                  Verificada por testes
+                                  {t("task.tested")}
                                 </Chip>
                               )}
                             </div>
                             <span className={s.msAmount}>
-                              <b className="num">{money(ms.amountUsdc)}</b> <span className="tiny faint num">· {usdc(ms.amountUsdc)}</span>
+                              <b className="num">{money(ms.amountUsdc)}</b> <span className="tiny faint num">· {f.usdc(ms.amountUsdc)}</span>
                             </span>
                           </div>
                           <ul className="small muted" style={{ margin: 0, paddingLeft: 18 }}>
@@ -549,7 +617,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                         </div>
                       </div>
                     ))}
-                    <p className="tiny faint">As etapas e os critérios são definidos pelo criador do especialista e valem para toda tarefa com garantia.</p>
+                    <p className="tiny faint">{t("task.criteriaNote")}</p>
                   </div>
                 </div>
 
@@ -558,43 +626,43 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                     <span className="ok">
                       <Icon name="shield-check" size="l" />
                     </span>
-                    <h2 className="h3">Como a garantia funciona</h2>
+                    <h2 className="h3">{t("how.title")}</h2>
                   </div>
                   <p className="muted" style={{ maxWidth: 640 }}>
-                    Seu pagamento fica guardado e só é liberado para o criador quando o resultado passa nos critérios combinados acima. Assim você só paga por resultado.
+                    {t("how.intro")}
                   </p>
                   <div className="steps">
-                    <GStep icon="lock" title="1. Você paga e o valor fica guardado">
-                      O dinheiro ainda não vai para o criador. Ele fica protegido até o fim da tarefa.
+                    <GStep icon="lock" title={t("how.s1.title")}>
+                      {t("how.s1.text")}
                     </GStep>
-                    <GStep icon="layers" title="2. O especialista entrega por etapas">
-                      Cada etapa é conferida contra os critérios que você viu. As de revisão manual, como o plano, você mesmo confere.
+                    <GStep icon="layers" title={t("how.s2.title")}>
+                      {t("how.s2.text")}
                     </GStep>
-                    <GStep icon="eye" title="3. Você confere uma prévia">
-                      A prévia vem com marca d&apos;água. A versão final só é liberada depois da sua aprovação.
+                    <GStep icon="eye" title={t("how.s3.title")}>
+                      {t("how.s3.text")}
                     </GStep>
-                    <GStep icon="check" title="4. Aprovou? O pagamento é liberado. Não passou? Você contesta.">
-                      Ao contestar, você aponta qual critério falhou. Se a contestação for procedente, o valor volta para você. Sem resposta em {reviewWin}, a aprovação é automática.
+                    <GStep icon="check" title={t("how.s4.title")}>
+                      {t("how.s4.text", { window: reviewWin })}
                     </GStep>
                   </div>
                   <GuaranteeLevelInfo limits={limits} logged={logged} totalUsdc={total} />
                   {singleTooBig && limits ? (
-                    <Notice tone="warn" title="Esta garantia precisa de pelo menos 2 etapas">
-                      Contas no nível limitado só abrem garantias de uma etapa até {usdc(limits.singleMilestoneMaxUsdc)}, e esta custa {usdc(total)}. Faça mais compras para chegar ao nível completo.
+                    <Notice tone="warn" title={t("singleTooBig.title")}>
+                      {t("singleTooBig.text", { max: f.usdc(limits.singleMilestoneMaxUsdc), total: f.usdc(total) })}
                     </Notice>
                   ) : null}
                   {logged && limitsFailed ? (
                     <Notice
                       tone="bad"
                       role="alert"
-                      title="Não deu para conferir seu limite de garantias"
+                      title={t("limitsFailed.title")}
                       actions={
                         <Button size="sm" variant="secondary" icon="refresh" onClick={() => void loadAccount()}>
-                          Tentar de novo
+                          {t("limitsFailed.retry")}
                         </Button>
                       }
                     >
-                      O pagamento fica liberado assim que o limite for conferido.
+                      {t("limitsFailed.text")}
                     </Notice>
                   ) : null}
                 </div>
@@ -605,87 +673,29 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
             <div className="card pad col" style={gap(18)}>
               <div className="row" style={gap(14)}>
                 <StepDot n={stepPay} done={showCharge && charge?.status === "credited"} />
-                <h2 className="h3">Como você quer pagar</h2>
+                <h2 className="h3">{t("pay.title")}</h2>
               </div>
-              {isR ? null : pixOn ? (
-                <button type="button" className={`opt ${effMethod === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")} aria-pressed={effMethod === "pix"} disabled={busy || showCharge}>
-                  <span className="dot-r" />
-                  <span className="col grow" style={gap(2)}>
-                    <span className="row wrapx" style={gap(8)}>
-                      <b>Pix</b>
-                      {config?.pix.provider === "simulated" || config?.cluster !== "mainnet-beta" ? <Chip tone="warn">Teste</Chip> : null}
-                    </span>
-                    <span className="small muted">Você paga em reais e nós convertemos para USDC automaticamente.</span>
-                  </span>
-                </button>
-              ) : (
-                <div className="opt" aria-disabled style={{ opacity: 0.6 }}>
-                  <span className="dot-r" />
-                  <span className="col" style={gap(2)}>
-                    <b>Pix (em breve)</b>
-                    <span className="small muted">Em breve você poderá pagar em reais.</span>
-                  </span>
-                </div>
-              )}
-              <button type="button" className={`opt ${effMethod === "wallet" ? "on" : ""}`} onClick={() => setMethod("wallet")} aria-pressed={effMethod === "wallet"} disabled={busy || showCharge}>
-                <span className="dot-r" />
-                <span className="col grow" style={gap(2)}>
-                  <b>Saldo em USDC</b>
-                  <span className="small muted">Use o saldo da sua carteira, se você já tiver.</span>
-                  {logged && balance != null ? (
-                    <span className="small num" style={{ marginTop: 4 }}>
-                      Seu saldo: <b>{usdc(balance)}</b>
-                      {rate != null ? <span className="muted"> ({brl(balance, rate)})</span> : null}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-              {isR ? <p className="tiny faint">Na compra de licença usada, o pagamento é só com saldo em USDC.</p> : null}
-              {sodaxCfg ? (
-                <>
-                  <button type="button" className={`opt ${effMethod === "sodax" ? "on" : ""}`} onClick={() => setMethod("sodax")} aria-pressed={effMethod === "sodax"} disabled={busy || showCharge}>
-                    <span className="dot-r" />
-                    <span className="col grow" style={gap(2)}>
-                      <span className="row wrapx" style={gap(8)}>
-                        <b>SODAX</b>
-                        <Chip tone="warn">Teste</Chip>
-                      </span>
-                      <span className="small muted">Para quem já tem cripto em outra rede (como Ethereum, Base ou Arbitrum). Você vê a cotação e o valor chega aqui em USDC.</span>
-                    </span>
-                  </button>
-                  {effMethod === "sodax" && !showCharge ? (
-                    <SodaxQuoteCard
-                      agentId={agent.id}
-                      type={type}
-                      sources={sodaxCfg.sources}
-                      source={sodaxSource}
-                      onSource={setSodaxPick}
-                      onQuote={setSodaxQuote}
-                      disabled={busy}
-                    />
-                  ) : null}
-                </>
-              ) : null}
+              {payOptions}
               {logged && effMethod === "wallet" && balance != null && !enough ? (
                 <Notice
                   tone="warn"
-                  title="Saldo de USDC insuficiente"
+                  title={t("pay.lowTitle")}
                   actions={
                     <>
                       {faucet.enabled ? (
                         <Button size="sm" icon="coin" loading={faucet.pending} onClick={getFaucet}>
-                          Receber {faucet.amountUsdc != null ? usdc(faucet.amountUsdc) : "USDC"} de teste
+                          {t("pay.faucet", { amount: faucet.amountUsdc != null ? f.usdc(faucet.amountUsdc) : t("pay.faucetAnyAmount") })}
                         </Button>
                       ) : null}
                       {pixOn ? (
                         <Button size="sm" variant="secondary" onClick={() => setMethod("pix")}>
-                          Pagar com Pix
+                          {t("pay.payWithPix")}
                         </Button>
                       ) : null}
                     </>
                   }
                 >
-                  Você tem {usdc(balance)} e esta compra custa {usdc(total)}.
+                  {t("pay.lowText", { balance: f.usdc(balance), total: f.usdc(total) })}
                 </Notice>
               ) : null}
               {faucet.error ? (
@@ -699,7 +709,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
             <div className="card pad col" style={gap(16)}>
               <div className="row" style={gap(14)}>
                 <StepDot n={stepReview} />
-                <h2 className="h3">{showSodax ? "Pague com SODAX" : showCharge ? "Pague com Pix" : "Revisar e pagar"}</h2>
+                <h2 className="h3">{showSodax ? t("review.titleSodax") : showCharge ? t("review.titlePix") : t("review.title")}</h2>
               </div>
               {showCharge && charge ? (
                 showSodax ? (
@@ -725,15 +735,14 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                   </button>
                   {touched && isG && (!titleOk || !descOk) ? (
                     <p className="small warn" role="alert">
-                      Dê um título e descreva o que você quer receber (mínimo de {DESC_MIN} caracteres).
+                      {t("review.needTask", { min: DESC_MIN })}
                     </p>
                   ) : null}
                   <Button size="lg" block iconRight="arrow-right" loading={busy} disabled={!canPay} className={canPay ? "" : "off"} onClick={pay}>
-                    {isR ? `Comprar licença usada por ${totalText}` : `Pagar ${totalText}`}
+                    {isR ? t("review.payUsed", { price: totalText }) : t("review.pay", { price: totalText })}
                   </Button>
                   <p className="tiny faint center">
-                    <Icon name="lock" size="s" /> Pagamento protegido.{" "}
-                    {isG ? "O valor fica guardado até você aprovar cada etapa." : "Você recebe a licença assim que ele for confirmado."}
+                    <Icon name="lock" size="s" /> {t("review.protected")} {isG ? t("review.protectedGuarantee") : t("review.protectedLicense")}
                   </p>
                 </>
               )}
@@ -741,25 +750,25 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 <Notice
                   tone="warn"
                   role="alert"
-                  title="O preço do especialista mudou"
+                  title={t("review.priceTitle")}
                   actions={
                     // Pix já pago e creditado: a compra só segue quando a pessoa confirma o novo valor.
                     showCharge && charge?.status === "credited" ? (
                       <Button size="sm" loading={tx.pending} onClick={() => void purchase()}>
-                        Confirmar e pagar {totalText}
+                        {t("review.confirmPay", { price: totalText })}
                       </Button>
                     ) : null
                   }
                 >
                   {priceChange
-                    ? `O preço do especialista mudou de ${money(priceChange.previousUsdc)} para ${money(priceChange.usdc)}. Confira o novo valor e confirme de novo.`
-                    : "O preço do especialista mudou. Confira o novo valor e confirme de novo."}
+                    ? t("review.priceChanged", { from: money(priceChange.previousUsdc), to: money(priceChange.usdc) })
+                    : t("review.priceChangedGeneric")}
                 </Notice>
               ) : null}
               {tx.error?.code === "listing_changed" ? (
                 <Notice tone="warn" role="alert" title={tx.error.title}>
                   {tx.error.listingPriceUsdc != null
-                    ? `O vendedor mudou o preço para ${money(tx.error.listingPriceUsdc)} (${usdc(tx.error.listingPriceUsdc)}). Confira o novo valor e confirme de novo.`
+                    ? t("review.listingChanged", { price: money(tx.error.listingPriceUsdc), usdc: f.usdc(tx.error.listingPriceUsdc) })
                     : tx.error.text}
                 </Notice>
               ) : null}
@@ -769,7 +778,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 </Notice>
               ) : null}
               <p className={tx.pending ? "small muted center" : "sr-only"} role="status" aria-live="polite">
-                {tx.pending ? "Assinando e registrando a compra na rede…" : ""}
+                {tx.pending ? t("review.signing") : ""}
               </p>
               {tx.error && tx.error.code !== "price_changed" && tx.error.code !== "listing_changed" && tx.error.code !== "sold_out" ? (
                 <Notice
@@ -779,19 +788,19 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                   actions={
                     tx.error.code === "listing_not_found" ? (
                       <Button size="sm" href="/resale">
-                        Ver outros anúncios
+                        {t("review.viewOthers")}
                       </Button>
                     ) : tx.error.action === "faucet" && faucet.enabled ? (
                       <Button size="sm" icon="coin" loading={faucet.pending} onClick={getFaucet}>
-                        Receber USDC de teste
+                        {t("review.getFaucet")}
                       </Button>
                     ) : tx.error.action === "login" ? (
                       <Button size="sm" onClick={doLogin}>
-                        Entrar de novo
+                        {t("review.loginAgain")}
                       </Button>
                     ) : tx.error.action === "retry" || (showCharge && charge?.status === "credited") ? (
                       <Button size="sm" icon="refresh" onClick={() => void purchase()}>
-                        Tentar de novo
+                        {t("review.retry")}
                       </Button>
                     ) : null
                   }
@@ -806,7 +815,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
           <aside className="sticky">
             <div className="card pad col" style={gap(18)}>
               {!isR && modes.length > 1 ? (
-                <div className="seg" role="tablist" aria-label="Tipo de compra" style={{ alignSelf: "stretch", display: "flex" }}>
+                <div className="seg" role="tablist" aria-label={t("summary.typeLabel")} style={{ alignSelf: "stretch", display: "flex" }}>
                   {modes.map((m) => (
                     <button
                       key={m.id}
@@ -827,7 +836,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 <Tile category={agent.category} />
                 <div className="grow">
                   <b style={{ fontSize: 17 }}>{agent.name}</b>
-                  <div className="small muted trunc">por {creator.name}</div>
+                  <div className="small muted trunc">{t("summary.by", { creator: creator.name })}</div>
                 </div>
               </div>
               <div className="divider" />
@@ -839,51 +848,49 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 {isR && listing ? (
                   <>
                     <div className="row between" style={gap(12)}>
-                      <span className="muted">Vendido por</span>
+                      <span className="muted">{t("summary.soldBy")}</span>
                       <b className="num flex-none">{short(listing.sellerWallet)}</b>
                     </div>
                     <div className="row between" style={gap(12)}>
-                      <span className="muted">Preço de um novo</span>
+                      <span className="muted">{t("summary.newPrice")}</span>
                       <span className="num flex-none">{money(agent.priceUsdc)}</span>
                     </div>
                   </>
                 ) : null}
                 <div className="row between">
-                  <span className="muted">Taxa de rede</span>
-                  <b className="num ok">Por conta do Solvers</b>
+                  <span className="muted">{t("summary.networkFee")}</span>
+                  <b className="num ok">{t("summary.networkFeeValue")}</b>
                 </div>
               </div>
               <div className="divider" />
               <div className="col" style={gap(2)}>
                 <div className="row between" style={{ alignItems: "baseline" }}>
-                  <span className="bold">Total</span>
+                  <span className="bold">{t("summary.total")}</span>
                   <span className="display num" style={{ fontSize: 44 }}>
                     {totalText}
                   </span>
                 </div>
                 <div className="row between small">
-                  <span className="muted">Preço em USDC</span>
-                  <b className="num">{usdc(total)}</b>
+                  <span className="muted">{t("summary.usdcPrice")}</span>
+                  <b className="num">{f.usdc(total)}</b>
                 </div>
-                {rate != null ? (
+                {f.locale === "en" || rate != null ? (
                   <div className="tiny faint" style={{ marginTop: 6 }}>
-                    Valor em reais pela cotação de referência. 1 USDC = R$ {rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+                    {t("summary.rateNote", { rate: f.num(rate ?? 0, 2) })}
                   </div>
                 ) : null}
               </div>
               {isR ? (
-                <p className="small muted">
-                  Licença usada: a nota do especialista é a mesma, mas as memórias de quem vende não vêm junto. O criador recebe uma parte desta revenda.
-                </p>
+                <p className="small muted">{t("summary.usedNote")}</p>
               ) : null}
               <div>
               {isG ? (
                 <Chip tone="ok" icon="lock">
-                  O valor fica guardado até você aprovar
+                  {t("summary.chipGuarantee")}
                 </Chip>
               ) : (
                 <Chip tone="ok" icon="shield-check">
-                  Licença registrada em seu nome
+                  {t("summary.chipLicense")}
                 </Chip>
               )}
               </div>
@@ -911,54 +918,58 @@ function GStep({ icon, title, children }: { icon: "lock" | "layers" | "eye" | "c
 
 function GuaranteeLevelInfo({ limits, logged, totalUsdc }: { limits: GuaranteeStatus | null; logged: boolean; totalUsdc: number }) {
   const { config } = useSession();
+  const t = useTranslations("checkout.view.level");
+  const f = useFormat();
+  const bold = (c: ReactNode) => <b>{c}</b>;
   const L = config?.guaranteeLimitsUsdc;
   if (!logged || !limits)
     return (
       <div className="row card-flat pad-s" style={gap(12)}>
         <Icon name="info" />
-        <span className="small grow">
-          {L ? (
-            <>
-              Contas novas podem ter até <b>{usdc(L.limited)}</b> em garantias abertas. O nível completo vai até <b>{usdc(L.full)}</b> e sobe conforme você compra e conclui tarefas sem disputas.
-            </>
-          ) : (
-            "Seu limite de garantias sobe conforme você compra e conclui tarefas sem disputas."
-          )}
-        </span>
+        <span className="small grow">{L ? t.rich("newAccounts", { limited: f.usdc(L.limited), full: f.usdc(L.full), b: bold }) : t("generic")}</span>
       </div>
     );
+  const level = f.guaranteeLevel(limits.level).toLowerCase();
   if (limits.availableUsdc + 1e-9 < totalUsdc)
     return (
-      <Notice tone="warn" title="Esta tarefa passa do seu limite de garantias">
-        Seu nível é <b>{GUARANTEE_LEVEL_LABEL[limits.level].toLowerCase()}</b>: até {usdc(limits.limitUsdc)} em garantias abertas, e você já tem {usdc(limits.openUsdc)} em andamento. Cabem mais {usdc(Math.max(0, limits.availableUsdc))} e esta tarefa custa {usdc(totalUsdc)}.
+      <Notice tone="warn" title={t("overTitle")}>
+        {t.rich("overText", {
+          level,
+          limit: f.usdc(limits.limitUsdc),
+          open: f.usdc(limits.openUsdc),
+          available: f.usdc(Math.max(0, limits.availableUsdc)),
+          total: f.usdc(totalUsdc),
+          b: bold,
+        })}
         {limits.purchasesToFull > 0 && L
-          ? ` Faltam ${limits.purchasesToFull} ${limits.purchasesToFull === 1 ? "compra" : "compras"} para o nível completo (até ${usdc(L.full)}).`
+          ? t("toFullMax", { n: limits.purchasesToFull, full: f.usdc(L.full) })
           : limits.disputesLost > limits.maxDisputesLost
-            ? " O limite fica reduzido por causa de disputas perdidas."
-            : " Espere uma tarefa em andamento terminar para abrir outra."}
+            ? t("reduced")
+            : t("wait")}
       </Notice>
     );
   return (
     <div className="row card-flat pad-s" style={gap(12)}>
       <Icon name="info" />
       <span className="small grow">
-        Seu nível de garantia é <b>{GUARANTEE_LEVEL_LABEL[limits.level].toLowerCase()}</b>: até <b>{usdc(limits.limitUsdc)}</b> em garantias abertas (cabem mais {usdc(limits.availableUsdc)}). Ele sobe conforme você compra e conclui tarefas sem disputas.
-        {limits.purchasesToFull > 0 ? ` Faltam ${limits.purchasesToFull} ${limits.purchasesToFull === 1 ? "compra" : "compras"} para o nível completo.` : ""}
+        {t.rich("info", { level, limit: f.usdc(limits.limitUsdc), available: f.usdc(limits.availableUsdc), b: bold })}
+        {limits.purchasesToFull > 0 ? t("toFull", { n: limits.purchasesToFull }) : ""}
       </span>
     </div>
   );
 }
 
 function PrivyLogin({ loading, onLogin }: { loading: boolean; onLogin: () => void }) {
+  const t = useTranslations("checkout.view.login");
   // Só e-mail por enquanto: carteira externa (Phantom etc.) fica para depois.
   return (
     <div className="col" style={gap(14)}>
       <div>
         <Button size="lg" icon="mail" loading={loading} onClick={onLogin}>
-          Continuar com e-mail
+          {t("privyButton")}
         </Button>
       </div>
-      <p className="small muted">Enviamos um código de acesso. Sem carteira? Criamos uma para você automaticamente, e você pode exportá-la depois.</p>
+      <p className="small muted">{t("privyText")}</p>
     </div>
   );
 }

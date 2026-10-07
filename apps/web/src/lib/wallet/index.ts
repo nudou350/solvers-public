@@ -1,4 +1,5 @@
 export type { WalletAdapter, WalletKind, WalletLike } from "./types";
+import { localText } from "../local-text";
 export { createDevAdapter, forgetDevWallet, loadDevWallet } from "./dev";
 
 /** App ID do Privy (build-time). Sem ele, a vitrine usa a carteira de desenvolvimento. */
@@ -10,9 +11,9 @@ export const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || null;
  */
 export const DEV_WALLET_ALLOWED = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ALLOW_DEV_WALLET === "1";
 
-/** Motivo para recusar a carteira de desenvolvimento nesta vitrine/rede (null = pode usar). */
+/** Motivo (no idioma da página) para recusar a carteira de desenvolvimento nesta vitrine/rede (null = pode usar). */
 export function devWalletBlocked(cluster: string | null | undefined): string | null {
-  if (!DEV_WALLET_ALLOWED) return "O login ainda não está configurado nesta vitrine (falta o NEXT_PUBLIC_PRIVY_APP_ID).";
-  if (cluster === "mainnet-beta" || cluster === "mainnet") return "A carteira de teste só funciona nas redes de teste. Na rede principal, entre pelo e-mail.";
+  if (!DEV_WALLET_ALLOWED) return localText("wallet.notConfigured");
+  if (cluster === "mainnet-beta" || cluster === "mainnet") return localText("wallet.mainnetBlocked");
   return null;
 }

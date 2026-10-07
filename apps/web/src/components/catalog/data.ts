@@ -1,5 +1,6 @@
 // Tipos e helpers do catálogo (home, especialista, criador).
 // Formatação, selo de reputação e duração em lib/format; explorador e rede em lib/explorer; --gap em lib/style.
+// O texto de contestações perdidas vive em messages/<locale>/catalog.json (chave "disputes").
 import type { Creator } from "@solvers/api-client";
 
 /** Criador resumido para os cards: nome e reputação (de getCreators()). */
@@ -12,9 +13,3 @@ export function creatorMap(list: Creator[]): CreatorMap {
 
 export const agentHref = (slug: string) => `/solvers/${encodeURIComponent(slug)}`;
 export const creatorHref = (id: string) => `/creators/${encodeURIComponent(id)}`;
-
-/** "Nenhuma contestação perdida" / "1 contestação perdida" / "3 contestações perdidas". */
-export function disputesText(n: number): string {
-  if (n === 0) return "Nenhuma contestação perdida";
-  return n === 1 ? "1 contestação perdida" : `${n} contestações perdidas`;
-}

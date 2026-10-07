@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { ConnectView } from "@/components/connect/ConnectView";
 
-export const metadata: Metadata = { title: "Conectar ao Claude ou ChatGPT", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("connect.meta");
+  return { title: t("title"), robots: { index: false } };
+}
 
 // Destino do /oauth/authorize do servidor: tela de consentimento do conector.
 export default async function ConnectPage({ searchParams }: PageProps<"/[locale]/connect">) {

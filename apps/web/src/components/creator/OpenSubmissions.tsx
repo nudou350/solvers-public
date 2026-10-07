@@ -2,6 +2,7 @@
 // Cartão do painel do criador (/creator): envios em andamento. Some sozinho se não há nenhum ou se a lista não carrega
 // (o painel continua útil sem ele).
 import { SUBMISSION_OPEN_STATUSES, type SubmissionView } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
 import { Ago } from "@/components/ui/Ago";
@@ -15,6 +16,7 @@ import { StatusChip } from "./SubmissionParts";
 const SHOWN = 3;
 
 export function OpenSubmissions() {
+  const t = useTranslations("submissions");
   const { api, me } = useSession();
   const [items, setItems] = useState<SubmissionView[] | null>(null);
 
@@ -34,10 +36,10 @@ export function OpenSubmissions() {
     <section className="card pad-s" style={{ padding: "8px 24px", marginBottom: 24 }} aria-labelledby="open-subs">
       <div className="row between wrapx" style={{ padding: "14px 0" }}>
         <h2 className="h3" id="open-subs">
-          Envios em andamento
+          {t("open.title")}
         </h2>
         <Button variant="secondary" href="/creator/submissions">
-          Ver todos os envios
+          {t("open.viewAll")}
         </Button>
       </div>
       <ul style={{ borderTop: "1px solid var(--line)" }}>
@@ -51,15 +53,15 @@ export function OpenSubmissions() {
                 <span className="tiny faint">v{it.version}</span>
                 <StatusChip status={it.status} nextAction={it.nextAction} />
               </div>
-              <span className="small muted">{statusInfo(it.status, it.nextAction).text}</span>
+              <span className="small muted">{statusInfo(t, it.status, it.nextAction).text}</span>
               <span className="tiny faint">
-                Atualizado <Ago iso={it.updatedAt} />
+                {t.rich("open.updated", { updated: () => <Ago iso={it.updatedAt} /> })}
               </span>
             </div>
           </li>
         ))}
       </ul>
-      {items.length > SHOWN ? <p className="small muted" style={{ padding: "0 0 14px" }}>E mais {items.length - SHOWN} em andamento.</p> : null}
+      {items.length > SHOWN ? <p className="small muted" style={{ padding: "0 0 14px" }}>{t("open.more", { n: items.length - SHOWN })}</p> : null}
     </section>
   );
 }

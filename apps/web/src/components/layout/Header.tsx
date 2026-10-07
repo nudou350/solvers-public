@@ -1,22 +1,26 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
+import { useErrorText } from "@/lib/error-text";
 import { initials, short } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
 
-type NavItem = { href: string; label: string; short: string; icon: IconName };
+// `key` aponta para common.json -> nav.<key> (rótulo) e nav.<key>Short (rótulo curto da barra inferior).
+type NavItem = { href: string; key: "explore" | "resale" | "library" | "guarantees" | "creators"; icon: IconName };
 
 export const NAV: NavItem[] = [
-  { href: "/", label: "Explorar", short: "Explorar", icon: "home" },
-  { href: "/resale", label: "Revenda", short: "Revenda", icon: "tag" },
-  { href: "/library", label: "Minha biblioteca", short: "Biblioteca", icon: "library" },
-  { href: "/guarantees", label: "Garantias", short: "Garantias", icon: "shield-check" },
-  { href: "/creator", label: "Para criadores", short: "Criador", icon: "pen" },
+  { href: "/", key: "explore", icon: "home" },
+  { href: "/resale", key: "resale", icon: "tag" },
+  { href: "/library", key: "library", icon: "library" },
+  { href: "/guarantees", key: "guarantees", icon: "shield-check" },
+  { href: "/creator", key: "creators", icon: "pen" },
 ];
 
 export function isActive(pathname: string, href: string) {
@@ -25,8 +29,9 @@ export function isActive(pathname: string, href: string) {
 }
 
 export function Logo() {
+  const t = useTranslations("common.header");
   return (
-    <Link className="logo" href="/" aria-label="Solvers, página inicial">
+    <Link className="logo" href="/" aria-label={t("logoLabel")}>
       <span className="logo-mark">
         <Icon name="diamond" size="s" />
       </span>
@@ -38,6 +43,8 @@ export function Logo() {
 function Account() {
   const { status, me, login, loggingIn, logout, walletKind, switchDevWallet } = useSession();
   const toast = useToast();
+  const t = useTranslations("common.header");
+  const errorText = useErrorText();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,10 +75,10 @@ function Account() {
         variant="primary"
         loading={loggingIn}
         onClick={() =>
-          login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }))
+          login().catch((e: unknown) => toast({ tone: "bad", title: t("signInFailed"), text: errorText(e) }))
         }
       >
-        Entrar
+        {t("signIn")}
       </Button>
     );
   const name = me.displayName ?? short(me.wallet);
@@ -83,7 +90,7 @@ function Account() {
       await fn();
       setOpen(false);
     } catch (e) {
-      toast({ tone: "bad", title: fail, text: (e as Error).message });
+      toast({ tone: "bad", title: fail, text: errorText(e) });
     } finally {
       setBusy(false);
     }
@@ -91,7 +98,7 @@ function Account() {
 
   return (
     <div className="acct" ref={box}>
-      <button type="button" className="me-pill" aria-expanded={open} aria-controls="menu-conta" onClick={() => setOpen(!open)} aria-label={`Minha conta: ${name}`}>
+      <button type="button" className="me-pill" aria-expanded={open} aria-controls="menu-conta" onClick={() => setOpen(!open)} aria-label={t("myAccount", { name })}>
         <span className="av av-s">{me.displayName ? initials(name) : me.wallet.slice(0, 2).toUpperCase()}</span>
         <span className="me-name">{first}</span>
       </button>
@@ -99,7 +106,7 @@ function Account() {
         <div className="acct-menu card" id="menu-conta">
           <div className="acct-who">
             <b className="trunc" style={{ display: "block" }}>
-              {me.displayName ?? (walletKind === "dev" ? "Carteira de teste" : "Sua conta")}
+              {me.displayName ?? (walletKind === "dev" ? t("testWallet") : t("yourAccount"))}
             </b>
             <span className="tiny faint">
               {me.email ? `${me.email} · ` : ""}
@@ -108,21 +115,21 @@ function Account() {
           </div>
           <Link href="/profile">
             <Icon name="user" size="s" />
-            Meu perfil
+            {t("myProfile")}
           </Link>
           <Link href="/library">
             <Icon name="library" size="s" />
-            Minha biblioteca
+            {t("myLibrary")}
           </Link>
           {walletKind === "dev" ? (
-            <button type="button" disabled={busy} onClick={act(switchDevWallet, "Não deu para trocar de carteira")}>
+            <button type="button" disabled={busy} onClick={act(switchDevWallet, t("switchWalletFailed"))}>
               <Icon name="wallet" size="s" />
-              Usar outra carteira de teste
+              {t("useOtherTestWallet")}
             </button>
           ) : null}
-          <button type="button" disabled={busy} onClick={act(logout, "Não deu para sair")}>
+          <button type="button" disabled={busy} onClick={act(logout, t("signOutFailed"))}>
             <Icon name="arrow-right" size="s" />
-            Sair
+            {t("signOut")}
           </button>
         </div>
       ) : null}
@@ -132,21 +139,23 @@ function Account() {
 
 export function Header() {
   const pathname = usePathname() ?? "/";
+  const t = useTranslations("common");
   return (
     <header className="nav">
       <div className="wrap">
         <Logo />
-        <nav className="nav-links" aria-label="Principal">
+        <nav className="nav-links" aria-label={t("header.mainNav")}>
           {NAV.map((n) => {
             const on = isActive(pathname, n.href);
             return (
               <Link key={n.href} href={n.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
-                {n.label}
+                {t(`nav.${n.key}`)}
               </Link>
             );
           })}
         </nav>
         <div className="nav-actions">
+          <LocaleSwitcher />
           <ThemeToggle />
           <Account />
         </div>
@@ -158,14 +167,15 @@ export function Header() {
 /** Barra de navegação inferior (só no celular, pelo CSS do design). */
 export function TabBar() {
   const pathname = usePathname() ?? "/";
+  const t = useTranslations("common");
   return (
-    <nav className="tabbar" aria-label="Navegação">
+    <nav className="tabbar" aria-label={t("header.tabbar")}>
       {NAV.map((n) => {
         const on = isActive(pathname, n.href);
         return (
           <Link key={n.href} href={n.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
             <Icon name={n.icon} size="l" />
-            <span>{n.short}</span>
+            <span>{t(`nav.${n.key}Short`)}</span>
           </Link>
         );
       })}

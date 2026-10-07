@@ -2,6 +2,7 @@
 // Avaliar o especialista (estrelas + texto). Quem chama já sabe que a conta tem a licença; o servidor confere de novo.
 // A avaliação é uma por conta: se já existe, o formulário abre com ela preenchida e "Atualizar" a substitui.
 import { MAX_IMAGE_UPLOAD_BYTES, MAX_REVIEW_IMAGES, type ImageRef } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -9,24 +10,18 @@ import { Icon } from "@/components/ui/Icon";
 import { Notice, useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
 import { compressImage, ImageCompressError } from "@/lib/image-compress";
+import { useErrorText } from "@/lib/error-text";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { useTx } from "@/lib/tx";
 
 const TEXT_MAX = 2000;
-const LABELS = ["Ruim", "Fraco", "Bom", "Muito bom", "Excelente"] as const;
+const LABEL_KEYS = ["label1", "label2", "label3", "label4", "label5"] as const;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PHOTO_MB = MAX_IMAGE_UPLOAD_BYTES / (1024 * 1024);
 
 /** Foto escolhida no aparelho, ainda não enviada. */
 type Picked = { key: number; file: File; url: string };
-
-/** Mensagem curta em português para uma falha de envio/remoção de foto. */
-function photoErrorText(e: unknown): string {
-  if (e instanceof ImageCompressError) return e.message;
-  if (e instanceof ApiError) return e.code === "image_unavailable" ? "O envio de fotos está indisponível agora." : e.message;
-  return "Tente de novo.";
-}
 
 export function ReviewBox({
   agentId,
@@ -42,6 +37,8 @@ export function ReviewBox({
   onSaved?: () => void;
   onCancel?: () => void;
 }) {
+  const t = useTranslations("catalog.review");
+  const errorText = useErrorText();
   const { api, me } = useSession();
   const toast = useToast();
   const router = useRouter();
@@ -93,6 +90,13 @@ export function ReviewBox({
     };
   }, [api, slug, wallet]);
 
+  /** Mensagem curta, no idioma da página, para uma falha de envio/remoção de foto. */
+  function photoErrorText(e: unknown): string {
+    if (e instanceof ImageCompressError) return e.message;
+    if (e instanceof ApiError) return e.code === "image_unavailable" ? t("photoUnavailable") : errorText(e);
+    return t("tryAgain");
+  }
+
   const total = existing.length + picked.length;
   const busy = tx.pending || uploading;
 
@@ -104,9 +108,9 @@ export function ReviewBox({
     const add: Picked[] = [];
     let msg: string | null = null;
     for (const file of files) {
-      if (!PHOTO_TYPES.includes(file.type)) msg = `"${file.name}" não é uma foto JPG, PNG ou WebP.`;
-      else if (file.size > MAX_IMAGE_UPLOAD_BYTES) msg = `"${file.name}" passa de ${PHOTO_MB} MB.`;
-      else if (room <= 0) msg = `Você pode anexar até ${MAX_REVIEW_IMAGES} fotos.`;
+      if (!PHOTO_TYPES.includes(file.type)) msg = t("notPhoto", { name: file.name });
+      else if (file.size > MAX_IMAGE_UPLOAD_BYTES) msg = t("tooBig", { name: file.name, mb: PHOTO_MB });
+      else if (room <= 0) msg = t("tooMany", { max: MAX_REVIEW_IMAGES });
       else {
         add.push({ key: ++seq.current, file, url: URL.createObjectURL(file) });
         room--;
@@ -130,7 +134,7 @@ export function ReviewBox({
       setExisting(await api.deleteReviewImage(slug, id));
       router.refresh();
     } catch (e) {
-      setPhotoError(`Não deu para remover a foto. ${photoErrorText(e)}`);
+      setPhotoError(t("removeFailed", { detail: photoErrorText(e) }));
     } finally {
       setRemoving(null);
     }
@@ -170,18 +174,18 @@ export function ReviewBox({
     const photosOk = await uploadPicked();
     router.refresh();
     if (photosOk) {
-      toast({ tone: "ok", title: "Avaliação publicada", text: "Obrigado por contar como foi." });
+      toast({ tone: "ok", title: t("toastOk"), text: t("toastOkText") });
       onSaved?.();
     } else {
       // A avaliação não é desfeita; o formulário fica aberto (sem onSaved) para tentar as fotos de novo.
-      toast({ tone: "warn", title: "Avaliação publicada, mas faltam fotos", text: "Veja o aviso no formulário para enviar de novo." });
+      toast({ tone: "warn", title: t("toastPartial"), text: t("toastPartialText") });
     }
   }
 
   /** Só as fotos, sem publicar a avaliação de novo (ela já existe). */
   async function sendPhotosOnly() {
     if (!(await uploadPicked())) return;
-    toast({ tone: "ok", title: "Fotos enviadas" });
+    toast({ tone: "ok", title: t("toastPhotos") });
     router.refresh();
     onSaved?.();
   }
@@ -201,15 +205,16 @@ export function ReviewBox({
     >
       <div className="col" style={gap(2)}>
         <h3 className="h4" id={`${textId}-t`}>
-          {had ? "Sua avaliação" : "Avaliar este especialista"}
+          {had ? t("titleEdit") : t("titleNew")}
         </h3>
         <span className="small muted">
-          {had ? "Você já avaliou. Mude o que quiser e atualize." : "Você comprou este especialista, então a sua opinião ajuda quem vem depois."}
+          {had ? t("subEdit") : t("subNew")}
         </span>
       </div>
       <div className="col" style={gap(6)}>
-        <div className="row" style={gap(4)} role="radiogroup" aria-label="Sua nota de 1 a 5">
-          {LABELS.map((label, i) => {
+        <div className="row" style={gap(4)} role="radiogroup" aria-label={t("ratingGroup")}>
+          {LABEL_KEYS.map((labelKey, i) => {
+            const label = t(labelKey);
             const n = i + 1;
             const on = n <= rating;
             return (
@@ -218,7 +223,7 @@ export function ReviewBox({
                 type="button"
                 role="radio"
                 aria-checked={rating === n}
-                aria-label={`${n} de 5: ${label}`}
+                aria-label={t("ratingOption", { n, label })}
                 title={label}
                 onClick={() => {
                   dirty.current = true;
@@ -242,25 +247,25 @@ export function ReviewBox({
             );
           })}
           <span className="small muted" aria-live="polite" style={{ marginLeft: 8 }}>
-            {rating > 0 ? LABELS[rating - 1] : ""}
+            {rating > 0 ? t(LABEL_KEYS[rating - 1] ?? "label1") : ""}
           </span>
         </div>
         {missingRating ? (
           <span className="small warn" role="alert">
-            Escolha uma nota de 1 a 5.
+            {t("pickRating")}
           </span>
         ) : null}
       </div>
       <div className="field">
         <label className="label" htmlFor={textId}>
-          Conte como foi (opcional)
+          {t("textLabel")}
         </label>
         <textarea
           id={textId}
           className="textarea"
           value={text}
           maxLength={TEXT_MAX}
-          placeholder="O que você pediu, o que funcionou e o que poderia melhorar."
+          placeholder={t("textPlaceholder")}
           disabled={busy}
           onChange={(e) => {
             dirty.current = true;
@@ -273,15 +278,15 @@ export function ReviewBox({
       </div>
       <div className="field">
         <span className="label" id={`${textId}-p`}>
-          Fotos (opcional)
+          {t("photosLabel")}
         </span>
         <div className="photo-grid" role="group" aria-labelledby={`${textId}-p`} style={{ paddingBottom: 0 }}>
           {existing.map((im) => (
             <div key={im.id} className="photo-slot">
               <span className="photo-thumb">
-                <img src={im.thumbUrl} alt="Foto anexada à sua avaliação" width={88} height={88} loading="lazy" decoding="async" />
+                <img src={im.thumbUrl} alt={t("attachedAlt")} width={88} height={88} loading="lazy" decoding="async" />
               </span>
-              <button type="button" className="photo-x" aria-label="Remover foto anexada" disabled={busy || removing === im.id} onClick={() => void removeExisting(im.id)}>
+              <button type="button" className="photo-x" aria-label={t("removeAttached")} disabled={busy || removing === im.id} onClick={() => void removeExisting(im.id)}>
                 <Icon name="x" size="s" />
               </button>
             </div>
@@ -289,9 +294,9 @@ export function ReviewBox({
           {picked.map((p) => (
             <div key={p.key} className="photo-slot">
               <span className="photo-thumb">
-                <img src={p.url} alt={`Prévia de ${p.file.name}`} width={88} height={88} />
+                <img src={p.url} alt={t("previewAlt", { name: p.file.name })} width={88} height={88} />
               </span>
-              <button type="button" className="photo-x" aria-label={`Tirar ${p.file.name}`} disabled={busy} onClick={() => dropPicked(p.key)}>
+              <button type="button" className="photo-x" aria-label={t("removePicked", { name: p.file.name })} disabled={busy} onClick={() => dropPicked(p.key)}>
                 <Icon name="x" size="s" />
               </button>
             </div>
@@ -299,13 +304,13 @@ export function ReviewBox({
           {total < MAX_REVIEW_IMAGES ? (
             <label className={["photo-add", busy ? "is-off" : ""].filter(Boolean).join(" ")}>
               <Icon name="upload" />
-              <span>Adicionar foto</span>
+              <span>{t("addPhoto")}</span>
               <input type="file" accept={PHOTO_TYPES.join(",")} multiple disabled={busy} onChange={addPhotos} />
             </label>
           ) : null}
         </div>
         <span className="hint">
-          Até {MAX_REVIEW_IMAGES} fotos (JPG, PNG ou WebP, {PHOTO_MB} MB cada), enviadas depois que a avaliação for publicada. Cubra dados pessoais (valores, nomes, documentos) antes de enviar.
+          {t("photosHint", { max: MAX_REVIEW_IMAGES, mb: PHOTO_MB })}
         </span>
         {photoError ? (
           <span className="small warn" role="alert">
@@ -314,11 +319,11 @@ export function ReviewBox({
         ) : null}
       </div>
       {failed.length ? (
-        <Notice tone="warn" role="alert" title="Algumas fotos não subiram">
-          {failed.map((f) => `${f.name}: ${f.text}`).join(" ")} A avaliação já está publicada; tente enviar as fotos de novo.
+        <Notice tone="warn" role="alert" title={t("failedTitle")}>
+          {t("failedBody", { list: failed.map((f) => `${f.name}: ${f.text}`).join(" ") })}
         </Notice>
       ) : null}
-      <p className="tiny faint">A avaliação fica pública, com o nome do seu perfil. Não há custo para você.</p>
+      <p className="tiny faint">{t("publicNote")}</p>
       {tx.error ? (
         <Notice tone="bad" role="alert" title={tx.error.title}>
           {tx.error.text}
@@ -326,16 +331,16 @@ export function ReviewBox({
       ) : null}
       <div className="row wrapx" style={gap(10)}>
         <Button type="submit" loading={busy}>
-          {had ? "Atualizar avaliação" : "Publicar avaliação"}
+          {had ? t("update") : t("publish")}
         </Button>
         {had && picked.length > 0 ? (
           <Button variant="secondary" onClick={() => void sendPhotosOnly()} disabled={busy}>
-            Enviar só as fotos
+            {t("photosOnly")}
           </Button>
         ) : null}
         {onCancel ? (
           <Button variant="ghost" onClick={onCancel} disabled={busy}>
-            Cancelar
+            {t("cancel")}
           </Button>
         ) : null}
       </div>

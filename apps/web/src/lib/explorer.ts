@@ -1,5 +1,7 @@
 // Explorador da Solana e nome da rede, a partir da config pública (getConfig()).
 import type { PublicConfig } from "@solvers/api-client";
+import type { Locale } from "@/i18n/routing";
+import { localText } from "./local-text";
 
 type ClusterInfo = Pick<PublicConfig, "cluster" | "rpcUrl">;
 
@@ -42,10 +44,10 @@ export function trustedExplorerUrl(v: string | null | undefined): string | null 
   }
 }
 
-/** Nome da rede para as pessoas. */
-export function clusterName(cluster: string): string {
-  if (isMainnet(cluster)) return "Solana (rede principal)";
-  if (cluster === "devnet") return "Solana Devnet (rede de testes)";
-  if (cluster === "testnet") return "Solana Testnet (rede de testes)";
-  return "Rede local de testes (localnet)";
+/** Nome da rede para as pessoas, no idioma da página (sem `locale`: o do navegador; componente de servidor passa o dele). */
+export function clusterName(cluster: string, locale?: Locale): string {
+  if (isMainnet(cluster)) return localText("cluster.mainnet", undefined, locale);
+  if (cluster === "devnet") return localText("cluster.devnet", undefined, locale);
+  if (cluster === "testnet") return localText("cluster.testnet", undefined, locale);
+  return localText("cluster.local", undefined, locale);
 }

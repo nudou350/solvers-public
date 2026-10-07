@@ -5,26 +5,30 @@
 // liga a assinatura à submissão e avança o fluxo.
 import type { CreatorSigningStep, PublicationPlan, SubmissionView } from "@solvers/api-client";
 import { CREATOR_SIGNING_STEPS } from "@solvers/api-client";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Notice, useToast } from "@/components/ui/Toast";
+import { useErrorText } from "@/lib/error-text";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { runTx, txErrorMessage, useFaucet, type TxErrorInfo } from "@/lib/tx";
+import { runTx, useFaucet, useTxErrorMessage, type TxErrorInfo } from "@/lib/tx";
 import { loadErrorText } from "@/lib/submissions-ui";
 
 const isSigning = (step: PublicationPlan["step"]): step is CreatorSigningStep => step !== null && (CREATOR_SIGNING_STEPS as readonly string[]).includes(step);
 
-const BUTTON: Record<CreatorSigningStep, string> = {
-  "register-agent": "Confirmar o cadastro",
-  "update-version": "Confirmar a atualização",
-  "update-pricing": "Confirmar o novo preço",
-};
-
-const usdc = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-
 export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Promise<void> }) {
+  const t = useTranslations("creator.cosign");
+  const tSub = useTranslations("submissions");
+  const f = useFormat();
+  const errorText = useErrorText();
+  const txError = useTxErrorMessage();
+  const usdc = (n: number) => f.num(n, 0, 2);
+  // Tradutores por ref: mudam a cada render e não devem refazer a busca do plano.
+  const loadMsg = useRef((e: unknown) => String(e));
+  loadMsg.current = (e) => loadErrorText(tSub, e, errorText);
   const { api, requireWallet, login } = useSession();
   const toast = useToast();
   const faucet = useFaucet();
@@ -38,7 +42,7 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
       setPlan(await api.getPublicationPlan(sub.id));
       setPlanError(null);
     } catch (e) {
-      setPlanError(loadErrorText(e));
+      setPlanError(loadMsg.current(e));
     }
   }, [api, sub.id]);
 
@@ -65,9 +69,9 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
         setPlan(next);
         step = next.step;
       }
-      toast({ tone: "ok", title: "Confirmação registrada", text: "A equipe faz o resto. Acompanhe por aqui." });
+      toast({ tone: "ok", title: t("toast.title"), text: t("toast.text") });
     } catch (e) {
-      setError(txErrorMessage(e));
+      setError(txError(e));
     } finally {
       setPending(false);
       await onDone();
@@ -85,29 +89,25 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
 
   if (planError) {
     return (
-      <Notice tone="warn" title="Não deu para ver o que falta" role="status" actions={<Button size="sm" onClick={() => void loadPlan()}>Tentar de novo</Button>}>
+      <Notice tone="warn" title={t("planFailTitle")} role="status" actions={<Button size="sm" onClick={() => void loadPlan()}>{t("retry")}</Button>}>
         {planError}
       </Notice>
     );
   }
-  if (!plan) return <div className="card pad small muted">Conferindo o que falta para publicar…</div>;
+  if (!plan) return <div className="card pad small muted">{t("checking")}</div>;
 
   if (step === "blocked") {
     return (
-      <Notice tone="bad" title="Este especialista está bloqueado na rede" role="alert">
-        Ele está suspenso ou registrado por outra conta. Fale com a equipe.
+      <Notice tone="bad" title={t("blockedTitle")} role="alert">
+        {t("blockedText")}
       </Notice>
     );
   }
   if (!isSigning(step)) {
     return (
       <div className="card pad col" style={gap(6)}>
-        <h2 className="h3">{step === "await-admin-approval" ? "Falta a aprovação final da equipe" : "Tudo certo na rede"}</h2>
-        <p className="muted">
-          {step === "await-admin-approval"
-            ? "Você já confirmou. Assim que a equipe fizer a aprovação final, o especialista entra na vitrine."
-            : "A publicação está sendo concluída. Esta página se atualiza sozinha."}
-        </p>
+        <h2 className="h3">{step === "await-admin-approval" ? t("awaitTitle") : t("doneTitle")}</h2>
+        <p className="muted">{step === "await-admin-approval" ? t("awaitText") : t("doneText")}</p>
       </div>
     );
   }
@@ -116,42 +116,39 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
   return (
     <div className="card pad col" style={gap(16, { borderColor: "var(--amber)" })}>
       <div className="col" style={gap(4)}>
-        <h2 className="h3">{plan.label ?? (isRegister ? "Confirme o cadastro do especialista" : step === "update-pricing" ? "Confirme o novo preço" : "Confirme a nova versão")}</h2>
+        <h2 className="h3">{plan.label ?? (isRegister ? t("title.register") : step === "update-pricing" ? t("title.pricing") : t("title.version"))}</h2>
         <p className="muted">
-          {isRegister
-            ? "A equipe aprovou o pacote. Falta você confirmar com a sua conta, uma única vez, para registrar o especialista como seu."
-            : step === "update-pricing"
-              ? "A versão já está na rede. Falta confirmar o preço aprovado."
-              : "A equipe aprovou a nova versão. Falta você confirmar a atualização com a sua conta."}
+          {isRegister ? t("text.register") : step === "update-pricing" ? t("text.pricing") : t("text.version")}
         </p>
       </div>
       <ul className="col small" style={gap(8)}>
-        <Li>A taxa da rede é do Solvers.</Li>
+        <Li>{t("li.fee")}</Li>
         <Li>
-          Preço, nome e versão vêm do que a equipe aprovou
-          {plan.approved ? ` (${plan.approved.name} v${plan.approved.version}, ${usdc(plan.approved.priceUsdc)} USDC)` : ""}. Você não precisa digitar nada.
+          {plan.approved
+            ? t("li.approved", { name: plan.approved.name, version: plan.approved.version, price: usdc(plan.approved.priceUsdc) })
+            : t("li.approvedShort")}
         </Li>
         {register ? (
           <Li>
-            O programa cobra um depósito de {usdc(register.stakeUsdc)} USDC no cadastro. Seu saldo: {usdc(register.balanceUsdc)} USDC.
+            {t("li.stake", { stake: usdc(register.stakeUsdc), balance: usdc(register.balanceUsdc) })}
           </Li>
         ) : null}
-        {isRegister ? <Li>Depois da sua confirmação, a equipe faz a aprovação final e o especialista entra na vitrine.</Li> : <Li>Depois da sua confirmação, a nova versão entra no ar.</Li>}
+        {isRegister ? <Li>{t("li.afterRegister")}</Li> : <Li>{t("li.afterUpdate")}</Li>}
       </ul>
       {missing ? (
         <Notice
           tone="warn"
-          title="Saldo de USDC insuficiente para o depósito"
+          title={t("lowTitle")}
           role="status"
           actions={
             register.faucetEnabled ? (
               <Button size="sm" loading={faucet.pending} onClick={() => void receiveFaucet()}>
-                Receber USDC de teste
+                {t("faucet")}
               </Button>
             ) : null
           }
         >
-          Faltam {usdc(register.stakeUsdc - register.balanceUsdc)} USDC para o depósito.
+          {t("lowText", { missing: usdc(register.stakeUsdc - register.balanceUsdc) })}
         </Notice>
       ) : null}
       {error ? (
@@ -162,11 +159,11 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
           actions={
             error.action === "login" ? (
               <Button size="sm" onClick={() => void login().catch(() => {})}>
-                Entrar de novo
+                {t("relogin")}
               </Button>
             ) : error.action === "faucet" && faucet.enabled ? (
               <Button size="sm" loading={faucet.pending} onClick={() => void receiveFaucet()}>
-                Receber USDC de teste
+                {t("faucet")}
               </Button>
             ) : null
           }
@@ -176,10 +173,10 @@ export function CoSign({ sub, onDone }: { sub: SubmissionView; onDone: () => Pro
       ) : null}
       <div className="row wrapx" style={gap(12)}>
         <Button size="lg" loading={pending} disabled={!!missing} onClick={() => void sign()}>
-          {error?.action === "retry" ? "Tentar de novo" : BUTTON[step]}
+          {error?.action === "retry" ? t("retryBtn") : t(`button.${step}`)}
         </Button>
       </div>
-      <p className="tiny faint">Uma janela do seu login pode abrir para você confirmar. A confirmação vale por poucos minutos: se demorar, é só tentar de novo.</p>
+      <p className="tiny faint">{t("footnote")}</p>
     </div>
   );
 }

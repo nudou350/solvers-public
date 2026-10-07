@@ -12,6 +12,7 @@ import {
   partiallySignTransaction,
   signBytes,
 } from "@solana/kit";
+import { localText } from "../local-text";
 import type { WalletAdapter, WalletLike } from "./types";
 
 const STORAGE_KEY = "solvers.devWallet.v1";
@@ -63,7 +64,7 @@ export function loadDevWallet(create: boolean): Promise<WalletLike> | null {
   }
   cached = devWalletFromSeed(seed).catch((e: unknown) => {
     cached = null;
-    throw new Error(`Este navegador não suporta chaves Ed25519 (WebCrypto): ${(e as Error).message}`);
+    throw new Error(localText("wallet.noEd25519", { detail: (e as Error).message }));
   });
   return cached;
 }

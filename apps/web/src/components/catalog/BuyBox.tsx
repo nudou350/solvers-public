@@ -1,13 +1,13 @@
 "use client";
 import type { AgentSupply, TrialInfo } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { brlValue, usdc } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { useMyAccess } from "@/lib/hooks";
 import { gap } from "@/lib/style";
-import { usesText } from "./TrialBlock";
 
 export type BuyBoxProps = {
   slug: string;
@@ -30,29 +30,30 @@ export type BuyBoxProps = {
 
 /** Caixa da página de um especialista da plataforma: sem preço nem compra, só como instalar. */
 function PlatformBox({ slug }: { slug: string }) {
+  const t = useTranslations("catalog.buy");
   const install = `/install?agent=${encodeURIComponent(slug)}`;
   return (
     <div className="card" style={{ overflow: "hidden" }}>
       <div className="sol-line" style={{ borderRadius: 0, height: 4 }} />
       <div className="pad col" style={gap("18px")}>
         <div className="col" style={gap("4px")}>
-          <span className="eyebrow">Incluído na plataforma</span>
+          <span className="eyebrow">{t("platformTitle")}</span>
           <span className="display big num" style={{ fontSize: 56, whiteSpace: "nowrap" }}>
-            Gratuito
+            {t("free")}
           </span>
-          <span className="small faint">Sem compra, sem licença e sem pagamento.</span>
+          <span className="small faint">{t("noPurchase")}</span>
         </div>
         <Button href={install} size="lg" block iconRight="arrow-right">
-          Instalar na minha IA
+          {t("install")}
         </Button>
         <ol className="col small" style={gap("10px")}>
-          <Step n={1}>Copie o endereço do conector do Solvers.</Step>
-          <Step n={2}>Cole no Claude ou no ChatGPT e autorize com a sua conta.</Step>
-          <Step n={3}>Peça o que você precisa e cite o especialista pelo nome.</Step>
+          <Step n={1}>{t("step1")}</Step>
+          <Step n={2}>{t("step2")}</Step>
+          <Step n={3}>{t("step3")}</Step>
         </ol>
         <ul className="col small" style={gap("10px")}>
-          <Check>O mesmo conector serve para todos os especialistas que você tiver.</Check>
-          <Check>Você só precisa entrar na sua conta do Solvers.</Check>
+          <Check>{t("check1")}</Check>
+          <Check>{t("check2")}</Check>
         </ul>
       </div>
     </div>
@@ -77,8 +78,12 @@ export function BuyBox(p: BuyBoxProps) {
 }
 
 function PaidBox(p: BuyBoxProps) {
+  const t = useTranslations("catalog.buy");
+  const tTrial = useTranslations("catalog.trial");
+  const f = useFormat();
   const access = useMyAccess(p.slug);
-  const price = p.priceBrl != null ? brlValue(p.priceBrl) : brlValue(p.priceUsdc * p.rate);
+  // pt: reais (valor fixado pelo criador, se houver, senão pela cotação); en: dólar 1:1 com o USDC.
+  const price = f.locale === "pt" ? (p.priceBrl != null ? f.brlValue(p.priceBrl) : f.brlValue(p.priceUsdc * p.rate)) : f.brl(p.priceUsdc, p.rate);
   const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=permanent`;
   const install = `/install?agent=${encodeURIComponent(p.slug)}`;
   const owned = !!access?.license;
@@ -95,18 +100,18 @@ function PaidBox(p: BuyBoxProps) {
           <div className="note note-ok" role="status">
             <Icon name="check-circle" />
             <div className="note-body">
-              <span className="note-title">Você já tem este especialista</span>
-              <span className="small">Sua licença permanente está ativa. Conecte à sua IA para usar.</span>
+              <span className="note-title">{t("ownedTitle")}</span>
+              <span className="small">{t("ownedBody")}</span>
               <div className="note-actions">
                 <Button href={install} size="sm" iconRight="arrow-right">
-                  Ir para a instalação
+                  {t("goInstall")}
                 </Button>
                 <Button href="/library" size="sm" variant="secondary">
-                  Minha biblioteca
+                  {t("library")}
                 </Button>
                 {p.resaleOn ? (
                   <Button href="/library" size="sm" variant="ghost" icon="tag">
-                    Anunciar minha licença
+                    {t("listLicense")}
                   </Button>
                 ) : null}
               </div>
@@ -116,40 +121,40 @@ function PaidBox(p: BuyBoxProps) {
         {owned ? null : (
           <>
             <div className="col" style={gap("2px")}>
-              <span className="eyebrow">Licença permanente</span>
+              <span className="eyebrow">{t("permanent")}</span>
               <div className="row price-row" style={gap("10px", { alignItems: "baseline" })}>
                 <span className="display big num price-big" style={{ fontSize: 60, whiteSpace: "nowrap" }}>
                   {price}
                 </span>
-                <span className="muted">pagamento único</span>
+                <span className="muted">{t("oneTime")}</span>
               </div>
-              <span className="small faint">{usdc(p.priceUsdc)} · cotação de hoje</span>
+              <span className="small faint">{t("rate", { usdc: f.usdc(p.priceUsdc) })}</span>
             </div>
             {limited && p.supply ? (
               <span className="small" role="status">
-                <Icon name="tag" size="s" /> <b>Restam {p.supply.left} de {p.supply.max} licenças.</b> Limite atual verificado na blockchain; o criador só pode aumentá-lo, nunca reduzi-lo.
+                <Icon name="tag" size="s" /> {t.rich("supplyLeft", { left: p.supply.left ?? 0, max: p.supply.max ?? 0, b: (chunks) => <b>{chunks}</b> })}
               </span>
             ) : null}
             {soldOut ? (
               <div className="col" style={gap("8px")}>
                 <Button size="lg" block disabled>
-                  Esgotado
+                  {t("soldOut")}
                 </Button>
                 <p className="small muted" role="status">
-                  Todas as licenças deste especialista já foram vendidas. {p.resaleOn ? "Veja se alguém está vendendo uma usada." : "Quem já tem uma licença pode revendê-la quando o mercado de revenda abrir."}
+                  {p.resaleOn ? t("soldOutResale") : t("soldOutNoResale")}
                 </p>
               </div>
             ) : (
               <Button href={checkout} size="lg" block iconRight="arrow-right">
-                Comprar licença
+                {t("buy")}
               </Button>
             )}
             {p.resaleOn && usedHref && p.resale ? (
               <Link className="row between card-flat pad-s" href={usedHref} style={gap("12px")}>
                 <span className="col" style={gap("2px")}>
-                  <span className="small faint">Prefere pagar menos?</span>
-                  <b>Licença usada a partir de {brlValue(p.resale.floorUsdc * p.rate)}</b>
-                  <span className="tiny faint">Mesma nota do especialista. As memórias de quem vende não vão junto.</span>
+                  <span className="small faint">{t("cheaper")}</span>
+                  <b>{t("usedFrom", { price: f.locale === "pt" ? f.brlValue(p.resale.floorUsdc * p.rate) : f.brl(p.resale.floorUsdc, p.rate) })}</b>
+                  <span className="tiny faint">{t("usedNote")}</span>
                 </span>
                 <Icon name="arrow-right" />
               </Link>
@@ -157,16 +162,16 @@ function PaidBox(p: BuyBoxProps) {
             {p.trial ? (
               <div className="col" style={gap("8px")}>
                 <Button href={install} variant="secondary" block icon="play">
-                  Testar grátis
+                  {t("tryFree")}
                 </Button>
                 <p className="small muted center" role="status">
                   {trialLeft == null
-                    ? `${usesText(p.trial.uses)} para experimentar. `
+                    ? t("trialTry", { uses: tTrial("uses", { n: p.trial.uses }) })
                     : trialLeft > 0
-                      ? `Restam ${trialLeft} de ${usesText(p.trial.uses)}. `
-                      : "Seu teste grátis acabou. "}
+                      ? t("trialLeft", { left: trialLeft, uses: tTrial("uses", { n: p.trial.uses }) })
+                      : t("trialOver")}{" "}
                   <a className="link" href="#teste-gratis">
-                    Ver o que o teste inclui
+                    {t("seeTrial")}
                   </a>
                 </p>
               </div>
@@ -174,17 +179,17 @@ function PaidBox(p: BuyBoxProps) {
           </>
         )}
         <ul className="col small" style={gap("10px")}>
-          <Check>Licença registrada na rede Solana, em seu nome.</Check>
-          {p.trial ? <Check>O teste grátis acontece na sua IA, pelo conector.</Check> : null}
-          <Check>{p.hasGuarantee ? "Garantia de resultado disponível para tarefas." : "Sem garantia de resultado para este especialista."}</Check>
+          <Check>{t("onChain")}</Check>
+          {p.trial ? <Check>{t("trialInAi")}</Check> : null}
+          <Check>{p.hasGuarantee ? t("withGuarantee") : t("noGuarantee")}</Check>
         </ul>
         {p.hasGuarantee ? (
           <>
             <div className="divider" />
             <a className="row between" href="#garantia" style={gap("12px")}>
               <span className="col" style={gap("2px")}>
-                <span className="small faint">Prefere pagar só pelo resultado?</span>
-                <b>Tarefa com garantia</b>
+                <span className="small faint">{t("guaranteeAsk")}</span>
+                <b>{t("guaranteeTask")}</b>
               </span>
               <Icon name="arrow-right" />
             </a>

@@ -1,1 +1,183 @@
-{}
+{
+  "meta": {
+    "installTitle": "Guided setup",
+    "doneTitle": "Purchase complete"
+  },
+  "done": {
+    "heading": {
+      "pending": "Your purchase of {name}",
+      "escrow": "All set! Your task with {name} has started.",
+      "license": "All set! {name} is yours."
+    },
+    "lead": {
+      "unknown": "Sign in with the account you used for the purchase so we can check it. We only confirm after we see it in your account.",
+      "checking": "Just a moment, we're checking your account.",
+      "escrow": "Your payment is held safely and only goes to the creator when you approve each milestone. Connect the solver to your AI so it can start working on the task.",
+      "resale": "Your used license is already in your account. All that's left is connecting the solver to your AI. It takes about 5 minutes and we'll guide you through every step. The previous owner's memories stayed with them, so the solver starts getting to know you from scratch.",
+      "license": "Your permanent license is already in your account. All that's left is connecting the solver to your AI. It takes about 5 minutes and we'll guide you through every step."
+    },
+    "missing": {
+      "title": "We can't find this purchase in your account yet",
+      "body": "If you just paid, it may take a few more moments to show up. If you signed in with a different account, check the one you used for the purchase.",
+      "recheck": "Check again",
+      "goGuarantees": "View my guarantees",
+      "goLibrary": "View my library"
+    },
+    "unknown": {
+      "title": "Sign in to check your purchase",
+      "body": "This page only confirms the purchase after it sees it in your account.",
+      "login": "Sign in to check",
+      "loginFailed": "Couldn't sign in"
+    },
+    "chip": {
+      "checking": "Checking the payment…",
+      "escrow": "Payment held",
+      "license": "Payment confirmed"
+    },
+    "ticket": {
+      "eyebrowTask": "Your task",
+      "eyebrowLicense": "Your license",
+      "statusTask": "In progress",
+      "statusActive": "Active",
+      "taskLine": "Task with guarantee · {n, plural, one {# milestone} other {# milestones}}",
+      "licenseLine": "Permanent license · version {version}",
+      "licenseLineResale": "Used permanent license · version {version}",
+      "createdOn": "Created on {date}",
+      "issuedOn": "Issued on {date}",
+      "held": "Held",
+      "paid": "Paid"
+    },
+    "actions": {
+      "connect": "Connect to my AI",
+      "trackGuarantees": "Track in Guarantees",
+      "library": "View my library"
+    },
+    "review": {
+      "intro": "After using the solver, tell us how it went: <link>review {name}</link>.",
+      "resaleNote": " If the previous owner already reviewed with this license, you may not be able to review with it."
+    },
+    "tech": {
+      "hide": "Hide technical details",
+      "showTask": "View the task's technical details",
+      "showLicense": "View the license's technical details",
+      "taskRecorded": "Task recorded on the network",
+      "licenseRecorded": "License recorded on the network",
+      "receipt": "Payment receipt",
+      "network": "Network",
+      "openExplorer": "Open in the network explorer"
+    }
+  },
+  "setup": {
+    "eyebrow": "Guided setup",
+    "title": "Connect {name} to your AI",
+    "leadAgent": "It takes four quick steps. You only do this once.",
+    "leadGeneric": "It takes four quick steps. You only do this once: the same connector works for every solver you have.",
+    "trial": "{n, plural, one {You have # free use to try it out} other {You have # free uses to try it out}}",
+    "progressLabel": "Setup progress",
+    "progress": "{done} of {total}",
+    "tabsLabel": "Your AI",
+    "step1": {
+      "title": "Copy the connector address",
+      "body": "It's a single address for all solvers. Once your AI connects, you sign in with your Solvers account and it starts using what you bought.",
+      "loading": "Loading…",
+      "inputLabel": "Connector address",
+      "copy": "Copy address",
+      "copied": "Copied"
+    },
+    "step2": {
+      "titleClaude": "Open Claude's settings",
+      "titleGpt": "Open ChatGPT's settings",
+      "bodyClaude": "In Claude, open Settings, go to Connectors and choose Add custom connector.",
+      "bodyGpt": "In ChatGPT, open Settings and go to Apps & Connectors (if you don't see it, turn on Developer mode under Advanced settings). Choose Create to add a custom connector.",
+      "sidebarClaude": "Connectors",
+      "sidebarGpt": "Apps & Connectors",
+      "buttonClaude": "Add custom connector",
+      "buttonGpt": "Create"
+    },
+    "step3": {
+      "title": "Paste the address and confirm",
+      "body": "Paste the address you copied in step 1 and confirm. Your AI will open a Solvers page asking for your authorization: sign in with the same account you use here.",
+      "cancel": "Cancel",
+      "confirmClaude": "Add",
+      "confirmGpt": "Create",
+      "done": "I've pasted it and confirmed",
+      "doneNoted": "Noted, thanks"
+    },
+    "step4": {
+      "title": "Run a test",
+      "body": "Open a new conversation and ask for something simple. If your AI answers mentioning the solver, it worked.",
+      "promptAgent": "“Use {name} and tell me how it can help me.”",
+      "promptGeneric": "“Which Solvers do I have?”"
+    },
+    "ill": {
+      "caption": "Illustration. Menu names may vary depending on the app version."
+    },
+    "checklist": {
+      "title": "Requirements checklist",
+      "officialHelp": "Official help",
+      "plan": {
+        "label": "{client} with a compatible plan",
+        "ok": "Confirmed by you",
+        "no": "Custom connectors usually require a paid plan.",
+        "noWithReq": "{label}. Custom connectors usually require a paid plan.",
+        "act": "I have a compatible plan"
+      },
+      "connector": {
+        "labelOptional": "{name} (optional)",
+        "label": "{name} connected?",
+        "ok": "Connected",
+        "no": "This solver uses {name}. Connect it to your AI too.",
+        "act": "Already connected",
+        "optionalFigma": "Optional: connect Figma so the solver can read the file directly; without it, you can paste screenshots and values.",
+        "optionalGeneric": "Optional: connect {name} so the solver can read your data directly; without it, you can paste the information into the conversation."
+      },
+      "added": {
+        "label": "Solvers connector added",
+        "ok": "Added to your AI",
+        "no": "You still need to paste the address in step 3",
+        "act": "Already added"
+      },
+      "test": {
+        "label": "Connection test",
+        "ok": "{client} authorized {ago}. Do step 4 to confirm.",
+        "okNoClient": "Authorized. Do step 4 to confirm.",
+        "noLogin": "Sign in to your account to test",
+        "noOthers": "We found {names}, but not {client}. Do step 3 in this app and authorize access.",
+        "noEmpty": "We still can't find {client}. Check step 3 and authorize access.",
+        "ready": "Ready to test",
+        "doStep3": "Do step 3 first",
+        "actLogin": "Sign in",
+        "actTest": "Test connection"
+      },
+      "loginFailed": "Couldn't sign in"
+    },
+    "allDone": {
+      "title": "All set!",
+      "agent": "Your solver is ready to use in your AI.",
+      "generic": "Your solvers are ready to use in your AI.",
+      "review": "After using it, <link>tell us how it went</link>."
+    },
+    "stuck": {
+      "askCreator": "Stuck on a step? Check the address from step 1 or <action>ask {name} for help</action>.",
+      "seeCreator": "Stuck on a step? Check the address from step 1 or <action>see who {name} is</action>.",
+      "generic": "Stuck on a step? Check that the address from step 1 was pasted in full and that you authorized with the same account.",
+      "library": "View my library"
+    }
+  },
+  "help": {
+    "title": "Ask {name} for help",
+    "titleSent": "Request sent",
+    "protocol": "Reference {protocol}",
+    "notified": "{name} has been notified.",
+    "withContact": "The reply will go to the contact you provided.",
+    "withoutContact": "You didn't provide a contact, so the reply may take a while to reach you.",
+    "close": "Close",
+    "label": "What happened?",
+    "placeholder": "Which step you stopped at and what showed up on the screen.",
+    "contactLabel": "How can {name} reply to you? (optional)",
+    "contactPlaceholder": "Email or Telegram @handle",
+    "cancel": "Cancel",
+    "send": "Send request",
+    "sendFailed": "Couldn't send right now. Please try again in a moment."
+  }
+}

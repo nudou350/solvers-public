@@ -1,6 +1,8 @@
 "use client";
 // /garantias (garantias-em-andamento.html): limite do comprador, garantias em andamento e histórico.
 import type { Escrow, EscrowDetail, GuaranteeStatus } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -9,7 +11,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Tile } from "@/components/ui/Tile";
 import { Notice } from "@/components/ui/Toast";
-import { brl, GUARANTEE_LEVEL_LABEL, usdc } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { Deliverable, ESCROW_CHIP, EscrowCard } from "./EscrowCard";
 import { AuthGate } from "@/components/ui/AuthGate";
@@ -18,6 +20,8 @@ import { LoadError, PageHead } from "./shared";
 
 
 function LevelCard({ g }: { g: GuaranteeStatus | null }) {
+  const t = useTranslations("account.guarantees");
+  const f = useFormat();
   if (!g) return null;
   return (
     <div className="card pad-s row start" style={{ "--gap": "12px", padding: "14px 18px", maxWidth: 380 } as React.CSSProperties}>
@@ -25,16 +29,12 @@ function LevelCard({ g }: { g: GuaranteeStatus | null }) {
         <Icon name="shield-check" size="l" />
       </span>
       <div className="col grow" style={{ "--gap": "2px" } as React.CSSProperties}>
-        <div className="small muted">Seu nível de garantia</div>
-        <b>
-          {GUARANTEE_LEVEL_LABEL[g.level]} · até {usdc(g.limitUsdc)} em aberto
-        </b>
-        <span className="tiny faint">
-          Em aberto: {usdc(g.openUsdc)} · Disponível: {usdc(g.availableUsdc)}
-        </span>
+        <div className="small muted">{t("levelTitle")}</div>
+        <b>{t("levelLine", { level: f.guaranteeLevel(g.level), limit: f.usdc(g.limitUsdc) })}</b>
+        <span className="tiny faint">{t("levelDetail", { open: f.usdc(g.openUsdc), available: f.usdc(g.availableUsdc) })}</span>
         {g.purchasesToFull > 0 ? (
           <span className="tiny faint">
-            {g.purchasesToFull === 1 ? "Falta 1 compra" : `Faltam ${g.purchasesToFull} compras`} para o nível completo.
+            {t("toFull", { n: g.purchasesToFull })}
           </span>
         ) : null}
       </div>
@@ -52,6 +52,10 @@ const RESUME_MIN_MS = 5_000;
 
 function Inner() {
   const { api, config } = useSession();
+  const lang = useLocale() as Locale;
+  const t = useTranslations("account.guarantees");
+  const f = useFormat();
+  const te = useTranslations("account.escrow");
   const rate = config?.brlPerUsd ?? null;
   const [data, setData] = useState<Data | null | "error">(null);
   const [g, setG] = useState<GuaranteeStatus | null>(null);
@@ -74,7 +78,7 @@ function Inner() {
       try {
         const list = await api.getMyEscrows();
         // Detalhes das etapas (critérios, prévia, prazos, downloads) de cada garantia.
-        const det = await Promise.all(list.map((e) => api.getMyEscrow(e.id).catch(() => null)));
+        const det = await Promise.all(list.map((e) => api.getMyEscrow(e.id, lang).catch(() => null)));
         if (seq !== loadSeq.current) return;
         const details = new Map<string, EscrowDetail>();
         const failed = new Set<string>();
@@ -94,7 +98,7 @@ function Inner() {
         else setRefreshFailed(true);
       }
     },
-    [api],
+    [api, lang],
   );
 
   useEffect(() => {
@@ -104,7 +108,7 @@ function Inner() {
   // Tenta de novo só o detalhe de uma garantia (o botão do cartão).
   const retryDetail = useCallback(
     async (id: string) => {
-      const d = await api.getMyEscrow(id).catch(() => null);
+      const d = await api.getMyEscrow(id, lang).catch(() => null);
       if (!d) return false;
       setData((cur) => {
         if (!cur || cur === "error") return cur;
@@ -125,14 +129,14 @@ function Inner() {
     const refresh = () => {
       if (document.visibilityState === "visible") void load(true);
     };
-    const t = setInterval(refresh, REFRESH_MS);
+    const timer = setInterval(refresh, REFRESH_MS);
     const resume = () => {
       if (document.visibilityState === "visible" && Date.now() - loadedAt.current > RESUME_MIN_MS) void load(true);
     };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("focus", resume);
     return () => {
-      clearInterval(t);
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("focus", resume);
     };
@@ -140,8 +144,8 @@ function Inner() {
 
   const head = (
     <PageHead
-      title="Garantias em andamento"
-      lead="Confira o que foi entregue, aprove quando os critérios forem cumpridos ou conteste indicando o que falhou. Seu pagamento só é liberado depois."
+      title={t("title")}
+      lead={t("lead")}
       aside={<LevelCard g={g} />}
     />
   );
@@ -150,20 +154,20 @@ function Inner() {
     return (
       <>
         {head}
-        <LoadError onRetry={() => void load()} text="Não conseguimos carregar suas garantias agora." />
+        <LoadError onRetry={() => void load()} text={t("loadError")} />
       </>
     );
   if (data === null)
     return (
       <>
         {head}
-        <Loading text="Carregando suas garantias…" />
+        <Loading text={t("loading")} />
       </>
     );
 
   const active = data.escrows.filter((e) => e.status === "active" || e.status === "disputed");
   const history = data.escrows.filter((e) => e.status === "approved" || e.status === "refunded");
-  const money = (n: number) => (rate ? brl(n, rate) : usdc(n));
+  const money = (n: number) => (rate ? f.brl(n, rate) : f.usdc(n));
 
   return (
     <>
@@ -172,14 +176,14 @@ function Inner() {
         {refreshFailed ? (
           <Notice
             tone="warn"
-            title="Não deu para atualizar agora"
+            title={t("refreshFailedTitle")}
             actions={
               <Button size="sm" variant="secondary" icon="refresh" onClick={() => void load(true)}>
-                Atualizar
+                {t("refresh")}
               </Button>
             }
           >
-            O que aparece abaixo pode estar desatualizado.
+            {t("refreshFailedText")}
           </Notice>
         ) : null}
         {active.map((e) => (
@@ -194,8 +198,8 @@ function Inner() {
           />
         ))}
         {!active.length ? (
-          <Empty icon="shield-check" title="Nenhuma garantia em andamento" action={<Button href="/">Explorar especialistas</Button>}>
-            Nas tarefas com garantia, o pagamento fica guardado e só é liberado quando você aprova cada etapa. Procure o selo de garantia na página do especialista.
+          <Empty icon="shield-check" title={t("emptyTitle")} action={<Button href="/">{t("explore")}</Button>}>
+            {t("emptyText")}
           </Empty>
         ) : null}
       </div>
@@ -203,13 +207,13 @@ function Inner() {
       {history.length ? (
         <div style={{ marginTop: 44 }}>
           <h2 className="display h2s" style={{ marginBottom: 18 }}>
-            Histórico
+            {t("history")}
           </h2>
           <div className="card pad-s" style={{ padding: "6px 24px" }}>
             {history.map((e) => {
               const a = agents.get(e.agentId);
               const d = data.details.get(e.id);
-              const [label, tone] = ESCROW_CHIP[e.status];
+              const [chipKey, tone] = ESCROW_CHIP[e.status];
               const files = d?.milestones.filter((m) => m.downloadable) ?? [];
               return (
                 <div key={e.id} className="rowline wrapx">
@@ -219,10 +223,10 @@ function Inner() {
                     <div className="small muted">{d?.agent.name ?? a?.name ?? ""}</div>
                   </div>
                   {files.map((m) => (
-                    <Deliverable key={m.index} escrowId={e.id} index={m.index} label={files.length > 1 ? `Baixar etapa ${m.index + 1}` : "Baixar entrega"} />
+                    <Deliverable key={m.index} escrowId={e.id} index={m.index} label={files.length > 1 ? t("downloadStep", { n: m.index + 1 }) : t("downloadDelivery")} />
                   ))}
                   <b className="num hide-m">{money(e.amountUsdc)}</b>
-                  <Chip tone={tone}>{label}</Chip>
+                  <Chip tone={tone}>{te(chipKey)}</Chip>
                 </div>
               );
             })}
@@ -234,9 +238,10 @@ function Inner() {
 }
 
 export function Guarantees() {
+  const t = useTranslations("account.guarantees");
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
-      <AuthGate icon="shield-check" title="Entre para ver suas garantias" text="As tarefas com garantia, as entregas de cada etapa e o que falta aprovar ficam aqui.">
+      <AuthGate icon="shield-check" title={t("gateTitle")} text={t("gateText")}>
         <Inner />
       </AuthGate>
     </section>

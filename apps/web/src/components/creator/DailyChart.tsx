@@ -1,5 +1,7 @@
 import type { CreatorDashboard } from "@solvers/api-client";
-import { int } from "@/lib/format";
+import { useTranslations } from "next-intl";
+import { INTL_LOCALE } from "@/i18n/routing";
+import { useFormat } from "@/lib/format";
 import { gap } from "@/lib/style";
 
 type Day = { date: string; sales: number; uses: number };
@@ -25,6 +27,8 @@ const H = 160;
  * como o gráfico "Receita por dia" do design.
  */
 export function DailyChart({ daily }: { daily: CreatorDashboard["daily"] }) {
+  const t = useTranslations("creator.chart");
+  const f = useFormat();
   const days = fillDays(daily);
   const maxSales = Math.max(1, ...days.map((d) => d.sales));
   const maxUses = Math.max(1, ...days.map((d) => d.uses));
@@ -34,21 +38,22 @@ export function DailyChart({ daily }: { daily: CreatorDashboard["daily"] }) {
   const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
   const totalSales = days.reduce((s, d) => s + d.sales, 0);
   const totalUses = days.reduce((s, d) => s + d.uses, 0);
-  const label = `Vendas e usos por dia nos últimos 30 dias: ${int(totalSales)} vendas e ${int(totalUses)} usos.`;
-  const fmtDay = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+  const label = t("label", { sales: totalSales, uses: totalUses });
+  const dayFmt = new Intl.DateTimeFormat(INTL_LOCALE[f.locale], { timeZone: "UTC", day: "numeric", month: "short" });
+  const fmtDay = (iso: string) => dayFmt.format(new Date(`${iso}T00:00:00Z`));
 
   return (
     <div className="col" style={gap(16)}>
       <div className="row between wrapx">
-        <h2 className="h3">Vendas e usos por dia</h2>
+        <h2 className="h3">{t("title")}</h2>
         <div className="row" style={gap(16)}>
           <span className="row small muted" style={gap(6)}>
             <i style={{ width: 12, height: 12, borderRadius: 3, background: "var(--brand)" }} />
-            Vendas
+            {t("sales")}
           </span>
           <span className="row small muted" style={gap(6)}>
             <i style={{ width: 14, height: 3, borderRadius: 2, background: "var(--mint)" }} />
-            Usos
+            {t("uses")}
           </span>
         </div>
       </div>
@@ -58,7 +63,7 @@ export function DailyChart({ daily }: { daily: CreatorDashboard["daily"] }) {
           const h = d.sales ? Math.max(3, (H * d.sales) / maxSales) : 0;
           return (
             <g key={d.date}>
-              <title>{`${fmtDay(d.date)}: ${int(d.sales)} vendas, ${int(d.uses)} usos`}</title>
+              <title>{t("tip", { day: fmtDay(d.date), sales: d.sales, uses: d.uses })}</title>
               {/* área de toque/hover do dia inteiro */}
               <rect x={i * slot} y={0} width={slot} height={H} fill="transparent" />
               {h ? <rect x={i * slot + (slot - bw) / 2} y={H - h} width={bw} height={h} rx={3} fill="var(--brand)" /> : null}
@@ -70,11 +75,9 @@ export function DailyChart({ daily }: { daily: CreatorDashboard["daily"] }) {
         ) : null}
       </svg>
       <div className="row between tiny faint wrapx" style={gap(8)}>
-        <span>30 dias atrás</span>
-        <span>
-          Máximo em um dia: {int(maxSales === 1 && !totalSales ? 0 : maxSales)} vendas · {int(maxUses === 1 && !totalUses ? 0 : maxUses)} usos
-        </span>
-        <span>Hoje</span>
+        <span>{t("daysAgo")}</span>
+        <span>{t("max", { sales: maxSales === 1 && !totalSales ? 0 : maxSales, uses: maxUses === 1 && !totalUses ? 0 : maxUses })}</span>
+        <span>{t("today")}</span>
       </div>
     </div>
   );

@@ -1,1 +1,183 @@
-{}
+{
+  "meta": {
+    "installTitle": "Instalação guiada",
+    "doneTitle": "Compra concluída"
+  },
+  "done": {
+    "heading": {
+      "pending": "Sua compra do {name}",
+      "escrow": "Pronto! Sua tarefa com o {name} começou.",
+      "license": "Pronto! O {name} é seu."
+    },
+    "lead": {
+      "unknown": "Entre com a conta que você usou na compra para a gente conferir. Só confirmamos depois de ver na sua conta.",
+      "checking": "Só um instante, estamos conferindo na sua conta.",
+      "escrow": "O pagamento está guardado e só vai para o criador quando você aprovar cada etapa. Conecte o especialista à sua IA para ele começar a trabalhar na tarefa.",
+      "resale": "Sua licença usada já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo. As memórias de quem vendeu ficaram com ele, então o especialista começa a conhecer você do zero.",
+      "license": "Sua licença permanente já está na sua conta. Falta só conectar o especialista à sua IA. Leva uns 5 minutos e a gente guia cada passo."
+    },
+    "missing": {
+      "title": "Ainda não encontramos esta compra na sua conta",
+      "body": "Se você acabou de pagar, ela pode levar mais alguns instantes para aparecer. Se entrou com outra conta, confira na conta usada na compra.",
+      "recheck": "Conferir de novo",
+      "goGuarantees": "Ver minhas garantias",
+      "goLibrary": "Ver minha biblioteca"
+    },
+    "unknown": {
+      "title": "Entre para conferir a compra",
+      "body": "Esta página só confirma depois de ver a compra na sua conta.",
+      "login": "Entrar para conferir",
+      "loginFailed": "Não deu para entrar"
+    },
+    "chip": {
+      "checking": "Conferindo o pagamento…",
+      "escrow": "Pagamento guardado",
+      "license": "Pagamento confirmado"
+    },
+    "ticket": {
+      "eyebrowTask": "Sua tarefa",
+      "eyebrowLicense": "Sua licença",
+      "statusTask": "Em andamento",
+      "statusActive": "Ativa",
+      "taskLine": "Tarefa com garantia · {n, plural, =0 {# etapas} one {# etapa} other {# etapas}}",
+      "licenseLine": "Licença permanente · versão {version}",
+      "licenseLineResale": "Licença permanente usada · versão {version}",
+      "createdOn": "Criada em {date}",
+      "issuedOn": "Emitida em {date}",
+      "held": "Guardado",
+      "paid": "Pago"
+    },
+    "actions": {
+      "connect": "Conectar à minha IA",
+      "trackGuarantees": "Acompanhar em Garantias",
+      "library": "Ver minha biblioteca"
+    },
+    "review": {
+      "intro": "Depois de usar o especialista, conte como foi: <link>avaliar o {name}</link>.",
+      "resaleNote": " Se quem vendeu já avaliou com esta licença, talvez você não consiga avaliar com ela."
+    },
+    "tech": {
+      "hide": "Ocultar detalhes técnicos",
+      "showTask": "Ver detalhes técnicos da tarefa",
+      "showLicense": "Ver detalhes técnicos da licença",
+      "taskRecorded": "Tarefa registrada na rede",
+      "licenseRecorded": "Licença registrada na rede",
+      "receipt": "Comprovante do pagamento",
+      "network": "Rede",
+      "openExplorer": "Abrir no explorador da rede"
+    }
+  },
+  "setup": {
+    "eyebrow": "Instalação guiada",
+    "title": "Conecte o {name} à sua IA",
+    "leadAgent": "São quatro passos rápidos. Você só faz isso uma vez.",
+    "leadGeneric": "São quatro passos rápidos. Você só faz isso uma vez: o mesmo conector serve para todos os especialistas que você tiver.",
+    "trial": "{n, plural, one {Você tem # uso grátis para testar} other {Você tem # usos grátis para testar}}",
+    "progressLabel": "Progresso da instalação",
+    "progress": "{done} de {total}",
+    "tabsLabel": "Sua IA",
+    "step1": {
+      "title": "Copie o endereço do conector",
+      "body": "É um endereço só para todos os especialistas. Quando a sua IA se conectar, você entra com a sua conta do Solvers e ela passa a usar o que você comprou.",
+      "loading": "Carregando…",
+      "inputLabel": "Endereço do conector",
+      "copy": "Copiar endereço",
+      "copied": "Copiado"
+    },
+    "step2": {
+      "titleClaude": "Abra as configurações do Claude",
+      "titleGpt": "Abra as configurações do ChatGPT",
+      "bodyClaude": "No Claude, abra Configurações, entre em Conectores e escolha Adicionar conector personalizado.",
+      "bodyGpt": "No ChatGPT, abra as configurações e procure por Conectores (ou Aplicativos). Escolha adicionar um conector personalizado.",
+      "sidebarClaude": "Conectores",
+      "sidebarGpt": "Conectores",
+      "buttonClaude": "Adicionar conector personalizado",
+      "buttonGpt": "Criar conector"
+    },
+    "step3": {
+      "title": "Cole o endereço e confirme",
+      "body": "Cole o endereço que você copiou no passo 1 e confirme. A sua IA vai abrir uma página do Solvers pedindo a sua autorização: entre com a mesma conta que você usa aqui.",
+      "cancel": "Cancelar",
+      "confirmClaude": "Adicionar",
+      "confirmGpt": "Criar",
+      "done": "Já colei e confirmei",
+      "doneNoted": "Anotado, obrigado"
+    },
+    "step4": {
+      "title": "Faça um teste",
+      "body": "Abra uma conversa nova e peça algo simples. Se a sua IA responder citando o especialista, deu certo.",
+      "promptAgent": "“Use o {name} e me diga como ele pode me ajudar.”",
+      "promptGeneric": "“Quais especialistas do Solvers eu tenho?”"
+    },
+    "ill": {
+      "caption": "Ilustração. Os nomes dos menus podem variar conforme a versão do aplicativo."
+    },
+    "checklist": {
+      "title": "Checklist de requisitos",
+      "officialHelp": "Ajuda oficial",
+      "plan": {
+        "label": "{client} com plano compatível",
+        "ok": "Confirmado por você",
+        "no": "Conectores personalizados costumam pedir um plano pago.",
+        "noWithReq": "{label}. Conectores personalizados costumam pedir um plano pago.",
+        "act": "Tenho um plano compatível"
+      },
+      "connector": {
+        "labelOptional": "{name} (opcional)",
+        "label": "{name} conectado?",
+        "ok": "Conectado",
+        "no": "Este especialista usa o {name}. Conecte-o na sua IA também.",
+        "act": "Já conectei",
+        "optionalFigma": "Opcional: conecte o Figma para ler o arquivo direto; sem ele, dá para colar prints e valores.",
+        "optionalGeneric": "Opcional: conecte o {name} para o especialista ler os dados direto; sem ele, dá para colar as informações na conversa."
+      },
+      "added": {
+        "label": "Conector do Solvers adicionado",
+        "ok": "Adicionado à sua IA",
+        "no": "Falta colar o endereço no passo 3",
+        "act": "Já adicionei"
+      },
+      "test": {
+        "label": "Teste de conexão",
+        "ok": "{client} autorizado {ago}. Faça o passo 4 para confirmar.",
+        "okNoClient": "Autorizado. Faça o passo 4 para confirmar.",
+        "noLogin": "Entre na sua conta para testar",
+        "noOthers": "Encontramos {names}, mas não o {client}. Faça o passo 3 neste app e autorize o acesso.",
+        "noEmpty": "Ainda não encontramos o {client}. Confira o passo 3 e autorize o acesso.",
+        "ready": "Pronto para testar",
+        "doStep3": "Faça o passo 3 primeiro",
+        "actLogin": "Entrar",
+        "actTest": "Testar conexão"
+      },
+      "loginFailed": "Não deu para entrar"
+    },
+    "allDone": {
+      "title": "Tudo pronto!",
+      "agent": "Seu especialista já pode ser usado na sua IA.",
+      "generic": "Seus especialistas já podem ser usados na sua IA.",
+      "review": "Depois de usar, <link>conte como foi</link>."
+    },
+    "stuck": {
+      "askCreator": "Travou em algum passo? Confira o endereço do passo 1 ou <action>peça ajuda a {name}</action>.",
+      "seeCreator": "Travou em algum passo? Confira o endereço do passo 1 ou <action>veja quem é {name}</action>.",
+      "generic": "Travou em algum passo? Confira se o endereço do passo 1 foi colado inteiro e se você autorizou com a mesma conta.",
+      "library": "Ver minha biblioteca"
+    }
+  },
+  "help": {
+    "title": "Pedir ajuda a {name}",
+    "titleSent": "Pedido enviado",
+    "protocol": "Protocolo {protocol}",
+    "notified": "{name} foi avisado.",
+    "withContact": "A resposta vai para o contato que você informou.",
+    "withoutContact": "Você não informou um contato, então a resposta pode demorar a chegar até você.",
+    "close": "Fechar",
+    "label": "O que aconteceu?",
+    "placeholder": "Em que passo você parou e o que apareceu na tela.",
+    "contactLabel": "Como {name} pode te responder? (opcional)",
+    "contactPlaceholder": "E-mail ou @ do Telegram",
+    "cancel": "Cancelar",
+    "send": "Enviar pedido",
+    "sendFailed": "Não deu para enviar agora. Tente de novo em instantes."
+  }
+}

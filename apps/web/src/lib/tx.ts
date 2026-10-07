@@ -1,8 +1,11 @@
 "use client";
 // Transações: o servidor monta (e paga a taxa), a carteira só assina e o servidor envia e indexa.
 import type { SubmitResponse, TxResponse } from "@solvers/api-client";
+import { useLocale } from "next-intl";
 import { useCallback, useState } from "react";
+import { INTL_LOCALE, type Locale } from "@/i18n/routing";
 import { ApiError, type SolversApi } from "./api";
+import { detectLocale, errorsTranslator, localText, type ErrorsTranslator } from "./local-text";
 import { useSession } from "./session";
 import type { WalletLike } from "./wallet";
 
@@ -28,7 +31,7 @@ export type TxResult = SubmitResponse & {
 export async function runTx(apiClient: SolversApi, wallet: WalletLike, built: TxResponse | (() => Promise<TxResponse>)): Promise<TxResult> {
   const tx = typeof built === "function" ? await built() : built;
   const res = await apiClient.signAndSubmit(wallet, tx);
-  if (res.status !== "confirmed") throw new TxFailedError(res.error ?? "A transação falhou na rede.", res.signature);
+  if (res.status !== "confirmed") throw new TxFailedError(res.error ?? localText("wallet.txFailedMessage"), res.signature);
   const extra = res as SubmitResponse & { explorerUrl?: unknown };
   return { ...res, meta: tx.meta, explorerUrl: typeof extra.explorerUrl === "string" ? extra.explorerUrl : null };
 }
@@ -45,178 +48,147 @@ export type TxErrorInfo = {
   priceChange?: { previousUsdc: number; usdc: number };
 };
 
-/** Mensagem em português para qualquer erro de transação/API. */
-export function txErrorMessage(err: unknown): TxErrorInfo {
+type Action = TxErrorInfo["action"];
+
+/** Texto da API para o código (errors.api.<code>); sem tradução, a mensagem que o servidor mandou. */
+function apiText(t: ErrorsTranslator, err: ApiError): string {
+  return err.code && t.has(`api.${err.code}`) ? t(`api.${err.code}`) : err.message;
+}
+
+/**
+ * Mensagem (título + texto) no idioma da página para qualquer erro de transação/API.
+ * Sem `locale`, vale o idioma da página no navegador (os chamadores rodam em eventos do cliente); nas telas,
+ * `useLocale()` pode ser passado, ou use o hook `useTxErrorMessage()`.
+ */
+export function txErrorMessage(err: unknown, locale?: Locale): TxErrorInfo {
+  const loc = locale ?? detectLocale();
+  const t = errorsTranslator(loc);
+  const fmt = (n: number) => n.toLocaleString(INTL_LOCALE[loc], { maximumFractionDigits: 2 });
+  const msg = (code: string, id: string, action: Action = null, extra?: Partial<TxErrorInfo>): TxErrorInfo => ({
+    code,
+    title: t(`tx.${id}.title`),
+    text: t(`tx.${id}.text`),
+    action,
+    ...extra,
+  });
+  const withText = (code: string, id: string, text: string, action: Action = null): TxErrorInfo => ({ code, title: t(`tx.${id}.title`), text, action });
+
   if (err instanceof ApiError) {
     const b = err.body;
     // /api/tx/submit não conseguiu confirmar: a transação pode ter sido enviada. Não diz que nada foi cobrado
     // e não sugere tentar de novo já (evita pagar em dobro).
-    if (err.code === "unconfirmed")
-      return {
-        code: err.code,
-        title: "Ainda não conseguimos confirmar",
-        text: "Sua transação foi enviada, mas ainda não conseguimos confirmar. Aguarde um instante e confira em Minha conta antes de tentar de novo.",
-        action: null,
-      };
+    if (err.code === "unconfirmed") return msg(err.code, "unconfirmed");
     // /api/tx/submit: a rede recusou a transação (HTTP 422, {status:"failed", error} sem código). O caso comum é
     // o blockhash expirar enquanto a pessoa assina; tentar de novo monta uma transação nova.
-    if (err.status === 422 || b.status === "failed")
-      return {
-        code: "transaction_failed",
-        title: "A rede não confirmou a transação",
-        text: "Nada foi cobrado. Às vezes a transação expira enquanto você assina. Tente de novo: montamos uma nova.",
-        action: "retry",
-      };
+    if (err.status === 422 || b.status === "failed") return msg("transaction_failed", "network_failed", "retry");
     switch (err.code) {
       case "insufficient_funds": {
         const need = typeof b.neededUsdc === "number" ? b.neededUsdc : null;
         const bal = typeof b.balanceUsdc === "number" ? b.balanceUsdc : null;
-        return {
-          code: err.code,
-          title: "Saldo de USDC insuficiente",
-          text:
-            need != null && bal != null
-              ? `Você tem ${fmt(bal)} USDC e precisa de ${fmt(need)} USDC.`
-              : "Seu saldo em USDC não cobre esta compra.",
-          action: "faucet",
-        };
+        if (need != null && bal != null) {
+          return {
+            code: err.code,
+            title: t("tx.insufficient_funds_amounts.title"),
+            text: t("tx.insufficient_funds_amounts.text", { balance: fmt(bal), needed: fmt(need) }),
+            action: "faucet",
+          };
+        }
+        return msg(err.code, "insufficient_funds", "faucet");
       }
       case "price_changed": {
         const now = typeof b.priceUsdc === "number" ? b.priceUsdc : null;
         const before = typeof b.previousPriceUsdc === "number" ? b.previousPriceUsdc : null;
-        return {
-          code: err.code,
-          title: "O preço do especialista mudou",
-          text:
-            now != null && before != null
-              ? `O preço do especialista mudou de ${fmt(before)} USDC para ${fmt(now)} USDC. Confira o novo valor e confirme de novo.`
-              : "O preço do especialista mudou. Confira o novo valor e confirme de novo.",
-          action: null,
-          priceChange: now != null && before != null ? { previousUsdc: before, usdc: now } : undefined,
-        };
+        if (now != null && before != null) {
+          return {
+            code: err.code,
+            title: t("tx.price_changed_amounts.title"),
+            text: t("tx.price_changed_amounts.text", { before: fmt(before), now: fmt(now) }),
+            action: null,
+            priceChange: { previousUsdc: before, usdc: now },
+          };
+        }
+        return msg(err.code, "price_changed");
       }
       // ----- Teto de licenças (SUPPLY_ERROR_CODES, @solvers/shared) -----
       case "sold_out":
-        return {
-          code: err.code,
-          title: "Acabaram as vagas",
-          text: "Todas as licenças deste especialista já foram vendidas. Nada foi cobrado. Quem já tem uma licença pode revendê-la no mercado, quando a revenda estiver aberta.",
-          action: null,
-        };
+        return msg(err.code, "sold_out");
       // ----- Revenda de licenças (códigos em RESALE_ERROR_CODES, @solvers/shared) -----
       case "resale_disabled":
-        return { code: err.code, title: "A revenda não está aberta agora", text: "O mercado de revenda está fechado por enquanto. Tente de novo mais tarde.", action: null };
+        return msg(err.code, "resale_disabled");
       case "listing_not_found":
-        return {
-          code: err.code,
-          title: "Esse anúncio não está mais disponível",
-          text: "Ele foi vendido, cancelado ou mudou. Veja os outros anúncios do mercado de revenda.",
-          action: null,
-        };
+        return msg(err.code, "listing_not_found");
       case "listing_changed": {
         const now = typeof b.priceUsdc === "number" ? b.priceUsdc : null;
-        return {
-          code: err.code,
-          title: "O preço do anúncio mudou",
-          text:
-            now != null
-              ? `O vendedor mudou o preço para ${fmt(now)} USDC. Confira o novo valor e confirme de novo.`
-              : "O vendedor mudou o preço. Confira o novo valor e confirme de novo.",
-          action: null,
-          listingPriceUsdc: now ?? undefined,
-        };
+        if (now != null) {
+          return {
+            code: err.code,
+            title: t("tx.listing_changed_amount.title"),
+            text: t("tx.listing_changed_amount.text", { now: fmt(now) }),
+            action: null,
+            listingPriceUsdc: now,
+          };
+        }
+        return msg(err.code, "listing_changed");
       }
       case "not_owner":
-        return {
-          code: err.code,
-          title: "Esta licença não é da sua conta",
-          text: "Só quem tem a licença pode anunciar ou cancelar o anúncio. Atualize a página e confira sua biblioteca.",
-          action: null,
-        };
       case "own_listing":
-        return {
-          code: err.code,
-          title: "Esse anúncio é seu",
-          text: "Você não pode comprar a própria licença. Para tirá-la do mercado, cancele o anúncio na sua biblioteca.",
-          action: null,
-        };
       case "price_too_low":
-        return { code: err.code, title: "O preço está baixo demais", text: "Escolha um valor igual ou maior que o mínimo e tente de novo.", action: null };
       case "already_listed":
-        return {
-          code: err.code,
-          title: "Esta licença já está à venda",
-          text: "Atualize a página. Para mudar o preço, cancele o anúncio e anuncie de novo.",
-          action: null,
-        };
       case "cut_too_high":
-        return {
-          code: err.code,
-          title: "Este especialista não pode ser revendido agora",
-          text: "A soma do royalty do criador com a taxa do Solvers passa do limite permitido numa revenda.",
-          action: null,
-        };
       case "creator_cannot_resell":
-        return {
-          code: err.code,
-          title: "Criadores não revendem os próprios especialistas",
-          text: "Você criou este especialista, então não pode anunciar licenças dele no mercado.",
-          action: null,
-        };
       case "cancel_via_wallet":
-        return {
-          code: err.code,
-          title: "Cancele o anúncio pela sua carteira",
-          text: "Não dá para cancelar este anúncio por aqui. Na sua carteira, retire a permissão de venda da licença e depois atualize a página. Enquanto isso a licença continua sendo sua.",
-          action: null,
-        };
       case "license_invalid":
-        return { code: err.code, title: "Não reconhecemos esta licença", text: "Atualize a página e tente de novo. Se continuar, fale com o suporte.", action: null };
       case "license_already_reviewed":
-        return {
-          code: err.code,
-          title: "Esta licença já foi usada numa avaliação",
-          text: "Quem vendeu a licença usada já avaliou o especialista com ela, e cada licença serve para uma avaliação só. A nota do especialista segue valendo para você.",
-          action: null,
-        };
-      case "guarantee_limit":
-        return { code: err.code, title: "Limite de garantias atingido", text: err.message, action: null };
+        return msg(err.code, err.code);
+      case "guarantee_limit": {
+        const limit = typeof b.limitUsdc === "number" ? b.limitUsdc : null;
+        const open = typeof b.openUsdc === "number" ? b.openUsdc : null;
+        if (limit != null && open != null) {
+          return {
+            code: err.code,
+            title: t("tx.guarantee_limit_amounts.title"),
+            text: t("tx.guarantee_limit_amounts.text", { limit: fmt(limit), open: fmt(open) }),
+            action: null,
+          };
+        }
+        return msg(err.code, "guarantee_limit");
+      }
       // ----- Publicação de pacote (co-assinatura do criador) -----
       case "submission_state":
-        return { code: err.code, title: "Este envio não espera a sua confirmação agora", text: "Atualize a página para ver em que passo ele está.", action: null };
       case "not_approved":
-        return { code: err.code, title: "Esta versão ainda não foi aprovada", text: "A confirmação só abre depois da aprovação da equipe.", action: null };
       case "wrong_step":
-        return { code: err.code, title: "Este não é o passo certo agora", text: "Atualize a página: ela mostra o passo que falta.", action: null };
       case "publication_blocked":
-        return { code: err.code, title: "Este especialista está bloqueado na rede", text: "Ele está suspenso ou registrado por outra conta. Fale com a equipe.", action: null };
+        return msg(err.code, err.code);
       case "rate_limited":
-        return { code: err.code, title: "Muitas tentativas", text: "Aguarde um minuto e tente de novo.", action: "retry" };
+        return msg(err.code, "rate_limited", "retry");
       case "unauthorized":
-        return { code: err.code, title: "Sua sessão expirou", text: "Entre de novo para continuar.", action: "login" };
+        return msg(err.code, "unauthorized", "login");
       case "faucet_cooldown":
       case "faucet_daily_cap":
-        return { code: err.code, title: "USDC de teste indisponível agora", text: err.message, action: null };
+        return withText(err.code, "faucet_unavailable", apiText(t, err));
       case "invalid_criterion":
-        return { code: err.code, title: "Escolha um dos critérios combinados", text: "A contestação precisa apontar um dos critérios da etapa.", action: null };
+        return msg(err.code, "invalid_criterion");
       case "transaction_failed":
-        return { code: err.code, title: "A transação falhou na rede", text: err.message, action: "retry" };
+        return withText(err.code, "transaction_failed", apiText(t, err), "retry");
       case "validation":
       case "bad_request":
-        return { code: err.code, title: "Não deu para concluir", text: err.message, action: null };
+        return withText(err.code, "bad_request", err.message);
       default:
-        if (err.status >= 500) return { code: err.code, title: "O servidor não respondeu bem", text: "Tente de novo em instantes.", action: "retry" };
-        return { code: err.code, title: "Não deu para concluir", text: err.message, action: null };
+        if (err.status >= 500) return msg(err.code, "server_error", "retry");
+        return withText(err.code, "bad_request", apiText(t, err));
     }
   }
-  if (err instanceof TxFailedError)
-    return { code: "transaction_failed", title: "A rede não confirmou a transação", text: "Nada foi cobrado. Tente de novo: montamos uma nova.", action: "retry" };
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/cancel|rejected|denied|exited/i.test(msg)) return { code: "cancelled", title: "Assinatura cancelada", text: "Nada foi cobrado.", action: null };
-  return { code: "unknown", title: "Algo deu errado", text: msg || "Tente de novo.", action: "retry" };
+  if (err instanceof TxFailedError) return msg("transaction_failed", "network_failed_short", "retry");
+  const m = err instanceof Error ? err.message : String(err);
+  if (/cancel|rejected|denied|exited|cancelad/i.test(m)) return msg("cancelled", "cancelled");
+  return { code: "unknown", title: t("tx.unknown.title"), text: m || t("tx.unknown.text"), action: "retry" };
 }
 
-const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+/** Para as telas: `const errorInfo = useTxErrorMessage(); errorInfo(e).text` já no idioma da página (também no SSR). */
+export function useTxErrorMessage(): (err: unknown) => TxErrorInfo {
+  const locale = useLocale() as Locale;
+  return useCallback((err: unknown) => txErrorMessage(err, locale), [locale]);
+}
 
 /**
  * Hook para as telas: `const { run, pending, error } = useTx();`
@@ -225,21 +197,23 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 
  */
 export function useTx() {
   const { api, requireWallet } = useSession();
+  const locale = useLocale() as Locale;
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<TxErrorInfo | null>(null);
+  // Guarda o erro cru: o texto é montado a cada render, no idioma atual da página.
+  const [raw, setRaw] = useState<{ e: unknown } | null>(null);
   const [result, setResult] = useState<TxResult | null>(null);
 
   const run = useCallback(
     async (build: () => Promise<TxResponse>) => {
       setPending(true);
-      setError(null);
+      setRaw(null);
       try {
         const wallet = await requireWallet();
         const r = await runTx(api, wallet, build);
         setResult(r);
         return r;
       } catch (e) {
-        setError(txErrorMessage(e));
+        setRaw({ e });
         return null;
       } finally {
         setPending(false);
@@ -248,7 +222,8 @@ export function useTx() {
     [api, requireWallet],
   );
 
-  return { run, pending, error, result, explorerUrl: result?.explorerUrl ?? null, reset: () => setError(null) };
+  const error: TxErrorInfo | null = raw ? txErrorMessage(raw.e, locale) : null;
+  return { run, pending, error, result, explorerUrl: result?.explorerUrl ?? null, reset: () => setRaw(null) };
 }
 
 /**
@@ -257,23 +232,25 @@ export function useTx() {
  */
 export function useFaucet() {
   const { api, config, requireWallet } = useSession();
+  const locale = useLocale() as Locale;
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<TxErrorInfo | null>(null);
+  const [raw, setRaw] = useState<{ e: unknown } | null>(null);
 
   const receive = useCallback(async () => {
     setPending(true);
-    setError(null);
+    setRaw(null);
     try {
       await requireWallet();
       const r = await api.faucet();
       return r.amountUsdc;
     } catch (e) {
-      setError(txErrorMessage(e));
+      setRaw({ e });
       return null;
     } finally {
       setPending(false);
     }
   }, [api, requireWallet]);
 
+  const error: TxErrorInfo | null = raw ? txErrorMessage(raw.e, locale) : null;
   return { enabled: !!config?.faucetEnabled, amountUsdc: config?.faucetAmountUsdc ?? null, receive, pending, error };
 }

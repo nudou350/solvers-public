@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 
@@ -44,6 +45,7 @@ const ToastCtx = createContext<((t: ToastInput) => void) | null>(null);
 
 /** Provider dos toasts (já montado no layout). */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const tr = useTranslations("common.ui");
   const [items, setItems] = useState<ToastItem[]>([]);
   const seq = useRef(0);
   const dismiss = useCallback((id: number) => setItems((l) => l.filter((t) => t.id !== id)), []);
@@ -83,7 +85,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </div>
               ) : null}
             </div>
-            <button type="button" className="x" aria-label="Fechar aviso" onClick={() => dismiss(t.id)}>
+            <button type="button" className="x" aria-label={tr("closeNotice")} onClick={() => dismiss(t.id)}>
               <Icon name="x" size="s" />
             </button>
           </div>
@@ -93,7 +95,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** `const toast = useToast(); toast({ tone: "ok", title: "Compra concluída" })`. */
+/** `const toast = useToast(); toast({ tone: "ok", title: "Purchase complete" })`. */
 export function useToast() {
   const push = useContext(ToastCtx);
   return useMemo(() => push ?? ((t: ToastInput) => console.warn("[toast sem provider]", t.title)), [push]);

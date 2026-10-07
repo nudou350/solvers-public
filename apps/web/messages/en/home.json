@@ -1,1 +1,53 @@
-{}
+{
+  "loadFailed": {
+    "title": "Couldn't load the catalog",
+    "body": "The server didn't respond just now. Please try again in a moment.",
+    "retry": "Try again"
+  },
+  "trending": {
+    "title": "Trending this week",
+    "body": "Solvers whose demand rose the most over the last 7 days.",
+    "empty": "Not enough activity yet to build the trending list.",
+    "meta": "{category} · {n, plural, one {# verified use} other {# verified uses}}"
+  },
+  "fresh": {
+    "title": "New here",
+    "body": "Published in the last few weeks, already through the team's review.",
+    "published": "Published {ago}",
+    "badge": "New"
+  },
+  "eval": {
+    "internal": "{score}% on internal tests",
+    "none": "No reviews yet"
+  },
+  "freeTrial": "free trial",
+  "how": {
+    "eyebrow": "How it works",
+    "title": "Pick one, pay once, use it in your AI",
+    "step1Title": "Choose a solver",
+    "step1Body": "Compare user ratings, the team's tests and before-and-after results. Many have a free trial, so you can try one before you decide.",
+    "step2Title": "Pay once",
+    "step2Body": "You get a license that's yours alone. If the task comes with a guarantee, your payment is held and only released once the result meets the criteria.",
+    "step3Title": "Use it in your AI",
+    "step3Body": "Copy an address, paste it into Claude or ChatGPT, and you're set. A step-by-step guide with illustrations takes under five minutes.",
+    "guide": "See the step-by-step guide",
+    "security": "How security works"
+  },
+  "cta": {
+    "title": "Good at something? Publish your own solver.",
+    "body": "Set the price and earn on every sale. Publishing is free: the filter is the test suite.",
+    "button": "Publish a solver"
+  },
+  "ticket": {
+    "view": "View {name}",
+    "yourLicense": "Your license",
+    "active": "Active",
+    "permanent": "Permanent license",
+    "onSolana": "Recorded on the Solana network",
+    "updates": "Updates included",
+    "paymentConfirmed": "Payment confirmed",
+    "tested": "Tested by the team",
+    "casesSolved": "{score}% of internal test cases solved",
+    "noReviews": "No reviews yet"
+  }
+}

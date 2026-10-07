@@ -1,1 +1,260 @@
-{}
+{
+  "meta": {
+    "queueTitle": "Revisões",
+    "reviewTitle": "Revisar envio"
+  },
+  "gate": {
+    "title": "Entre para continuar",
+    "text": "Esta área é só para a equipe do Solvers."
+  },
+  "status": {
+    "submitted": "Recebido",
+    "validating": "Conferindo",
+    "rejected_validation": "Tem erros",
+    "pending_review": "Na fila da revisão",
+    "changes_requested": "Mudanças pedidas",
+    "rejected": "Recusado",
+    "awaiting_creator_signature": "Falta a sua confirmação",
+    "awaiting_onchain_approval": "Aprovação final",
+    "publishing": "Publicando",
+    "publish_failed": "Publicação travou",
+    "published": "No ar",
+    "superseded": "Substituído",
+    "suspended": "Suspenso",
+    "withdrawn": "Retirado"
+  },
+  "differentiator": {
+    "memory": "Memória",
+    "escalation": "Atendimento do criador",
+    "liveData": "Dado vivo",
+    "tool": "Ferramenta própria",
+    "verifier": "Resultado verificado"
+  },
+  "queue": {
+    "eyebrow": "Equipe",
+    "title": "Revisões",
+    "intro": "Pacotes enviados por criadores. Todo conteúdo aparece como texto puro: nada do pacote é executado nem aberto como página.",
+    "filterLabel": "Filtrar por estado",
+    "filters": {
+      "pending_review": "Na fila",
+      "awaiting_onchain_approval": "Aprovação final",
+      "publish_failed": "Publicação travada",
+      "awaiting_creator_signature": "Esperando o criador",
+      "changes_requested": "Mudanças pedidas",
+      "published": "Publicados",
+      "all": "Todos"
+    },
+    "loading": "Carregando a fila…",
+    "errorTitle": "Não deu para carregar a fila",
+    "retry": "Tentar de novo",
+    "emptyTitle": "Nada por aqui",
+    "emptyText": "Nenhum envio neste estado.",
+    "newSolver": "Especialista novo",
+    "newVersion": "Nova versão",
+    "errors": "{n, plural, =1 {# erro} other {# erros}}",
+    "warnings": "{n, plural, =1 {# aviso} other {# avisos}}",
+    "noName": "Sem nome",
+    "sent": "Enviado <ago></ago>",
+    "overdue": "Passou da meta de 5 dias úteis",
+    "businessDays": "{days} de 5 dias úteis",
+    "review": "Revisar",
+    "reviewAria": "Revisar {name}"
+  },
+  "detail": {
+    "back": "Fila de revisões",
+    "loading": "Carregando o envio…",
+    "missingTitle": "Envio não encontrado",
+    "missingText": "Este envio não existe.",
+    "missingBack": "Voltar à fila",
+    "errorTitle": "Não deu para carregar o envio",
+    "retry": "Tentar de novo"
+  },
+  "raw": {
+    "hiddenTitle": "{n, plural, =1 {# caractere invisível} other {# caracteres invisíveis}} neste texto",
+    "hiddenText": "Eles aparecem como [U+XXXX]. Caracteres invisíveis e de direção podem esconder instruções do olhar do revisor: confira cada um."
+  },
+  "header": {
+    "eyebrow": "Revisão",
+    "newSolver": "Especialista novo",
+    "newVersion": "Nova versão",
+    "sent": "enviado <ago></ago>"
+  },
+  "summary": {
+    "title": "Resumo",
+    "creator": "Criador",
+    "noName": "Sem nome",
+    "verified": "Contato verificado",
+    "unverified": "Contato não verificado",
+    "wallet": "Carteira",
+    "bio": "Bio",
+    "category": "Categoria",
+    "tagline": "Frase curta",
+    "price": "Preço",
+    "differentiators": "Diferenciais",
+    "none": "Nenhum declarado",
+    "proven": " (comprovado)",
+    "notProven": " (não comprovado)",
+    "description": "Descrição enviada",
+    "descriptionAria": "Descrição enviada pelo criador"
+  },
+  "validator": {
+    "title": "Validador",
+    "counts": "{errors, plural, =1 {# erro} other {# erros}} · {warnings, plural, =1 {# aviso} other {# avisos}}",
+    "noResult": "Sem resultado",
+    "noResultText": "Sem resultado de conferência."
+  },
+  "scans": {
+    "title": "Varreduras automáticas",
+    "intro": "Unicode oculto, HTML ou CSS escondido, padrões de injeção, URLs, conteúdo repetido de outros pacotes e frases de busca fora do assunto.",
+    "none": "Sem resultado de varredura.",
+    "rawAria": "Resultado das varreduras",
+    "high": "{n} alta(s)",
+    "medium": "{n} média(s)",
+    "info": "{n} aviso(s)",
+    "suppressed": "{n} repetidos omitidos",
+    "nothing": "Nada achado pelas varreduras.",
+    "snippetAria": "Trecho do achado {kind}",
+    "severity": {
+      "high": "Alta",
+      "warn": "Média",
+      "info": "Aviso"
+    }
+  },
+  "diff": {
+    "title": "Diff contra a versão publicada",
+    "truncated": "Cortado pelo teto",
+    "intro": "Linhas com + entraram, linhas com - saíram. Na primeira versão, tudo é novo.",
+    "fileTruncated": "Cortado",
+    "aria": "Diff de {path}"
+  },
+  "files": {
+    "title": "Arquivos e diferenças",
+    "onlyChanged": "Só o que mudou",
+    "summary": "{added} novos · {changed} alterados · {removed} removidos · {same} iguais à versão publicada. Toque em um arquivo para ler o conteúdo como texto.",
+    "empty": "Nenhum arquivo.",
+    "loading": "Carregando o arquivo…",
+    "contentAria": "Conteúdo de {path}",
+    "groups": {
+      "manifest": "Manifesto e etapas",
+      "templates": "Templates",
+      "evals": "Evals",
+      "knowledge": "Conhecimento",
+      "others": "Outros arquivos"
+    },
+    "diffLabel": {
+      "added": "Novo",
+      "changed": "Mudou",
+      "removed": "Removido",
+      "same": "Igual"
+    }
+  },
+  "knowledge": {
+    "title": "Conhecimento",
+    "ingest": "Ingestão: {status}",
+    "ingestStatus": {
+      "queued": "Na fila",
+      "running": "Rodando",
+      "done": "Pronta",
+      "failed": "Falhou",
+      "none": "Sem conhecimento"
+    },
+    "counts": "{files, plural, =1 {# arquivo} other {# arquivos}} · {chunks} trechos · {expired, plural, =1 {# trecho vencido} other {# trechos vencidos}}.",
+    "expiredNotice": "Há trechos com validade vencida. Eles não deveriam sustentar o diferencial “Dado vivo”.",
+    "searchLabel": "Busca de teste na base do pacote",
+    "searchPlaceholder": "Ex.: uma pergunta que um comprador faria",
+    "search": "Buscar",
+    "noHits": "Nada encontrado para essa busca.",
+    "resultsAria": "Resultados da busca",
+    "relevance": "relevância {score}",
+    "hitAria": "Trecho {n} de {source}"
+  },
+  "manifest": {
+    "title": "Manifesto",
+    "aria": "Manifesto como enviado",
+    "none": "Sem manifesto."
+  },
+  "history": {
+    "title": "Histórico de revisões",
+    "none": "Ainda não há decisões neste envio.",
+    "checklist": "Checklist: {done} de {total} itens marcados",
+    "actions": {
+      "approve": "Aprovou",
+      "request_changes": "Pediu mudanças",
+      "reject": "Recusou",
+      "finish": "Concluiu a publicação",
+      "suspend": "Suspendeu",
+      "resume": "Reativou"
+    }
+  },
+  "decision": {
+    "asideAria": "Decisão",
+    "progress": "Andamento",
+    "title": "Decisão",
+    "noDecision": "Este envio está em “{status}”. Não há decisão para tomar agora.",
+    "checklistAria": "Checklist da revisão",
+    "checklist": "Checklist",
+    "checklistRequired": "Aprovar exige o checklist inteiro marcado.",
+    "notesLabel": "Nota para o criador",
+    "notesHint": "Obrigatória em toda decisão. Guardada como parte do registro, que não pode ser apagado.",
+    "notesError": "Escreva o motivo (pelo menos 3 caracteres). O criador lê este texto.",
+    "errorTitle": "Não deu para registrar a decisão",
+    "approve": "Aprovar",
+    "requestChanges": "Pedir mudanças",
+    "reject": "Recusar",
+    "revoke": "Revogar aprovação",
+    "revokeHelp": "O criador ainda não assinou: revogar volta o envio para “mudanças pedidas” (a nota é obrigatória) e libera a correção na mesma versão.",
+    "finish": "Concluir publicação",
+    "finishHelp": "Especialista novo: antes disto, a aprovação on-chain precisa ser feita na máquina da equipe (<code>cli:approve</code>); este botão não assina nada. Use aqui só se o evento da cadeia não chegou sozinho: conclui o catálogo e coloca o especialista no ar.",
+    "approveHelp": "Aprovar no site não assina nada na cadeia: libera o criador para confirmar. A aprovação final, em especialista novo, é feita à parte com a carteira fria.",
+    "back": "Voltar",
+    "checklistItems": {
+      "promiseDelivered": "A promessa é entregue pelas etapas.",
+      "twoDifferentiatorsProven": "Pelo menos 2 dos 5 diferenciais estão comprovados.",
+      "rightsAndSources": "As fontes estão listadas e há permissão para o conteúdo de terceiros.",
+      "noHarmfulInstructions": "Nada age contra o usuário nem manda dados dele para fora, e não há injeção em nenhum texto (inclusive o que só aparece para uma consulta específica).",
+      "priceTrialShowcaseCoherent": "Preço, teste grátis e vitrine são coerentes, sem promessa de resultado financeiro, jurídico ou médico sem ressalva."
+    },
+    "toast": {
+      "notPublishedTitle": "Ainda não foi publicado",
+      "busy": "Outra finalização está em andamento. Espere um minuto e confira de novo.",
+      "failed": "A publicação falhou: {error}",
+      "internalError": "erro interno",
+      "awaitAdmin": "Falta a aprovação on-chain com a carteira fria. Na máquina da equipe: pnpm --filter @solvers/server cli:approve {slug}",
+      "missingStep": "Falta: {step}.",
+      "missingChain": "um passo na cadeia",
+      "approved": "Aprovado",
+      "changesRequested": "Mudanças pedidas",
+      "rejected": "Envio recusado",
+      "revoked": "Aprovação revogada",
+      "finished": "Publicação concluída",
+      "approvedText": "O criador já pode confirmar com a conta dele. Nada foi assinado na cadeia."
+    },
+    "confirm": {
+      "approve": {
+        "title": "Aprovar este envio?",
+        "text": "A versão aprovada (conteúdo, preço e versão) fica gravada e o criador passa a poder confirmar o cadastro. Depois disso, o conteúdo não pode mais ser trocado.",
+        "label": "Aprovar"
+      },
+      "request_changes": {
+        "title": "Pedir mudanças?",
+        "text": "O criador recebe a sua nota e envia o pacote corrigido na mesma versão.",
+        "label": "Pedir mudanças"
+      },
+      "reject": {
+        "title": "Recusar este envio?",
+        "text": "A recusa é definitiva para este envio: o criador vê a sua nota e só pode mandar um pacote novo.",
+        "label": "Recusar"
+      },
+      "revoke": {
+        "title": "Revogar a aprovação?",
+        "text": "O criador ainda não assinou: o envio volta para “mudanças pedidas” com a sua nota, e a versão aprovada deixa de valer.",
+        "label": "Revogar"
+      },
+      "finish": {
+        "title": "Concluir a publicação?",
+        "text": "O especialista entra na vitrine agora. Confira se a aprovação na cadeia já aconteceu.",
+        "label": "Concluir"
+      }
+    }
+  }
+}

@@ -1,1 +1,31 @@
-{}
+{
+  "meta": {
+    "title": "Conectar ao Claude ou ChatGPT"
+  },
+  "title": "Conectar sua conta do Solvers",
+  "invalidRequest": "Pedido de conexão inválido. Volte ao Claude ou ChatGPT e conecte de novo.",
+  "genericError": "Não deu para continuar.",
+  "somethingWrong": "Algo deu errado. Tente de novo.",
+  "walletMismatch": "A carteira não é a da sessão. Saia e entre de novo.",
+  "loadingRequest": "Carregando o pedido de conexão…",
+  "intro": "<b>{client}</b> quer usar os seus especialistas do Solvers. Ele vai ver as suas licenças e poderá usar as suas memórias. <b>Isto não autoriza pagamentos.</b>",
+  "returnsTo": "Volta para:",
+  "verified": "(verificado)",
+  "unverifiedTitle": "Aplicativo não verificado",
+  "unverifiedBody": "Só continue se foi você quem iniciou esta conexão agora.",
+  "signInPrompt": "Entre com o seu e-mail para escolher a conta que será conectada.",
+  "signIn": "Entrar",
+  "connectingAs": "Conectando como",
+  "switchAccount": "(não é você? trocar conta)",
+  "authorize": "Autorizar {client}",
+  "stepConfirming": "Confirmando que a carteira é sua…",
+  "stepMemories": "Protegendo suas memórias…",
+  "stepConnecting": "Conectando…",
+  "stepDone": "Pronto! Voltando para o {client}…",
+  "failedTitle": "Não deu para conectar",
+  "walletHint": "Usa Phantom, Solflare ou Backpack? <link>Conectar com a carteira do navegador</link>. Atenção: é outra conta, com outras compras.",
+  "errExpired": "Este pedido de conexão expirou. Volte ao Claude ou ChatGPT e conecte de novo.",
+  "errSignature": "Esta assinatura não pertence a este pedido de conexão. Volte ao Claude ou ChatGPT e conecte de novo.",
+  "errMemoryKey": "Não deu para confirmar a chave que protege as suas memórias. Tente de novo.",
+  "errTooMany": "Muitas tentativas. Espere um minuto e tente de novo."
+}

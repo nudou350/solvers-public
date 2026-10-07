@@ -2,6 +2,7 @@
 // Instalação guiada (design: instalacao-guiada). Endereço único do conector (getConfig().connectorUrl),
 // passo a passo para Claude e ChatGPT e checklist com o teste real da conexão (getConnector()).
 import type { AgentDetail, ConnectorStatus } from "@solvers/api-client";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
@@ -9,12 +10,13 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/Toast";
-import { ago, connectorName, copyText } from "@/lib/format";
+import { useErrorText } from "@/lib/error-text";
+import { copyText, useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import s from "./checkout.module.css";
 import { HelpDialog } from "./HelpDialog";
-import { txErrorMessage } from "@/lib/tx";
+import { useTxErrorMessage } from "@/lib/tx";
 
 type Client = "claude" | "gpt";
 
@@ -39,13 +41,8 @@ type Check = {
 };
 
 
-/** O que muda sem um conector opcional. Figma tem texto próprio; os demais, um genérico. */
-function optionalHint(key: string | undefined, name: string) {
-  if ((key ?? name).toLowerCase() === "figma") return "Opcional: conecte o Figma para ler o arquivo direto; sem ele, dá para colar prints e valores.";
-  return `Opcional: conecte o ${name} para o especialista ler os dados direto; sem ele, dá para colar as informações na conversa.`;
-}
-
 function Ill({ children }: { children: ReactNode }) {
+  const t = useTranslations("install");
   return (
     <div className="ill">
       <div className="ill-win">
@@ -57,7 +54,7 @@ function Ill({ children }: { children: ReactNode }) {
         {children}
       </div>
       <div className="tiny faint" style={{ marginTop: 8 }}>
-        Ilustração. Os nomes dos menus podem variar conforme a versão do aplicativo.
+        {t("setup.ill.caption")}
       </div>
     </div>
   );
@@ -66,6 +63,11 @@ function Ill({ children }: { children: ReactNode }) {
 export function InstallView({ detail }: { detail: AgentDetail | null }) {
   const { api, config, status, me, login, loggingIn } = useSession();
   const toast = useToast();
+  const t = useTranslations("install");
+  const f = useFormat();
+  const locale = useLocale();
+  const errorText = useErrorText();
+  const txError = useTxErrorMessage();
   const agent = detail?.agent ?? null;
   const creator = detail?.creator ?? null;
   const [tab, setTab] = useState<Client>("claude");
@@ -99,14 +101,14 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
         if (!silent) setTestedEmpty(true);
       } catch (e) {
         if (!silent) {
-          const info = txErrorMessage(e);
+          const info = txError(e);
           toast({ tone: "bad", title: info.title, text: info.text });
         }
       } finally {
         setTesting(false);
       }
     },
-    [api, toast],
+    [api, toast, txError],
   );
 
   // Logado: confere a conexão uma vez em silêncio (quem já conectou vê o item marcado).
@@ -129,33 +131,36 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
     }
   }
 
-  const doLogin = () => login().catch((e: unknown) => toast({ tone: "bad", title: "Não deu para entrar", text: (e as Error).message }));
+  const doLogin = () => login().catch((e: unknown) => toast({ tone: "bad", title: t("setup.checklist.loginFailed"), text: errorText(e) }));
 
   const planReq = agent?.requirements.find((r) => r.type === "plan");
   const connectorReqs = agent?.requirements.filter((r) => r.type === "connector") ?? [];
   const logged = status === "authed" && !!me;
   const first = mine[0];
-  const otherNames = [...new Set(others.map((c) => c.clientName))].join(" e ");
+  const otherNames = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format([...new Set(others.map((c) => c.clientName))]);
+  // O que muda sem um conector opcional. Figma tem texto próprio; os demais, um genérico.
+  const optionalHint = (key: string | undefined, name: string) =>
+    (key ?? name).toLowerCase() === "figma" ? t("setup.checklist.connector.optionalFigma") : t("setup.checklist.connector.optionalGeneric", { name });
 
   const checks: Check[] = [
     {
       key: "plan",
-      label: `${clientName} com plano compatível`,
+      label: t("setup.checklist.plan.label", { client: clientName }),
       ok: plan,
-      statusOk: "Confirmado por você",
-      statusNo: planReq ? `${planReq.label}. Conectores personalizados costumam pedir um plano pago.` : "Conectores personalizados costumam pedir um plano pago.",
-      actLabel: "Tenho um plano compatível",
+      statusOk: t("setup.checklist.plan.ok"),
+      statusNo: planReq ? t("setup.checklist.plan.noWithReq", { label: planReq.label }) : t("setup.checklist.plan.no"),
+      actLabel: t("setup.checklist.plan.act"),
       act: () => setPlan(true),
     },
     ...connectorReqs.map<Check>((r) => {
-      const n = connectorName(r.label);
+      const n = f.connectorName(r.label);
       return {
         key: `conn-${r.key ?? r.label}`,
-        label: r.optional ? `${n} (opcional)` : `${n} conectado?`,
+        label: r.optional ? t("setup.checklist.connector.labelOptional", { name: n }) : t("setup.checklist.connector.label", { name: n }),
         ok: !!conns[r.label],
-        statusOk: "Conectado",
-        statusNo: r.optional ? optionalHint(r.key, n) : `Este especialista usa o ${n}. Conecte-o na sua IA também.`,
-        actLabel: "Já conectei",
+        statusOk: t("setup.checklist.connector.ok"),
+        statusNo: r.optional ? optionalHint(r.key, n) : t("setup.checklist.connector.no", { name: n }),
+        actLabel: t("setup.checklist.connector.act"),
         act: () => setConns((c) => ({ ...c, [r.label]: true })),
         optional: r.optional,
         howTo: r.howTo,
@@ -164,28 +169,28 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
     }),
     {
       key: "added",
-      label: "Conector do Solvers adicionado",
+      label: t("setup.checklist.added.label"),
       ok: added,
-      statusOk: "Adicionado à sua IA",
-      statusNo: "Falta colar o endereço no passo 3",
-      actLabel: "Já adicionei",
+      statusOk: t("setup.checklist.added.ok"),
+      statusNo: t("setup.checklist.added.no"),
+      actLabel: t("setup.checklist.added.act"),
       act: () => setAdded(true),
     },
     {
       key: "test",
-      label: "Teste de conexão",
+      label: t("setup.checklist.test.label"),
       ok: connected,
-      statusOk: first ? `${first.clientName} autorizado ${ago(first.authorizedAt)}. Faça o passo 4 para confirmar.` : "Autorizado. Faça o passo 4 para confirmar.",
+      statusOk: first ? t("setup.checklist.test.ok", { client: first.clientName, ago: f.ago(first.authorizedAt) }) : t("setup.checklist.test.okNoClient"),
       statusNo: !logged
-        ? "Entre na sua conta para testar"
+        ? t("setup.checklist.test.noLogin")
         : others.length
-          ? `Encontramos ${otherNames}, mas não o ${clientName}. Faça o passo 3 neste app e autorize o acesso.`
+          ? t("setup.checklist.test.noOthers", { names: otherNames, client: clientName })
           : testedEmpty
-            ? `Ainda não encontramos o ${clientName}. Confira o passo 3 e autorize o acesso.`
+            ? t("setup.checklist.test.noEmpty", { client: clientName })
             : added
-              ? "Pronto para testar"
-              : "Faça o passo 3 primeiro",
-      actLabel: !logged ? "Entrar" : "Testar conexão",
+              ? t("setup.checklist.test.ready")
+              : t("setup.checklist.test.doStep3"),
+      actLabel: !logged ? t("setup.checklist.test.actLogin") : t("setup.checklist.test.actTest"),
       act: !logged ? doLogin : () => void test(false),
       acting: !logged ? loggingIn : testing,
     },
@@ -198,24 +203,24 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
   return (
     <section className="wrap" style={{ paddingTop: 36, paddingBottom: 56 }}>
       <div className="col" style={{ ...gap(12), marginBottom: 32 }}>
-        <span className="eyebrow">Instalação guiada</span>
-        <h1 className="display h1s">Conecte o {name} à sua IA</h1>
+        <span className="eyebrow">{t("setup.eyebrow")}</span>
+        <h1 className="display h1s">{t("setup.title", { name })}</h1>
         <p className="lead" style={{ maxWidth: 660 }}>
-          São quatro passos rápidos. Você só faz isso uma vez{agent ? "" : ": o mesmo conector serve para todos os especialistas que você tiver"}.
+          {agent ? t("setup.leadAgent") : t("setup.leadGeneric")}
         </p>
         {trial && !trial.owned && trial.trialUsesLeft > 0 ? (
           <div>
             <Chip tone="brand" icon="gift">
-              Você tem {trial.trialUsesLeft} {trial.trialUsesLeft === 1 ? "uso grátis" : "usos grátis"} para testar
+              {t("setup.trial", { n: trial.trialUsesLeft })}
             </Chip>
           </div>
         ) : null}
         <div className="row" style={{ ...gap(14), marginTop: 6, maxWidth: 460 }}>
-          <div className="bar mint grow" role="progressbar" aria-valuemin={0} aria-valuemax={required.length} aria-valuenow={doneCount} aria-label="Progresso da instalação">
+          <div className="bar mint grow" role="progressbar" aria-valuemin={0} aria-valuemax={required.length} aria-valuenow={doneCount} aria-label={t("setup.progressLabel")}>
             <i style={{ width: `${(doneCount / required.length) * 100}%` }} />
           </div>
           <b className="small num">
-            {doneCount} de {required.length}
+            {t("setup.progress", { done: doneCount, total: required.length })}
           </b>
         </div>
       </div>
@@ -223,7 +228,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
       <div className="split">
         <div className="col" style={gap(22)}>
           <Tabs<Client>
-            aria-label="Sua IA"
+            aria-label={t("setup.tabsLabel")}
             value={tab}
             onChange={setTab}
             tabs={[
@@ -235,15 +240,15 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           <div className="card pad col" style={gap(16)}>
             <div className="row" style={gap(14)}>
               <span className="dot dot-now">1</span>
-              <h2 className="h3">Copie o endereço do conector</h2>
+              <h2 className="h3">{t("setup.step1.title")}</h2>
             </div>
             <p className="muted">
-              É um endereço só para todos os especialistas. Quando a sua IA se conectar, você entra com a sua conta do Solvers e ela passa a usar o que você comprou.
+              {t("setup.step1.body")}
             </p>
             <div className="row m-col" style={gap(10)}>
-              <input className="input mono" readOnly value={url} placeholder="Carregando…" aria-label="Endereço do conector" style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
+              <input className="input mono" readOnly value={url} placeholder={t("setup.step1.loading")} aria-label={t("setup.step1.inputLabel")} style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
               <Button size="lg" icon={copied ? "check" : "copy"} onClick={copy} disabled={!url}>
-                {copied ? "Copiado" : "Copiar endereço"}
+                {copied ? t("setup.step1.copied") : t("setup.step1.copy")}
               </Button>
             </div>
           </div>
@@ -251,12 +256,10 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           <div className="card pad col" style={gap(16)}>
             <div className="row" style={gap(14)}>
               <span className="dot dot-now">2</span>
-              <h2 className="h3">{gpt ? "Abra as configurações do ChatGPT" : "Abra as configurações do Claude"}</h2>
+              <h2 className="h3">{gpt ? t("setup.step2.titleGpt") : t("setup.step2.titleClaude")}</h2>
             </div>
             <p className="muted">
-              {gpt
-                ? "No ChatGPT, abra as configurações e procure por Conectores (ou Aplicativos). Escolha adicionar um conector personalizado."
-                : "No Claude, abra Configurações, entre em Conectores e escolha Adicionar conector personalizado."}
+              {gpt ? t("setup.step2.bodyGpt") : t("setup.step2.bodyClaude")}
             </p>
             <Ill>
               <div className={s.illGrid}>
@@ -264,7 +267,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                   <div className="skel" style={{ width: "70%" }} />
                   <div className="ill-hi row" style={{ ...gap(8), padding: "8px 10px" }}>
                     <Icon name="plug" size="s" />
-                    <b className="tiny">Conectores</b>
+                    <b className="tiny">{gpt ? t("setup.step2.sidebarGpt") : t("setup.step2.sidebarClaude")}</b>
                   </div>
                   <div className="skel" style={{ width: "60%" }} />
                   <div className="skel" style={{ width: "75%" }} />
@@ -274,7 +277,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                   <div className="skel" style={{ width: "85%" }} />
                   <div className={`btn btn-secondary ill-hi ${s.illBtn}`}>
                     <Icon name="plus" size="s" />
-                    {gpt ? "Criar conector" : "Adicionar conector personalizado"}
+                    {gpt ? t("setup.step2.buttonGpt") : t("setup.step2.buttonClaude")}
                   </div>
                 </div>
               </div>
@@ -284,10 +287,10 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           <div className="card pad col" style={gap(16)}>
             <div className="row" style={gap(14)}>
               <span className="dot dot-now">3</span>
-              <h2 className="h3">Cole o endereço e confirme</h2>
+              <h2 className="h3">{t("setup.step3.title")}</h2>
             </div>
             <p className="muted">
-              Cole o endereço que você copiou no passo 1 e confirme. A sua IA vai abrir uma página do Solvers pedindo a sua autorização: entre com a mesma conta que você usa aqui.
+              {t("setup.step3.body")}
             </p>
             <Ill>
               <div className="col" style={{ ...gap(12), padding: 18 }}>
@@ -297,17 +300,17 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                 </div>
                 <div className="row" style={{ ...gap(8), justifyContent: "flex-end" }}>
                   <span className="btn btn-ghost" style={{ minHeight: 40 }}>
-                    Cancelar
+                    {t("setup.step3.cancel")}
                   </span>
                   <span className="btn btn-primary" style={{ minHeight: 40 }}>
-                    {gpt ? "Criar" : "Adicionar"}
+                    {gpt ? t("setup.step3.confirmGpt") : t("setup.step3.confirmClaude")}
                   </span>
                 </div>
               </div>
             </Ill>
             <div>
               <Button variant="secondary" onClick={() => setAdded(true)} disabled={added} icon={added ? "check" : undefined}>
-                {added ? "Anotado, obrigado" : "Já colei e confirmei"}
+                {added ? t("setup.step3.doneNoted") : t("setup.step3.done")}
               </Button>
             </div>
           </div>
@@ -315,18 +318,18 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
           <div className="card pad col" style={gap(16)}>
             <div className="row" style={gap(14)}>
               <span className="dot dot-now">4</span>
-              <h2 className="h3">Faça um teste</h2>
+              <h2 className="h3">{t("setup.step4.title")}</h2>
             </div>
-            <p className="muted">Abra uma conversa nova e peça algo simples. Se a sua IA responder citando o especialista, deu certo.</p>
+            <p className="muted">{t("setup.step4.body")}</p>
             <div className="card-flat pad-s row between" style={gap(12)}>
-              <span className="grow">{agent ? `“Use o ${agent.name} e me diga como ele pode me ajudar.”` : "“Quais especialistas do Solvers eu tenho?”"}</span>
+              <span className="grow">{agent ? t("setup.step4.promptAgent", { name: agent.name }) : t("setup.step4.promptGeneric")}</span>
             </div>
           </div>
         </div>
 
         <aside className="sticky col" style={gap(16)}>
           <div className="card pad col" style={gap(16)}>
-            <h2 className="h3">Checklist de requisitos</h2>
+            <h2 className="h3">{t("setup.checklist.title")}</h2>
             {checks.map((k) => (
               <div key={k.key} className="row start" style={gap(12)}>
                 <span className={`dot ${k.ok ? "dot-ok" : k.optional ? "" : "dot-now"}`} aria-hidden>
@@ -345,7 +348,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                     ) : null}
                     {!k.ok && k.helpUrl ? (
                       <a className="link small" href={k.helpUrl} target="_blank" rel="noopener noreferrer">
-                        Ajuda oficial
+                        {t("setup.checklist.officialHelp")}
                       </a>
                     ) : null}
                   </div>
@@ -364,15 +367,17 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                 <Icon name="check" />
               </span>
               <div className="grow">
-                <b>Tudo pronto!</b>
-                <div className="small muted">{agent ? "Seu especialista já pode ser usado na sua IA." : "Seus especialistas já podem ser usados na sua IA."}</div>
+                <b>{t("setup.allDone.title")}</b>
+                <div className="small muted">{agent ? t("setup.allDone.agent") : t("setup.allDone.generic")}</div>
                 {agent && trial?.owned ? (
                   <div className="tiny faint" style={{ marginTop: 4 }}>
-                    Depois de usar,{" "}
-                    <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
-                      conte como foi
-                    </Link>
-                    .
+                    {t.rich("setup.allDone.review", {
+                      link: (chunks) => (
+                        <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
+                          {chunks}
+                        </Link>
+                      ),
+                    })}
                   </div>
                 ) : null}
               </div>
@@ -382,22 +387,28 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
             <Icon name="message" />
             <span className="small grow">
               {creator ? (
-                <>
-                  Travou em algum passo? Confira o endereço do passo 1 ou{" "}
-                  {logged && agent ? (
-                    <button type="button" className={`link ${s.helpLink}`} onClick={() => setHelping(true)}>
-                      peça ajuda a {creator.name}
-                    </button>
-                  ) : (
-                    <Link className="link" href={`/creators/${creator.id}`}>
-                      veja quem é {creator.name}
-                    </Link>
-                  )}
-                  .
-                </>
+                logged && agent ? (
+                  t.rich("setup.stuck.askCreator", {
+                    name: creator.name,
+                    action: (chunks) => (
+                      <button type="button" className={`link ${s.helpLink}`} onClick={() => setHelping(true)}>
+                        {chunks}
+                      </button>
+                    ),
+                  })
+                ) : (
+                  t.rich("setup.stuck.seeCreator", {
+                    name: creator.name,
+                    action: (chunks) => (
+                      <Link className="link" href={`/creators/${creator.id}`}>
+                        {chunks}
+                      </Link>
+                    ),
+                  })
+                )
               ) : (
                 <>
-                  Travou em algum passo? Confira se o endereço do passo 1 foi colado inteiro e se você autorizou com a mesma conta. <Link className="link" href="/library">Ver minha biblioteca</Link>
+                  {t("setup.stuck.generic")} <Link className="link" href="/library">{t("setup.stuck.library")}</Link>
                 </>
               )}
             </span>

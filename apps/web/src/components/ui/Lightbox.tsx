@@ -2,6 +2,7 @@
 // Visualizador de imagens em tela cheia. Usa <dialog>.showModal(): a camada do navegador cuida do foco preso,
 // do Esc e de deixar o resto da página inerte; aqui entram as setas, o clique fora, o contador e o foco de volta.
 import type { ImageRef } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 
@@ -9,14 +10,16 @@ export function Lightbox({
   images,
   index,
   onClose,
-  label = "Imagens",
+  label,
 }: {
   images: ImageRef[];
   index: number;
   onClose: () => void;
-  /** Nome do grupo, lido por leitores de tela ("Capturas do especialista"). */
+  /** Nome do grupo, lido por leitores de tela ("Solver screenshots"). */
   label?: string;
 }) {
+  const t = useTranslations("common.ui");
+  const groupLabel = label ?? t("images");
   const ref = useRef<HTMLDialogElement>(null);
   const [i, setI] = useState(() => Math.min(Math.max(index, 0), Math.max(images.length - 1, 0)));
   const prevFocus = useRef<HTMLElement | null | undefined>(undefined);
@@ -52,7 +55,7 @@ export function Lightbox({
     <dialog
       ref={ref}
       className="lightbox"
-      aria-label={label}
+      aria-label={groupLabel}
       onKeyDown={(e) => {
         if (n < 2) return;
         if (e.key === "ArrowLeft") {
@@ -65,11 +68,11 @@ export function Lightbox({
       }}
     >
       <div className="lightbox-bar">
-        <button type="button" className="lightbox-btn" onClick={() => closeRef.current()} aria-label="Fechar">
+        <button type="button" className="lightbox-btn" onClick={() => closeRef.current()} aria-label={t("close")}>
           <Icon name="x" />
         </button>
         <span className="lightbox-count" aria-live="polite">
-          {i + 1} de {n}
+          {t("imageCount", { i: i + 1, n })}
         </span>
       </div>
       <div
@@ -79,13 +82,13 @@ export function Lightbox({
         }}
       >
         {n > 1 ? (
-          <button type="button" className="lightbox-btn lightbox-nav" onClick={() => go(-1)} aria-label="Imagem anterior">
+          <button type="button" className="lightbox-btn lightbox-nav" onClick={() => go(-1)} aria-label={t("previousImage")}>
             <Icon name="arrow-left" />
           </button>
         ) : null}
-        <img key={cur.id} src={cur.url} width={cur.width} height={cur.height} alt={`${label}: ${i + 1} de ${n}`} decoding="async" />
+        <img key={cur.id} src={cur.url} width={cur.width} height={cur.height} alt={t("imageAlt", { label: groupLabel, i: i + 1, n })} decoding="async" />
         {n > 1 ? (
-          <button type="button" className="lightbox-btn lightbox-nav" onClick={() => go(1)} aria-label="Próxima imagem">
+          <button type="button" className="lightbox-btn lightbox-nav" onClick={() => go(1)} aria-label={t("nextImage")}>
             <Icon name="arrow-right" />
           </button>
         ) : null}

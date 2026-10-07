@@ -1,1 +1,90 @@
-{}
+{
+  "meta": {
+    "title": "Mercado de revenda",
+    "description": "Licenças permanentes de especialistas à venda por outras pessoas. Mesma nota de desempenho do original, e o criador ganha royalty em cada revenda.",
+    "soonTitle": "Mercado de revenda (em breve)",
+    "soonDescription": "Em breve: revenda a licença do especialista que você não usa mais. O criador ganha royalty em cada revenda feita no Solvers."
+  },
+  "loadFailed": {
+    "title": "Não deu para carregar o mercado de revenda",
+    "body": "O servidor não respondeu agora. Tente de novo em instantes.",
+    "retry": "Tentar de novo"
+  },
+  "market": {
+    "title": "Mercado de revenda",
+    "lead": "Licenças permanentes à venda por outras pessoas. Cada uma tem a mesma nota de desempenho do especialista original, e o criador recebe uma parte de cada revenda.",
+    "perks": {
+      "verified": "<b>Licença verificada.</b> A propriedade é conferida antes de cada venda.",
+      "instant": "<b>Troca imediata.</b> Você paga e a licença passa para você na hora. As memórias do antigo dono não vão junto.",
+      "sellers": "<b>Vendedores com reputação.</b> Quando o vendedor já tem histórico, mostramos o selo dele."
+    },
+    "empty": {
+      "title": "Nenhuma licença à venda agora",
+      "body": "Quando alguém anunciar uma licença, ela aparece aqui. Você também pode anunciar a sua, na sua biblioteca.",
+      "library": "Ver minha biblioteca",
+      "explore": "Explorar especialistas"
+    },
+    "filterLabel": "Filtrar por categoria",
+    "all": "Todas",
+    "sortBy": "Ordenar por",
+    "sort": {
+      "price": "Menor preço",
+      "rating": "Melhor nota",
+      "trend": "Em alta"
+    },
+    "count": "{n, plural, one {# licença à venda} other {# licenças à venda}}"
+  },
+  "row": {
+    "aria": "{name}, à venda por {price}",
+    "soldByYou": "Vendido por você",
+    "soldBy": "Vendido por {seller}",
+    "seller": "Vendedor {level}",
+    "noReviews": "Ainda sem avaliações",
+    "demand": "procura em 7 dias",
+    "noTrend": "Sem variação de procura recente",
+    "samePrice": "Mesmo preço de um especialista novo",
+    "diffUp": "+{n}% em relação ao preço de novo",
+    "diffDown": "−{n}% em relação ao preço de novo",
+    "yours": "Seu anúncio",
+    "buy": "Comprar",
+    "evalShort": "{score}% nos testes internos",
+    "noEval": "Sem avaliações ainda",
+    "evalNote": "Teste interno da equipe (checagens automáticas), não uma verificação independente."
+  },
+  "list": {
+    "title": "Anunciar {name}",
+    "feeUnknownTitle": "Não dá para anunciar agora",
+    "feeUnknownBody": "Não consegui consultar a taxa agora. Tente de novo em instantes.",
+    "cutTooHighTitle": "Este especialista não pode ser revendido agora",
+    "cutTooHighBody": "O royalty do criador ({royalty}) somado à taxa do Solvers ({fee}) passa do limite de {max} do preço. Por isso a revenda dele está bloqueada.",
+    "priceLabel": "Por quanto você quer vender? (em USDC)",
+    "placeholder": "Mínimo {min}",
+    "hintMin": "Preço mínimo: {min}.",
+    "hintLoading": "Carregando as regras da revenda…",
+    "hintApprox": " Isso dá cerca de {amount}.",
+    "errEmpty": "Informe o preço.",
+    "errNumber": "Use só números, por exemplo 25 ou 12,50.",
+    "errDecimals": "Use no máximo {n} casas depois da vírgula.",
+    "errTooHigh": "Esse valor é alto demais.",
+    "errMin": "O preço mínimo é {min}.",
+    "summaryLabel": "Quanto cada parte recebe",
+    "rowPrice": "Preço",
+    "rowRoyalty": "Royalty do criador ({pct})",
+    "rowFee": "Taxa do Solvers ({pct})",
+    "rowFeeNoPct": "Taxa do Solvers",
+    "rowYouGet": "Você recebe",
+    "note1": "Você continua usando o especialista até alguém comprar.",
+    "note2": "Suas memórias não vão junto com a licença. Elas ficam com você.",
+    "note3": "Para mudar o preço depois, cancele o anúncio e anuncie de novo.",
+    "signing": "Assinando e registrando o anúncio…",
+    "cancel": "Cancelar",
+    "submit": "Anunciar licença",
+    "toastTitle": "Licença anunciada",
+    "toastText": "Ela já aparece no mercado de revenda. Você continua usando o especialista até alguém comprar."
+  },
+  "txError": {
+    "loginFailed": "Não deu para entrar",
+    "login": "Entrar de novo",
+    "retry": "Tentar de novo"
+  }
+}

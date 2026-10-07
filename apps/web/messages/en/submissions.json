@@ -1,1 +1,128 @@
-{}
+{
+  "meta": { "listTitle": "My submissions", "detailTitle": "Track submission" },
+  "sla": "Our goal is to reply within 5 business days.",
+  "status": {
+    "submitted": { "label": "Received", "text": "We got your package. It enters the automatic check in a moment." },
+    "validating": { "label": "Checking", "text": "We're checking the package's format, steps and knowledge. It only takes a few minutes." },
+    "rejected_validation": { "label": "Has errors", "text": "The automatic check found errors. Fix what's listed below and upload the package again. Nothing has gone to the team's review." },
+    "pending_review": { "label": "In the review queue", "text": "The team will read the whole package. {sla}" },
+    "changes_requested": { "label": "Changes requested", "text": "The team asked for changes. Read the note below, fix the package and upload it again: the version stays the same." },
+    "rejected": { "label": "Declined", "text": "The team did not approve this package. The reason is below. You can upload a new package whenever you like." },
+    "awaiting_creator_signature": {
+      "label": "Needs your confirmation",
+      "textUpdate": "The team approved the new version. You just need to confirm the update with your account.",
+      "textRegister": "The team approved your solver. You just need to confirm the listing with your account."
+    },
+    "awaiting_onchain_approval": { "label": "Final approval", "text": "You've already confirmed. The team still needs to give the final approval for the solver to appear on the storefront. You don't need to do anything." },
+    "publishing": { "label": "Publishing", "text": "We're putting the solver live. It takes a few moments." },
+    "publish_failed": { "label": "Publishing stalled", "text": "Publishing didn't finish. The team has been notified and will try again. You don't need to do anything." },
+    "published": { "label": "Live", "text": "The solver is published on the storefront." },
+    "superseded": { "label": "Superseded", "text": "There is a newer version of this solver. This one is no longer the live version." },
+    "suspended": { "label": "Suspended", "text": "The platform suspended this solver. Contact the team to find out why." },
+    "withdrawn": { "label": "Withdrawn", "text": "This solver was removed from the storefront at the creator's request." }
+  },
+  "stages": {
+    "sent": { "title": "Uploaded", "text": "The package reached the server." },
+    "check": { "title": "Automatic check", "text": "Format, steps and knowledge." },
+    "review": { "title": "Team review", "text": "A person reads the package. {sla}" },
+    "sign": { "title": "Your confirmation", "text": "You confirm the listing or the new version with your account." },
+    "final": { "title": "Final approval", "text": "New solvers only: the team clears the solver for the storefront." },
+    "publish": { "title": "Publishing", "text": "The solver goes live on the storefront." }
+  },
+  "stageState": {
+    "done": "done",
+    "current": "in progress",
+    "attention": "needs attention",
+    "failed": "did not pass",
+    "todo": "not reached yet",
+    "skipped": "does not apply to this update"
+  },
+  "uploadError": {
+    "aborted": { "title": "Upload canceled", "text": "Nothing was uploaded. Choose the file and try again." },
+    "network": { "title": "The connection dropped", "text": "The upload was interrupted before it finished. Check your internet and try again." },
+    "unauthorized": { "title": "Your session expired", "text": "Sign in again and upload the file once more." },
+    "forbidden": { "title": "Your profile can't upload yet", "text": "Complete your creator profile (invite, terms and contact) before uploading." },
+    "conflict": { "title": "This version already exists", "text": "There is already an upload or a published version with that name and version. Bump the version in the manifest and upload again." },
+    "tooLarge": { "title": "The file is too large", "text": "The limit is 50 MB. Remove files that aren't part of the package (heavy images, copies) and zip it again." },
+    "rateLimited": { "title": "You've reached the upload limit", "text": "You can have at most 3 uploads in progress and 5 per day. Wait for a review to finish or try again tomorrow." },
+    "rejected": { "title": "The server didn't accept the file", "text": "Check that it's a ZIP with manifest.json at the root and try again." },
+    "serverError": { "title": "The server didn't respond properly", "text": "Nothing was lost. Try again in a moment." },
+    "generic": { "title": "Couldn't upload", "text": "Try again in a moment." }
+  },
+  "loadError": {
+    "unauthorized": "Your session expired. Sign in again.",
+    "forbidden": "You don't have access to this page.",
+    "serverError": "The server isn't responding right now. Try again in a moment.",
+    "generic": "Couldn't load right now."
+  },
+  "errorCount": "{n, plural, one {# error} other {# errors}}",
+  "action": {
+    "fix_and_resubmit": "Fix and upload again",
+    "sign_register": "Confirm the listing",
+    "sign_update": "Confirm the update",
+    "view": "View details"
+  },
+  "list": {
+    "authTitle": "Sign in to see your submissions",
+    "authText": "Here you can follow every package you've uploaded: check, review and publishing.",
+    "loading": "Loading your submissions…",
+    "loadFailed": "Couldn't load your submissions",
+    "retry": "Try again",
+    "emptyTitle": "You haven't uploaded any packages yet",
+    "emptyText": "Build the package with the Solver Builder and upload the ZIP. Progress shows up here.",
+    "publish": "Publish a solver",
+    "notice": "{sla} You'll get a notice when the team replies.",
+    "heading": "Your submissions",
+    "sendNew": "Upload a new package",
+    "meta": "Uploaded <sent></sent> · updated <updated></updated> · {size}",
+    "actionAria": "{action}: {name}",
+    "footer": "Want a new solver or a new version? Every upload goes through the same steps."
+  },
+  "detail": {
+    "authTitle": "Sign in to see this submission",
+    "authText": "Only the person who uploaded the package can see its progress.",
+    "back": "All my submissions",
+    "loading": "Loading the submission…",
+    "missingTitle": "Submission not found",
+    "missingText": "This submission doesn't exist or doesn't belong to your account.",
+    "missingCta": "View my submissions",
+    "loadFailed": "Couldn't load the submission",
+    "retry": "Try again",
+    "eyebrow": "Submission",
+    "meta": "<slug></slug> · version {version} · {size} · uploaded <sent></sent> · updated <updated></updated>",
+    "notesRejected": "Reason for the decline",
+    "notesChanges": "What the team asked for",
+    "notesDefault": "Note from the team",
+    "technicalTitle": "There was a technical problem",
+    "liveTitle": "The solver is live on the storefront",
+    "liveText": "Buyers can already find and use this version.",
+    "liveCta": "View the solver",
+    "validationTitle": "Automatic check",
+    "noErrors": "No errors",
+    "validationPending": "The result shows up here as soon as the check finishes.",
+    "validationNone": "This submission doesn't have a check result yet.",
+    "resubmitChanges": "Upload the fixed package",
+    "resubmitDefault": "Upload again",
+    "resubmitChangesText": "The fixed package goes in under the same version and returns to the automatic check.",
+    "resubmitDefaultText": "Fix the errors below, build the ZIP again and upload it. If the version already exists, bump the number in manifest.json.",
+    "uploadAction": "Upload fixed package",
+    "progressAria": "Progress",
+    "progressTitle": "Progress",
+    "deadline": "Timing: our goal is to reply within 5 business days after the package passes the automatic check."
+  },
+  "parts": {
+    "timelineAria": "Submission progress",
+    "validationOk": "The automatic check found no errors or warnings.",
+    "errorsTitle": "{n, plural, one {# error to fix} other {# errors to fix}}",
+    "warningsTitle": "{n, plural, one {# warning} other {# warnings}}",
+    "warningsNote": "Warnings don't block the upload, but the reviewer will see every one. Fixing them now speeds up approval.",
+    "inFile": "in file",
+    "howToFix": "How to fix:"
+  },
+  "open": {
+    "title": "Submissions in progress",
+    "viewAll": "View all submissions",
+    "updated": "Updated <updated></updated>",
+    "more": "And {n} more in progress."
+  }
+}

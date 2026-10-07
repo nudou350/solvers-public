@@ -1,13 +1,15 @@
 "use client";
 // Envio do ZIP do pacote: arrastar e soltar (ou escolher), limite de 50 MB conferido aqui, progresso real (XHR)
 // e erros do servidor traduzidos. Serve ao envio novo e ao reenvio depois de "mudanças pedidas" (`resubmit`).
+import { useTranslations } from "next-intl";
 import { useRef, useState, type DragEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Toast";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { fileSizeText, MAX_ZIP_BYTES, uploadErrorInfo } from "@/lib/submissions-ui";
+import { MAX_ZIP_BYTES, uploadErrorInfo } from "@/lib/submissions-ui";
 import s from "./creator.module.css";
 
 type Props = {
@@ -19,14 +21,20 @@ type Props = {
   action?: string;
 };
 
-function checkFile(f: File): string | null {
-  if (!/\.zip$/i.test(f.name)) return `“${f.name}” não é um arquivo ZIP. Compacte a pasta do pacote em um .zip e escolha de novo.`;
-  if (f.size === 0) return "Esse arquivo está vazio.";
-  if (f.size > MAX_ZIP_BYTES) return `O arquivo tem ${fileSizeText(f.size)} e o limite é ${fileSizeText(MAX_ZIP_BYTES)}. Tire o que não faz parte do pacote e compacte de novo.`;
+type T = ReturnType<typeof useTranslations>;
+type Format = ReturnType<typeof useFormat>;
+
+function checkFile(f: File, t: T, fmt: Format): string | null {
+  if (!/\.zip$/i.test(f.name)) return t("notZip", { name: f.name });
+  if (f.size === 0) return t("empty");
+  if (f.size > MAX_ZIP_BYTES) return t("tooBig", { size: fmt.fileSize(f.size), max: fmt.fileSize(MAX_ZIP_BYTES) });
   return null;
 }
 
 export function ZipUploader({ resubmit, onDone, action }: Props) {
+  const t = useTranslations("creator.zip");
+  const fmt = useFormat();
+  const tSub = useTranslations("submissions");
   const { api } = useSession();
   const input = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
@@ -41,7 +49,7 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
     const f = list?.[0];
     if (!f) return;
     setError(null);
-    const problem = checkFile(f);
+    const problem = checkFile(f, t, fmt);
     setFileError(problem);
     setFile(problem ? null : f);
   }
@@ -63,7 +71,7 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
       onDone(r.id);
     } catch (e) {
       setProgress(null);
-      setError(uploadErrorInfo(e));
+      setError(uploadErrorInfo(tSub, e));
     } finally {
       abort.current = null;
     }
@@ -85,18 +93,18 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
         <span className="brand">
           <Icon name="upload" size="xl" />
         </span>
-        <b>{file ? "Pacote escolhido" : "Arraste o ZIP do pacote até aqui"}</b>
+        <b>{file ? t("picked") : t("drop")}</b>
         <span className="small muted" style={{ maxWidth: 460 }}>
-          {file ? "Confira o arquivo abaixo e envie." : `Um arquivo .zip de até ${fileSizeText(MAX_ZIP_BYTES)}, com o manifest.json na raiz.`}
+          {file ? t("pickedHint") : t("hint", { max: fmt.fileSize(MAX_ZIP_BYTES) })}
         </span>
-        <input ref={input} id="zip-input" className={s.fileInput} type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={(e) => { pick(e.target.files); e.target.value = ""; }} disabled={sending} aria-label="Escolher o arquivo ZIP do pacote" />
+        <input ref={input} id="zip-input" className={s.fileInput} type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={(e) => { pick(e.target.files); e.target.value = ""; }} disabled={sending} aria-label={t("inputLabel")} />
         <Button variant={file ? "ghost" : "secondary"} icon="file" disabled={sending} onClick={() => input.current?.click()}>
-          {file ? "Escolher outro arquivo" : "Escolher arquivo"}
+          {file ? t("chooseOther") : t("choose")}
         </Button>
       </div>
 
       {fileError ? (
-        <Notice tone="warn" role="alert" title="Esse arquivo não serve">
+        <Notice tone="warn" role="alert" title={t("badFileTitle")}>
           {fileError}
         </Notice>
       ) : null}
@@ -111,11 +119,11 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
               <b className="mono" style={{ overflowWrap: "anywhere" }}>
                 {file.name}
               </b>
-              <span className="tiny faint">{fileSizeText(file.size)}</span>
+              <span className="tiny faint">{fmt.fileSize(file.size)}</span>
             </span>
           </span>
           {sending ? null : (
-            <button type="button" className="icon-btn" aria-label={`Remover ${file.name}`} onClick={() => setFile(null)}>
+            <button type="button" className="icon-btn" aria-label={t("remove", { name: file.name })} onClick={() => setFile(null)}>
               <Icon name="trash" size="s" />
             </button>
           )}
@@ -124,10 +132,10 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
 
       {sending ? (
         <div className="col" style={gap(8)} role="status" aria-live="polite">
-          <div className="bar mint" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Progresso do envio">
+          <div className="bar mint" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("progressLabel")}>
             <i style={{ width: `${pct}%` }} />
           </div>
-          <span className="small muted">{pct < 100 ? `Enviando… ${pct}%` : "Enviado. Aguardando o servidor confirmar o recebimento…"}</span>
+          <span className="small muted">{pct < 100 ? t("uploading", { pct }) : t("uploaded")}</span>
         </div>
       ) : null}
 
@@ -139,17 +147,15 @@ export function ZipUploader({ resubmit, onDone, action }: Props) {
 
       <div className="row wrapx" style={gap(12)}>
         <Button size="lg" icon="upload" disabled={!file} loading={sending} onClick={() => void send()}>
-          {action ?? "Enviar para revisão"}
+          {action ?? t("send")}
         </Button>
         {sending ? (
           <Button variant="ghost" onClick={() => abort.current?.abort()}>
-            Cancelar envio
+            {t("cancel")}
           </Button>
         ) : null}
       </div>
-      <p className="tiny faint">
-        O servidor confere o pacote de novo, mesmo que você já tenha validado no seu computador. Se houver erros, você vê tudo na tela de acompanhamento e nada vai para a revisão da equipe.
-      </p>
+      <p className="tiny faint">{t("note")}</p>
     </div>
   );
 }

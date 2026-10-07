@@ -5,6 +5,7 @@ import type { PublicConfig } from "@solvers/api-client";
 import dynamic from "next/dynamic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, onUnauthorized, type SolversApi } from "./api";
+import { localText } from "./local-text";
 import { createDevAdapter, devWalletBlocked, forgetDevWallet, loadDevWallet, PRIVY_APP_ID, type WalletAdapter, type WalletLike } from "./wallet";
 
 const PrivyWallet = dynamic(() => import("./wallet/privy"), { ssr: false });
@@ -104,7 +105,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const adapter: WalletAdapter = useMemo(
     () =>
       PRIVY_APP_ID
-        ? (privyAdapter ?? { kind: "privy", ready: false, current: null, email: null, connect: () => Promise.reject(new Error("Carregando o login...")), disconnect: async () => {} })
+        ? (privyAdapter ?? { kind: "privy", ready: false, current: null, email: null, connect: () => Promise.reject(new Error(localText("wallet.loadingLogin"))), disconnect: async () => {} })
         : createDevAdapter(devWallet, setDevWallet),
     [privyAdapter, devWallet],
   );
@@ -167,7 +168,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         if (adapterRef.current.kind === "dev") {
           const cfg = await loadConfig().catch(() => null);
-          if (!cfg) throw new Error("Não deu para confirmar a rede agora. Tente de novo em instantes.");
+          if (!cfg) throw new Error(localText("wallet.networkUnconfirmed"));
           const blocked = devWalletBlocked(cfg.cluster);
           if (blocked) throw new Error(blocked);
         }
@@ -177,7 +178,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const email = adapterRef.current.email;
         if (email) await api.updateProfile({ email }).catch(() => {});
         const m = await fetchMe();
-        if (!m) throw new Error("A sessão não foi criada. Tente de novo.");
+        if (!m) throw new Error(localText("wallet.sessionNotCreated"));
         setMe(m);
         setStatus("authed");
         return m;
@@ -198,7 +199,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const switchDevWallet = useCallback(async () => {
-    if (PRIVY_APP_ID) throw new Error("Com o login por e-mail, use Sair para trocar de conta.");
+    if (PRIVY_APP_ID) throw new Error(localText("wallet.switchWithEmail"));
     setHint(false);
     await api.logout().catch(() => {});
     forgetDevWallet();
@@ -237,7 +238,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 export function useSession(): Session {
   const s = useContext(Ctx);
-  if (!s) throw new Error("useSession precisa estar dentro de <SessionProvider>");
+  if (!s) throw new Error(localText("wallet.sessionOutsideProvider"));
   return s;
 }
 

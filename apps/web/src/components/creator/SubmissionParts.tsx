@@ -2,34 +2,29 @@
 // SEGURANÇA: todo texto vindo do criador (nome, manifesto, mensagens, arquivos) entra aqui como TEXTO do React
 // (escapado). Nada de dangerouslySetInnerHTML, de Markdown renderizado nem de links montados a partir do conteúdo.
 import type { SubmissionStatus, SubmissionView, ValidationReport } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Untrusted } from "@/components/ui/Untrusted";
-import { CHIP_TONE, STAGES, stageStates, statusInfo, type StageState } from "@/lib/submissions-ui";
+import { CHIP_TONE, stageInfo, STAGES, stageStates, statusInfo } from "@/lib/submissions-ui";
 import { gap } from "@/lib/style";
 import s from "./creator.module.css";
 
 export function StatusChip({ status, nextAction }: { status: SubmissionStatus; nextAction?: SubmissionView["nextAction"] }) {
-  const info = statusInfo(status, nextAction);
+  const t = useTranslations("submissions");
+  const info = statusInfo(t, status, nextAction);
   return <Chip tone={CHIP_TONE[info.tone]}>{info.label}</Chip>;
 }
 
-const STAGE_LABEL: Record<StageState, string> = {
-  done: "concluído",
-  current: "em andamento",
-  attention: "precisa de atenção",
-  failed: "não passou",
-  todo: "ainda não chegou",
-  skipped: "não se aplica a esta atualização",
-};
-
 /** Linha do tempo dos estados da PACKAGE_SPEC.md 14.2 em linguagem simples. */
 export function Timeline({ status, nextAction }: { status: SubmissionStatus; nextAction?: SubmissionView["nextAction"] }) {
+  const t = useTranslations("submissions");
   const states = stageStates(status, nextAction);
   return (
-    <ol className={s.timeline} aria-label="Andamento do envio">
+    <ol className={s.timeline} aria-label={t("parts.timelineAria")}>
       {STAGES.map((st, i) => {
         const state = states[i] ?? "todo";
+        const info = stageInfo(t, st.key);
         const dot = state === "done" ? "dot dot-ok" : state === "current" ? "dot dot-now" : state === "failed" ? "dot dot-bad" : state === "attention" ? "dot dot-now" : "dot";
         return (
           <li key={st.key} className={[s.tl, state === "done" ? s.tlDone : "", state === "skipped" ? s.tlSkipped : ""].filter(Boolean).join(" ")} aria-current={state === "current" || state === "attention" ? "step" : undefined}>
@@ -37,12 +32,12 @@ export function Timeline({ status, nextAction }: { status: SubmissionStatus; nex
               {state === "done" ? <Icon name="check" size="s" /> : state === "failed" ? <Icon name="x" size="s" /> : state === "attention" ? <Icon name="warning" size="s" /> : i + 1}
             </span>
             <div className={s.tlBody}>
-              <b>{st.title}</b>
+              <b>{info.title}</b>
               <span className="sr-only" style={srOnly}>
                 {" "}
-                ({STAGE_LABEL[state]})
+                ({t(`stageState.${state}`)})
               </span>
-              <div className="small muted">{st.text}</div>
+              <div className="small muted">{info.text}</div>
             </div>
           </li>
         );
@@ -55,12 +50,13 @@ const srOnly = { position: "absolute", width: 1, height: 1, margin: -1, padding:
 
 /** Erros (bloqueiam o envio) e avisos (vão ao revisor) do validador, com código, caminho e o que corrigir. */
 export function ValidationList({ report }: { report: ValidationReport | null }) {
+  const t = useTranslations("submissions");
   if (!report) return null;
   const { errors, warnings } = report;
   if (errors.length === 0 && warnings.length === 0)
     return (
       <p className="small ok" role="status">
-        <Icon name="check-circle" size="s" /> A conferência automática não achou erros nem avisos.
+        <Icon name="check-circle" size="s" /> {t("parts.validationOk")}
       </p>
     );
   return (
@@ -68,7 +64,7 @@ export function ValidationList({ report }: { report: ValidationReport | null }) 
       {errors.length ? (
         <section className="col" style={gap(10)} aria-labelledby="val-errors">
           <h3 className="h4" id="val-errors">
-            {errors.length === 1 ? "1 erro para corrigir" : `${errors.length} erros para corrigir`}
+            {t("parts.errorsTitle", { n: errors.length })}
           </h3>
           <ul className="col" style={gap(10)}>
             {errors.map((e, i) => (
@@ -80,9 +76,9 @@ export function ValidationList({ report }: { report: ValidationReport | null }) 
       {warnings.length ? (
         <section className="col" style={gap(10)} aria-labelledby="val-warns">
           <h3 className="h4" id="val-warns">
-            {warnings.length === 1 ? "1 aviso" : `${warnings.length} avisos`}
+            {t("parts.warningsTitle", { n: warnings.length })}
           </h3>
-          <p className="small muted">Avisos não bloqueiam o envio, mas o revisor vai ver todos. Corrigir agora acelera a aprovação.</p>
+          <p className="small muted">{t("parts.warningsNote")}</p>
           <ul className="col" style={gap(10)}>
             {warnings.map((w, i) => (
               <Issue key={`${w.code}-${w.path ?? ""}-${i}`} issue={w} kind="warning" />
@@ -95,6 +91,7 @@ export function ValidationList({ report }: { report: ValidationReport | null }) 
 }
 
 function Issue({ issue, kind }: { issue: ValidationReport["errors"][number]; kind: "error" | "warning" }) {
+  const t = useTranslations("submissions");
   return (
     <li className={[s.issue, kind === "error" ? s.issueErr : s.issueWarn].join(" ")}>
       <div className="row wrapx" style={gap(8)}>
@@ -105,7 +102,7 @@ function Issue({ issue, kind }: { issue: ValidationReport["errors"][number]; kin
         {issue.path ? (
           <span className={s.path}>
             <span className="sr-only" style={srOnly}>
-              no arquivo{" "}
+              {t("parts.inFile")}{" "}
             </span>
             <Untrusted>{issue.path}</Untrusted>
           </span>
@@ -114,7 +111,7 @@ function Issue({ issue, kind }: { issue: ValidationReport["errors"][number]; kin
       <span className={s.untrusted}><Untrusted>{issue.message}</Untrusted></span>
       {issue.fix ? (
         <span className="small">
-          <b>Como corrigir:</b> <span className={s.untrusted}><Untrusted>{issue.fix}</Untrusted></span>
+          <b>{t("parts.howToFix")}</b> <span className={s.untrusted}><Untrusted>{issue.fix}</Untrusted></span>
         </span>
       ) : null}
     </li>

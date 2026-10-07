@@ -1,1 +1,31 @@
-{}
+{
+  "meta": {
+    "title": "Connect to Claude or ChatGPT"
+  },
+  "title": "Connect your Solvers account",
+  "invalidRequest": "Invalid connection request. Go back to Claude or ChatGPT and connect again.",
+  "genericError": "Couldn't continue.",
+  "somethingWrong": "Something went wrong. Please try again.",
+  "walletMismatch": "This wallet isn't the one in your session. Sign out and sign in again.",
+  "loadingRequest": "Loading the connection request…",
+  "intro": "<b>{client}</b> wants to use your Solvers specialists. It will see your licenses and be able to use your memories. <b>This does not authorize payments.</b>",
+  "returnsTo": "Returns to:",
+  "verified": "(verified)",
+  "unverifiedTitle": "Unverified app",
+  "unverifiedBody": "Only continue if you started this connection just now.",
+  "signInPrompt": "Sign in with your email to choose the account to connect.",
+  "signIn": "Sign in",
+  "connectingAs": "Connecting as",
+  "switchAccount": "(not you? switch account)",
+  "authorize": "Authorize {client}",
+  "stepConfirming": "Confirming the wallet is yours…",
+  "stepMemories": "Protecting your memories…",
+  "stepConnecting": "Connecting…",
+  "stepDone": "Done! Returning to {client}…",
+  "failedTitle": "Couldn't connect",
+  "walletHint": "Use Phantom, Solflare or Backpack? <link>Connect with your browser wallet</link>. Note: it's a different account, with different purchases.",
+  "errExpired": "This connection request expired. Go back to Claude or ChatGPT and connect again.",
+  "errSignature": "This signature doesn't match the connection request. Go back to Claude or ChatGPT and connect again.",
+  "errMemoryKey": "Couldn't confirm the key that protects your memories. Please try again.",
+  "errTooMany": "Too many attempts. Please wait a minute and try again."
+}

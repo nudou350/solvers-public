@@ -1,6 +1,7 @@
 "use client";
 // Aba "Especialistas" da biblioteca: licenças permanentes, com o uso das últimas 8 semanas.
 import type { License, MyTrial, UsageSummary } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -12,7 +13,7 @@ import { ListLicenseDialog } from "@/components/resale/ListLicenseDialog";
 import { TxErrorNotice } from "@/components/resale/TxErrorNotice";
 import { Tile } from "@/components/ui/Tile";
 import { useToast } from "@/components/ui/Toast";
-import { brl, date, int, spark, usdc } from "@/lib/format";
+import { spark, useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { useTx } from "@/lib/tx";
 import { useLibrary } from "./LibraryShell";
@@ -23,6 +24,8 @@ import { TrialsSection } from "./TrialsSection";
 export function Licenses() {
   const { licenses, reloadLicenses } = useLibrary();
   const { api, config } = useSession();
+  const t = useTranslations("account");
+  const f = useFormat();
   const toast = useToast();
   // Revenda: só com a flag ligada. Anunciar abre o diálogo; cancelar assina direto (um de cada vez).
   const resaleOn = !!config?.resaleEnabled;
@@ -37,7 +40,7 @@ export function Licenses() {
   // Licença com o formulário de avaliação aberto.
   const [reviewing, setReviewing] = useState<string | null>(null);
   const list = Array.isArray(licenses) ? licenses : [];
-  const agents = useAgentsIndex([...list.map((l) => l.agentId), ...(trials ?? []).map((t) => t.agentId)]);
+  const agents = useAgentsIndex([...list.map((l) => l.agentId), ...(trials ?? []).map((tr) => tr.agentId)]);
   // Anunciar ou cancelar recarrega a lista e o botão clicado some: o foco vai para a lista (que continua na tela).
   const listRef = useRef<HTMLDivElement>(null);
   const refocus = useRef(false);
@@ -66,23 +69,23 @@ export function Licenses() {
       setCancelFailed(l.id);
       return;
     }
-    toast({ tone: "ok", title: "Anúncio cancelado", text: "A licença saiu do mercado e continua sua." });
+    toast({ tone: "ok", title: t("licenses.cancelledTitle"), text: t("licenses.cancelledText") });
     reloadAndFocus();
   }
 
-  if (licenses === "error") return <LoadError onRetry={reloadLicenses} text="Não conseguimos carregar suas licenças agora." />;
-  if (licenses === null || trials === null) return <Loading text="Carregando seus especialistas…" />;
+  if (licenses === "error") return <LoadError onRetry={reloadLicenses} text={t("licenses.loadError")} />;
+  if (licenses === null || trials === null) return <Loading text={t("licenses.loading")} />;
   if (!list.length && !trials.length)
     return (
-      <Empty icon="library" title="Nenhum especialista na sua biblioteca" action={<Button href="/">Explorar especialistas</Button>}>
-        Quando você comprar a licença de um especialista, ele aparece aqui com o uso de cada mês. Os testes grátis que você começar também.
+      <Empty icon="library" title={t("licenses.emptyTitle")} action={<Button href="/">{t("licenses.explore")}</Button>}>
+        {t("licenses.emptyText")}
       </Empty>
     );
 
   return (
-    <div ref={listRef} tabIndex={-1} role="region" aria-label="Suas licenças" className="col" style={{ "--gap": "18px", outline: "none" } as React.CSSProperties}>
+    <div ref={listRef} tabIndex={-1} role="region" aria-label={t("licenses.region")} className="col" style={{ "--gap": "18px", outline: "none" } as React.CSSProperties}>
       {trials.length ? <TrialsSection trials={trials} agents={agents} /> : null}
-      {trials.length && list.length ? <h2 className="h4">Licenças</h2> : null}
+      {trials.length && list.length ? <h2 className="h4">{t("licenses.heading")}</h2> : null}
       {list.map((l) => {
         const a = agents.get(l.agentId);
         const u = usage.get(l.agentId);
@@ -94,20 +97,22 @@ export function Licenses() {
               <div className="row" style={{ "--gap": "16px", minWidth: 0 } as React.CSSProperties}>
                 {a ? <Tile category={a.category} /> : <span className="tile" aria-hidden />}
                 <div className="grow">
-                  <h2 className="h4 trunc">{a?.name ?? "Especialista"}</h2>
+                  <h2 className="h4 trunc">{a?.name ?? t("shared.unnamedSolver")}</h2>
                   <div className="row wrapx" style={{ "--gap": "6px 8px", marginTop: 4 } as React.CSSProperties}>
-                    <Chip tone="brand">Licença permanente</Chip>
+                    <Chip tone="brand">{t("licenses.permanent")}</Chip>
                     {resaleOn && l.listedForResale ? (
                       <Chip tone="ok" icon="tag">
-                        À venda{l.resalePriceUsdc != null ? ` por ${rate != null ? brl(l.resalePriceUsdc, rate) : usdc(l.resalePriceUsdc)}` : ""}
+                        {l.resalePriceUsdc != null
+                          ? t("licenses.forSaleFor", { price: rate != null ? f.brl(l.resalePriceUsdc, rate) : f.usdc(l.resalePriceUsdc) })
+                          : t("licenses.forSale")}
                       </Chip>
                     ) : null}
-                    <span className="tiny faint">desde {date(l.acquiredAt)}</span>
+                    <span className="tiny faint">{t("licenses.since", { date: f.date(l.acquiredAt) })}</span>
                   </div>
                 </div>
               </div>
               <div className="col" style={{ "--gap": "6px" } as React.CSSProperties}>
-                <span className="small muted">Uso nas últimas 8 semanas</span>
+                <span className="small muted">{t("licenses.usage8w")}</span>
                 <div className="row" style={{ "--gap": "14px" } as React.CSSProperties}>
                   <svg className="spark" width="96" height="30" viewBox="0 0 96 30" aria-hidden>
                     <path
@@ -120,36 +125,36 @@ export function Licenses() {
                       style={{ color: "var(--brand)" }}
                     />
                   </svg>
-                  <b className="num">{uses === 1 ? "1 uso este mês" : `${int(uses)} usos este mês`}</b>
+                  <b className="num">{t("licenses.usesMonth", { n: uses })}</b>
                 </div>
               </div>
               <div className="col" style={{ "--gap": "6px" } as React.CSSProperties}>
-                <span className="small muted">Uso</span>
+                <span className="small muted">{t("licenses.usage")}</span>
                 <b className="ok row" style={{ "--gap": "6px" } as React.CSSProperties}>
                   <Icon name="check-circle" size="s" />
-                  Uso ilimitado
+                  {t("licenses.unlimited")}
                 </b>
               </div>
               <div className="row wrapx" style={{ "--gap": "8px", justifyContent: "flex-end", ...(resaleOn ? { maxWidth: 340 } : {}) } as React.CSSProperties}>
                 {a ? (
                   <>
                     <Button variant="secondary" href={`/install?agent=${encodeURIComponent(a.slug)}`}>
-                      Abrir instalação
+                      {t("licenses.openInstall")}
                     </Button>
                     <Button variant="ghost" icon="star" aria-expanded={reviewing === l.id} onClick={() => setReviewing(reviewing === l.id ? null : l.id)}>
-                      Avaliar
+                      {t("licenses.review")}
                     </Button>
                     <Button variant="ghost" href={`/solvers/${encodeURIComponent(a.slug)}`}>
-                      Ver especialista
+                      {t("licenses.viewSolver")}
                     </Button>
                     {resaleOn ? (
                       l.listedForResale ? (
                         <Button variant="secondary" loading={cancelling === l.id} disabled={cancelling != null} onClick={() => void cancelListing(l)}>
-                          Cancelar anúncio
+                          {t("licenses.cancelListing")}
                         </Button>
                       ) : (
                         <Button variant="secondary" icon="tag" onClick={() => setListing(l)}>
-                          Anunciar
+                          {t("licenses.list")}
                         </Button>
                       )
                     ) : null}
@@ -160,7 +165,7 @@ export function Licenses() {
             {resaleOn && l.listedForResale ? (
               <p className="tiny faint row" style={{ "--gap": "8px", padding: "0 24px 16px", marginTop: -8 } as React.CSSProperties}>
                 <Icon name="info" size="s" />
-                Você continua usando o especialista até alguém comprar.
+                {t("licenses.listedNote")}
               </p>
             ) : null}
             {resaleOn && cancelFailed === l.id && cancelTx.error ? (
@@ -179,7 +184,7 @@ export function Licenses() {
       {resaleOn ? null : (
         <p className="small faint row" style={{ "--gap": "8px", marginTop: 4 } as React.CSSProperties}>
           <Icon name="tag" size="s" />
-          Revenda de licenças em breve.
+          {t("licenses.resaleSoon")}
         </p>
       )}
       {resaleOn && listing && listingAgent ? (

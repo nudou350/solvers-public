@@ -13,5 +13,83 @@
     "label": "Idioma",
     "en": "English",
     "pt": "Português"
+  },
+  "nav": {
+    "explore": "Explorar",
+    "exploreShort": "Explorar",
+    "resale": "Revenda",
+    "resaleShort": "Revenda",
+    "library": "Minha biblioteca",
+    "libraryShort": "Biblioteca",
+    "guarantees": "Garantias",
+    "guaranteesShort": "Garantias",
+    "creators": "Para criadores",
+    "creatorsShort": "Criador"
+  },
+  "header": {
+    "logoLabel": "Solvers, página inicial",
+    "mainNav": "Principal",
+    "tabbar": "Navegação",
+    "signIn": "Entrar",
+    "signInFailed": "Não deu para entrar",
+    "myAccount": "Minha conta: {name}",
+    "testWallet": "Carteira de teste",
+    "yourAccount": "Sua conta",
+    "myProfile": "Meu perfil",
+    "myLibrary": "Minha biblioteca",
+    "useOtherTestWallet": "Usar outra carteira de teste",
+    "switchWalletFailed": "Não deu para trocar de carteira",
+    "signOut": "Sair",
+    "signOutFailed": "Não deu para sair"
+  },
+  "footer": {
+    "tagline": "Especialistas de IA para usar com o Claude e o ChatGPT que você já tem. Compre uma vez e use onde quiser.",
+    "explore": "Explorar",
+    "solvers": "Especialistas",
+    "resale": "Mercado de revenda",
+    "guarantees": "Garantias",
+    "creators": "Criadores",
+    "publish": "Publicar especialista",
+    "dashboard": "Painel do criador",
+    "trust": "Confiança",
+    "profile": "Perfil e reputação",
+    "solana": "Licenças registradas na rede Solana"
+  },
+  "theme": {
+    "useLight": "Usar tema claro",
+    "useDark": "Usar tema escuro"
+  },
+  "switchAccount": {
+    "label": "Trocar conta",
+    "group": "Trocar de carteira de teste",
+    "newWallet": "Nova carteira de teste",
+    "signedInWith": "Você entrou com a carteira {wallet}.",
+    "switchFailed": "Não deu para trocar de carteira",
+    "explain": "Nesta versão de teste, a carteira {wallet} foi criada por este navegador. Usar outra apaga a atual daqui: o que foi comprado com ela deixa de aparecer.",
+    "useOther": "Usar outra carteira de teste",
+    "justSignOut": "Só sair",
+    "cancel": "Cancelar"
+  },
+  "ui": {
+    "loading": "Carregando…",
+    "close": "Fechar",
+    "closeNotice": "Fechar aviso",
+    "signIn": "Entrar",
+    "signInFailed": "Não deu para entrar",
+    "seeMore": "Ver mais",
+    "seeLess": "Ver menos",
+    "images": "Imagens",
+    "imageCount": "{i} de {n}",
+    "imageAlt": "{label}: {i} de {n}",
+    "previousImage": "Imagem anterior",
+    "nextImage": "Próxima imagem",
+    "reputationTitle": "Reputação {score}/100",
+    "verifiedPurchase": "Compra verificada",
+    "ratingLabel": "Nota {rating} de 5",
+    "ratingLabelWithCount": "Nota {rating} de 5, {count, plural, one {# avaliação} other {# avaliações}}",
+    "techTitle": "Quer conferir os detalhes técnicos?",
+    "techHide": "Ocultar detalhes técnicos",
+    "techShow": "Verificar na blockchain",
+    "techExplorer": "Abrir no explorador da rede"
   }
 }

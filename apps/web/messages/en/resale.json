@@ -1,1 +1,90 @@
-{}
+{
+  "meta": {
+    "title": "Resale market",
+    "description": "Permanent Solver licenses listed by other people. Same performance score as the original, and the creator earns a royalty on every resale.",
+    "soonTitle": "Resale market (coming soon)",
+    "soonDescription": "Coming soon: resell the license of a Solver you no longer use. The creator earns a royalty on every resale made on Solvers."
+  },
+  "loadFailed": {
+    "title": "Couldn't load the resale market",
+    "body": "The server didn't respond. Please try again in a moment.",
+    "retry": "Try again"
+  },
+  "market": {
+    "title": "Resale market",
+    "lead": "Permanent licenses listed by other people. Each one carries the same performance score as the original Solver, and the creator gets a share of every resale.",
+    "perks": {
+      "verified": "<b>Verified license.</b> Ownership is checked before every sale.",
+      "instant": "<b>Instant transfer.</b> You pay and the license is yours right away. The previous owner's memories don't come with it.",
+      "sellers": "<b>Sellers with a track record.</b> When a seller has a history, we show their badge."
+    },
+    "empty": {
+      "title": "No licenses for sale right now",
+      "body": "When someone lists a license, it will show up here. You can also list yours from your library.",
+      "library": "View my library",
+      "explore": "Explore Solvers"
+    },
+    "filterLabel": "Filter by category",
+    "all": "All",
+    "sortBy": "Sort by",
+    "sort": {
+      "price": "Lowest price",
+      "rating": "Best rating",
+      "trend": "Trending"
+    },
+    "count": "{n, plural, one {# license for sale} other {# licenses for sale}}"
+  },
+  "row": {
+    "aria": "{name}, for sale at {price}",
+    "soldByYou": "Sold by you",
+    "soldBy": "Sold by {seller}",
+    "seller": "Seller: {level}",
+    "noReviews": "No reviews yet",
+    "demand": "7-day demand",
+    "noTrend": "No recent change in demand",
+    "samePrice": "Same price as a new Solver",
+    "diffUp": "+{n}% compared to the new price",
+    "diffDown": "−{n}% compared to the new price",
+    "yours": "Your listing",
+    "buy": "Buy",
+    "evalShort": "{score}% in internal tests",
+    "noEval": "No ratings yet",
+    "evalNote": "Internal team test (automated checks), not an independent verification."
+  },
+  "list": {
+    "title": "List {name}",
+    "feeUnknownTitle": "Can't list right now",
+    "feeUnknownBody": "We couldn't look up the fee. Please try again in a moment.",
+    "cutTooHighTitle": "This Solver can't be resold right now",
+    "cutTooHighBody": "The creator's royalty ({royalty}) plus the Solvers fee ({fee}) exceeds the {max} limit on the price. That's why resale is blocked for it.",
+    "priceLabel": "How much do you want to sell it for? (in USDC)",
+    "placeholder": "Minimum {min}",
+    "hintMin": "Minimum price: {min}.",
+    "hintLoading": "Loading the resale rules…",
+    "hintApprox": " That comes to about {amount}.",
+    "errEmpty": "Enter a price.",
+    "errNumber": "Use numbers only, for example 25 or 12.50.",
+    "errDecimals": "Use at most {n, plural, one {# decimal place} other {# decimal places}}.",
+    "errTooHigh": "That amount is too high.",
+    "errMin": "The minimum price is {min}.",
+    "summaryLabel": "How much each party receives",
+    "rowPrice": "Price",
+    "rowRoyalty": "Creator royalty ({pct})",
+    "rowFee": "Solvers fee ({pct})",
+    "rowFeeNoPct": "Solvers fee",
+    "rowYouGet": "You receive",
+    "note1": "You keep using the Solver until someone buys it.",
+    "note2": "Your memories don't go with the license. They stay with you.",
+    "note3": "To change the price later, cancel the listing and list it again.",
+    "signing": "Signing and registering your listing…",
+    "cancel": "Cancel",
+    "submit": "List license",
+    "toastTitle": "License listed",
+    "toastText": "It now appears in the resale market. You keep using the Solver until someone buys it."
+  },
+  "txError": {
+    "loginFailed": "Couldn't sign in",
+    "login": "Sign in again",
+    "retry": "Try again"
+  }
+}

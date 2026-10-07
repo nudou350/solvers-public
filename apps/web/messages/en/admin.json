@@ -1,1 +1,260 @@
-{}
+{
+  "meta": {
+    "queueTitle": "Reviews",
+    "reviewTitle": "Review submission"
+  },
+  "gate": {
+    "title": "Sign in to continue",
+    "text": "This area is for the Solvers team only."
+  },
+  "status": {
+    "submitted": "Received",
+    "validating": "Checking",
+    "rejected_validation": "Has errors",
+    "pending_review": "In the review queue",
+    "changes_requested": "Changes requested",
+    "rejected": "Rejected",
+    "awaiting_creator_signature": "Needs your confirmation",
+    "awaiting_onchain_approval": "Final approval",
+    "publishing": "Publishing",
+    "publish_failed": "Publishing stuck",
+    "published": "Live",
+    "superseded": "Superseded",
+    "suspended": "Suspended",
+    "withdrawn": "Withdrawn"
+  },
+  "differentiator": {
+    "memory": "Memory",
+    "escalation": "Creator support",
+    "liveData": "Live data",
+    "tool": "Custom tool",
+    "verifier": "Verified result"
+  },
+  "queue": {
+    "eyebrow": "Team",
+    "title": "Reviews",
+    "intro": "Packages submitted by creators. All content is shown as plain text: nothing in a package is executed or opened as a page.",
+    "filterLabel": "Filter by status",
+    "filters": {
+      "pending_review": "In queue",
+      "awaiting_onchain_approval": "Final approval",
+      "publish_failed": "Publishing stuck",
+      "awaiting_creator_signature": "Waiting for the creator",
+      "changes_requested": "Changes requested",
+      "published": "Published",
+      "all": "All"
+    },
+    "loading": "Loading the queue…",
+    "errorTitle": "Couldn't load the queue",
+    "retry": "Try again",
+    "emptyTitle": "Nothing here",
+    "emptyText": "No submissions in this status.",
+    "newSolver": "New solver",
+    "newVersion": "New version",
+    "errors": "{n, plural, one {# error} other {# errors}}",
+    "warnings": "{n, plural, one {# warning} other {# warnings}}",
+    "noName": "No name",
+    "sent": "Submitted <ago></ago>",
+    "overdue": "Past the 5-business-day target",
+    "businessDays": "{days} of 5 business days",
+    "review": "Review",
+    "reviewAria": "Review {name}"
+  },
+  "detail": {
+    "back": "Review queue",
+    "loading": "Loading the submission…",
+    "missingTitle": "Submission not found",
+    "missingText": "This submission doesn't exist.",
+    "missingBack": "Back to the queue",
+    "errorTitle": "Couldn't load the submission",
+    "retry": "Try again"
+  },
+  "raw": {
+    "hiddenTitle": "{n, plural, one {# invisible character} other {# invisible characters}} in this text",
+    "hiddenText": "They appear as [U+XXXX]. Invisible and text-direction characters can hide instructions from the reviewer's eyes: check each one."
+  },
+  "header": {
+    "eyebrow": "Review",
+    "newSolver": "New solver",
+    "newVersion": "New version",
+    "sent": "submitted <ago></ago>"
+  },
+  "summary": {
+    "title": "Summary",
+    "creator": "Creator",
+    "noName": "No name",
+    "verified": "Contact verified",
+    "unverified": "Contact not verified",
+    "wallet": "Wallet",
+    "bio": "Bio",
+    "category": "Category",
+    "tagline": "Tagline",
+    "price": "Price",
+    "differentiators": "Differentiators",
+    "none": "None declared",
+    "proven": " (proven)",
+    "notProven": " (not proven)",
+    "description": "Submitted description",
+    "descriptionAria": "Description submitted by the creator"
+  },
+  "validator": {
+    "title": "Validator",
+    "counts": "{errors, plural, one {# error} other {# errors}} · {warnings, plural, one {# warning} other {# warnings}}",
+    "noResult": "No result",
+    "noResultText": "No validation result."
+  },
+  "scans": {
+    "title": "Automatic scans",
+    "intro": "Hidden Unicode, hidden HTML or CSS, injection patterns, URLs, content repeated from other packages and search phrases that are off topic.",
+    "none": "No scan result.",
+    "rawAria": "Scan results",
+    "high": "{n} high",
+    "medium": "{n} medium",
+    "info": "{n} info",
+    "suppressed": "{n} repeated omitted",
+    "nothing": "Nothing found by the scans.",
+    "snippetAria": "Excerpt of finding {kind}",
+    "severity": {
+      "high": "High",
+      "warn": "Medium",
+      "info": "Info"
+    }
+  },
+  "diff": {
+    "title": "Diff against the published version",
+    "truncated": "Cut by the size cap",
+    "intro": "Lines starting with + were added, lines starting with - were removed. In the first version, everything is new.",
+    "fileTruncated": "Cut",
+    "aria": "Diff of {path}"
+  },
+  "files": {
+    "title": "Files and differences",
+    "onlyChanged": "Only what changed",
+    "summary": "{added} new · {changed} changed · {removed} removed · {same} identical to the published version. Select a file to read its contents as plain text.",
+    "empty": "No files.",
+    "loading": "Loading the file…",
+    "contentAria": "Contents of {path}",
+    "groups": {
+      "manifest": "Manifest and steps",
+      "templates": "Templates",
+      "evals": "Evals",
+      "knowledge": "Knowledge",
+      "others": "Other files"
+    },
+    "diffLabel": {
+      "added": "New",
+      "changed": "Changed",
+      "removed": "Removed",
+      "same": "Same"
+    }
+  },
+  "knowledge": {
+    "title": "Knowledge",
+    "ingest": "Ingestion: {status}",
+    "ingestStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "done": "Ready",
+      "failed": "Failed",
+      "none": "No knowledge"
+    },
+    "counts": "{files, plural, one {# file} other {# files}} · {chunks, plural, one {# passage} other {# passages}} · {expired, plural, one {# expired passage} other {# expired passages}}.",
+    "expiredNotice": "Some passages are past their expiry date. They shouldn't back the “Live data” differentiator.",
+    "searchLabel": "Test search on the package knowledge base",
+    "searchPlaceholder": "E.g. a question a buyer would ask",
+    "search": "Search",
+    "noHits": "Nothing found for this search.",
+    "resultsAria": "Search results",
+    "relevance": "relevance {score}",
+    "hitAria": "Passage {n} from {source}"
+  },
+  "manifest": {
+    "title": "Manifest",
+    "aria": "Manifest as submitted",
+    "none": "No manifest."
+  },
+  "history": {
+    "title": "Review history",
+    "none": "No decisions on this submission yet.",
+    "checklist": "Checklist: {done} of {total} items checked",
+    "actions": {
+      "approve": "Approved",
+      "request_changes": "Requested changes",
+      "reject": "Rejected",
+      "finish": "Finished the publication",
+      "suspend": "Suspended",
+      "resume": "Resumed"
+    }
+  },
+  "decision": {
+    "asideAria": "Decision",
+    "progress": "Progress",
+    "title": "Decision",
+    "noDecision": "This submission is “{status}”. There is no decision to make right now.",
+    "checklistAria": "Review checklist",
+    "checklist": "Checklist",
+    "checklistRequired": "Approving requires the whole checklist to be checked.",
+    "notesLabel": "Note for the creator",
+    "notesHint": "Required for every decision. Kept as part of the record, which can't be deleted.",
+    "notesError": "Write the reason (at least 3 characters). The creator reads this text.",
+    "errorTitle": "Couldn't record the decision",
+    "approve": "Approve",
+    "requestChanges": "Request changes",
+    "reject": "Reject",
+    "revoke": "Revoke approval",
+    "revokeHelp": "The creator hasn't signed yet: revoking sends the submission back to “changes requested” (a note is required) and lets them fix it in the same version.",
+    "finish": "Finish publication",
+    "finishHelp": "New solver: before this, the on-chain approval has to be done on the team machine (<code>cli:approve</code>); this button doesn't sign anything. Use it here only if the chain event didn't arrive on its own: it completes the catalog entry and puts the solver live.",
+    "approveHelp": "Approving on the site doesn't sign anything on-chain: it lets the creator confirm. The final approval, for a new solver, is done separately with the cold wallet.",
+    "back": "Back",
+    "checklistItems": {
+      "promiseDelivered": "The promise is delivered by the steps.",
+      "twoDifferentiatorsProven": "At least 2 of the 5 differentiators are proven.",
+      "rightsAndSources": "Sources are listed and there is permission for any third-party content.",
+      "noHarmfulInstructions": "Nothing acts against the user or sends their data elsewhere, and there is no injection in any text (including text that only shows up for a specific query).",
+      "priceTrialShowcaseCoherent": "Price, free trial and showcase are consistent, with no promise of financial, legal or medical results without a disclaimer."
+    },
+    "toast": {
+      "notPublishedTitle": "Not published yet",
+      "busy": "Another finalization is in progress. Wait a minute and check again.",
+      "failed": "Publishing failed: {error}",
+      "internalError": "internal error",
+      "awaitAdmin": "The on-chain approval with the cold wallet is still missing. On the team machine: pnpm --filter @solvers/server cli:approve {slug}",
+      "missingStep": "Still missing: {step}.",
+      "missingChain": "a step on the chain",
+      "approved": "Approved",
+      "changesRequested": "Changes requested",
+      "rejected": "Submission rejected",
+      "revoked": "Approval revoked",
+      "finished": "Publication finished",
+      "approvedText": "The creator can now confirm with their account. Nothing was signed on-chain."
+    },
+    "confirm": {
+      "approve": {
+        "title": "Approve this submission?",
+        "text": "The approved version (content, price and version) is locked in and the creator can then confirm the listing. After that, the content can no longer be changed.",
+        "label": "Approve"
+      },
+      "request_changes": {
+        "title": "Request changes?",
+        "text": "The creator receives your note and sends the corrected package in the same version.",
+        "label": "Request changes"
+      },
+      "reject": {
+        "title": "Reject this submission?",
+        "text": "The rejection is final for this submission: the creator sees your note and can only send a new package.",
+        "label": "Reject"
+      },
+      "revoke": {
+        "title": "Revoke the approval?",
+        "text": "The creator hasn't signed yet: the submission goes back to “changes requested” with your note, and the approved version is no longer valid.",
+        "label": "Revoke"
+      },
+      "finish": {
+        "title": "Finish the publication?",
+        "text": "The solver goes into the showcase now. Make sure the on-chain approval has already happened.",
+        "label": "Finish"
+      }
+    }
+  }
+}

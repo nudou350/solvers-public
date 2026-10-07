@@ -2,22 +2,19 @@
 // Mercado de revenda (/resale com a revenda ligada): licenças permanentes à venda por outras pessoas.
 // Os anúncios vêm do servidor (on-chain, via indexer). Nada aqui é de exemplo: sem anúncio, o estado vazio diz isso.
 import type { ResaleListing } from "@solvers/api-client";
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useTranslations } from "next-intl";
+import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
-import { categoryLabel, int } from "@/lib/format";
+import { useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { ResaleRow } from "./ResaleRow";
 
 type Sort = "price" | "rating" | "trend";
 
-const SORTS: { id: Sort; label: string }[] = [
-  { id: "price", label: "Menor preço" },
-  { id: "rating", label: "Melhor nota" },
-  { id: "trend", label: "Em alta" },
-];
+const SORTS: Sort[] = ["price", "rating", "trend"];
 
 const byPrice = (x: ResaleListing, y: ResaleListing) => x.priceUsdc - y.priceUsdc || x.listedAt.localeCompare(y.listedAt);
 const COMPARE: Record<Sort, (x: ResaleListing, y: ResaleListing) => number> = {
@@ -28,9 +25,12 @@ const COMPARE: Record<Sort, (x: ResaleListing, y: ResaleListing) => number> = {
 
 export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; rate: number }) {
   const { me } = useSession();
+  const t = useTranslations("resale.market");
+  const f = useFormat();
   const [cat, setCat] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("price");
   const sortLabelId = useId();
+  const rich = { b: (c: ReactNode) => <b>{c}</b> };
   const sortRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // radiogroup: Tab entra só na opção marcada; as setas movem a seleção (e o foco).
@@ -41,7 +41,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
     const next = (i + step + SORTS.length) % SORTS.length;
     const o = SORTS[next];
     if (!o) return;
-    setSort(o.id);
+    setSort(o);
     sortRefs.current[next]?.focus();
   }
 
@@ -52,10 +52,8 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <div className="col" style={gap(12, { maxWidth: 720, marginBottom: 32 })}>
-        <h1 className="display h1s">Mercado de revenda</h1>
-        <p className="lead">
-          Licenças permanentes à venda por outras pessoas. Cada uma tem a mesma nota de desempenho do especialista original, e o criador recebe uma parte de cada revenda.
-        </p>
+        <h1 className="display h1s">{t("title")}</h1>
+        <p className="lead">{t("lead")}</p>
       </div>
 
       <div className="g3 m1" style={gap(16, { marginBottom: 32 })}>
@@ -64,7 +62,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
             <Icon name="shield-check" />
           </span>
           <span className="small">
-            <b>Licença verificada.</b> A propriedade é conferida antes de cada venda.
+            {t.rich("perks.verified", rich)}
           </span>
         </div>
         <div className="card-flat pad-s row start" style={gap(12)}>
@@ -72,7 +70,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
             <Icon name="repeat" />
           </span>
           <span className="small">
-            <b>Troca imediata.</b> Você paga e a licença passa para você na hora. As memórias do antigo dono não vão junto.
+            {t.rich("perks.instant", rich)}
           </span>
         </div>
         <div className="card-flat pad-s row start" style={gap(12)}>
@@ -80,7 +78,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
             <Icon name="users" />
           </span>
           <span className="small">
-            <b>Vendedores com reputação.</b> Quando o vendedor já tem histórico, mostramos o selo dele.
+            {t.rich("perks.sellers", rich)}
           </span>
         </div>
       </div>
@@ -88,51 +86,51 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
       {listings.length === 0 ? (
         <Empty
           icon="tag"
-          title="Nenhuma licença à venda agora"
+          title={t("empty.title")}
           action={
             <>
               <Button href="/library" variant="secondary" icon="library">
-                Ver minha biblioteca
+                {t("empty.library")}
               </Button>
-              <Button href="/">Explorar especialistas</Button>
+              <Button href="/">{t("empty.explore")}</Button>
             </>
           }
         >
-          Quando alguém anunciar uma licença, ela aparece aqui. Você também pode anunciar a sua, na sua biblioteca.
+          {t("empty.body")}
         </Empty>
       ) : (
         <>
           <div className="row between wrapx m-col" style={gap(16, { marginBottom: 22 })}>
-            <div className="row wrapx" style={gap(8)} role="group" aria-label="Filtrar por categoria">
+            <div className="row wrapx" style={gap(8)} role="group" aria-label={t("filterLabel")}>
               <button type="button" className={`chip${cat === null ? " on" : ""}`} aria-pressed={cat === null} onClick={() => setCat(null)}>
-                Todas
+                {t("all")}
               </button>
               {categories.map((c) => (
                 <button key={c} type="button" className={`chip${cat === c ? " on" : ""}`} aria-pressed={cat === c} onClick={() => setCat(c)}>
-                  {categoryLabel(c)}
+                  {f.categoryLabel(c)}
                 </button>
               ))}
             </div>
             <div className="row m-col" style={gap(10)}>
               <span id={sortLabelId} className="small muted">
-                Ordenar por
+                {t("sortBy")}
               </span>
               <div className="seg" role="radiogroup" aria-labelledby={sortLabelId}>
                 {SORTS.map((o, i) => (
                   <button
-                    key={o.id}
+                    key={o}
                     ref={(el) => {
                       sortRefs.current[i] = el;
                     }}
                     type="button"
                     role="radio"
-                    aria-checked={sort === o.id}
-                    tabIndex={sort === o.id ? 0 : -1}
-                    className={sort === o.id ? "on" : undefined}
-                    onClick={() => setSort(o.id)}
+                    aria-checked={sort === o}
+                    tabIndex={sort === o ? 0 : -1}
+                    className={sort === o ? "on" : undefined}
+                    onClick={() => setSort(o)}
                     onKeyDown={(e) => onSortKey(e, i)}
                   >
-                    {o.label}
+                    {t(`sort.${o}`)}
                   </button>
                 ))}
               </div>
@@ -140,7 +138,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
           </div>
 
           <p className="sr-only" role="status" aria-live="polite">
-            {shown.length === 1 ? "1 licença à venda" : `${int(shown.length)} licenças à venda`}
+            {t("count", { n: shown.length })}
           </p>
           <div className="col" style={gap(14)}>
             {shown.map((l) => (

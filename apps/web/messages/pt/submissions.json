@@ -1,1 +1,128 @@
-{}
+{
+  "meta": { "listTitle": "Meus envios", "detailTitle": "Acompanhar envio" },
+  "sla": "Nossa meta é responder em até 5 dias úteis.",
+  "status": {
+    "submitted": { "label": "Recebido", "text": "Recebemos o seu pacote. Ele entra na conferência automática em instantes." },
+    "validating": { "label": "Conferindo", "text": "Estamos conferindo o formato, as etapas e o conhecimento do pacote. Leva poucos minutos." },
+    "rejected_validation": { "label": "Tem erros", "text": "A conferência automática achou erros. Corrija o que está listado abaixo e envie o pacote de novo. Nada foi para a revisão da equipe." },
+    "pending_review": { "label": "Na fila da revisão", "text": "A equipe vai ler o pacote inteiro. {sla}" },
+    "changes_requested": { "label": "Mudanças pedidas", "text": "A equipe pediu ajustes. Leia o recado abaixo, corrija o pacote e envie de novo: a versão é a mesma." },
+    "rejected": { "label": "Recusado", "text": "A equipe não aprovou este pacote. O motivo está abaixo. Você pode enviar um pacote novo quando quiser." },
+    "awaiting_creator_signature": {
+      "label": "Falta a sua confirmação",
+      "textUpdate": "A equipe aprovou a nova versão. Falta você confirmar a atualização com a sua conta.",
+      "textRegister": "A equipe aprovou o seu especialista. Falta você confirmar o cadastro com a sua conta."
+    },
+    "awaiting_onchain_approval": { "label": "Aprovação final", "text": "Você já confirmou. Falta a aprovação final da equipe para o especialista entrar na vitrine. Você não precisa fazer nada." },
+    "publishing": { "label": "Publicando", "text": "Estamos colocando o especialista no ar. Leva alguns instantes." },
+    "publish_failed": { "label": "Publicação travou", "text": "A publicação não terminou. A equipe foi avisada e vai tentar de novo. Você não precisa fazer nada." },
+    "published": { "label": "No ar", "text": "O especialista está publicado na vitrine." },
+    "superseded": { "label": "Substituído", "text": "Existe uma versão mais nova deste especialista. Esta não é mais a versão do ar." },
+    "suspended": { "label": "Suspenso", "text": "A plataforma suspendeu este especialista. Fale com a equipe para entender o motivo." },
+    "withdrawn": { "label": "Retirado", "text": "Este especialista foi retirado da vitrine a pedido do criador." }
+  },
+  "stages": {
+    "sent": { "title": "Enviado", "text": "O pacote chegou ao servidor." },
+    "check": { "title": "Conferência automática", "text": "Formato, etapas e conhecimento." },
+    "review": { "title": "Revisão da equipe", "text": "Leitura humana do pacote. {sla}" },
+    "sign": { "title": "Sua confirmação", "text": "Você confirma o cadastro ou a nova versão com a sua conta." },
+    "final": { "title": "Aprovação final", "text": "Só em especialistas novos: a equipe libera a entrada na vitrine." },
+    "publish": { "title": "Publicação", "text": "O especialista entra na vitrine." }
+  },
+  "stageState": {
+    "done": "concluído",
+    "current": "em andamento",
+    "attention": "precisa de atenção",
+    "failed": "não passou",
+    "todo": "ainda não chegou",
+    "skipped": "não se aplica a esta atualização"
+  },
+  "uploadError": {
+    "aborted": { "title": "Envio cancelado", "text": "Nada foi enviado. Escolha o arquivo e tente de novo." },
+    "network": { "title": "A conexão caiu", "text": "O envio foi interrompido antes de terminar. Confira a sua internet e tente de novo." },
+    "unauthorized": { "title": "Sua sessão expirou", "text": "Entre de novo e envie o arquivo outra vez." },
+    "forbidden": { "title": "Seu cadastro ainda não permite enviar", "text": "Complete o cadastro de criador (convite, termos e contato) antes de enviar." },
+    "conflict": { "title": "Esta versão já existe", "text": "Já há um envio ou uma versão publicada com esse nome e versão. Aumente a versão no manifesto e envie de novo." },
+    "tooLarge": { "title": "O arquivo é grande demais", "text": "O limite é 50 MB. Tire arquivos que não fazem parte do pacote (imagens pesadas, cópias) e compacte de novo." },
+    "rateLimited": { "title": "Você chegou ao limite de envios", "text": "São no máximo 3 envios em andamento e 5 por dia. Espere uma revisão terminar ou tente de novo amanhã." },
+    "rejected": { "title": "O servidor não aceitou o arquivo", "text": "Confira se é um ZIP com o manifest.json na raiz e tente de novo." },
+    "serverError": { "title": "O servidor não respondeu bem", "text": "Nada foi perdido. Tente de novo em instantes." },
+    "generic": { "title": "Não deu para enviar", "text": "Tente de novo em instantes." }
+  },
+  "loadError": {
+    "unauthorized": "Sua sessão expirou. Entre de novo.",
+    "forbidden": "Você não tem acesso a esta página.",
+    "serverError": "O servidor não respondeu agora. Tente de novo em instantes.",
+    "generic": "Não deu para carregar agora."
+  },
+  "errorCount": "{n, plural, one {# erro} other {# erros}}",
+  "action": {
+    "fix_and_resubmit": "Corrigir e enviar de novo",
+    "sign_register": "Confirmar o cadastro",
+    "sign_update": "Confirmar a atualização",
+    "view": "Ver detalhes"
+  },
+  "list": {
+    "authTitle": "Entre para ver os seus envios",
+    "authText": "Aqui você acompanha cada pacote enviado: conferência, revisão e publicação.",
+    "loading": "Carregando os seus envios…",
+    "loadFailed": "Não deu para carregar os envios",
+    "retry": "Tentar de novo",
+    "emptyTitle": "Você ainda não enviou nenhum pacote",
+    "emptyText": "Monte o pacote com o Criador de Solvers e envie o ZIP. O andamento aparece aqui.",
+    "publish": "Publicar especialista",
+    "notice": "{sla} Você recebe um aviso quando a equipe responder.",
+    "heading": "Seus envios",
+    "sendNew": "Enviar novo pacote",
+    "meta": "Enviado <sent></sent> · atualizado <updated></updated> · {size}",
+    "actionAria": "{action}: {name}",
+    "footer": "Quer um especialista novo ou uma nova versão? Cada envio passa pelas mesmas etapas."
+  },
+  "detail": {
+    "authTitle": "Entre para ver este envio",
+    "authText": "Só quem enviou o pacote vê o andamento dele.",
+    "back": "Todos os meus envios",
+    "loading": "Carregando o envio…",
+    "missingTitle": "Envio não encontrado",
+    "missingText": "Este envio não existe ou não é da sua conta.",
+    "missingCta": "Ver meus envios",
+    "loadFailed": "Não deu para carregar o envio",
+    "retry": "Tentar de novo",
+    "eyebrow": "Envio",
+    "meta": "<slug></slug> · versão {version} · {size} · enviado <sent></sent> · atualizado <updated></updated>",
+    "notesRejected": "Motivo da recusa",
+    "notesChanges": "O que a equipe pediu",
+    "notesDefault": "Recado da equipe",
+    "technicalTitle": "Houve um problema técnico",
+    "liveTitle": "O especialista está na vitrine",
+    "liveText": "Compradores já podem encontrar e usar esta versão.",
+    "liveCta": "Ver o especialista",
+    "validationTitle": "Conferência automática",
+    "noErrors": "Sem erros",
+    "validationPending": "O resultado aparece aqui assim que a conferência terminar.",
+    "validationNone": "Este envio ainda não tem resultado de conferência.",
+    "resubmitChanges": "Enviar o pacote corrigido",
+    "resubmitDefault": "Enviar de novo",
+    "resubmitChangesText": "O pacote corrigido entra na mesma versão e volta para a conferência automática.",
+    "resubmitDefaultText": "Corrija os erros abaixo, gere o ZIP de novo e envie. Se a versão já existir, aumente o número no manifest.json.",
+    "uploadAction": "Enviar pacote corrigido",
+    "progressAria": "Andamento",
+    "progressTitle": "Andamento",
+    "deadline": "Prazo: nossa meta é responder em até 5 dias úteis depois que o pacote passar na conferência automática."
+  },
+  "parts": {
+    "timelineAria": "Andamento do envio",
+    "validationOk": "A conferência automática não achou erros nem avisos.",
+    "errorsTitle": "{n, plural, one {# erro para corrigir} other {# erros para corrigir}}",
+    "warningsTitle": "{n, plural, one {# aviso} other {# avisos}}",
+    "warningsNote": "Avisos não bloqueiam o envio, mas o revisor vai ver todos. Corrigir agora acelera a aprovação.",
+    "inFile": "no arquivo",
+    "howToFix": "Como corrigir:"
+  },
+  "open": {
+    "title": "Envios em andamento",
+    "viewAll": "Ver todos os envios",
+    "updated": "Atualizado <updated></updated>",
+    "more": "E mais {n} em andamento."
+  }
+}

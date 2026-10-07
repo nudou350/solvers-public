@@ -1,8 +1,9 @@
 "use client";
 // Saque privado do criador (Cloak, rede real): move USDC da carteira para outro endereço sem o explorador ligar os dois, e
 // gera a "chave do contador" (leitura do histórico). Ver docs/cloak-privacidade.md.
-import { formatUsdcBase, parseUsdcInput, PRIVATE_WITHDRAW_PROBLEM_TEXT, planPrivateWithdraw } from "@solvers/shared";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { planPrivateWithdraw } from "@solvers/shared";
+import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { Chip } from "@/components/ui/Chip";
@@ -21,20 +22,16 @@ import {
   type MainnetBalances,
   type WithdrawStep,
 } from "@/lib/cloak/withdraw";
-import { short } from "@/lib/format";
+import { short, useFormat, type Format } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
 import { CreatorHead } from "./CreatorHead";
 
-const STEPS: { id: WithdrawStep; label: string }[] = [
-  { id: "keys", label: "Preparando as suas chaves" },
-  { id: "deposit", label: "Protegendo o valor (leva cerca de 1 minuto)" },
-  { id: "withdraw", label: "Enviando ao endereço de destino" },
-  { id: "done", label: "Concluído" },
-];
+const STEPS: WithdrawStep[] = ["keys", "deposit", "withdraw", "done"];
 
-const usdc = (v: bigint) => `${formatUsdcBase(v)} USDC`;
-const sol = (v: bigint) => `${(Number(v) / 1e9).toFixed(4).replace(".", ",")} SOL`;
+/** Valores em unidades base (USDC com 6 casas, SOL com 9), no formato do idioma da página. */
+const usdcText = (f: Format, v: bigint) => `${f.num(Number(v) / 1e6, 2, 6)} USDC`;
+const solText = (f: Format, v: bigint) => `${f.num(Number(v) / 1e9, 4)} SOL`;
 
 function download(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -47,10 +44,11 @@ function download(name: string, text: string, type: string) {
 
 /** Painel do saque privado (/creator/private-withdraw). Exige login; fala com a rede real por conta própria. */
 export function PrivateWithdrawView() {
+  const t = useTranslations("creator.cloak");
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>
-      <CreatorHead tab="private" title="Sacar em privado" />
-      <AuthGate icon="lock" title="Entre para sacar em privado" text="Use a mesma conta do painel do criador.">
+      <CreatorHead tab="private" title={t("title")} />
+      <AuthGate icon="lock" title={t("gateTitle")} text={t("gateText")}>
         <Panel />
       </AuthGate>
     </section>
@@ -58,6 +56,10 @@ export function PrivateWithdrawView() {
 }
 
 function Panel() {
+  const t = useTranslations("creator.cloak");
+  const f = useFormat();
+  const usdc = (v: bigint) => usdcText(f, v);
+  const friendly = (e: unknown) => friendlyError(e, (k) => t(`errors.${k}`));
   const { wallet, me, requireWallet } = useSession();
   const address = me?.wallet ?? "";
   const [balances, setBalances] = useState<MainnetBalances | null>(null);
@@ -69,6 +71,10 @@ function Panel() {
   const [history, setHistory] = useState<WithdrawEntry[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Tradutor por ref: muda a cada render e não deve refazer a leitura dos saldos.
+  const friendlyErrorRef = useRef(friendly);
+  friendlyErrorRef.current = friendly;
+
   const refreshHistory = useCallback(() => setHistory(address ? loadHistory(address) : []), [address]);
   const refreshBalances = useCallback(async () => {
     if (!address) return;
@@ -77,7 +83,7 @@ function Panel() {
       setBalances(await getMainnetBalances(address));
     } catch (e) {
       setBalances(null);
-      setBalanceError(friendlyError(e));
+      setBalanceError(friendlyErrorRef.current(e));
     }
   }, [address]);
 
@@ -96,7 +102,7 @@ function Panel() {
       setCopied(key);
       setTimeout(() => setCopied((c) => (c === key ? null : c)), 1800);
     } catch {
-      setError("Não deu para copiar. Selecione o texto e copie à mão.");
+      setError(t("copyFail"));
     }
   }
 
@@ -109,7 +115,7 @@ function Panel() {
       await privateWithdraw({ wallet: w, amount: plan.amount, destination: plan.destination, hooks: { onStep: setStep } });
       setAmount("");
     } catch (e) {
-      setError(friendlyError(e));
+      setError(friendly(e));
       setStep(null);
     } finally {
       refreshHistory();
@@ -124,7 +130,7 @@ function Panel() {
       const w = wallet ?? (await requireWallet());
       await resumeWithdraw(w, id, { onStep: setStep });
     } catch (e) {
-      setError(friendlyError(e));
+      setError(friendly(e));
       setStep(null);
     } finally {
       refreshHistory();
@@ -140,23 +146,23 @@ function Panel() {
       <div className="card pad-l col" style={gap(14)}>
         <div className="row wrapx" style={gap(10)}>
           <Chip tone="warn" icon="warning">
-            Rede real · dinheiro de verdade
+            {t("liveBadge")}
           </Chip>
           <Chip icon="lock">Cloak</Chip>
         </div>
         <p className="lead" style={{ maxWidth: 720 }}>
-          Seus ganhos chegam à sua carteira e qualquer pessoa pode ver. Aqui você move uma parte para outro endereço <b>sem que o explorador mostre a ligação entre os dois</b>.
+          {t.rich("lead", { b: (c) => <b>{c}</b> })}
         </p>
         <p className="small muted" style={{ maxWidth: 720 }}>
-          Funciona na rede real, separada da rede de teste usada no resto do Solvers. As vendas continuam públicas de propósito: é o que dá confiança aos compradores. O que fica protegido é o que você faz com o dinheiro depois.
+          {t("leadNote")}
         </p>
       </div>
 
       <div className="card pad-l col" style={gap(14)}>
         <div className="row between wrapx" style={gap(12)}>
-          <b>Sua carteira na rede real</b>
+          <b>{t("walletTitle")}</b>
           <Button size="sm" variant="ghost" icon="refresh" onClick={() => void refreshBalances()}>
-            Atualizar
+            {t("refresh")}
           </Button>
         </div>
         <div className="row wrapx" style={gap(10)}>
@@ -164,13 +170,13 @@ function Panel() {
             {address}
           </code>
           <Button size="sm" variant="secondary" icon="copy" onClick={() => void copy("addr", address)}>
-            {copied === "addr" ? "Copiado" : "Copiar"}
+            {copied === "addr" ? t("copied") : t("copy")}
           </Button>
         </div>
         {balanceError ? (
-          <Notice tone="bad" role="alert" title="Não deu para ler os saldos">
+          <Notice tone="bad" role="alert" title={t("balanceFailTitle")}>
             {balanceError}
-            {CLOAK_RPC_URL.includes("api.mainnet-beta") ? " O endereço de leitura padrão limita navegadores: configure NEXT_PUBLIC_CLOAK_RPC_URL." : ""}
+            {CLOAK_RPC_URL.includes("api.mainnet-beta") ? t("rpcHint") : ""}
           </Notice>
         ) : balances ? (
           <div className="row wrapx" style={gap(24)}>
@@ -180,17 +186,17 @@ function Panel() {
               <b>{usdc(balances.usdc)}</b>
             </span>
             <span>
-              <span className="small muted">SOL (taxas de rede)</span>
+              <span className="small muted">{t("solLabel")}</span>
               <br />
-              <b>{sol(balances.sol)}</b>
+              <b>{solText(f, balances.sol)}</b>
             </span>
           </div>
         ) : (
-          <span className="small muted">Lendo os saldos…</span>
+          <span className="small muted">{t("reading")}</span>
         )}
         {balances && balances.usdc === 0n ? (
-          <Notice tone="info" title="Sem saldo na rede real">
-            Para sacar, envie USDC e uns 0,005 SOL (para as taxas de rede) para o endereço acima, na rede real. O USDC de teste do Solvers não vale aqui.
+          <Notice tone="info" title={t("emptyTitle")}>
+            {t("emptyText")}
           </Notice>
         ) : null}
       </div>
@@ -203,40 +209,40 @@ function Panel() {
           void submit();
         }}
       >
-        <b>Novo saque</b>
+        <b>{t("newWithdrawal")}</b>
         <div className="field">
           <label className="label" htmlFor="pw-valor">
-            Valor (USDC)
+            {t("amountLabel")}
           </label>
           <input id="pw-valor" className="input" inputMode="decimal" placeholder="2" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} autoComplete="off" />
-          <span className="hint">Mínimo de 1 USDC. Taxa do Cloak: 0,45 USDC + 0,3%.</span>
+          <span className="hint">{t("amountHint")}</span>
         </div>
         <div className="field">
           <label className="label" htmlFor="pw-destino">
-            Endereço de destino
+            {t("destLabel")}
           </label>
-          <input id="pw-destino" className="input mono" placeholder="Cole o endereço que vai receber" value={destination} onChange={(e) => setDestination(e.target.value)} disabled={busy} autoComplete="off" spellCheck={false} />
-          <span className="hint">Use um endereço só para isso: o relatório do contador lista os saques que chegaram nele.</span>
+          <input id="pw-destino" className="input mono" placeholder={t("destPlaceholder")} value={destination} onChange={(e) => setDestination(e.target.value)} disabled={busy} autoComplete="off" spellCheck={false} />
+          <span className="hint">{t("destHint")}</span>
         </div>
         {typed && !plan.ok ? (
           <span className="hint" style={{ color: "var(--red)" }} role="alert">
-            {PRIVATE_WITHDRAW_PROBLEM_TEXT[plan.problem]}
+            {t(`problems.${plan.problem}`)}
           </span>
         ) : null}
         {plan.ok ? (
           <div className="card-flat pad-s row wrapx" style={gap(24)}>
             <span>
-              <span className="small muted">Você retira</span>
+              <span className="small muted">{t("youWithdraw")}</span>
               <br />
               <b>{usdc(plan.amount)}</b>
             </span>
             <span>
-              <span className="small muted">Taxa estimada</span>
+              <span className="small muted">{t("estFee")}</span>
               <br />
               <b>{usdc(plan.fee)}</b>
             </span>
             <span>
-              <span className="small muted">O destino recebe</span>
+              <span className="small muted">{t("destReceives")}</span>
               <br />
               <b>{usdc(plan.net)}</b>
             </span>
@@ -244,41 +250,42 @@ function Panel() {
         ) : null}
         <div className="row wrapx" style={gap(12)}>
           <Button type="submit" size="lg" icon="lock" loading={busy} disabled={!plan.ok}>
-            Sacar em privado
+            {t("submit")}
           </Button>
         </div>
 
         {step ? (
           <ol className="col small" style={gap(8, { listStyle: "none", padding: 0, margin: 0 })} aria-live="polite">
-            {STEPS.map((s, i) => {
-              const at = STEPS.findIndex((x) => x.id === step);
+            {STEPS.map((id, i) => {
+              const at = STEPS.indexOf(step);
               const state = i < at || step === "done" ? "ok" : i === at ? "now" : "todo";
               return (
-                <li key={s.id} className="row" style={gap(8, { opacity: state === "todo" ? 0.5 : 1 })}>
+                <li key={id} className="row" style={gap(8, { opacity: state === "todo" ? 0.5 : 1 })}>
                   <Icon name={state === "ok" ? "check-circle" : state === "now" ? "clock" : "minus"} size="s" />
-                  <span style={{ fontWeight: state === "now" ? 600 : 400 }}>{s.label}</span>
+                  <span style={{ fontWeight: state === "now" ? 600 : 400 }}>{t(`steps.${id}`)}</span>
                 </li>
               );
             })}
           </ol>
         ) : null}
         {error ? (
-          <Notice tone="bad" role="alert" title="O saque não terminou">
-            {error} Se o valor já tinha sido protegido, ele aparece abaixo para você concluir.
+          <Notice tone="bad" role="alert" title={t("failTitle")}>
+            {error}
+            {t("failNote")}
           </Notice>
         ) : null}
       </form>
 
       {pending.length ? (
-        <Notice tone="warn" title="Saque pela metade">
+        <Notice tone="warn" title={t("halfTitle")}>
           <span className="col" style={gap(8)}>
             {pending.map((p) => (
               <span key={p.id} className="row wrapx" style={gap(10)}>
                 <span>
-                  {usdc(BigInt(p.amount))} para {short(p.destination)}
+                  {t("halfLine", { amount: usdc(BigInt(p.amount)), dest: short(p.destination) })}
                 </span>
                 <Button size="sm" onClick={() => void resume(p.id)} loading={busy}>
-                  Concluir saque
+                  {t("finish")}
                 </Button>
               </span>
             ))}
@@ -288,32 +295,34 @@ function Panel() {
 
       {done.length ? (
         <div className="card pad-l col" style={gap(12)}>
-          <b>Saques feitos neste navegador</b>
+          <b>{t("doneTitle")}</b>
           <ul className="col small" style={gap(10, { listStyle: "none", padding: 0, margin: 0 })}>
             {done.map((h) => (
               <li key={h.id} className="row wrapx" style={gap(12)}>
-                <span>{new Date(h.createdAt).toLocaleString("pt-BR")}</span>
+                <span>{f.dateTime(h.createdAt)}</span>
                 <b>{usdc(BigInt(h.amount))}</b>
                 <span className="muted">→ {short(h.destination)}</span>
                 {h.depositSignature ? (
                   <a href={solscanTx(h.depositSignature)} target="_blank" rel="noopener noreferrer">
-                    depósito
+                    {t("deposit")}
                   </a>
                 ) : null}
                 {h.withdrawSignature ? (
                   <a href={solscanTx(h.withdrawSignature)} target="_blank" rel="noopener noreferrer">
-                    saque
+                    {t("withdrawal")}
                   </a>
                 ) : null}
               </li>
             ))}
           </ul>
           <span className="small muted">
-            No explorador, o depósito aparece na sua carteira e o saque aparece no destino ({" "}
-            <a href={solscanAccount(done[0]!.destination)} target="_blank" rel="noopener noreferrer">
-              ver destino
-            </a>
-            ), sem nada que ligue um ao outro.
+            {t.rich("doneNote", {
+              a: (c) => (
+                <a href={solscanAccount(done[0]!.destination)} target="_blank" rel="noopener noreferrer">
+                  {c}
+                </a>
+              ),
+            })}
           </span>
         </div>
       ) : null}
@@ -322,22 +331,14 @@ function Panel() {
 
       <details className="card pad-l">
         <summary className="bold" style={{ cursor: "pointer" }}>
-          O que isso esconde, e o que não esconde
+          {t("hides.title")}
         </summary>
         <ul className="col small" style={gap(8, { marginTop: 12 })}>
-          <Bullet>
-            <b>Escondido:</b> a ligação entre a sua carteira e o endereço de destino, e o saldo que você guarda.
-          </Bullet>
-          <Bullet>
-            <b>De quem:</b> de concorrentes, clientes e qualquer pessoa olhando o explorador.
-          </Bullet>
-          <Bullet>
-            <b>Não escondido:</b> suas vendas e receita (são públicas de propósito), o fato de você usar o Cloak, o valor e o horário (num pool pequeno, valor e horário parecidos podem sugerir a ligação) e o que o Cloak enxerga: ele recebe a chave do contador ao registrar a carteira.
-          </Bullet>
-          <Bullet>
-            <b>Ganho:</b> você escolhe quem vê o histórico. Dê a chave ao contador e ele enxerga tudo; o público, nada.
-          </Bullet>
-          <Bullet>O Cloak é novo (alfa), o código não é aberto e a auditoria não foi publicada. Comece com valores pequenos.</Bullet>
+          <Bullet>{t.rich("hides.hidden", { b: (c) => <b>{c}</b> })}</Bullet>
+          <Bullet>{t.rich("hides.from", { b: (c) => <b>{c}</b> })}</Bullet>
+          <Bullet>{t.rich("hides.notHidden", { b: (c) => <b>{c}</b> })}</Bullet>
+          <Bullet>{t.rich("hides.gain", { b: (c) => <b>{c}</b> })}</Bullet>
+          <Bullet>{t("hides.alpha")}</Bullet>
         </ul>
       </details>
     </div>
@@ -355,6 +356,9 @@ function Bullet({ children }: { children: ReactNode }) {
 
 /** Chave do contador: derivada da carteira (nada guardado), só lê o histórico. */
 function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry[]; onError: (m: string | null) => void; copy: (k: string, t: string) => Promise<void>; copied: boolean }) {
+  const t = useTranslations("creator.cloak");
+  const f = useFormat();
+  const friendly = (e: unknown) => friendlyError(e, (k) => t(`errors.${k}`));
   const { wallet, requireWallet } = useSession();
   const destinations = useMemo(() => [...new Set(history.map((h) => h.destination))], [history]);
   const [dest, setDest] = useState("");
@@ -373,7 +377,7 @@ function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry
     try {
       await copy("key", viewingKeyHex((await keys()).nk));
     } catch (e) {
-      onError(friendlyError(e));
+      onError(friendly(e));
     } finally {
       setWorking(null);
     }
@@ -383,7 +387,7 @@ function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry
     if (!chosen) return;
     onError(null);
     setWorking("report");
-    setStatus("Lendo o histórico (leva alguns minutos)…");
+    setStatus(t("acct.reading"));
     try {
       const k = await keys();
       const expectSignatures = history.filter((h) => h.destination === chosen).flatMap((h) => [h.depositSignature, h.withdrawSignature].filter((s): s is string => Boolean(s)));
@@ -392,16 +396,13 @@ function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry
         destination: chosen,
         ownerPublicKey: k.owner.publicKey,
         expectSignatures,
-        onStatus: (t) => setStatus(t.startsWith("Scanned") ? "Lendo o histórico (leva alguns minutos)…" : t),
+        onStatus: (text) => setStatus(text.startsWith("Scanned") ? t("acct.reading") : text),
+        onRetry: ({ missing: n, attempt, attempts }) => setStatus(t("acct.retrying", { missing: n, attempt, attempts })),
       });
-      download("comprovante-saques-privados.csv", csv, "text/csv");
-      setStatus(
-        missing.length
-          ? `Arquivo gerado, mas ${missing.length} movimentação(ões) não apareceram (a rede recusou algumas leituras). Tente de novo em instantes.`
-          : `Pronto: ${summary.transactionCount} movimentações no arquivo.`,
-      );
+      download(t("acct.fileName"), csv, "text/csv");
+      setStatus(missing.length ? t("acct.partial", { missing: missing.length }) : t("acct.ready", { count: f.int(summary.transactionCount) }));
     } catch (e) {
-      onError(friendlyError(e));
+      onError(friendly(e));
       setStatus(null);
     } finally {
       setWorking(null);
@@ -412,17 +413,17 @@ function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry
     <div className="card pad-l col" style={gap(14)}>
       <div className="row wrapx" style={gap(10)}>
         <Icon name="key" />
-        <b>Chave do contador</b>
+        <b>{t("acct.title")}</b>
       </div>
       <p className="small muted" style={{ maxWidth: 720 }}>
-        É uma chave só de leitura: quem a tem enxerga o histórico dos seus saques privados, mas não consegue mexer no dinheiro. Ela é refeita a partir da sua carteira, então você não precisa guardá-la.
+        {t("acct.text")}
       </p>
       <div className="row wrapx" style={gap(12)}>
         <Button variant="secondary" icon="copy" loading={working === "key"} onClick={() => void copyKey()}>
-          {copied ? "Chave copiada" : "Copiar chave do contador"}
+          {copied ? t("acct.keyCopied") : t("acct.copyKey")}
         </Button>
         {destinations.length > 1 ? (
-          <select className="input" style={{ maxWidth: 260 }} value={chosen} onChange={(e) => setDest(e.target.value)} aria-label="Destino do relatório">
+          <select className="input" style={{ maxWidth: 260 }} value={chosen} onChange={(e) => setDest(e.target.value)} aria-label={t("acct.destLabel")}>
             {destinations.map((d) => (
               <option key={d} value={d}>
                 {short(d)}
@@ -431,10 +432,10 @@ function Accountant({ history, onError, copy, copied }: { history: WithdrawEntry
           </select>
         ) : null}
         <Button variant="secondary" icon="download" loading={working === "report"} disabled={!chosen} onClick={() => void report()}>
-          Baixar relatório (CSV)
+          {t("acct.download")}
         </Button>
       </div>
-      {!chosen ? <span className="small muted">O relatório fica disponível depois do primeiro saque.</span> : null}
+      {!chosen ? <span className="small muted">{t("acct.afterFirst")}</span> : null}
       {status ? (
         <span className="small" aria-live="polite">
           {status}

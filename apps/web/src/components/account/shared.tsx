@@ -1,16 +1,18 @@
 "use client";
 // Peças comuns das telas da conta (biblioteca, memórias, garantias e perfil).
 // AuthGate fica em components/ui; useAgentsIndex e useNow em lib/hooks.
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { gap } from "@/lib/style";
 
 /** Erro de carregamento de uma seção, com "Tentar de novo". */
-export function LoadError({ onRetry, text = "Não conseguimos carregar agora." }: { onRetry: () => void; text?: string }) {
+export function LoadError({ onRetry, text }: { onRetry: () => void; text?: string }) {
+  const t = useTranslations("account.shared");
   return (
-    <Empty icon="warning" title="Algo deu errado" action={<Button variant="secondary" icon="refresh" onClick={onRetry}>Tentar de novo</Button>}>
-      {text}
+    <Empty icon="warning" title={t("somethingWrong")} action={<Button variant="secondary" icon="refresh" onClick={onRetry}>{t("retry")}</Button>}>
+      {text ?? t("loadError")}
     </Empty>
   );
 }

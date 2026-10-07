@@ -21,6 +21,18 @@ function loadSdk(): Promise<Sdk> {
 }
 
 export type WithdrawStep = "keys" | "deposit" | "withdraw" | "done";
+
+/** Códigos dos erros que este módulo lança: a tela traduz por `creator.cloak.errors.<chave>` (ver cloakErrorKey). */
+export type CloakErrorCode = "rpcNotMainnet" | "badSignature" | "noNote" | "noNoteReturned" | "nothingPending";
+export class CloakError extends Error {
+  constructor(
+    readonly code: CloakErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CloakError";
+  }
+}
 export type Hooks = {
   onStep?: (step: WithdrawStep) => void;
   /** Textos de andamento do SDK (inglês, só para log/diagnóstico). */
@@ -32,7 +44,7 @@ const KEY_MESSAGE = "Solvers private withdrawal key v1";
 async function connect(sdk: Sdk) {
   const connection = sdk.createCloakRpc(CLOAK_RPC_URL);
   const genesis = await connection.getGenesisHash().send();
-  if (genesis !== MAINNET_GENESIS_HASH) throw new Error("O RPC configurado não é o da rede real (mainnet). O saque privado só funciona nela.");
+  if (genesis !== MAINNET_GENESIS_HASH) throw new CloakError("rpcNotMainnet", "The configured RPC is not mainnet. Private withdrawal only works there.");
   return connection;
 }
 
@@ -62,7 +74,7 @@ export type CloakKeys = { owner: { privateKey: bigint; publicKey: bigint }; nk: 
 export async function deriveKeys(wallet: WalletLike): Promise<CloakKeys> {
   const sdk = await loadSdk();
   const signature = await wallet.signMessage(new TextEncoder().encode(KEY_MESSAGE));
-  if (signature.length !== 64) throw new Error("A carteira devolveu uma assinatura inesperada. Entre de novo e tente outra vez.");
+  if (signature.length !== 64) throw new CloakError("badSignature", "The wallet returned an unexpected signature.");
   const seed = new Uint8Array(await crypto.subtle.digest("SHA-256", signature as BufferSource));
   const spend = sdk.deriveSpendKey(seed);
   const owner = await sdk.deriveUtxoKeypairFromSpendKey(spend.sk_spend);
@@ -110,7 +122,7 @@ export type WithdrawResult = { depositSignature: string; withdrawSignature: stri
 
 /** Etapa 3 (também usada para retomar): saca a nota do pool para o destino. */
 async function finishWithdraw(sdk: Sdk, wallet: WalletLike, entry: WithdrawEntry, keys: CloakKeys, hooks: Hooks, merkleTree?: unknown): Promise<WithdrawEntry> {
-  if (!entry.note) throw new Error("Esse saque não tem o valor depositado no pool para retomar.");
+  if (!entry.note) throw new CloakError("noNote", "This withdrawal has no deposited note to resume.");
   hooks.onStep?.("withdraw");
   const connection = await connect(sdk);
   const note = await sdk.deserializeUtxo(fromB64(entry.note));
@@ -148,7 +160,7 @@ export async function privateWithdraw(input: { wallet: WalletLike; amount: bigin
     { ...baseOptions(sdk, connection, wallet, keys, hooks), chainNoteSalt: noteSalt, relaySupplementalAlt: true },
   );
   const note = deposited.outputUtxos[0];
-  if (!note) throw new Error("O depósito não devolveu a nota. Não repita: veja o histórico.");
+  if (!note) throw new CloakError("noNoteReturned", "The deposit did not return the note. Do not repeat it: check the history.");
   entry = { ...entry, status: "deposited", note: toB64(sdk.serializeUtxo(note)), depositSignature: deposited.signature };
   saveEntry(wallet.address, entry);
 
@@ -160,7 +172,7 @@ export async function privateWithdraw(input: { wallet: WalletLike; amount: bigin
 /** Conclui um saque que parou depois do depósito (aba fechada, rede caiu). */
 export async function resumeWithdraw(wallet: WalletLike, entryId: string, hooks: Hooks = {}): Promise<WithdrawEntry> {
   const entry = loadHistory(wallet.address).find((e) => e.id === entryId);
-  if (!entry || entry.status !== "deposited") throw new Error("Não há saque pendente para retomar.");
+  if (!entry || entry.status !== "deposited") throw new CloakError("nothingPending", "There is no pending withdrawal to resume.");
   const sdk = await loadSdk();
   hooks.onStep?.("keys");
   const keys = await deriveKeys(wallet);
@@ -182,7 +194,10 @@ export async function buildReport(input: {
   ownerPublicKey?: bigint;
   expectSignatures?: string[];
   maxAttempts?: number;
+  /** Texto de andamento do scanner do SDK (inglês). */
   onStatus?: (text: string) => void;
+  /** Releitura porque faltaram movimentações conhecidas: a tela monta o texto no idioma da página. */
+  onRetry?: (info: { missing: number; attempt: number; attempts: number }) => void;
 }): Promise<ReportResult & { missing: string[] }> {
   const sdk = await loadSdk();
   const connection = await connect(sdk);
@@ -204,16 +219,24 @@ export async function buildReport(input: {
     result = { csv: sdk.formatComplianceCsv(report), summary: report.summary };
     missing = (input.expectSignatures ?? []).filter((sig) => !result.csv.includes(sig));
     if (!missing.length) break;
-    input.onStatus?.(`Faltam ${missing.length} movimentações; lendo de novo (${attempt}/${attempts})…`);
+    input.onRetry?.({ missing: missing.length, attempt, attempts });
   }
   return { ...result, missing };
 }
 
-/** Mensagem em português para o erro mais comum; o resto passa como veio. */
-export function friendlyError(e: unknown): string {
+/** Chave (em `creator.cloak.errors`) do erro conhecido; null quando o erro não tem tradução e passa como veio. */
+export function cloakErrorKey(e: unknown): string | null {
+  if (e instanceof CloakError) return e.code;
   const text = e instanceof Error ? e.message : String(e);
-  if (/429|Too Many Requests/i.test(text)) return "A rede real está ocupada (limite de requisições). Espere um minuto e tente de novo.";
-  if (/reject|denied|cancel/i.test(text)) return "A assinatura foi cancelada.";
-  if (/Failed to fetch|NetworkError/i.test(text)) return "Não deu para falar com a rede real. Confira a conexão e o RPC configurado.";
-  return text;
+  if (/429|Too Many Requests/i.test(text)) return "rateLimited";
+  if (/reject|denied|cancel/i.test(text)) return "cancelled";
+  if (/Failed to fetch|NetworkError/i.test(text)) return "network";
+  return null;
+}
+
+/** Texto do erro para a tela. Com `t` (mensagens de `creator.cloak.errors`) sai no idioma da página; sem ele, em inglês. */
+export function friendlyError(e: unknown, t?: (key: string) => string): string {
+  const key = cloakErrorKey(e);
+  if (key && t) return t(key);
+  return e instanceof Error ? e.message : String(e);
 }

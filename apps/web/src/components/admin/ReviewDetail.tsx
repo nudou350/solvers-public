@@ -1,12 +1,13 @@
 "use client";
-// Revisão de um pacote (/admin/revisoes/[id]): resumo, validador, diff por arquivo, varreduras, conhecimento, histórico,
+// Revisão de um pacote (/admin/reviews/[id]): resumo, validador, diff por arquivo, varreduras, conhecimento, histórico,
 // checklist da PACKAGE_SPEC.md 14.5 e as decisões.
 // SEGURANÇA: tudo que veio do criador (manifesto, etapas, templates, evals, conhecimento, notas) é mostrado como TEXTO
 // do React (escapado), em bloco monoespaçado. Nunca dangerouslySetInnerHTML, nunca Markdown renderizado, nunca um
 // link montado a partir do conteúdo. Caracteres invisíveis e de direção viram marcas visíveis ([U+202E]).
 import { REVIEW_CHECKLIST_KEYS, reviewChecklistComplete, type AdminSubmissionDetail, type ReviewChecklist } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { StatusChip, Timeline, ValidationList } from "@/components/creator/SubmissionParts";
 import creator from "@/components/creator/creator.module.css";
@@ -18,35 +19,19 @@ import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Spinner";
 import { Notice, useToast } from "@/components/ui/Toast";
-import { differentiatorLabel } from "@/lib/differentiators";
-import { short } from "@/lib/format";
+import { useErrorText } from "@/lib/error-text";
+import { short, useFormat } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
-import { fileSizeText, loadErrorText, prettyJson, revealHidden, statusInfo } from "@/lib/submissions-ui";
+import { prettyJson, revealHidden } from "@/lib/submissions-ui";
 import { Untrusted } from "@/components/ui/Untrusted";
 import { AdminGate } from "./AdminGate";
 
-const CHECKLIST_LABEL: Record<(typeof REVIEW_CHECKLIST_KEYS)[number], string> = {
-  promiseDelivered: "A promessa é entregue pelas etapas.",
-  twoDifferentiatorsProven: "Pelo menos 2 dos 5 diferenciais estão comprovados.",
-  rightsAndSources: "As fontes estão listadas e há permissão para o conteúdo de terceiros.",
-  noHarmfulInstructions: "Nada age contra o usuário nem manda dados dele para fora, e não há injeção em nenhum texto (inclusive o que só aparece para uma consulta específica).",
-  priceTrialShowcaseCoherent: "Preço, teste grátis e vitrine são coerentes, sem promessa de resultado financeiro, jurídico ou médico sem ressalva.",
-};
+const ACTIONS = ["approve", "request_changes", "reject", "finish", "suspend", "resume"];
 
-const ACTION_LABEL: Record<string, string> = {
-  approve: "Aprovou",
-  request_changes: "Pediu mudanças",
-  reject: "Recusou",
-  finish: "Concluiu a publicação",
-  suspend: "Suspendeu",
-  resume: "Reativou",
-};
-
-const DIFF_LABEL = { added: "Novo", changed: "Mudou", removed: "Removido", same: "Igual" } as const;
 const DIFF_TONE = { added: "ok", changed: "warn", removed: "red", same: "default" } as const;
 
-type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; message: string } | { kind: "ok"; d: AdminSubmissionDetail };
+type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; error: unknown } | { kind: "ok"; d: AdminSubmissionDetail };
 
 export function ReviewDetailView({ id }: { id: string }) {
   return (
@@ -57,6 +42,8 @@ export function ReviewDetailView({ id }: { id: string }) {
 }
 
 function Detail({ id }: { id: string }) {
+  const t = useTranslations("admin");
+  const errorText = useErrorText();
   const { api } = useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -68,7 +55,7 @@ function Detail({ id }: { id: string }) {
       } catch (e) {
         if (silent) return;
         if (e instanceof ApiError && e.status === 404) setState({ kind: "missing" });
-        else setState({ kind: "error", message: loadErrorText(e) });
+        else setState({ kind: "error", error: e });
       }
     },
     [api, id],
@@ -81,19 +68,19 @@ function Detail({ id }: { id: string }) {
   return (
     <div className="col" style={gap(20)}>
       <div>
-        <Link className="link small" href="/admin/revisoes">
-          <Icon name="arrow-left" size="s" /> Fila de revisões
+        <Link className="link small" href="/admin/reviews">
+          <Icon name="arrow-left" size="s" /> {t("detail.back")}
         </Link>
       </div>
-      {state.kind === "loading" ? <Loading text="Carregando o envio…" /> : null}
+      {state.kind === "loading" ? <Loading text={t("detail.loading")} /> : null}
       {state.kind === "missing" ? (
-        <Empty icon="search" title="Envio não encontrado" action={<Button href="/admin/revisoes">Voltar à fila</Button>}>
-          Este envio não existe.
+        <Empty icon="search" title={t("detail.missingTitle")} action={<Button href="/admin/reviews">{t("detail.missingBack")}</Button>}>
+          {t("detail.missingText")}
         </Empty>
       ) : null}
       {state.kind === "error" ? (
-        <Empty icon="warning" title="Não deu para carregar o envio" action={<Button onClick={() => void load()}>Tentar de novo</Button>}>
-          {state.message}
+        <Empty icon="warning" title={t("detail.errorTitle")} action={<Button onClick={() => void load()}>{t("detail.retry")}</Button>}>
+          {errorText(state.error)}
         </Empty>
       ) : null}
       {state.kind === "ok" ? <Review d={state.d} reload={() => load(true)} /> : null}
@@ -103,12 +90,13 @@ function Detail({ id }: { id: string }) {
 
 /** Texto do criador como texto puro. Mostra quantos caracteres invisíveis foram tornados visíveis. */
 function RawText({ text, label }: { text: string; label: string }) {
+  const t = useTranslations("admin.raw");
   const { text: shown, count } = revealHidden(text);
   return (
     <div className="col" style={gap(6)}>
       {count ? (
-        <Notice tone="warn" role="alert" title={`${count} ${count === 1 ? "caractere invisível" : "caracteres invisíveis"} neste texto`}>
-          Eles aparecem como [U+XXXX]. Caracteres invisíveis e de direção podem esconder instruções do olhar do revisor: confira cada um.
+        <Notice tone="warn" role="alert" title={t("hiddenTitle", { n: count })}>
+          {t("hiddenText")}
         </Notice>
       ) : null}
       <pre className={creator.raw} tabIndex={0} aria-label={label}>
@@ -133,6 +121,8 @@ function Section({ id, title, aside, children }: { id: string; title: string; as
 }
 
 function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise<void> }) {
+  const t = useTranslations("admin");
+  const f = useFormat();
   const sub = d.submission;
   const m = d.manifest;
   const text = (k: string): string | null => {
@@ -148,51 +138,51 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
       <div className="col" style={gap(20)}>
         <div className="col" style={gap(8)}>
           <div className="row wrapx" style={gap(8)}>
-            <span className="eyebrow">Revisão</span>
-            <Chip tone={d.isNewAgent ? "brand" : "default"}>{d.isNewAgent ? "Especialista novo" : "Nova versão"}</Chip>
+            <span className="eyebrow">{t("header.eyebrow")}</span>
+            <Chip tone={d.isNewAgent ? "brand" : "default"}>{d.isNewAgent ? t("header.newSolver") : t("header.newVersion")}</Chip>
             <StatusChip status={sub.status} nextAction={sub.nextAction} />
           </div>
           <h1 className="display h2s" style={{ overflowWrap: "anywhere" }}>
             <Untrusted>{sub.name || sub.slug}</Untrusted>
           </h1>
           <p className="small muted" style={{ overflowWrap: "anywhere" }}>
-            <span className="mono">{sub.slug}</span> · v{sub.version} · {fileSizeText(sub.sizeBytes)} · enviado <Ago iso={sub.createdAt} />
+            <span className="mono">{sub.slug}</span> · v{sub.version} · {f.fileSize(sub.sizeBytes)} · {t.rich("header.sent", { ago: () => <Ago iso={sub.createdAt} /> })}
           </p>
         </div>
 
-        <Section id="rv-resumo" title="Resumo">
+        <Section id="rv-resumo" title={t("summary.title")}>
           <dl className="col" style={gap(10)}>
-            <Row label="Criador">
-              <span style={{ overflowWrap: "anywhere" }}><Untrusted>{d.creator.name || "Sem nome"}</Untrusted></span>{" "}
-              <Chip tone={d.creator.contactVerified ? "ok" : "warn"}>{d.creator.contactVerified ? "Contato verificado" : "Contato não verificado"}</Chip>
+            <Row label={t("summary.creator")}>
+              <span style={{ overflowWrap: "anywhere" }}><Untrusted>{d.creator.name || t("summary.noName")}</Untrusted></span>{" "}
+              <Chip tone={d.creator.contactVerified ? "ok" : "warn"}>{d.creator.contactVerified ? t("summary.verified") : t("summary.unverified")}</Chip>
             </Row>
-            <Row label="Carteira">
+            <Row label={t("summary.wallet")}>
               <span className="mono" style={{ overflowWrap: "anywhere" }}>
                 {d.creator.wallet}
               </span>
             </Row>
             {d.creator.bio ? (
-              <Row label="Bio">
+              <Row label={t("summary.bio")}>
                 <span style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}><Untrusted>{d.creator.bio}</Untrusted></span>
               </Row>
             ) : null}
-            {text("category") ? <Row label="Categoria"><Untrusted>{text("category")}</Untrusted></Row> : null}
+            {text("category") ? <Row label={t("summary.category")}><Untrusted>{text("category")}</Untrusted></Row> : null}
             {text("tagline") ? (
-              <Row label="Frase curta">
+              <Row label={t("summary.tagline")}>
                 <span style={{ overflowWrap: "anywhere" }}><Untrusted>{text("tagline")}</Untrusted></span>
               </Row>
             ) : null}
-            {price !== null ? <Row label="Preço">{price} USDC</Row> : null}
-            <Row label="Diferenciais">
+            {price !== null ? <Row label={t("summary.price")}>{f.usdc(price)}</Row> : null}
+            <Row label={t("summary.differentiators")}>
               {d.differentiators.declared.length === 0 ? (
-                <span className="muted">Nenhum declarado</span>
+                <span className="muted">{t("summary.none")}</span>
               ) : (
                 <span className="row wrapx" style={gap(6)}>
                   {d.differentiators.declared.map((k) => (
                     <Chip key={k} tone={proven.has(k) ? "ok" : "warn"} icon={proven.has(k) ? "check-circle" : "warning"}>
-                      {differentiatorLabel(k)}
+                      {t.has(`differentiator.${k}`) ? t(`differentiator.${k}`) : k}
                       <span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
-                        {proven.has(k) ? " (comprovado)" : " (não comprovado)"}
+                        {proven.has(k) ? t("summary.proven") : t("summary.notProven")}
                       </span>
                     </Chip>
                   ))}
@@ -202,18 +192,18 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
           </dl>
           {text("description") ? (
             <div className="col" style={gap(6)}>
-              <span className="label">Descrição enviada</span>
-              <RawText text={text("description") ?? ""} label="Descrição enviada pelo criador" />
+              <span className="label">{t("summary.description")}</span>
+              <RawText text={text("description") ?? ""} label={t("summary.descriptionAria")} />
             </div>
           ) : null}
         </Section>
 
-        <Section id="rv-validador" title="Validador" aside={<Chip tone={d.validation && d.validation.errors.length === 0 ? "ok" : "red"}>{d.validation ? `${d.validation.errors.length} erros · ${d.validation.warnings.length} avisos` : "Sem resultado"}</Chip>}>
-          {d.validation ? <ValidationList report={d.validation} /> : <p className="small muted">Sem resultado de conferência.</p>}
+        <Section id="rv-validador" title={t("validator.title")} aside={<Chip tone={d.validation && d.validation.errors.length === 0 ? "ok" : "red"}>{d.validation ? t("validator.counts", { errors: d.validation.errors.length, warnings: d.validation.warnings.length }) : t("validator.noResult")}</Chip>}>
+          {d.validation ? <ValidationList report={d.validation} /> : <p className="small muted">{t("validator.noResultText")}</p>}
         </Section>
 
-        <Section id="rv-varreduras" title="Varreduras automáticas">
-          <p className="small muted">Unicode oculto, HTML ou CSS escondido, padrões de injeção, URLs, conteúdo repetido de outros pacotes e frases de busca fora do assunto.</p>
+        <Section id="rv-varreduras" title={t("scans.title")}>
+          <p className="small muted">{t("scans.intro")}</p>
           <Scans scans={d.scans} />
         </Section>
 
@@ -223,13 +213,13 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
 
         <Knowledge id={sub.id} k={d.knowledge} />
 
-        <Section id="rv-manifesto" title="Manifesto">
-          {m ? <RawText text={prettyJson(m)} label="Manifesto como enviado" /> : <p className="small muted">Sem manifesto.</p>}
+        <Section id="rv-manifesto" title={t("manifest.title")}>
+          {m ? <RawText text={prettyJson(m)} label={t("manifest.aria")} /> : <p className="small muted">{t("manifest.none")}</p>}
         </Section>
 
-        <Section id="rv-historico" title="Histórico de revisões">
+        <Section id="rv-historico" title={t("history.title")}>
           {d.reviews.length === 0 ? (
-            <p className="small muted">Ainda não há decisões neste envio.</p>
+            <p className="small muted">{t("history.none")}</p>
           ) : (
             <ul className="col" style={gap(14)}>
               {d.reviews.map((r) => {
@@ -237,14 +227,14 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
                 return (
                   <li key={r.id} className="card-flat pad-s col" style={gap(6)}>
                     <div className="row between wrapx" style={gap(8)}>
-                      <b>{ACTION_LABEL[r.action] ?? r.action}</b>
+                      <b>{ACTIONS.includes(r.action) ? t(`history.actions.${r.action}`) : r.action}</b>
                       <span className="tiny faint">
                         <Ago iso={r.createdAt} /> · <span className="mono">{short(r.reviewerWallet)}</span>
                       </span>
                     </div>
                     {r.notes ? <p className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}><Untrusted>{r.notes}</Untrusted></p> : null}
                     <span className="tiny faint">
-                      Checklist: {done} de {REVIEW_CHECKLIST_KEYS.length} itens marcados
+                      {t("history.checklist", { done, total: REVIEW_CHECKLIST_KEYS.length })}
                     </span>
                   </li>
                 );
@@ -254,10 +244,10 @@ function Review({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise
         </Section>
       </div>
 
-      <aside className="sticky col" style={gap(16)} aria-label="Decisão">
+      <aside className="sticky col" style={gap(16)} aria-label={t("decision.asideAria")}>
         <Decision d={d} reload={reload} />
         <div className="card pad col" style={gap(14)}>
-          <h2 className="h4">Andamento</h2>
+          <h2 className="h4">{t("decision.progress")}</h2>
           <Timeline status={sub.status} nextAction={sub.nextAction} />
         </div>
       </aside>
@@ -285,30 +275,30 @@ type ScansShape = {
 };
 
 const SEVERITY_TONE = { high: "red", warn: "warn", info: "default" } as const;
-const SEVERITY_LABEL = { high: "Alta", warn: "Média", info: "Aviso" } as const;
 
 /** Varreduras do worker: `scans.report` (achados e contagens) e `scans.diff` (o texto do diff vai na seção de arquivos). Tudo texto escapado. */
 function Scans({ scans }: { scans: Record<string, unknown> | null }) {
-  if (!scans || Object.keys(scans).length === 0) return <p className="small muted">Sem resultado de varredura.</p>;
+  const t = useTranslations("admin.scans");
+  if (!scans || Object.keys(scans).length === 0) return <p className="small muted">{t("none")}</p>;
   const report = (scans as ScansShape).report;
   const findings = Array.isArray(report?.findings) ? report.findings : [];
   const counts = report?.counts;
   if (!report) {
-    return <RawText text={prettyJson(scans)} label="Resultado das varreduras" />;
+    return <RawText text={prettyJson(scans)} label={t("rawAria")} />;
   }
   return (
     <div className="col" style={gap(10)}>
       <div className="row wrapx" style={gap(8)}>
-        <Chip tone={counts?.high ? "red" : "ok"}>{counts?.high ?? 0} alta(s)</Chip>
-        <Chip tone={counts?.warn ? "warn" : "ok"}>{counts?.warn ?? 0} média(s)</Chip>
-        <Chip>{counts?.info ?? 0} aviso(s)</Chip>
-        {counts?.suppressed ? <Chip tone="warn">{counts.suppressed} repetidos omitidos</Chip> : null}
+        <Chip tone={counts?.high ? "red" : "ok"}>{t("high", { n: counts?.high ?? 0 })}</Chip>
+        <Chip tone={counts?.warn ? "warn" : "ok"}>{t("medium", { n: counts?.warn ?? 0 })}</Chip>
+        <Chip>{t("info", { n: counts?.info ?? 0 })}</Chip>
+        {counts?.suppressed ? <Chip tone="warn">{t("suppressed", { n: counts.suppressed })}</Chip> : null}
       </div>
-      {findings.length === 0 ? <p className="small muted">Nada achado pelas varreduras.</p> : null}
+      {findings.length === 0 ? <p className="small muted">{t("nothing")}</p> : null}
       {findings.map((f, i) => (
         <details key={`${f.kind}-${f.path}-${i}`} className="card-flat pad-s" open={f.severity === "high"}>
           <summary style={{ cursor: "pointer", minHeight: 32, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Chip tone={SEVERITY_TONE[f.severity] ?? "default"}>{SEVERITY_LABEL[f.severity] ?? f.severity}</Chip>
+            <Chip tone={SEVERITY_TONE[f.severity] ?? "default"}>{f.severity in SEVERITY_TONE ? t(`severity.${f.severity}`) : f.severity}</Chip>
             <b className="mono" style={{ overflowWrap: "anywhere" }}>
               {revealHidden(f.kind).text}
             </b>
@@ -320,7 +310,7 @@ function Scans({ scans }: { scans: Record<string, unknown> | null }) {
             <p className="small" style={{ overflowWrap: "anywhere" }}>
               {revealHidden(f.detail).text}
             </p>
-            <RawText text={f.snippet} label={`Trecho do achado ${f.kind}`} />
+            <RawText text={f.snippet} label={t("snippetAria", { kind: f.kind })} />
           </div>
         </details>
       ))}
@@ -330,22 +320,23 @@ function Scans({ scans }: { scans: Record<string, unknown> | null }) {
 
 /** Diff com texto de cada arquivo que mudou contra a versão publicada (`scans.diff.changed`). */
 function DiffSection({ scans }: { scans: Record<string, unknown> | null }) {
+  const t = useTranslations("admin.diff");
   const diff = (scans as ScansShape | null)?.diff;
   const changed = Array.isArray(diff?.changed) ? diff.changed : [];
   if (changed.length === 0) return null;
   return (
-    <Section id="rv-diff" title="Diff contra a versão publicada" aside={diff?.truncated ? <Chip tone="warn">Cortado pelo teto</Chip> : undefined}>
-      <p className="small muted">Linhas com + entraram, linhas com - saíram. Na primeira versão, tudo é novo.</p>
+    <Section id="rv-diff" title={t("title")} aside={diff?.truncated ? <Chip tone="warn">{t("truncated")}</Chip> : undefined}>
+      <p className="small muted">{t("intro")}</p>
       {changed.map((f) => (
         <details key={f.path} className="card-flat pad-s">
           <summary style={{ cursor: "pointer", minHeight: 32, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <b className="mono" style={{ overflowWrap: "anywhere" }}>
               {revealHidden(f.path).text}
             </b>
-            {f.truncated ? <Chip tone="warn">Cortado</Chip> : null}
+            {f.truncated ? <Chip tone="warn">{t("fileTruncated")}</Chip> : null}
           </summary>
           <div style={{ paddingTop: 10 }}>
-            <RawText text={f.unified} label={`Diff de ${f.path}`} />
+            <RawText text={f.unified} label={t("aria", { path: f.path })} />
           </div>
         </details>
       ))}
@@ -353,14 +344,15 @@ function DiffSection({ scans }: { scans: Record<string, unknown> | null }) {
   );
 }
 
-const GROUPS: { id: string; title: string; match: (p: string) => boolean }[] = [
-  { id: "manifest", title: "Manifesto e etapas", match: (p) => p === "manifest.json" || p.startsWith("steps/") },
-  { id: "templates", title: "Templates", match: (p) => p.startsWith("templates/") },
-  { id: "evals", title: "Evals", match: (p) => p.startsWith("evals/") },
-  { id: "knowledge", title: "Conhecimento", match: (p) => p.startsWith("knowledge/") },
+const GROUPS: { id: string; match: (p: string) => boolean }[] = [
+  { id: "manifest", match: (p) => p === "manifest.json" || p.startsWith("steps/") },
+  { id: "templates", match: (p) => p.startsWith("templates/") },
+  { id: "evals", match: (p) => p.startsWith("evals/") },
+  { id: "knowledge", match: (p) => p.startsWith("knowledge/") },
 ];
 
 function Files({ id, files }: { id: string; files: AdminSubmissionDetail["files"] }) {
+  const t = useTranslations("admin.files");
   const [onlyChanged, setOnlyChanged] = useState(false);
   const counts = { added: 0, changed: 0, removed: 0, same: 0 };
   for (const f of files) counts[f.diff]++;
@@ -372,28 +364,28 @@ function Files({ id, files }: { id: string; files: AdminSubmissionDetail["files"
     return { ...g, list };
   });
   const others = shown.filter((f) => !used.has(f.path));
-  if (others.length) groups.push({ id: "others", title: "Outros arquivos", match: () => false, list: others });
+  if (others.length) groups.push({ id: "others", match: () => false, list: others });
 
   return (
     <Section
       id="rv-arquivos"
-      title="Arquivos e diferenças"
+      title={t("title")}
       aside={
         <button type="button" className={["chip", onlyChanged ? "on" : ""].join(" ")} style={{ minHeight: 44 }} aria-pressed={onlyChanged} onClick={() => setOnlyChanged((v) => !v)}>
-          Só o que mudou
+          {t("onlyChanged")}
         </button>
       }
     >
       <p className="small muted">
-        {counts.added} novos · {counts.changed} alterados · {counts.removed} removidos · {counts.same} iguais à versão publicada. Toque em um arquivo para ler o conteúdo como texto.
+        {t("summary", counts)}
       </p>
-      {files.length === 0 ? <p className="small muted">Nenhum arquivo.</p> : null}
+      {files.length === 0 ? <p className="small muted">{t("empty")}</p> : null}
       {groups
         .filter((g) => g.list.length)
         .map((g) => (
           <div key={g.id} className="col" style={gap(4)}>
             <h3 className="h4">
-              {g.title} <span className="tiny faint">({g.list.length})</span>
+              {t(`groups.${g.id}`)} <span className="tiny faint">({g.list.length})</span>
             </h3>
             <ul>
               {g.list.map((f) => (
@@ -407,9 +399,12 @@ function Files({ id, files }: { id: string; files: AdminSubmissionDetail["files"
 }
 
 function FileItem({ id, file }: { id: string; file: AdminSubmissionDetail["files"][number] }) {
+  const t = useTranslations("admin.files");
+  const errorText = useErrorText();
+  const f = useFormat();
   const { api } = useSession();
   const [open, setOpen] = useState(false);
-  const [content, setContent] = useState<{ kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; text: string } | null>(null);
+  const [content, setContent] = useState<{ kind: "loading" } | { kind: "error"; error: unknown } | { kind: "ok"; text: string } | null>(null);
   const panel = `file-${file.path.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
   async function toggle() {
@@ -421,7 +416,7 @@ function FileItem({ id, file }: { id: string; file: AdminSubmissionDetail["files
         const r = await api.adminGetSubmissionFile(id, file.path);
         setContent({ kind: "ok", text: r.content });
       } catch (e) {
-        setContent({ kind: "error", message: loadErrorText(e) });
+        setContent({ kind: "error", error: e });
         setOpen(true);
       }
     }
@@ -432,27 +427,30 @@ function FileItem({ id, file }: { id: string; file: AdminSubmissionDetail["files
       <button type="button" className={creator.fileBtn} aria-expanded={open} aria-controls={panel} onClick={() => void toggle()} disabled={file.diff === "removed"}>
         <Icon name={open ? "chevron-down" : "chevron-right"} size="s" />
         <span className={creator.fileName}>{revealHidden(file.path).text}</span>
-        <span className="tiny faint">{fileSizeText(file.size)}</span>
-        <Chip tone={DIFF_TONE[file.diff]}>{DIFF_LABEL[file.diff]}</Chip>
+        <span className="tiny faint">{f.fileSize(file.size)}</span>
+        <Chip tone={DIFF_TONE[file.diff]}>{t(`diffLabel.${file.diff}`)}</Chip>
       </button>
       <div id={panel} hidden={!open} style={{ padding: "6px 10px 12px" }}>
-        {open && content?.kind === "loading" ? <Loading text="Carregando o arquivo…" /> : null}
+        {open && content?.kind === "loading" ? <Loading text={t("loading")} /> : null}
         {open && content?.kind === "error" ? (
           <p className="small bad" role="alert">
-            {content.message}
+            {errorText(content.error)}
           </p>
         ) : null}
-        {open && content?.kind === "ok" ? <RawText text={content.text} label={`Conteúdo de ${file.path}`} /> : null}
+        {open && content?.kind === "ok" ? <RawText text={content.text} label={t("contentAria", { path: file.path })} /> : null}
       </div>
     </li>
   );
 }
 
 function Knowledge({ id, k }: { id: string; k: AdminSubmissionDetail["knowledge"] }) {
+  const t = useTranslations("admin.knowledge");
+  const errorText = useErrorText();
+  const f = useFormat();
   const { api } = useSession();
   const [q, setQ] = useState("");
-  const [res, setRes] = useState<{ kind: "idle" } | { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; items: { source: string; content: string; score: number }[] }>({ kind: "idle" });
-  const ingest = { queued: "Na fila", running: "Rodando", done: "Pronta", failed: "Falhou", none: "Sem conhecimento" }[k.ingest];
+  const [res, setRes] = useState<{ kind: "idle" } | { kind: "loading" } | { kind: "error"; error: unknown } | { kind: "ok"; items: { source: string; content: string; score: number }[] }>({ kind: "idle" });
+  const ingest = t(`ingestStatus.${k.ingest}`);
 
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -463,52 +461,52 @@ function Knowledge({ id, k }: { id: string; k: AdminSubmissionDetail["knowledge"
       const r = await api.adminSearchSubmissionKnowledge(id, text);
       setRes({ kind: "ok", items: r.hits });
     } catch (err) {
-      setRes({ kind: "error", message: loadErrorText(err) });
+      setRes({ kind: "error", error: err });
     }
   }
 
   return (
-    <Section id="rv-conhecimento" title="Conhecimento" aside={<Chip tone={k.ingest === "done" ? "ok" : k.ingest === "failed" ? "red" : "default"}>Ingestão: {ingest}</Chip>}>
+    <Section id="rv-conhecimento" title={t("title")} aside={<Chip tone={k.ingest === "done" ? "ok" : k.ingest === "failed" ? "red" : "default"}>{t("ingest", { status: ingest })}</Chip>}>
       <p className="small muted">
-        {k.files} {k.files === 1 ? "arquivo" : "arquivos"} · {k.chunks} trechos · {k.expiredChunks} {k.expiredChunks === 1 ? "trecho vencido" : "trechos vencidos"}.
+        {t("counts", { files: k.files, chunks: k.chunks, expired: k.expiredChunks })}
       </p>
       {k.expiredChunks > 0 ? (
         <Notice tone="warn" role="note">
-          Há trechos com validade vencida. Eles não deveriam sustentar o diferencial “Dado vivo”.
+          {t("expiredNotice")}
         </Notice>
       ) : null}
       <form className="col" style={gap(10)} onSubmit={search}>
         <label className="label" htmlFor="kb-q">
-          Busca de teste na base do pacote
+          {t("searchLabel")}
         </label>
         <div className="row m-col" style={gap(10)}>
-          <input id="kb-q" className="input" value={q} onChange={(e) => setQ(e.target.value)} maxLength={200} placeholder="Ex.: uma pergunta que um comprador faria" disabled={k.ingest === "none"} />
+          <input id="kb-q" className="input" value={q} onChange={(e) => setQ(e.target.value)} maxLength={200} placeholder={t("searchPlaceholder")} disabled={k.ingest === "none"} />
           <Button type="submit" variant="secondary" icon="search" loading={res.kind === "loading"} disabled={k.ingest === "none" || q.trim().length < 2}>
-            Buscar
+            {t("search")}
           </Button>
         </div>
       </form>
       {res.kind === "error" ? (
         <p className="small bad" role="alert">
-          {res.message}
+          {errorText(res.error)}
         </p>
       ) : null}
       {res.kind === "ok" ? (
         res.items.length === 0 ? (
           <p className="small muted" role="status">
-            Nada encontrado para essa busca.
+            {t("noHits")}
           </p>
         ) : (
-          <ul className="col" style={gap(12)} aria-label="Resultados da busca">
+          <ul className="col" style={gap(12)} aria-label={t("resultsAria")}>
             {res.items.map((it, i) => (
               <li key={i} className="col" style={gap(6)}>
                 <span className="tiny faint">
                   <span className="mono" style={{ overflowWrap: "anywhere" }}>
                     {revealHidden(it.source).text}
                   </span>{" "}
-                  · relevância {it.score.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                  · {t("relevance", { score: f.num(it.score, 0, 2) })}
                 </span>
-                <RawText text={it.content} label={`Trecho ${i + 1} de ${it.source}`} />
+                <RawText text={it.content} label={t("hitAria", { n: i + 1, source: it.source })} />
               </li>
             ))}
           </ul>
@@ -521,6 +519,9 @@ function Knowledge({ id, k }: { id: string; k: AdminSubmissionDetail["knowledge"
 type Pending = "approve" | "request_changes" | "reject" | "revoke" | "finish" | null;
 
 function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promise<void> }) {
+  const t = useTranslations("admin.decision");
+  const tStatus = useTranslations("admin.status");
+  const errorText = useErrorText();
   const { api } = useSession();
   const toast = useToast();
   const sub = d.submission;
@@ -537,7 +538,7 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
   const canFinish = sub.status === "awaiting_onchain_approval" || sub.status === "publishing" || sub.status === "publish_failed";
   const complete = reviewChecklistComplete(checklist);
   const notesOk = notes.trim().length >= 3;
-  const noteError = touched && !notesOk ? "Escreva o motivo (pelo menos 3 caracteres). O criador lê este texto." : null;
+  const noteError = touched && !notesOk ? t("notesError") : null;
 
   async function run(action: Exclude<Pending, null>) {
     setBusy(true);
@@ -548,19 +549,40 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
       else if (action === "request_changes") await api.adminRequestChanges(sub.id, input);
       else if (action === "reject") await api.adminRejectSubmission(sub.id, input);
       else if (action === "revoke") await api.adminRevokeSubmission(sub.id, input);
-      else await api.adminFinishSubmission(sub.id);
+      else {
+        // O servidor responde 200 mesmo quando nada foi publicado (`not_ready`, `busy`, `failed`): o resultado é que diz.
+        const r = await api.adminFinishSubmission(sub.id);
+        if (r.outcome !== "published" && r.outcome !== "already_published") {
+          setConfirm(null);
+          toast({
+            tone: r.outcome === "failed" ? "bad" : "warn",
+            title: t("toast.notPublishedTitle"),
+            text:
+              r.outcome === "busy"
+                ? t("toast.busy")
+                : r.outcome === "failed"
+                  ? t("toast.failed", { error: r.error ?? t("toast.internalError") })
+                  : r.step === "await-admin-approval"
+                    ? t("toast.awaitAdmin", { slug: sub.slug })
+                    : t("toast.missingStep", { step: r.step ?? t("toast.missingChain") }),
+            durationMs: 12000,
+          });
+          await reload();
+          return;
+        }
+      }
       setConfirm(null);
       toast({
         tone: "ok",
-        title: { approve: "Aprovado", request_changes: "Mudanças pedidas", reject: "Envio recusado", revoke: "Aprovação revogada", finish: "Publicação concluída" }[action],
-        text: action === "approve" ? "O criador já pode confirmar com a conta dele. Nada foi assinado na cadeia." : undefined,
+        title: { approve: t("toast.approved"), request_changes: t("toast.changesRequested"), reject: t("toast.rejected"), revoke: t("toast.revoked"), finish: t("toast.finished") }[action],
+        text: action === "approve" ? t("toast.approvedText") : undefined,
       });
       setNotes("");
       setTouched(false);
       await reload();
     } catch (e) {
       setConfirm(null);
-      setError(e instanceof ApiError ? `${e.message}${e.code && e.code !== "error" ? ` (${e.code})` : ""}` : (e as Error).message);
+      setError(e instanceof ApiError ? `${errorText(e)}${e.code && e.code !== "error" ? ` (${e.code})` : ""}` : errorText(e));
     } finally {
       setBusy(false);
     }
@@ -577,31 +599,31 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
 
   return (
     <div className="card pad col" style={gap(16)}>
-      <h2 className="h3">Decisão</h2>
+      <h2 className="h3">{t("title")}</h2>
 
       {!inReview && !canReject && !canRevoke && !canFinish ? (
         <Notice tone="info" role="note">
-          Este envio está em “{statusInfo(sub.status).label}”. Não há decisão para tomar agora.
+          {t("noDecision", { status: tStatus(`${sub.status}`) })}
         </Notice>
       ) : null}
 
       {inReview || canReject || canRevoke ? (
         <>
-          <div className="col" style={gap(8)} role="group" aria-label="Checklist da revisão">
-            <span className="label">Checklist</span>
+          <div className="col" style={gap(8)} role="group" aria-label={t("checklistAria")}>
+            <span className="label">{t("checklist")}</span>
             {REVIEW_CHECKLIST_KEYS.map((k) => (
               <button key={k} type="button" role="checkbox" aria-checked={!!checklist[k]} className={creator.checkRow} onClick={() => setChecklist((c) => ({ ...c, [k]: !c[k] }))}>
                 <span className={["check", checklist[k] ? "on" : ""].join(" ")} aria-hidden>
                   {checklist[k] ? <Icon name="check" size="s" /> : null}
                 </span>
-                <span className="small grow">{CHECKLIST_LABEL[k]}</span>
+                <span className="small grow">{t(`checklistItems.${k}`)}</span>
               </button>
             ))}
-            {inReview && !complete ? <span className="hint">Aprovar exige o checklist inteiro marcado.</span> : null}
+            {inReview && !complete ? <span className="hint">{t("checklistRequired")}</span> : null}
           </div>
           <div className="field">
             <label className="label" htmlFor="rv-notes">
-              Nota para o criador
+              {t("notesLabel")}
             </label>
             <textarea id="rv-notes" className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000} aria-invalid={!!noteError} aria-describedby="rv-notes-hint" />
             {noteError ? (
@@ -610,7 +632,7 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
               </span>
             ) : (
               <span className="hint" id="rv-notes-hint">
-                Obrigatória em toda decisão. Guardada como parte do registro, que não pode ser apagado.
+                {t("notesHint")}
               </span>
             )}
           </div>
@@ -618,7 +640,7 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
       ) : null}
 
       {error ? (
-        <Notice tone="bad" role="alert" title="Não deu para registrar a decisão">
+        <Notice tone="bad" role="alert" title={t("errorTitle")}>
           {error}
         </Notice>
       ) : null}
@@ -627,62 +649,62 @@ function Decision({ d, reload }: { d: AdminSubmissionDetail; reload: () => Promi
         {inReview ? (
           <>
             <Button size="lg" block variant="ok" icon="check-circle" onClick={() => ask("approve")} disabled={!complete}>
-              Aprovar
+              {t("approve")}
             </Button>
             <Button block variant="secondary" icon="message" onClick={() => ask("request_changes")}>
-              Pedir mudanças
+              {t("requestChanges")}
             </Button>
           </>
         ) : null}
         {canReject ? (
           <Button block variant="danger" icon="x" onClick={() => ask("reject")}>
-            Recusar
+            {t("reject")}
           </Button>
         ) : null}
         {canRevoke ? (
           <>
-            <p className="small muted">O criador ainda não assinou: revogar volta o envio para “mudanças pedidas” (a nota é obrigatória) e libera a correção na mesma versão.</p>
+            <p className="small muted">{t("revokeHelp")}</p>
             <Button block variant="danger" icon="x" onClick={() => ask("revoke")}>
-              Revogar aprovação
+              {t("revoke")}
             </Button>
           </>
         ) : null}
         {canFinish ? (
           <>
-            <p className="small muted">Use só se o evento de aprovação na cadeia não chegou sozinho: conclui o catálogo e coloca o especialista no ar.</p>
+            <p className="small muted">{t.rich("finishHelp", { code: (chunks) => <code>{chunks}</code> })}</p>
             <Button size="lg" block icon="check" onClick={() => ask("finish")}>
-              Concluir publicação
+              {t("finish")}
             </Button>
           </>
         ) : null}
       </div>
-      {inReview ? <p className="tiny faint">Aprovar no site não assina nada na cadeia: libera o criador para confirmar. A aprovação final, em especialista novo, é feita à parte com a carteira fria.</p> : null}
+      {inReview ? <p className="tiny faint">{t("approveHelp")}</p> : null}
 
       {confirm ? <ConfirmDialog action={confirm} busy={busy} onCancel={() => setConfirm(null)} onConfirm={() => void run(confirm)} /> : null}
     </div>
   );
 }
 
-const CONFIRM: Record<Exclude<Pending, null>, { title: string; text: string; label: string; variant: "ok" | "danger" | "primary" | "secondary" }> = {
-  approve: { title: "Aprovar este envio?", text: "A versão aprovada (conteúdo, preço e versão) fica gravada e o criador passa a poder confirmar o cadastro. Depois disso, o conteúdo não pode mais ser trocado.", label: "Aprovar", variant: "ok" },
-  request_changes: { title: "Pedir mudanças?", text: "O criador recebe a sua nota e envia o pacote corrigido na mesma versão.", label: "Pedir mudanças", variant: "primary" },
-  reject: { title: "Recusar este envio?", text: "A recusa é definitiva para este envio: o criador vê a sua nota e só pode mandar um pacote novo.", label: "Recusar", variant: "danger" },
-  revoke: { title: "Revogar a aprovação?", text: "O criador ainda não assinou: o envio volta para “mudanças pedidas” com a sua nota, e a versão aprovada deixa de valer.", label: "Revogar", variant: "danger" },
-  finish: { title: "Concluir a publicação?", text: "O especialista entra na vitrine agora. Confira se a aprovação na cadeia já aconteceu.", label: "Concluir", variant: "primary" },
+const CONFIRM_VARIANT: Record<Exclude<Pending, null>, "ok" | "danger" | "primary" | "secondary"> = {
+  approve: "ok",
+  request_changes: "primary",
+  reject: "danger",
+  revoke: "danger",
+  finish: "primary",
 };
 
 function ConfirmDialog({ action, busy, onCancel, onConfirm }: { action: Exclude<Pending, null>; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const c = CONFIRM[action];
+  const t = useTranslations("admin.decision");
   return (
-    <Dialog title={c.title} onClose={onCancel} locked={busy}>
+    <Dialog title={t(`confirm.${action}.title`)} onClose={onCancel} locked={busy}>
       <div className="col" style={gap(16)}>
-        <p className="muted">{c.text}</p>
+        <p className="muted">{t(`confirm.${action}.text`)}</p>
         <div className="row wrapx" style={gap(10)}>
-          <Button variant={c.variant} loading={busy} onClick={onConfirm}>
-            {c.label}
+          <Button variant={CONFIRM_VARIANT[action]} loading={busy} onClick={onConfirm}>
+            {t(`confirm.${action}.label`)}
           </Button>
           <Button variant="ghost" disabled={busy} onClick={onCancel}>
-            Voltar
+            {t("back")}
           </Button>
         </div>
       </div>

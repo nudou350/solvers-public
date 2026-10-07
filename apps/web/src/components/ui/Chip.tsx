@@ -1,5 +1,6 @@
+import { useTranslations } from "next-intl";
 import type { CSSProperties, ReactNode } from "react";
-import { repCls, repLevel } from "@/lib/format";
+import { repCls, useFormat } from "@/lib/format";
 import { Icon, type IconName } from "./Icon";
 
 export type ChipTone = "default" | "ok" | "brand" | "warn" | "red" | "plain";
@@ -15,13 +16,15 @@ export function Chip({ tone = "default", icon, children, className }: { tone?: C
 }
 
 /**
- * Selo de reputação (0..100) com o nível do design: Referência, Confiável, Em crescimento...
- * `children` troca o texto (ex: "Criador confiável"); o tom e o ícone seguem o nível.
+ * Selo de reputação (0..100) com o nível do design: Reference, Trusted, Growing...
+ * `children` troca o texto (ex: "Trusted creator"); o tom e o ícone seguem o nível.
  */
 export function RepBadge({ score, showScore = false, children, style }: { score: number; showScore?: boolean; children?: ReactNode; style?: CSSProperties }) {
-  const lv = repLevel(score);
+  const f = useFormat();
+  const t = useTranslations("common.ui");
+  const lv = f.repLevel(score);
   return (
-    <span className={repCls(score)} title={`Reputação ${Math.round(score)}/100`} style={style}>
+    <span className={repCls(score)} title={t("reputationTitle", { score: Math.round(score) })} style={style}>
       <Icon name={lv.tone === "warn" ? "warning" : "shield-check"} size="s" />
       {children ?? <span>{lv.label}</span>}
       {showScore ? <span className="num">· {Math.round(score)}</span> : null}
@@ -29,12 +32,13 @@ export function RepBadge({ score, showScore = false, children, style }: { score:
   );
 }
 
-/** "Compra verificada" (ou outro texto) em verde. */
-export function Verified({ children = "Compra verificada" }: { children?: ReactNode }) {
+/** "Verified purchase" (ou outro texto) em verde. */
+export function Verified({ children }: { children?: ReactNode }) {
+  const t = useTranslations("common.ui");
   return (
     <span className="verified">
       <Icon name="check-circle" size="s" />
-      {children}
+      {children ?? t("verifiedPurchase")}
     </span>
   );
 }

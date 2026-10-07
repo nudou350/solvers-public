@@ -2,12 +2,13 @@
 // Cobrança Pix da demo: QR (ou QR de mentira no modo simulado), copia e cola, valor, expiração
 // e consulta a cada 3 s até o USDC de teste ser creditado. O status do servidor decide; o relógio local só avisa.
 import type { PixCharge } from "@solvers/api-client";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/Spinner";
 import { Notice } from "@/components/ui/Toast";
-import { brlValue, copyText, usdc } from "@/lib/format";
+import { copyText, useFormat } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { gap } from "@/lib/style";
@@ -47,6 +48,8 @@ export function PixPanel({
   onRestart: () => void;
 }) {
   const { api, config, me, login, loggingIn } = useSession();
+  const t = useTranslations("checkout.pix");
+  const f = useFormat();
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
   const [simulating, setSimulating] = useState(false);
@@ -72,8 +75,8 @@ export function PixPanel({
   const [slowCredit, setSlowCredit] = useState(false);
   useEffect(() => {
     if (!approved) return setSlowCredit(false);
-    const t = setTimeout(() => setSlowCredit(true), SLOW_CREDIT_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setSlowCredit(true), SLOW_CREDIT_MS);
+    return () => clearTimeout(timer);
   }, [approved]);
   const polling = (pending || approved) && sessionOk && !gone && !lapsed;
 
@@ -96,18 +99,18 @@ export function PixPanel({
         else if (!(e instanceof ApiError && e.status === 401) && ++failures.current >= 3) setOffline(true);
       }
     };
-    const t = setInterval(check, slowCredit ? SLOW_POLL_MS : POLL_MS);
+    const timer = setInterval(check, slowCredit ? SLOW_POLL_MS : POLL_MS);
     if (due) void check(); // o prazo acabou agora: uma consulta imediata antes de dar o Pix como vencido
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [api, charge.id, polling, due, ownerWallet, slowCredit]);
 
   useEffect(() => {
     if (!pending || lapsed) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, [pending, lapsed]);
 
   // Só aceita base64 puro no QR (vai para um data: URL).
@@ -122,7 +125,7 @@ export function PixPanel({
       onUpdate(c);
       if (c.status === "credited") onCredited(c);
     } catch (e) {
-      setError(txErrorMessage(e));
+      setError(txErrorMessage(e, f.locale));
     } finally {
       setSimulating(false);
     }
@@ -137,21 +140,21 @@ export function PixPanel({
 
   if (charge.status === "credited")
     return (
-      <Notice tone="ok" title="Pix recebido">
-        {usdc(charge.amountUsdc)} de teste chegaram na sua carteira. Concluindo a compra…
+      <Notice tone="ok" title={t("received.title")}>
+        {t("received.text", { amount: f.usdc(charge.amountUsdc) })}
       </Notice>
     );
 
   const restart = (
     <Button variant="secondary" size="sm" icon="refresh" onClick={onRestart}>
-      Gerar outro Pix
+      {t("restart")}
     </Button>
   );
 
   if (gone)
     return (
-      <Notice tone="warn" role="alert" title="Não encontramos este Pix nesta conta" actions={restart}>
-        Ele pode ter sido gerado por outra conta. Se você já pagou, o valor entra na conta que gerou o Pix. Gere um novo código para continuar aqui.
+      <Notice tone="warn" role="alert" title={t("gone.title")} actions={restart}>
+        {t("gone.text")}
       </Notice>
     );
 
@@ -160,17 +163,17 @@ export function PixPanel({
       <Notice
         tone="warn"
         role="alert"
-        title="Sua sessão terminou"
+        title={t("sessionEnded.title")}
         actions={
           <>
             <Button size="sm" loading={loggingIn} onClick={() => void login().catch(() => {})}>
-              Entrar de novo
+              {t("sessionEnded.login")}
             </Button>
             {restart}
           </>
         }
       >
-        Entre na mesma conta para continuar acompanhando este Pix. Se você já pagou, o saldo entra na conta quando o pagamento for confirmado.
+        {t("sessionEnded.text")}
       </Notice>
     );
 
@@ -179,14 +182,14 @@ export function PixPanel({
     return (
       <Notice
         tone="info"
-        title="Seu pagamento foi recebido"
+        title={t("slowCredit.title")}
         actions={
           <Button variant="secondary" size="sm" onClick={onRestart}>
-            Sair desta tela
+            {t("slowCredit.leave")}
           </Button>
         }
       >
-        O saldo pode demorar um pouco mais; você pode fechar esta tela, ele entra sozinho.
+        {t("slowCredit.text")}
       </Notice>
     );
   if (approved)
@@ -194,9 +197,9 @@ export function PixPanel({
       <div className={s.status} role="status" aria-live="polite">
         <Spinner size="s" />
         <span className="small">
-          <b>Pagamento recebido, creditando saldo…</b>
-          <span className="muted"> Não precisa pagar de novo. A compra continua sozinha.</span>
-          {offline ? <span className="muted"> Não conseguimos confirmar agora; tentando de novo.</span> : null}
+          <b>{t("crediting.title")}</b>
+          <span className="muted">{t("crediting.text")}</span>
+          {offline ? <span className="muted"> {t("offline")}</span> : null}
         </span>
       </div>
     );
@@ -205,19 +208,19 @@ export function PixPanel({
     return (
       <Notice
         tone="warn"
-        title={charge.status === "failed" ? "O Pix não foi aprovado" : "Este Pix expirou"}
+        title={charge.status === "failed" ? t("failed") : t("expired")}
         actions={restart}
       >
-        Nada foi cobrado. Gere um novo código para continuar.
+        {t("nothingCharged")}
       </Notice>
     );
 
   // O prazo acabou no relógio, mas o servidor ainda não deu o Pix como vencido: sem afirmar que nada foi cobrado.
   if (due)
     return (
-      <Notice tone="warn" title="O prazo deste Pix terminou" actions={restart}>
-        Se você já pagou, o saldo entra em instantes e a compra continua aqui. Se ainda não pagou, gere um novo código.
-        {offline ? " Não conseguimos confirmar agora; tentando de novo." : ""}
+      <Notice tone="warn" title={t("due.title")} actions={restart}>
+        {t("due.text")}
+        {offline ? ` ${t("offline")}` : ""}
       </Notice>
     );
 
@@ -229,31 +232,31 @@ export function PixPanel({
         <div className={s.qrBox}>
           {qrPng ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`data:image/png;base64,${qrPng}`} alt="QR Code do Pix" />
+            <img src={`data:image/png;base64,${qrPng}`} alt={t("qrAlt")} />
           ) : (
             <>
               <FakeQr text={charge.qrCode ?? charge.id} />
               <span className={s.stamp} aria-hidden>
-                TESTE
+                {t("stamp")}
               </span>
             </>
           )}
         </div>
         <div className="col" style={gap(14)}>
           <div className="col" style={gap(2)}>
-            <span className="muted small">Valor do Pix</span>
+            <span className="muted small">{t("amountLabel")}</span>
             <span className="display num" style={{ fontSize: 40, lineHeight: 1.05 }}>
-              {brlValue(charge.amountBrl)}
+              {f.brlValue(charge.amountBrl)}
             </span>
-            <span className="small muted num">Você recebe {usdc(charge.amountUsdc)} de teste na sua carteira</span>
+            <span className="small muted num">{t("youReceive", { amount: f.usdc(charge.amountUsdc) })}</span>
           </div>
-          {partial ? <p className="small muted">O seu saldo já cobre uma parte: o Pix completa só o que falta.</p> : null}
+          {partial ? <p className="small muted">{t("partial")}</p> : null}
           <div className={s.status} role="status" aria-live="polite">
             <Spinner size="s" />
             <span className="small">
-              Aguardando o pagamento
-              <span className="muted"> · expira em {mmss(left)}</span>
-              {offline ? <span className="muted"> · Não conseguimos confirmar agora; tentando de novo.</span> : null}
+              {t("waiting")}
+              <span className="muted">{t("expiresIn", { time: mmss(left) })}</span>
+              {offline ? <span className="muted"> · {t("offline")}</span> : null}
             </span>
           </div>
         </div>
@@ -262,12 +265,12 @@ export function PixPanel({
       {charge.qrCode ? (
         <div className="field">
           <label className="label" htmlFor="pix-copia-cola">
-            Pix copia e cola
+            {t("copyLabel")}
           </label>
           <div className="row m-col" style={gap(10)}>
             <input id="pix-copia-cola" className="input mono" readOnly value={charge.qrCode} style={{ flex: 1, minWidth: 0 }} onFocus={(e) => e.currentTarget.select()} />
             <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>
-              {copied ? "Copiado" : "Copiar código"}
+              {copied ? t("copied") : t("copy")}
             </Button>
           </div>
         </div>
@@ -275,10 +278,10 @@ export function PixPanel({
 
       {charge.simulated ? (
         <p className="tiny faint">
-          <Icon name="info" size="s" /> Cobrança de teste: este código não pode ser pago num banco. Use o botão abaixo para simular o pagamento.
+          <Icon name="info" size="s" /> {t("simulatedNote")}
         </p>
       ) : (
-        <p className="tiny faint">Abra o app do seu banco, escolha Pix e leia o QR Code ou cole o código. A confirmação aparece aqui sozinha.</p>
+        <p className="tiny faint">{t("realNote")}</p>
       )}
 
       {error ? <Notice tone="bad" role="alert" title={error.title}>{error.text}</Notice> : null}
@@ -286,16 +289,16 @@ export function PixPanel({
       <div className="row wrapx" style={gap(10)}>
         {config?.pix.simulate ? (
           <Button variant="primary" icon="bolt" loading={simulating} onClick={simulate}>
-            Simular pagamento (teste)
+            {t("simulate")}
           </Button>
         ) : null}
         {charge.ticketUrl ? (
           <Button variant="ghost" href={charge.ticketUrl} iconRight="external">
-            Abrir o Pix no Mercado Pago
+            {t("openMp")}
           </Button>
         ) : null}
         <button type="button" className="link-btn small" onClick={onRestart}>
-          Cancelar e escolher outra forma
+          {t("cancel")}
         </button>
       </div>
     </div>

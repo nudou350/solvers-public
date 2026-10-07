@@ -1,6 +1,7 @@
 // Reduz a foto no navegador antes do envio: o nginx de produção aceita corpo de até 2 MB, e uma foto de celular
 // passa disso fácil. Redimensiona (lado maior 1600 px, sem ampliar) e exporta WebP; sem WebP no navegador, JPEG.
 // O servidor reencoda de qualquer forma, então aqui o objetivo é só caber no limite e poupar a rede.
+import { localText } from "./local-text";
 
 const MAX_SIDE = 1600;
 /** Abaixo do limite de 2 MB do nginx, com folga para o cabeçalho. */
@@ -8,7 +9,7 @@ const MAX_BYTES = Math.floor(1.8 * 1024 * 1024);
 const QUALITIES = [0.85, 0.75, 0.65, 0.55];
 const SIDES = [MAX_SIDE, 1280, 1024, 800];
 
-/** Erro com mensagem pronta para mostrar à pessoa. */
+/** Erro com mensagem pronta para mostrar à pessoa (já no idioma da página). */
 export class ImageCompressError extends Error {}
 
 function encode(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
@@ -23,7 +24,7 @@ async function decode(file: Blob): Promise<ImageBitmap> {
     try {
       return await createImageBitmap(file);
     } catch {
-      throw new ImageCompressError("Não deu para ler esta imagem. Tente outra foto em JPG, PNG ou WebP.");
+      throw new ImageCompressError(localText("image.unreadable"));
     }
   }
 }
@@ -37,7 +38,7 @@ export async function compressImage(file: Blob): Promise<Blob> {
   try {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new ImageCompressError("Seu navegador não conseguiu preparar a imagem. Tente outro navegador.");
+    if (!ctx) throw new ImageCompressError(localText("image.noCanvas"));
     // Navegador sem codificador WebP devolve PNG: nesse caso usa JPEG (com fundo branco no lugar da transparência).
     let type = "image/webp";
     for (const side of SIDES) {
@@ -63,7 +64,7 @@ export async function compressImage(file: Blob): Promise<Blob> {
         if (blob && blob.size <= MAX_BYTES) return blob;
       }
     }
-    throw new ImageCompressError("Esta imagem ficou grande demais mesmo reduzida. Tente uma foto menor ou com menos detalhes.");
+    throw new ImageCompressError(localText("image.tooLarge"));
   } finally {
     bitmap.close();
   }
