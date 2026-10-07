@@ -6,7 +6,7 @@
   "tagline": "Turn what you know into a complete, valid Solver, step by step",
   "description": "The platform's free Solver that guides anyone to build an excellent Solver package with their own AI (Claude Code, Claude or ChatGPT). In 7 steps it helps you define the promise and the audience, choose the differentiators, write the process with checklists, organize knowledge with source and date, plan the first-use calibration and build the test cases. Along the way it queries the server validator, which points out each error and how to fix it, and at the end it hands you the ZIP ready to publish through the site, where a team member reviews it within 5 business days. It does not write your knowledge for you, does not promise a rating or approval, and does not accept Finance, Legal or health packages in this phase.",
   "category": "Outros",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "platform": true,
   "usesMemory": true,
   "creator": {
@@ -304,6 +304,7 @@
     }
   ],
   "versions": [
+    { "version": "1.1.0", "releasedAt": "2026-10-07T05:00:00Z", "notes": "English becomes the primary language: method, knowledge base and templates were translated, and the Portuguese storefront text moved to locales/pt.json. The AI still answers in the user's language." },
     {
       "version": "1.0.0",
       "releasedAt": "2026-10-02T12:00:00Z",
