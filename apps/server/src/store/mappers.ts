@@ -1,9 +1,10 @@
-import type { Agent, Creator, Escrow, ImageRef, License, Milestone, Review, UserReputation } from "@solvers/shared";
+import type { Agent, CatalogLang, Creator, Escrow, ImageRef, License, Milestone, Review, UserReputation } from "@solvers/shared";
 import {
   averageRating,
   bpsToScore,
   creatorReputationScore,
   guaranteeLevel,
+  overlayCatalogTexts,
   reputationScore,
   unitsToUsdc,
 } from "@solvers/shared";
@@ -45,13 +46,19 @@ export function hasTrial(agentId: string): boolean {
   return !!pkg && trialLimits(pkg.manifest) !== null;
 }
 
-export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
+/** `lang` pt sobrepõe os textos de catálogo traduzidos (`agents.translations`); en (padrão) é o do manifest. */
+export function toAgent(row: AgentRow, extras: AgentExtras, lang: CatalogLang = "en"): Agent {
+  const texts = overlayCatalogTexts(
+    { name: row.name, tagline: row.tagline, description: row.description, packageContents: row.packageContents, requirements: row.requirements },
+    row.translations,
+    lang,
+  );
   return {
     id: row.id,
     slug: row.slug,
-    name: row.name,
-    tagline: row.tagline,
-    description: row.description,
+    name: texts.name,
+    tagline: texts.tagline,
+    description: texts.description,
     category: row.category,
     creatorId: row.creatorId,
     version: row.version,
@@ -63,8 +70,8 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
     reviewsCount: row.ratingCount,
     verifiedUses: Number(row.verifiedUses),
     evalScore: bpsToScore(row.evalScoreBps),
-    requirements: row.requirements,
-    packageContents: row.packageContents,
+    requirements: texts.requirements,
+    packageContents: texts.packageContents,
     guaranteeAvailable: guaranteeOffered(row),
     resaleFloorUsdc: extras.resaleFloor == null ? null : unitsToUsdc(extras.resaleFloor),
     royaltyBps: row.royaltyBps,
@@ -81,12 +88,13 @@ export function toAgent(row: AgentRow, extras: AgentExtras): Agent {
 
 export type CreatorStats = { totalSales: number; avgRating: number; disputesLost: number; agentsPublished: number };
 
-export function toCreator(row: CreatorRow, stats: CreatorStats): Creator {
+/** `bio`: a bio já no idioma pedido (catalog.ts escolhe a traduzida); sem ela vale a do cadastro. */
+export function toCreator(row: CreatorRow, stats: CreatorStats, bio: string = row.bio): Creator {
   return {
     id: row.id,
     name: row.name,
     avatarUrl: row.avatarUrl,
-    bio: row.bio,
+    bio,
     reputationScore: creatorReputationScore(stats.totalSales, stats.avgRating, stats.disputesLost),
     disputesLost: stats.disputesLost,
     agentsPublished: stats.agentsPublished,

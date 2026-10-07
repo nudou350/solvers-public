@@ -6,3 +6,4 @@ export * from "./supply.js";
 export * from "./submissions.js";
 export * from "./publication.js";
 export * from "./cloak.js";
+export * from "./locales.js";

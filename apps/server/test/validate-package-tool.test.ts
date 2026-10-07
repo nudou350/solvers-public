@@ -50,17 +50,17 @@ const manifest = (over: Record<string, unknown> = {}) => ({
 const input = (over: Record<string, unknown> = {}) => ({ manifest: manifest(), steps: [{ file: "steps/01-receitas.md", content: STEP }], ...over });
 
 describe("validatePackageTool: entrada boa", () => {
-  it("manifesto e etapa válidos: ok, sem erros, summary em português e stats", () => {
+  it("manifesto e etapa válidos: ok, sem erros, summary em inglês e stats", () => {
     const out = validatePackageTool(input());
     assert.deepEqual(out.errors, []);
     assert.equal(out.ok, true);
     assert.equal(out.stats.steps, 1);
     assert.equal(out.stats.specVersion, 1);
-    assert.match(out.summary, /Manifesto e etapas sem erros/);
-    assert.match(out.summary, /validação completa/);
+    assert.match(out.summary, /Manifest and steps have no errors/);
+    assert.match(out.summary, /full validation/);
     // Sem conhecimento nem evals na entrada: o resumo avisa que não foram conferidos (e não reclama de falta de casos).
-    assert.match(out.summary, /conhecimento não foi enviado/);
-    assert.match(out.summary, /casos de eval não foram enviados/);
+    assert.match(out.summary, /knowledge base was not sent/);
+    assert.match(out.summary, /eval cases were not sent/);
     assert.ok(!out.warnings.some((w) => w.code === "EVAL_TOO_FEW_CASES"));
   });
 
@@ -107,9 +107,9 @@ describe("validatePackageTool: erros com code, path, message e fix", () => {
 
   it("o summary lista os erros, manifesto primeiro, com o que corrigir", () => {
     const out = validatePackageTool(input({ manifest: manifest({ terms: undefined }), steps: [{ file: "steps/01-receitas.md", content: "curto" }] }));
-    assert.match(out.summary, /erros? para corrigir\. Comece por:/);
+    assert.match(out.summary, /errors? to fix\. Start with:/);
     assert.match(out.summary, /1\) TERMS_MISSING/);
-    assert.match(out.summary, /Corrija:/);
+    assert.match(out.summary, /Fix:/);
     const first = out.summary.split("\n")[1]!;
     assert.match(first, /^1\) /);
   });
@@ -127,7 +127,7 @@ describe("validatePackageTool: arquivos, conhecimento, templates e evals", () =>
     const ok = validatePackageTool(input({ knowledge: [{ path: "knowledge/limite.md", head: knowledge }] }));
     assert.deepEqual(ok.errors, []);
     assert.equal(ok.stats.knowledgeFiles, 1);
-    assert.doesNotMatch(ok.summary, /conhecimento não foi enviado/);
+    assert.doesNotMatch(ok.summary, /knowledge base was not sent/);
     const bad = validatePackageTool(input({ knowledge: [{ path: "knowledge/limite.md", head: "# Sem fonte\n\ntexto" }] }));
     assert.ok(bad.errors.some((e) => e.code === "KNOWLEDGE_SOURCE_MISSING"));
   });
@@ -154,10 +154,10 @@ describe("validatePackageTool: arquivos, conhecimento, templates e evals", () =>
   it("eval ou conhecimento sem a pasta no caminho: o resumo avisa que não contam (e com o caminho certo, não avisa)", () => {
     const caseJson = JSON.stringify({ id: "a", input: "pedido", checks: [{ type: "contains", value: "x", description: "d" }] });
     const short = validatePackageTool(input({ evals: [{ path: "a.json", content: caseJson }], knowledge: [{ path: "tema.md", head: knowledge }] }));
-    assert.match(short.summary, /evals\/cases\/NN-nome\.json/);
-    assert.match(short.summary, /knowledge\/nome\.md/);
+    assert.match(short.summary, /evals\/cases\/NN-name\.json/);
+    assert.match(short.summary, /knowledge\/name\.md/);
     const full = validatePackageTool(input({ evals: [{ path: "evals/cases/a.json", content: caseJson }], knowledge: [{ path: "knowledge/tema.md", head: knowledge }] }));
-    assert.doesNotMatch(full.summary, /caminho completo/);
+    assert.doesNotMatch(full.summary, /full path/);
   });
 
   it("tipo de arquivo fora do Núcleo na lista de arquivos: FILE_TYPE_NOT_ALLOWED", () => {
@@ -173,7 +173,7 @@ describe("validatePackageTool: entrada inválida", () => {
     assert.throws(() => validatePackageTool({ steps: [] }), z.ZodError);
     assert.throws(
       () => validatePackageTool(input({ steps: [{ file: "steps/01-receitas.md", content: STEP }], templates: [{ path: "steps/01-receitas.md", content: "x" }] })),
-      (e: unknown) => (e as { status?: number }).status === 400 && /mais de uma vez/.test((e as Error).message),
+      (e: unknown) => (e as { status?: number }).status === 400 && /more than once/.test((e as Error).message),
     );
   });
 
@@ -204,14 +204,14 @@ describe("summarize", () => {
   const e = (code: string) => ({ code: code as never, path: "p", message: "m", fix: "f" });
   it("mostra no máximo 5 e diz quantos restam", () => {
     const s = summarize(Array.from({ length: 8 }, () => e("STEP_SECTION_MISSING")), []);
-    assert.match(s, /8 erros para corrigir/);
+    assert.match(s, /8 errors to fix/);
     assert.match(s, /5\) /);
     assert.doesNotMatch(s, /6\) /);
-    assert.match(s, /restam 3/);
+    assert.match(s, /3 left/);
   });
   it("sem erros e com avisos, conta os avisos", () => {
-    assert.match(summarize([], [e("TEXT_HIDDEN_CHARS"), e("TEXT_HIDDEN_CHARS")]), /Há 2 avisos/);
-    assert.match(summarize([], [e("TEXT_HIDDEN_CHARS")]), /Há 1 aviso /);
+    assert.match(summarize([], [e("TEXT_HIDDEN_CHARS"), e("TEXT_HIDDEN_CHARS")]), /There are 2 warnings/);
+    assert.match(summarize([], [e("TEXT_HIDDEN_CHARS")]), /There is 1 warning /);
   });
 });
 
@@ -247,10 +247,10 @@ describe("runServerTool: builtin:validate-package só roda em pacote da platafor
   });
 
   it("pacote de criador com o mesmo runner é recusado", async () => {
-    await assert.rejects(runServerTool(pkg("published"), "validate_package", input()), (e: unknown) => (e as { status?: number }).status === 400 && /indisponível/.test((e as Error).message));
+    await assert.rejects(runServerTool(pkg("published"), "validate_package", input()), (e: unknown) => (e as { status?: number }).status === 400 && /not available/.test((e as Error).message));
   });
 
   it("entrada inválida vira 400 com o motivo (não 500)", async () => {
-    await assert.rejects(runServerTool(pkg("agents"), "validate_package", { steps: [] }), (e: unknown) => (e as { status?: number }).status === 400 && /Entrada inválida/.test((e as Error).message));
+    await assert.rejects(runServerTool(pkg("agents"), "validate_package", { steps: [] }), (e: unknown) => (e as { status?: number }).status === 400 && /Invalid input/.test((e as Error).message));
   });
 });

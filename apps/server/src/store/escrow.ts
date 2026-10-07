@@ -27,6 +27,7 @@ import { refreshLicenseOwner } from "../indexer/sync.js";
 import { criteriaHash, discardAcceptance, filesHash, readDeliverable, saveAcceptance } from "../verifier/deliverables.js";
 import { cancelUndeliveredBlock, canCancelUndelivered, disputeDeadlineOf, deliveryDeadlineFrom, deliveryIntact, resolveDeliveryDays } from "./delivery-rules.js";
 import { findAgentRow, guaranteeOffer } from "./catalog.js";
+import { catalogLangOf } from "./lang-rules.js";
 import { toEscrow, toReputation } from "./mappers.js";
 import { assertEntriesOpen } from "./pause-gate.js";
 import { licenseReviewUsed } from "./license-review.js";
@@ -43,8 +44,8 @@ type MilestoneRow = typeof schema.milestones.$inferSelect;
 
 async function loadEscrow(id: string, wallet: string) {
   const [row] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, id));
-  if (!row) throw notFound("Tarefa com garantia não encontrada");
-  if (row.buyerWallet !== wallet) throw forbidden("Esta garantia pertence a outra carteira");
+  if (!row) throw notFound("Guaranteed task not found");
+  if (row.buyerWallet !== wallet) throw forbidden("This guarantee belongs to another wallet");
   const ms = await db.select().from(schema.milestones).where(eq(schema.milestones.escrowId, id));
   return { row, ms };
 }
@@ -108,7 +109,7 @@ const CreateBody = z.object({
     .array(
       z
         .record(z.string().max(100_000))
-        .refine((files) => Object.keys(files).length > 0, "bateria de aceite sem arquivos")
+        .refine((files) => Object.keys(files).length > 0, "acceptance test suite has no files")
         .nullable(),
     )
     .max(5)
@@ -130,12 +131,12 @@ escrowRouter.post(
     const agent = await findAgentRow(body.agentId);
     assertNotPlatformAgent(agent); // Solver gratuito da plataforma: sem garantia (409 platform_agent_not_for_sale)
     // Garantia é uma venda nova: especialista fora da vitrine não abre tarefas.
-    if (!agentIsAvailable(agent) || !agent.listed) throw badRequest("Este especialista ainda não está disponível.");
+    if (!agentIsAvailable(agent) || !agent.listed) throw badRequest("This specialist is not available yet.");
     const offer = guaranteeOffer(agent, 1);
-    if (!offer) throw badRequest("Este especialista não oferece tarefas com garantia.");
-    if ((body.acceptanceTests?.length ?? 0) > offer.milestones.length) throw badRequest("Há mais baterias de aceite do que etapas.");
+    if (!offer) throw badRequest("This specialist doesn't offer guaranteed tasks.");
+    if ((body.acceptanceTests?.length ?? 0) > offer.milestones.length) throw badRequest("There are more acceptance test suites than steps.");
     if (body.acceptanceTests?.some((t, idx) => t && offer.milestones[idx]!.verify === "manual")) {
-      throw badRequest("Etapas de revisão manual não têm bateria de aceite.");
+      throw badRequest("Manual review steps don't have an acceptance test suite.");
     }
     const plan = offer.milestones.map((m, idx) => ({
       title: m.title,
@@ -152,24 +153,24 @@ escrowRouter.post(
       throw new HttpError(
         400,
         g.level === "none"
-          ? "Sua conta não pode abrir tarefas com garantia no momento."
-          : `Seu limite atual de garantias abertas é de ${g.limitUsdc} USDC (você já tem ${g.openUsdc} USDC em andamento). Ele aumenta conforme você faz compras na loja.`,
+          ? "Your account can't open guaranteed tasks right now."
+          : `Your current limit for open guarantees is ${g.limitUsdc} USDC (you already have ${g.openUsdc} USDC in progress). It grows as you make purchases in the store.`,
         "guarantee_limit",
         { guaranteeLevel: g.level, limitUsdc: g.limitUsdc, openUsdc: g.openUsdc },
       );
     }
     if (g.level === "limited" && plan.length < 2 && total > SINGLE_MILESTONE_MAX_USDC) {
-      throw badRequest(`Para contas novas, garantias acima de ${SINGLE_MILESTONE_MAX_USDC} USDC precisam ter pelo menos 2 etapas.`);
+      throw badRequest(`For new accounts, guarantees above ${SINGLE_MILESTONE_MAX_USDC} USDC need at least 2 steps.`);
     }
 
     const c = chain();
     const config = await c.fetchConfig();
     if (usdcToUnits(total) < config.data.minPrice) {
-      throw badRequest(`O valor mínimo de uma tarefa com garantia é ${unitsToUsdc(config.data.minPrice)} USDC.`);
+      throw badRequest(`The minimum amount for a guaranteed task is ${unitsToUsdc(config.data.minPrice)} USDC.`);
     }
     const balance = await c.usdcBalance(wallet);
     if (balance < usdcToUnits(total)) {
-      throw new HttpError(400, "Saldo de USDC insuficiente", "insufficient_funds", { balanceUsdc: unitsToUsdc(balance), neededUsdc: total });
+      throw new HttpError(400, "Insufficient USDC balance", "insufficient_funds", { balanceUsdc: unitsToUsdc(balance), neededUsdc: total });
     }
 
     // 63 bits: cabe no bigint (com sinal) do Postgres e no u64 on-chain.
@@ -199,7 +200,7 @@ escrowRouter.post(
         .from(schema.escrows)
         .where(openEscrowsOf(wallet));
       if (unitsToUsdc(BigInt(again?.sum ?? "0")) + total > g.limitUsdc) {
-        throw new HttpError(400, `Seu limite atual de garantias abertas é de ${g.limitUsdc} USDC.`, "guarantee_limit", {
+        throw new HttpError(400, `Your current limit for open guarantees is ${g.limitUsdc} USDC.`, "guarantee_limit", {
           guaranteeLevel: g.level,
           limitUsdc: g.limitUsdc,
           openUsdc: unitsToUsdc(BigInt(again?.sum ?? "0")),
@@ -248,7 +249,7 @@ escrowRouter.post(
     const { index } = parse(z.object({ index: z.number().int().min(0).max(4) }), req.body);
     const { row, ms } = await loadEscrow(String(req.params.id), wallet);
     const m = ms.find((x) => x.idx === index);
-    if (!m || !["pending", "submitted", "passed"].includes(m.status)) throw badRequest("Esta etapa não pode ser aprovada agora.");
+    if (!m || !["pending", "submitted", "passed"].includes(m.status)) throw badRequest("This step can't be approved right now.");
     const c = chain();
     const ixs = await c.releaseMilestoneIxs(createNoopSigner(address(wallet)), address(row.id), index);
     return buildForUserChecked(ixs, { kind: "release", escrowId: row.id, index });
@@ -259,7 +260,7 @@ escrowRouter.post(
 async function buildCancelUndelivered(idParam: string, wallet: string, index: number): Promise<TxResponse> {
   const { row, ms } = await loadEscrow(idParam, wallet);
   const m = ms.find((x) => x.idx === index);
-  if (!m) throw notFound("Etapa não encontrada");
+  if (!m) throw notFound("Step not found");
   const blocked = cancelUndeliveredBlock({ closed: row.closed, deliveryDeadline: row.deliveryDeadline }, m, new Date());
   if (blocked) throw badRequest(blocked, "cancel_not_allowed");
   const c = chain();
@@ -302,13 +303,13 @@ escrowRouter.post(
     );
     const { row, ms } = await loadEscrow(String(req.params.id), wallet);
     const m = ms.find((x) => x.idx === body.index);
-    if (!m || !["pending", "submitted", "passed"].includes(m.status)) throw badRequest("Esta etapa não pode ser contestada agora.");
+    if (!m || !["pending", "submitted", "passed"].includes(m.status)) throw badRequest("This step can't be disputed right now.");
     if (m.status === "passed" && m.passedAt && Date.now() > m.passedAt.getTime() + row.reviewWindowSecs * 1000) {
-      throw badRequest("O prazo para contestar esta etapa já passou.");
+      throw badRequest("The deadline to dispute this step has passed.");
     }
     const criteria = splitCriteria(m.criteria);
     if (!criteria.includes(body.criterion.trim())) {
-      throw badRequest("Indique qual dos critérios combinados falhou.", "invalid_criterion", { criteria });
+      throw badRequest("Indicate which of the agreed criteria failed.", "invalid_criterion", { criteria });
     }
     const ix = await chain().openDisputeIx(address(wallet), address(row.id), body.index, sha256(`${body.criterion}\n${body.reason}`));
     // Simula antes de gravar critério/motivo: uma contestação que o programa recusaria não deixa rascunho.
@@ -364,14 +365,14 @@ escrowRouter.get(
 escrowRouter.get(
   "/me/escrows/:id",
   requireAuth,
-  h(async (req) => {
+  h(async (req, res) => {
     const { row, ms } = await loadEscrow(String(req.params.id), requireWallet(req));
     const agent = await findAgentRow(row.agentId);
     return {
       escrow: toEscrow(row, ms),
       description: row.description,
       createdAt: row.createdAt.toISOString(),
-      agent: { id: agent.id, slug: agent.slug, name: agent.name },
+      agent: { id: agent.id, slug: agent.slug, name: (catalogLangOf(req, res) === "pt" ? agent.translations?.pt?.name : undefined) || agent.name },
       milestones: ms.sort((a, b) => a.idx - b.idx).map((m) => milestoneExtras(m, row)),
       explorerUrl: explorerUrl("address", row.id),
     };
@@ -384,13 +385,13 @@ escrowRouter.get(
   h(async (req) => {
     const { ms } = await loadEscrow(String(req.params.id), requireWallet(req));
     const m = ms.find((x) => x.idx === Number(req.params.idx));
-    if (!m?.deliverablePath) throw notFound("Entrega não encontrada");
-    if (m.status !== "approved") throw forbidden("O arquivo final fica disponível depois da aprovação.");
+    if (!m?.deliverablePath) throw notFound("Delivery not found");
+    if (m.status !== "approved") throw forbidden("The final file becomes available after approval.");
     // O arquivo em disco precisa ser o que foi verificado e aprovado (o hash foi gravado no envio).
     const files = readDeliverable(m.deliverablePath);
     if (!deliveryIntact(Object.keys(files).length, filesHash(files).toString("hex"), m.deliverableHash)) {
       console.error(`[download] entrega diferente do hash aprovado (${m.escrowId}/${m.idx})`);
-      throw new HttpError(409, "Os arquivos desta entrega não conferem com o que foi aprovado, então o download foi bloqueado. Fale com o suporte.", "deliverable_changed");
+      throw new HttpError(409, "The files of this delivery don't match what was approved, so the download was blocked. Please contact support.", "deliverable_changed");
     }
     return { files };
   }),
@@ -405,7 +406,7 @@ escrowRouter.post(
     const wallet = address(requireWallet(req));
     const body = parse(z.object({ agentId: z.string(), rating: z.number().int().min(1).max(5), text: z.string().max(2000).default("") }), req.body);
     const agent = await findAgentRow(body.agentId);
-    if (!agent.onchainAddress) throw badRequest("Este especialista ainda não está disponível para avaliação.");
+    if (!agent.onchainAddress) throw badRequest("This specialist is not available for reviews yet.");
     const lic = await db
       .select()
       .from(schema.licenses)
@@ -428,13 +429,13 @@ escrowRouter.post(
     const licenseAsset = choice.kind === "use" ? choice.asset : undefined;
     if (choice.kind === "all_used" && !hasCredits) {
       throw badRequest(
-        "Esta licença já foi usada para avaliar este especialista por quem a tinha antes. Cada licença só pode avaliar uma vez, então você não pode avaliar com ela.",
+        "This license was already used to review this specialist by a previous owner. Each license can only review once, so you can't review with it.",
         "license_already_reviewed",
       );
     }
     if (!licenseAsset && !hasCredits) {
       // Quem comprou créditos no modelo antigo (pagamento por uso) ainda pode avaliar.
-      throw forbidden("Só quem tem a licença deste especialista pode avaliar.");
+      throw forbidden("Only people who hold this specialist's license can review it.");
     }
     const contentHash = sha256(body.text);
     const c = chain();
@@ -463,9 +464,9 @@ escrowRouter.post(
 
 async function requireAdmin(wallet: string) {
   const config = await chain().fetchConfig();
-  if (config.data.admin !== wallet) throw forbidden("Somente o admin");
+  if (config.data.admin !== wallet) throw forbidden("Admin only");
   const admin = authorities().admin;
-  if (!admin || admin.address !== wallet) throw forbidden("Chave de admin não configurada neste servidor");
+  if (!admin || admin.address !== wallet) throw forbidden("Admin key is not configured on this server");
   return admin;
 }
 
@@ -489,7 +490,7 @@ escrowRouter.post(
     const { signature } = await c.sendAsServer(await c.resolveDisputeIxs(admin, address(String(req.params.id)), index, refund));
     await processSignature(signature);
     const [row] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, String(req.params.id)));
-    if (row) void notifyCreator(row.agentId, `Solvers: disputa da etapa ${index + 1} resolvida (${refund ? "reembolso ao comprador" : "pagamento ao criador"}).`);
+    if (row) void notifyCreator(row.agentId, `Solvers: dispute for step ${index + 1} resolved (${refund ? "refund to the buyer" : "payment to the creator"}).`);
     return { signature, explorerUrl: explorerUrl("tx", signature) };
   }),
 );

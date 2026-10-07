@@ -459,7 +459,7 @@ describe("publicação com banco e cadeia simulada", { skip: url ? false : "defi
       const c = await http(CREATOR, "POST", "/tx/publication/confirm", { submissionId: S3, signature: sig, kind: "update-version" });
       assert.equal(c.body.outcome, "failed");
       assert.equal(c.body.status, "publish_failed");
-      assert.match(String(c.body.error), /mudou depois da aprovação/);
+      assert.match(String(c.body.error), /changed after approval/);
       const s = await sub(S3);
       assert.equal(s.status, "publish_failed");
       assert.match(s.error ?? "", /hash/);
@@ -496,7 +496,7 @@ describe("publicação com banco e cadeia simulada", { skip: url ? false : "defi
       });
       // Erro interno (banco): o criador vê texto fixo, o detalhe ("banco caiu") fica no log e no aviso do admin.
       assert.equal(first.outcome, "failed");
-      assert.match(String((first as { error?: string }).error), /erro interno/);
+      assert.match(String((first as { error?: string }).error), /internal error/);
       assert.doesNotMatch(String((first as { error?: string }).error), /banco caiu/);
       assert.equal((await sub(S4)).status, "publish_failed");
       assert.doesNotMatch((await sub(S4)).error ?? "", /banco caiu/);

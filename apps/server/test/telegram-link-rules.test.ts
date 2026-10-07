@@ -105,10 +105,10 @@ describe("comandos do bot", () => {
 
 describe("respostas", () => {
   it("o texto de sucesso traz o nome; o de código ruim não revela se o código existe", () => {
-    assert.equal(replyText({ kind: "linked", name: "Ana" }), "Pronto! Seu Telegram foi vinculado ao Solvers como Ana.");
+    assert.equal(replyText({ kind: "linked", name: "Ana" }), "Done! Your Telegram is now linked to Solvers as Ana.");
     const bad = replyText({ kind: "invalid" });
-    assert.match(bad, /errado, vencido ou já usado/);
-    assert.match(replyText({ kind: "chat_taken" }), /outro criador/);
+    assert.match(bad, /wrong, expired or already used/);
+    assert.match(replyText({ kind: "chat_taken" }), /another Solvers creator/);
     assert.ok(replyText({ kind: "help" }).length < 200 && !replyText({ kind: "help" }).includes("\n"));
   });
 });
@@ -155,13 +155,13 @@ describe("processUpdate", () => {
     const out = await processUpdate(msg("/vincular LINK-ABCD2345"), deps(api, async (...a) => (calls.push(a), { status: "linked", name: "Ana" })));
     assert.equal(out, "replied");
     assert.deepEqual(calls, [["4242", "LINK-ABCD2345", T0]]);
-    assert.deepEqual(sent, [{ chatId: "4242", text: "Pronto! Seu Telegram foi vinculado ao Solvers como Ana." }]);
+    assert.deepEqual(sent, [{ chatId: "4242", text: "Done! Your Telegram is now linked to Solvers as Ana." }]);
   });
 
   it("deep link /start CODIGO funciona igual", async () => {
     const { api, sent } = fakeApi();
     await processUpdate(msg("/start LINK-ABCD2345"), deps(api, async () => ({ status: "linked", name: "Ana" })));
-    assert.match(sent[0]!.text, /^Pronto!/);
+    assert.match(sent[0]!.text, /^Done!/);
   });
 
   it("código errado, vencido ou usado: mesma resposta curta; chat de outro criador: recusa", async () => {

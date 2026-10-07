@@ -15,7 +15,7 @@ function challenge(res: Response, error?: string) {
   const parts = [`Bearer resource_metadata="${resourceMetadataUrl()}"`];
   if (error) parts.push(`error="${error}"`);
   res.setHeader("WWW-Authenticate", parts.join(", "));
-  res.status(401).json({ error: error ?? "unauthorized", error_description: "Conecte sua carteira ao Solvers para usar os especialistas." });
+  res.status(401).json({ error: error ?? "unauthorized", error_description: "Connect your wallet to Solvers to use the specialists." });
 }
 
 /** Sem token válido: 401 com WWW-Authenticate apontando o metadata do recurso (dispara o OAuth no cliente). */
@@ -47,7 +47,7 @@ export function mountMcp(app: Express) {
     standardHeaders: "draft-8",
     legacyHeaders: false,
     keyGenerator: (req) => req.wallet ?? "anon",
-    message: { jsonrpc: "2.0", error: { code: -32000, message: "Muitas chamadas por minuto. Aguarde um pouco." }, id: null },
+    message: { jsonrpc: "2.0", error: { code: -32000, message: "Too many calls per minute. Please wait a moment." }, id: null },
   });
 
   const handler = async (req: Request, res: Response) => {
@@ -63,7 +63,7 @@ export function mountMcp(app: Express) {
       await transport.handleRequest(req, res, req.body);
     } catch (e) {
       console.error("[mcp] erro", e);
-      if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Erro interno" }, id: null });
+      if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: null });
     }
   };
 

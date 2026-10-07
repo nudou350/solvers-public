@@ -1,4 +1,4 @@
-import { RESERVED_SLUGS, THIRD_PARTY_CATEGORIES } from "@solvers/shared";
+import { localeFilePath, PACKAGE_LOCALE_LANGS, PackageLocale, RESERVED_SLUGS, THIRD_PARTY_CATEGORIES } from "@solvers/shared";
 import { chunkMarkdown } from "../../knowledge/chunk.js";
 import { todayInSaoPaulo } from "../../knowledge/search-rules.js";
 import { VERSION_RE } from "../agent-ids.js";
@@ -100,7 +100,7 @@ type View = {
   version: string;
   catalogOnly?: boolean;
   usesMemory?: boolean;
-  requirements: { label: string; howTo?: string }[];
+  requirements: { key?: string; label: string; howTo?: string }[];
   packageContents: string[];
   searchPhrases: string[];
   beforeAfter: { prompt: string; withoutSolver: string; withSolver: string }[];
@@ -124,8 +124,15 @@ const NAME_MAX_BYTES = 32;
 const STEP_MIN_CHARS = 400;
 const STEP_MAX_CHARS = 12_000;
 const MAX_GATE_ITEMS = 6;
-const REQUIRED_SECTIONS = ["Objetivo", "Como executar", "Formato do result_summary"] as const;
-const OPTIONAL_SECTIONS = ["O que perguntar ao usuário", "Erros comuns"] as const;
+// Títulos das seções das etapas (PACKAGE_SPEC.md 5.1): em inglês (padrão dos pacotes) ou em português (pacotes antigos);
+// qualquer um dos dois vale, o corpo pode estar em qualquer idioma.
+const STEP_SECTIONS: { title: string; pt: string; required: boolean }[] = [
+  { title: "Goal", pt: "Objetivo", required: true },
+  { title: "How to run", pt: "Como executar", required: true },
+  { title: "result_summary format", pt: "Formato do result_summary", required: true },
+  { title: "What to ask the user", pt: "O que perguntar ao usuário", required: false },
+  { title: "Common mistakes", pt: "Erros comuns", required: false },
+];
 /** Variações de "saúde" que o criador pode escrever como categoria (não existe na lista; é regulada como Finanças e Jurídico). */
 const HEALTH_CATEGORY = /sa[úu]de|m[ée]dic|health|terapia|nutri/i;
 const LEGACY_RUNNERS = new Set(["docker:solvers-react-test", "node:a11y", "node:contrast", "node:budget"]);
@@ -176,9 +183,9 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
 
   // ---- Envelope do ZIP (dados que só o extrator conhece)
   const ar = opts.archive;
-  if (ar?.zipBytes !== undefined && ar.zipBytes > limits.zipBytes) add("E", "ZIP_TOO_LARGE", "", `ZIP de ${ar.zipBytes} bytes passa do teto de ${limits.zipBytes}`, "Reduza o conhecimento ou divida o conteúdo.");
-  if (ar?.expandedBytes !== undefined && ar.expandedBytes > limits.expandedBytes) add("E", "ZIP_EXPANDS_TOO_MUCH", "", `Conteúdo extraído de ${ar.expandedBytes} bytes passa do teto de ${limits.expandedBytes}`, "Reduza o tamanho dos arquivos.");
-  if (ar?.roots !== undefined && ar.roots !== 1) add("E", "ZIP_BAD_ROOT", "", `O ZIP precisa ter exatamente 1 pasta raiz (achei ${ar.roots})`, "Coloque tudo dentro de uma única pasta com o manifest.json.");
+  if (ar?.zipBytes !== undefined && ar.zipBytes > limits.zipBytes) add("E", "ZIP_TOO_LARGE", "", `The ZIP is ${ar.zipBytes} bytes, over the ${limits.zipBytes} byte limit`, "Reduce the knowledge base or split the content.");
+  if (ar?.expandedBytes !== undefined && ar.expandedBytes > limits.expandedBytes) add("E", "ZIP_EXPANDS_TOO_MUCH", "", `The extracted content is ${ar.expandedBytes} bytes, over the ${limits.expandedBytes} byte limit`, "Reduce the size of the files.");
+  if (ar?.roots !== undefined && ar.roots !== 1) add("E", "ZIP_BAD_ROOT", "", `The ZIP must have exactly 1 root folder (found ${ar.roots})`, "Put everything inside a single folder that contains manifest.json.");
 
   // ---- Arquivos: caminhos, duplicatas, links, tipos, tamanhos
   const files = new Map<string, PackageEntry>();
@@ -187,31 +194,31 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   for (const e of sorted) {
     const base = e.path.slice(e.path.lastIndexOf("/") + 1);
     if (e.path.startsWith("__MACOSX/") || base === ".DS_Store" || base === "Thumbs.db") {
-      add("A", "ZIP_IGNORED_FILE", e.path, "Arquivo de sistema removido da extração", "Não precisa fazer nada; evite compactar pelo Finder sem limpar.");
+      add("A", "ZIP_IGNORED_FILE", e.path, "System file removed from the extraction", "Nothing to do; avoid compressing with Finder without cleaning up first.");
       continue;
     }
     if (e.isSymlink) {
-      add("E", "ZIP_SYMLINK", e.path, "Link simbólico não é permitido", "Troque o link pelo arquivo real.");
+      add("E", "ZIP_SYMLINK", e.path, "Symbolic links are not allowed", "Replace the link with the real file.");
       continue;
     }
     const nfc = e.path.normalize("NFC");
     const segs = e.path.split("/");
     const badChars = !/^[\p{L}\p{N}._\-/ ]+$/u.test(e.path);
-    const why = relativePathProblem(e.path, [""]) ?? (nfc !== e.path ? "não está normalizado em NFC" : segs.some((s) => s.startsWith(".")) ? "nome começa com ponto" : badChars ? "tem caractere fora de letras, dígitos, . _ - e espaço" : null);
+    const why = relativePathProblem(e.path, [""]) ?? (nfc !== e.path ? "is not NFC-normalized" : segs.some((s) => s.startsWith(".")) ? "name starts with a dot" : badChars ? "contains a character other than letters, digits, . _ - and space" : null);
     if (why) {
-      add("E", "ZIP_BAD_PATH", e.path, `Caminho inválido: ${why}`, "Renomeie o arquivo com letras, dígitos, hífen, sublinhado e ponto.");
+      add("E", "ZIP_BAD_PATH", e.path, `Invalid path: ${why}`, "Rename the file using letters, digits, hyphens, underscores and dots.");
       continue;
     }
     const key = nfc.toLowerCase();
     if (seen.has(key)) {
-      add("E", "ZIP_DUPLICATE_ENTRY", e.path, `Repete o arquivo ${seen.get(key)} (NFC, sem distinguir maiúsculas)`, "Deixe só uma versão do arquivo.");
+      add("E", "ZIP_DUPLICATE_ENTRY", e.path, `Duplicates the file ${seen.get(key)} (NFC, case-insensitive)`, "Keep only one version of the file.");
       continue;
     }
     seen.set(key, e.path);
     files.set(e.path, e);
   }
   stats.files = files.size;
-  if (files.size > limits.files) add("E", "ZIP_TOO_MANY_FILES", "", `${files.size} arquivos passam do teto de ${limits.files}`, "Junte arquivos pequenos de conhecimento.");
+  if (files.size > limits.files) add("E", "ZIP_TOO_MANY_FILES", "", `${files.size} files exceed the limit of ${limits.files}`, "Merge small knowledge files.");
 
   const textCache = new Map<string, string | null>();
   const readText = (path: string): string | null => {
@@ -222,7 +229,7 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
       try {
         out = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       } catch {
-        add("E", "FILE_NOT_UTF8", path, "O arquivo não é UTF-8 válido", "Salve o arquivo como UTF-8.");
+        add("E", "FILE_NOT_UTF8", path, "The file is not valid UTF-8", "Save the file as UTF-8.");
       }
     }
     textCache.set(path, out);
@@ -241,27 +248,36 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
         return [".md", ".txt", ".json"].includes(ext) || (open && [".csv", ".png", ".jpg", ".jpeg", ".pdf"].includes(ext));
       case "evals":
         return [".json", ".md"].includes(ext);
+      case "locales":
+        return ext === ".json";
       default:
         return false;
     }
   };
 
   for (const [path, e] of files) {
-    if (e.size > limits.fileBytes) add("E", "FILE_TOO_LARGE", path, `Arquivo de ${e.size} bytes passa do teto de ${limits.fileBytes}`, "Divida o arquivo em partes menores.");
+    if (e.size > limits.fileBytes) add("E", "FILE_TOO_LARGE", path, `File of ${e.size} bytes exceeds the limit of ${limits.fileBytes}`, "Split the file into smaller parts.");
     if (path === "manifest.json" || path === "README.md") continue;
     const folder = path.split("/")[0]!;
     if (folder === "verifier") {
-      if (third) add("E", "MANIFEST_PLATFORM_FORBIDDEN", path, "A pasta verifier/ é só de pacotes da plataforma", "Remova a pasta verifier/.");
+      if (third) add("E", "MANIFEST_PLATFORM_FORBIDDEN", path, "The verifier/ folder is for platform packages only", "Remove the verifier/ folder.");
+      continue;
+    }
+    if (folder === "locales") {
+      // Só `locales/<idioma>.json` dos idiomas aceitos (hoje pt): qualquer outro arquivo ali nunca seria lido.
+      if (!PACKAGE_LOCALE_LANGS.some((l) => path === localeFilePath(l))) {
+        add("E", "FILE_TYPE_NOT_ALLOWED", path, `Only these files are allowed in locales/: ${PACKAGE_LOCALE_LANGS.map(localeFilePath).join(", ")}`, "Rename it to locales/pt.json or remove the file.");
+      }
       continue;
     }
     if (third && !allowedIn(folder, extOf(path)) && !(folder === "knowledge" && path.endsWith(".meta.json"))) {
-      add("E", "FILE_TYPE_NOT_ALLOWED", path, `Tipo de arquivo não permitido em ${folder}/ nesta fase (${extOf(path) || "sem extensão"})`, "Converta para .md ou .txt (PDF, HTML e CSV entram só na Abertura).");
+      add("E", "FILE_TYPE_NOT_ALLOWED", path, `File type not allowed in ${folder}/ at this stage (${extOf(path) || "no extension"})`, "Convert it to .md or .txt (PDF, HTML and CSV are only accepted at the Open stage).");
     }
   }
 
   // ---- Manifesto
   if (!files.has("manifest.json")) {
-    add("E", "MANIFEST_MISSING", "manifest.json", "Falta o manifest.json na raiz do pacote", "Crie o manifest.json (veja o esqueleto no Criador de Solvers).");
+    add("E", "MANIFEST_MISSING", "manifest.json", "manifest.json is missing from the package root", "Create manifest.json (see the skeleton in the Solver Creator).");
     return finish();
   }
   const manifestText = readText("manifest.json");
@@ -270,17 +286,17 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   try {
     raw = JSON.parse(manifestText);
   } catch (e) {
-    add("E", "MANIFEST_INVALID_JSON", "manifest.json", `JSON inválido: ${(e as Error).message}`, "Corrija a sintaxe do JSON.");
+    add("E", "MANIFEST_INVALID_JSON", "manifest.json", `Invalid JSON: ${(e as Error).message}`, "Fix the JSON syntax.");
     return finish();
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    add("E", "MANIFEST_SCHEMA", "manifest.json", "O manifesto precisa ser um objeto JSON", "Use { ... } na raiz.");
+    add("E", "MANIFEST_SCHEMA", "manifest.json", "The manifest must be a JSON object", "Use { ... } at the root.");
     return finish();
   }
   const rawObj = raw as Record<string, unknown>;
   const strict = rawObj.specVersion === 1 || third;
   if (third && rawObj.specVersion !== 1) {
-    add("E", "MANIFEST_SPEC_VERSION", "manifest.json#specVersion", "Envios de terceiros precisam de \"specVersion\": 1", "Acrescente \"specVersion\": 1 ao manifesto.");
+    add("E", "MANIFEST_SPEC_VERSION", "manifest.json#specVersion", "Third-party submissions need \"specVersion\": 1", "Add \"specVersion\": 1 to the manifest.");
     rawObj.specVersion = 1;
   }
   // Nome e limites de tamanho do v1 viram erros com código próprio; o schema cuida do resto.
@@ -288,13 +304,13 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
     for (const i of issues) {
       const path = `manifest.json#${dotted(i.path)}`;
       if (i.code === "unrecognized_keys") {
-        for (const k of i.keys ?? []) add("E", "MANIFEST_UNKNOWN_FIELD", `manifest.json#${[...i.path, k].join(".")}`, `Campo desconhecido: ${k}`, "Remova o campo ou use um campo da especificação.");
-      } else if (/formato de um id/.test(i.message)) add("E", "MANIFEST_SLUG_LOOKS_LIKE_ID", path, i.message, "Escolha um slug com palavras (ex.: meu-solver).");
-      else if (/16 bytes/.test(i.message)) add("E", "MANIFEST_VERSION_TOO_LONG", path, i.message, "Use uma versão curta como 1.0.0.");
-      else if (i.path[0] === "trial" && i.path[1] === "steps") add("E", "TRIAL_STEPS_EXCEED", path, i.message, "Reduza trial.steps ao número de etapas.");
-      else if (i.path[0] === "trial" && i.path[1] === "tools") add("E", "TRIAL_TOOL_UNKNOWN", path, i.message, "Use só nomes que existem em tools.");
-      else if (i.path[0] === "trial" && i.path[1] === "templates") add("E", "TRIAL_TEMPLATE_UNKNOWN", path, i.message, "Use só nomes que existem em templates.");
-      else add("E", "MANIFEST_SCHEMA", path, i.message, "Corrija o campo conforme o schema do manifesto.");
+        for (const k of i.keys ?? []) add("E", "MANIFEST_UNKNOWN_FIELD", `manifest.json#${[...i.path, k].join(".")}`, `Unknown field: ${k}`, "Remove the field or use a field from the specification.");
+      } else if (/formato de um id|format of an id/i.test(i.message)) add("E", "MANIFEST_SLUG_LOOKS_LIKE_ID", path, i.message, "Pick a slug made of words (e.g. my-solver).");
+      else if (/16 bytes/.test(i.message)) add("E", "MANIFEST_VERSION_TOO_LONG", path, i.message, "Use a short version such as 1.0.0.");
+      else if (i.path[0] === "trial" && i.path[1] === "steps") add("E", "TRIAL_STEPS_EXCEED", path, i.message, "Reduce trial.steps to the number of steps.");
+      else if (i.path[0] === "trial" && i.path[1] === "tools") add("E", "TRIAL_TOOL_UNKNOWN", path, i.message, "Use only names that exist in tools.");
+      else if (i.path[0] === "trial" && i.path[1] === "templates") add("E", "TRIAL_TEMPLATE_UNKNOWN", path, i.message, "Use only names that exist in templates.");
+      else add("E", "MANIFEST_SCHEMA", path, i.message, "Fix the field according to the manifest schema.");
     }
   };
   const parsed = strict ? ManifestV1.safeParse(rawObj) : Manifest.safeParse(rawObj);
@@ -308,62 +324,62 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   const mp = (field: string) => `manifest.json#${field}`;
 
   // ---- Identidade, formato e limites do manifesto
-  if (Buffer.byteLength(m.name) > NAME_MAX_BYTES) add(L("E"), "MANIFEST_NAME_TOO_LONG", mp("name"), `O nome passa de ${NAME_MAX_BYTES} bytes (limite on-chain)`, "Encurte o nome.");
+  if (Buffer.byteLength(m.name) > NAME_MAX_BYTES) add(L("E"), "MANIFEST_NAME_TOO_LONG", mp("name"), `The name is longer than ${NAME_MAX_BYTES} bytes (on-chain limit)`, "Shorten the name.");
   if (strict) {
-    if (Buffer.byteLength(m.name) < 3) add("E", "MANIFEST_SCHEMA", mp("name"), "O nome precisa ter pelo menos 3 caracteres", "Escreva um nome.");
-    if (m.tagline.length < 10 || m.tagline.length > 100) add("E", "MANIFEST_SCHEMA", mp("tagline"), `A tagline precisa ter de 10 a 100 caracteres (tem ${m.tagline.length})`, "Reescreva em uma frase de valor.");
-    if (m.description.length < 120 || m.description.length > 2000) add("E", "MANIFEST_SCHEMA", mp("description"), `A descrição precisa ter de 120 a 2.000 caracteres (tem ${m.description.length})`, "Explique o que entrega, para quem e o que não faz.");
+    if (Buffer.byteLength(m.name) < 3) add("E", "MANIFEST_SCHEMA", mp("name"), "The name must be at least 3 characters long", "Write a name.");
+    if (m.tagline.length < 10 || m.tagline.length > 100) add("E", "MANIFEST_SCHEMA", mp("tagline"), `The tagline must be 10 to 100 characters long (it has ${m.tagline.length})`, "Rewrite it as a single value statement.");
+    if (m.description.length < 120 || m.description.length > 2000) add("E", "MANIFEST_SCHEMA", mp("description"), `The description must be 120 to 2,000 characters long (it has ${m.description.length})`, "Explain what it delivers, for whom, and what it does not do.");
     // Saúde não está na lista: para terceiros no Núcleo vira MANIFEST_CATEGORY_FORBIDDEN (abaixo), não "categoria desconhecida".
-    if (!(CATEGORIES as readonly string[]).includes(m.category) && !(third && phase === "nucleo" && HEALTH_CATEGORY.test(m.category))) add("E", "MANIFEST_SCHEMA", mp("category"), `Categoria desconhecida: ${m.category}`, `Use uma de: ${CATEGORIES.join(", ")}.`);
-    if (m.pricing.royaltyBps < 0 || m.pricing.royaltyBps > 1000) add("E", "MANIFEST_SCHEMA", mp("pricing.royaltyBps"), "royaltyBps precisa ficar entre 0 e 1000", "Ajuste o royalty.");
-    if (m.packageContents.length < 3 || m.packageContents.length > 8) add("E", "MANIFEST_SCHEMA", mp("packageContents"), "packageContents precisa ter de 3 a 8 itens", "Liste de 3 a 8 itens do que o pacote entrega.");
+    if (!(CATEGORIES as readonly string[]).includes(m.category) && !(third && phase === "nucleo" && HEALTH_CATEGORY.test(m.category))) add("E", "MANIFEST_SCHEMA", mp("category"), `Unknown category: ${m.category}`, `Use one of: ${CATEGORIES.join(", ")}.`);
+    if (m.pricing.royaltyBps < 0 || m.pricing.royaltyBps > 1000) add("E", "MANIFEST_SCHEMA", mp("pricing.royaltyBps"), "royaltyBps must be between 0 and 1000", "Adjust the royalty.");
+    if (m.packageContents.length < 3 || m.packageContents.length > 8) add("E", "MANIFEST_SCHEMA", mp("packageContents"), "packageContents must have 3 to 8 items", "List 3 to 8 things the package delivers.");
   }
   if (third) {
-    if (m.platform === true) add("E", "MANIFEST_PLATFORM_FORBIDDEN", mp("platform"), "Só pacotes da plataforma podem usar platform: true", "Remova o campo platform.");
+    if (m.platform === true) add("E", "MANIFEST_PLATFORM_FORBIDDEN", mp("platform"), "Only platform packages can use platform: true", "Remove the platform field.");
     // Fora de THIRD_PARTY_CATEGORIES (Finanças, Jurídico, saúde) é proibido no Núcleo; categoria desconhecida e não regulada cai em MANIFEST_SCHEMA.
     if (phase === "nucleo" && !THIRD_PARTY_CATEGORIES.includes(m.category) && ((CATEGORIES as readonly string[]).includes(m.category) || HEALTH_CATEGORY.test(m.category))) {
-      add("E", "MANIFEST_CATEGORY_FORBIDDEN", mp("category"), `A categoria ${m.category} não é aceita de terceiros nesta fase`, `Use outra categoria (${THIRD_PARTY_CATEGORIES.join(", ")}); conteúdo regulado espera a revisão jurídica.`);
+      add("E", "MANIFEST_CATEGORY_FORBIDDEN", mp("category"), `The category ${m.category} is not accepted from third parties at this stage`, `Use another category (${THIRD_PARTY_CATEGORIES.join(", ")}); regulated content waits for legal review.`);
     }
     if (phase === "nucleo" && m.guarantee?.available === true) {
-      add("E", "MANIFEST_GUARANTEE_FORBIDDEN", mp("guarantee.available"), "Terceiros ainda não oferecem garantia", "Use guarantee: { available: false, defaultCriteria: [] }.");
+      add("E", "MANIFEST_GUARANTEE_FORBIDDEN", mp("guarantee.available"), "Third parties cannot offer a guarantee yet", "Use guarantee: { available: false, defaultCriteria: [] }.");
     }
   }
   if (opts.minPriceUsdc !== undefined && m.pricing.priceUsdc < opts.minPriceUsdc) {
-    add(third || strict ? "E" : "A", "MANIFEST_PRICE_BELOW_MIN", mp("pricing.priceUsdc"), `O preço (${m.pricing.priceUsdc} USDC) é menor que o mínimo (${opts.minPriceUsdc} USDC)`, `Use ${opts.minPriceUsdc} USDC ou mais.`);
+    add(third || strict ? "E" : "A", "MANIFEST_PRICE_BELOW_MIN", mp("pricing.priceUsdc"), `The price (${m.pricing.priceUsdc} USDC) is below the minimum (${opts.minPriceUsdc} USDC)`, `Use ${opts.minPriceUsdc} USDC or more.`);
   }
   if (!m.versions.some((v) => v.version === m.version)) {
-    add(L("E"), "MANIFEST_VERSIONS_MISSING", mp("versions"), `Falta a entrada de versions[] para a versão ${m.version}`, "Acrescente { version, releasedAt, notes } da versão atual.");
+    add(L("E"), "MANIFEST_VERSIONS_MISSING", mp("versions"), `There is no versions[] entry for version ${m.version}`, "Add { version, releasedAt, notes } for the current version.");
   }
   if (strict && m.supply && m.trial && m.trial.available !== false) {
-    add("A", "SUPPLY_WITH_TRIAL", mp("supply"), "O produto tem teto de licenças e teste grátis ligado: o teste não consome vaga e é por carteira", "Para exclusividade real desligue o teste (trial.available: false); senão mantenha e avise o revisor.");
+    add("A", "SUPPLY_WITH_TRIAL", mp("supply"), "The product has a license cap and the free trial is on: the trial does not use up a slot and is per wallet", "For real exclusivity turn the trial off (trial.available: false); otherwise keep it and tell the reviewer.");
   }
-  if (m.catalogOnly !== undefined) add("A", "CATALOG_ONLY_IGNORED", mp("catalogOnly"), "catalogOnly não tem efeito no servidor", "Remova o campo.");
+  if (m.catalogOnly !== undefined) add("A", "CATALOG_ONLY_IGNORED", mp("catalogOnly"), "catalogOnly has no effect on the server", "Remove the field.");
   if (strict && !(m.terms?.rightsConfirmed === true && m.terms.sourcesListed === true)) {
-    add("E", "TERMS_MISSING", mp("terms"), "Confirme os direitos e a lista de fontes em terms", 'Use "terms": { "rightsConfirmed": true, "sourcesListed": true }.');
+    add("E", "TERMS_MISSING", mp("terms"), "Confirm the rights and the source list in terms", 'Use "terms": { "rightsConfirmed": true, "sourcesListed": true }.');
   } else if (!strict) {
-    add("A", "TERMS_MISSING", mp("terms"), "Pacote v0 sem terms", "Acrescente terms ao migrar para specVersion 1.");
+    add("A", "TERMS_MISSING", mp("terms"), "v0 package without terms", "Add terms when migrating to specVersion 1.");
   }
   // Terceiros nunca usam os slugs reservados (marcas e plataforma); quem passa `reservedSlugs` troca a lista.
   const reserved = opts.reservedSlugs ?? (third ? RESERVED_SLUGS : []);
-  if (reserved.includes(m.slug)) add("E", "MANIFEST_SLUG_RESERVED", mp("slug"), `O slug ${m.slug} é reservado`, "Escolha outro slug.");
+  if (reserved.includes(m.slug)) add("E", "MANIFEST_SLUG_RESERVED", mp("slug"), `The slug ${m.slug} is reserved`, "Choose another slug.");
   const ex = opts.existing;
   if (ex) {
     const me = ex.creatorId ?? opts.creatorId ?? ex.creatorWallet;
     const idOwner = m.id ? ex.ownerOfId?.(m.id) : undefined;
     const slugOwner = ex.ownerOfSlug?.(m.slug);
-    if (idOwner !== undefined && idOwner !== me) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id já pertence a outro criador", "Remova o id (o servidor atribui um novo) ou use o de um pacote seu.");
-    if ((slugOwner !== undefined && slugOwner !== me) || ex.slugs?.includes(m.slug)) add("E", "MANIFEST_ID_OWNER", mp("slug"), "Este slug já pertence a outro criador", "Escolha outro slug.");
+    if (idOwner !== undefined && idOwner !== me) add("E", "MANIFEST_ID_OWNER", mp("id"), "This id already belongs to another creator", "Remove the id (the server assigns a new one) or use the id of one of your own packages.");
+    if ((slugOwner !== undefined && slugOwner !== me) || ex.slugs?.includes(m.slug)) add("E", "MANIFEST_ID_OWNER", mp("slug"), "This slug already belongs to another creator", "Choose another slug.");
     // Por dados: o `id` do manifesto precisa ser o do Solver que este criador está atualizando; na 1ª versão ele não existe.
     const byData = ex.agentId !== undefined || ex.publishedVersion !== undefined || ex.slugs !== undefined || ex.creatorWallet !== undefined;
     if (m.id && byData) {
-      if (ex.agentId !== undefined && m.id !== ex.agentId) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id não é o do seu Solver", "Use o id do Solver que você está atualizando.");
-      else if (ex.agentId === undefined && ex.publishedVersion === undefined) add("E", "MANIFEST_ID_OWNER", mp("id"), "Este id não pertence a você (na 1ª versão o servidor atribui o id)", "Remova o campo id do manifesto.");
+      if (ex.agentId !== undefined && m.id !== ex.agentId) add("E", "MANIFEST_ID_OWNER", mp("id"), "This id is not your Solver's id", "Use the id of the Solver you are updating.");
+      else if (ex.agentId === undefined && ex.publishedVersion === undefined) add("E", "MANIFEST_ID_OWNER", mp("id"), "This id does not belong to you (on the first version the server assigns the id)", "Remove the id field from the manifest.");
     }
   }
   const prev = opts.previous ?? (ex?.publishedVersion ? { version: ex.publishedVersion } : undefined);
   if (prev) {
     if (!semverGreater(m.version, prev.version)) {
-      add("E", "MANIFEST_VERSION_NOT_GREATER", mp("version"), `A versão ${m.version} não é maior que a publicada (${prev.version})`, "Suba a versão (MAJOR.MINOR.PATCH).");
+      add("E", "MANIFEST_VERSION_NOT_GREATER", mp("version"), `Version ${m.version} is not greater than the published one (${prev.version})`, "Bump the version (MAJOR.MINOR.PATCH).");
     }
     const a = semver(m.version);
     const b = semver(prev.version);
@@ -375,7 +391,7 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
       if (stable(pm.requirements ?? []) !== stable(m.requirements)) changed.push("requirements");
       const prevSteps = Array.isArray(pm.steps) ? (pm.steps as { file?: string }[]).map((s) => s.file) : [];
       if (stable(prevSteps) !== stable(m.steps.map((s) => s.file))) changed.push("steps");
-      if (changed.length) add("E", "DIFF_ENDPOINT_CHANGED_MINOR", mp(changed[0]!), `Mudou ${changed.join(", ")} sem subir a versão MAJOR`, "Suba o MAJOR (ex.: 1.4.2 para 2.0.0) para mudanças nestes campos.");
+      if (changed.length) add("E", "DIFF_ENDPOINT_CHANGED_MINOR", mp(changed[0]!), `${changed.join(", ")} changed without bumping the MAJOR version`, "Bump the MAJOR version (e.g. 1.4.2 to 2.0.0) for changes to these fields.");
     }
   }
 
@@ -393,17 +409,59 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   ];
   const scanText = (path: string, text: string, kind: "manifest" | "step" | "knowledge" | "template") => {
     const hidden = hiddenCharsAt(text);
-    if (hidden) add("A", "TEXT_HIDDEN_CHARS", path, `Caractere invisível ou de direção ${hidden.codePoint} na posição ${hidden.index}`, "Remova o caractere (pode esconder instruções do revisor).");
+    if (hidden) add("A", "TEXT_HIDDEN_CHARS", path, `Invisible or direction-control character ${hidden.codePoint} at position ${hidden.index}`, "Remove the character (it can hide instructions from the reviewer).");
     const inj = injectionMatch(text);
-    if (inj) add("A", "STEP_INJECTION_PATTERN", path, `Trecho parecido com injeção de instruções: "${inj}"`, "Reescreva sem mandar a IA ignorar regras nem esconder coisas do usuário.");
+    if (inj) add("A", "STEP_INJECTION_PATTERN", path, `Text that looks like instruction injection: "${inj}"`, "Rewrite it without telling the AI to ignore rules or hide things from the user.");
     if (kind === "step") {
       const ask = sensitiveAsk(text);
-      if (ask) add("A", "STEP_SENSITIVE_ASK", path, `Pede dado sensível ao usuário: "${ask}"`, "Não peça senhas, CPF, cartão ou credenciais.");
+      if (ask) add("A", "STEP_SENSITIVE_ASK", path, `Asks the user for sensitive data: "${ask}"`, "Do not ask for passwords, national IDs, cards or credentials.");
       const url = sendingUrl(text);
-      if (url) add("A", "STEP_EXTERNAL_URL", path, `URL de envio de dados: ${url}`, "Não mande a IA enviar dados do usuário para endereços externos.");
+      if (url) add("A", "STEP_EXTERNAL_URL", path, `Data-sending URL: ${url}`, "Do not tell the AI to send user data to external addresses.");
     }
   };
   for (const [p, t] of manifestTexts) scanText(p, t, "manifest");
+
+  // ---- Traduções do catálogo (locales/pt.json): opcional; só texto de vitrine, validado e varrido como o do manifesto
+  for (const lang of PACKAGE_LOCALE_LANGS) {
+    const lp = localeFilePath(lang);
+    if (!files.has(lp)) continue;
+    const locText = readText(lp);
+    if (locText === null) continue;
+    let locRaw: unknown;
+    try {
+      locRaw = JSON.parse(locText);
+    } catch (e) {
+      add("E", "MANIFEST_INVALID_JSON", lp, `Invalid JSON: ${(e as Error).message}`, "Fix the JSON syntax.");
+      continue;
+    }
+    const lparsed = PackageLocale.safeParse(locRaw);
+    if (!lparsed.success) {
+      for (const i of lparsed.error.issues) {
+        if (i.code === "unrecognized_keys") {
+          for (const k of i.keys) add("E", "MANIFEST_UNKNOWN_FIELD", `${lp}#${[...i.path, k].join(".")}`, `Unknown field: ${k}`, "Remove the field or use a translation field (name, tagline, description, packageContents, requirements, searchPhrases, creatorBio).");
+        } else add("E", "MANIFEST_SCHEMA", `${lp}#${dotted(i.path)}`, i.message, "Fix the field according to the locales/<language>.json schema.");
+      }
+      continue;
+    }
+    const loc = lparsed.data;
+    const known = new Set(m.requirements.flatMap((r) => (r.key ? [r.key] : [])));
+    const seenKeys = new Set<string>();
+    for (const [i, r] of loc.requirements.entries()) {
+      if (!known.has(r.key)) add("E", "MANIFEST_SCHEMA", `${lp}#requirements.${i}.key`, `The key "${r.key}" does not exist in the manifest's requirements`, "Use the same key as the requirement being translated.");
+      else if (seenKeys.has(r.key)) add("E", "MANIFEST_SCHEMA", `${lp}#requirements.${i}.key`, `The key "${r.key}" is repeated`, "Translate each requirement only once.");
+      seenKeys.add(r.key);
+    }
+    const locTexts: [string, string][] = [
+      [`${lp}#name`, loc.name],
+      [`${lp}#tagline`, loc.tagline],
+      [`${lp}#description`, loc.description],
+      ...loc.packageContents.map((t, i): [string, string] => [`${lp}#packageContents.${i}`, t]),
+      ...loc.requirements.map((r, i): [string, string] => [`${lp}#requirements.${i}.label`, r.label]),
+      ...(loc.searchPhrases ?? []).map((t, i): [string, string] => [`${lp}#searchPhrases.${i}`, t]),
+      ...(loc.creatorBio ? ([[`${lp}#creatorBio`, loc.creatorBio]] as [string, string][]) : []),
+    ];
+    for (const [p, t] of locTexts) scanText(p, t, "manifest");
+  }
 
   // ---- Ferramentas
   const toolNames = new Set(m.tools.map((t) => t.name));
@@ -414,22 +472,22 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
     const remote = t.runner === "http" || t.runner === "mcp";
     if (third) {
       if (builtin || (phase === "nucleo" && remote) || !(builtin || remote)) {
-        add("E", "TOOL_FORBIDDEN_RUNNER", `${tp}.runner`, `O runner "${t.runner}" não é permitido a terceiros nesta fase`, phase === "nucleo" ? "Pacotes de terceiros ainda não têm ferramentas: remova tools." : "Use o runner http.");
+        add("E", "TOOL_FORBIDDEN_RUNNER", `${tp}.runner`, `The runner "${t.runner}" is not allowed for third parties at this stage`, phase === "nucleo" ? "Third-party packages cannot have tools yet: remove tools." : "Use the http runner.");
         continue;
       }
     }
-    if (!t.inputSchema) add(L("E"), "TOOL_SCHEMA_MISSING", `${tp}.inputSchema`, "A ferramenta não declara inputSchema", "Descreva a entrada com um JSON Schema.");
+    if (!t.inputSchema) add(L("E"), "TOOL_SCHEMA_MISSING", `${tp}.inputSchema`, "The tool does not declare an inputSchema", "Describe the input with a JSON Schema.");
     for (const key of ["inputSchema", "outputSchema"] as const) {
       const schema = t[key];
       if (schema) {
         const why = schemaUnsafe(schema);
-        if (why) add("E", "TOOL_SCHEMA_UNSAFE", `${tp}.${key}`, why, "Use um schema simples, sem $ref remoto nem pattern.");
+        if (why) add("E", "TOOL_SCHEMA_UNSAFE", `${tp}.${key}`, why, "Use a simple schema, without remote $ref or pattern.");
       }
     }
     if (remote) {
-      if (t.egress !== true) add("E", "TOOL_EGRESS_MISSING", `${tp}.egress`, "Ferramenta que envia dados a um serviço do criador precisa de egress: true", "Acrescente egress: true.");
-      const host = t.runner === "http" && t.http ? httpHostProblem(t.http) : t.runner === "http" ? "falta o bloco http" : null;
-      if (host) add("E", "TOOL_HTTP_HOST", `${tp}.http`, host, "Use https, porta 443, um domínio próprio e liste-o em allowedHosts.");
+      if (t.egress !== true) add("E", "TOOL_EGRESS_MISSING", `${tp}.egress`, "A tool that sends data to a creator-run service needs egress: true", "Add egress: true.");
+      const host = t.runner === "http" && t.http ? httpHostProblem(t.http) : t.runner === "http" ? "the http block is missing" : null;
+      if (host) add("E", "TOOL_HTTP_HOST", `${tp}.http`, host, "Use https, port 443 and your own domain, and list it in allowedHosts.");
     }
   }
 
@@ -440,22 +498,23 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
     const sp = mp(`steps.${i}.file`);
     const why = relativePathProblem(s.file, ["steps/"]);
     if (why) {
-      add("E", "MANIFEST_PATH_ESCAPE", sp, `Caminho "${s.file}" inválido: ${why}`, "Use um caminho como steps/01-nome.md.");
+      add("E", "MANIFEST_PATH_ESCAPE", sp, `Path "${s.file}" is invalid: ${why}`, "Use a path like steps/01-name.md.");
       continue;
     }
     if (!files.has(s.file)) {
-      add("E", "STEP_FILE_MISSING", sp, `A etapa ${i + 1} aponta para ${s.file}, que não existe no pacote`, "Crie o arquivo ou corrija o caminho.");
+      add("E", "STEP_FILE_MISSING", sp, `Step ${i + 1} points to ${s.file}, which does not exist in the package`, "Create the file or fix the path.");
       continue;
     }
     const text = readText(s.file);
     if (text === null) continue;
     stepTexts.push(text);
     if (text.length < STEP_MIN_CHARS || text.length > STEP_MAX_CHARS) {
-      add(L("E"), "STEP_TOO_SHORT_LONG", s.file, `A etapa tem ${text.length} caracteres (precisa ter de ${STEP_MIN_CHARS} a ${STEP_MAX_CHARS})`, "Detalhe a etapa ou divida em duas.");
+      add(L("E"), "STEP_TOO_SHORT_LONG", s.file, `The step has ${text.length} characters (it must have ${STEP_MIN_CHARS} to ${STEP_MAX_CHARS})`, "Add more detail to the step or split it in two.");
     }
-    for (const title of [...REQUIRED_SECTIONS, ...OPTIONAL_SECTIONS]) {
-      const has = new RegExp(`^##\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "im").test(text);
-      if (!has) add((REQUIRED_SECTIONS as readonly string[]).includes(title) ? L("E") : "A", "STEP_SECTION_MISSING", s.file, `Falta a seção "## ${title}"`, `Acrescente a seção "## ${title}".`);
+    for (const sec of STEP_SECTIONS) {
+      const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const has = new RegExp(`^##\\s+(${esc(sec.title)}|${esc(sec.pt)})\\s*$`, "im").test(text);
+      if (!has) add(sec.required ? L("E") : "A", "STEP_SECTION_MISSING", s.file, `Missing the "## ${sec.title}" section (the Portuguese title "## ${sec.pt}" is also accepted)`, `Add a "## ${sec.title}" section.`);
     }
     scanText(s.file, text, "step");
     // Referências a ferramentas: nomes snake_case entre crases em linhas que falam de ferramenta.
@@ -463,13 +522,13 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
       if (!/run_tool|ferramenta/i.test(line)) continue;
       for (const match of line.matchAll(/`([a-z][a-z0-9]*_[a-z0-9_]+)`/g)) {
         const name = match[1]!;
-        if (!toolNames.has(name) && !GLOBAL_NAMES.has(name)) add("A", "STEP_REFERENCE_UNKNOWN", s.file, `Cita a ferramenta ${name}, que não existe em tools`, "Declare a ferramenta em tools ou corrija o nome.");
+        if (!toolNames.has(name) && !GLOBAL_NAMES.has(name)) add("A", "STEP_REFERENCE_UNKNOWN", s.file, `Mentions the tool ${name}, which does not exist in tools`, "Declare the tool in tools or fix the name.");
       }
     }
-    if (s.gate.length > MAX_GATE_ITEMS) add(L("E"), "GATE_TOO_MANY", mp(`steps.${i}.gate`), `O gate tem ${s.gate.length} itens (máximo ${MAX_GATE_ITEMS})`, "Reduza o checklist.");
+    if (s.gate.length > MAX_GATE_ITEMS) add(L("E"), "GATE_TOO_MANY", mp(`steps.${i}.gate`), `The gate has ${s.gate.length} items (maximum ${MAX_GATE_ITEMS})`, "Shorten the checklist.");
     for (const [gi, g] of s.gate.entries()) {
       if (typeof g !== "string" && !toolNames.has(g.evidence.tool)) {
-        add("E", "GATE_EVIDENCE_UNKNOWN_TOOL", mp(`steps.${i}.gate.${gi}.evidence.tool`), `A evidência usa a ferramenta ${g.evidence.tool}, que não existe em tools`, "Use o nome de uma ferramenta declarada.");
+        add("E", "GATE_EVIDENCE_UNKNOWN_TOOL", mp(`steps.${i}.gate.${gi}.evidence.tool`), `The evidence uses the tool ${g.evidence.tool}, which does not exist in tools`, "Use the name of a declared tool.");
       }
     }
   }
@@ -481,19 +540,19 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   for (const t of declared) {
     const tp = t.path;
     const why = relativePathProblem(tp, ["templates/"]);
-    if (why) add("E", "MANIFEST_PATH_ESCAPE", mp(`templates.${t.name}.path`), `Caminho "${tp}" inválido: ${why}`, "Use um caminho como templates/modelo.md.");
-    else if (!files.has(tp)) add("E", "TEMPLATE_MISSING", mp(`templates.${t.name}.path`), `O template ${t.name} aponta para ${tp}, que não existe`, "Crie o arquivo ou corrija o caminho.");
+    if (why) add("E", "MANIFEST_PATH_ESCAPE", mp(`templates.${t.name}.path`), `Path "${tp}" is invalid: ${why}`, "Use a path like templates/template.md.");
+    else if (!files.has(tp)) add("E", "TEMPLATE_MISSING", mp(`templates.${t.name}.path`), `The template ${t.name} points to ${tp}, which does not exist`, "Create the file or fix the path.");
   }
   for (const p of templateFiles) {
-    if (third && !allowedIn("templates", extOf(p))) add("E", "TEMPLATE_TYPE_FORBIDDEN", p, `Tipo ${extOf(p)} não é permitido em templates nesta fase`, "Use .md, .txt ou .json.");
-    if (!declared.some((t) => t.path === p)) add("A", "TEMPLATE_UNDECLARED", p, "Arquivo em templates/ que não está declarado em templates[] (não será entregue)", "Declare em templates[] ou remova.");
+    if (third && !allowedIn("templates", extOf(p))) add("E", "TEMPLATE_TYPE_FORBIDDEN", p, `The type ${extOf(p)} is not allowed in templates at this stage`, "Use .md, .txt or .json.");
+    if (!declared.some((t) => t.path === p)) add("A", "TEMPLATE_UNDECLARED", p, "File in templates/ that is not declared in templates[] (it will not be delivered)", "Declare it in templates[] or remove it.");
     if ([".md", ".txt", ".json"].includes(extOf(p))) {
       const text = readText(p);
       if (text) scanText(p, text, "template");
     }
   }
   if (phase === "abertura" && third) {
-    for (const p of templateFiles) if ([".svg", ".html", ".htm", ".js"].includes(extOf(p))) add("E", "TEMPLATE_TYPE_FORBIDDEN", p, `Tipo ${extOf(p)} é bloqueado em templates`, "Use .md, .txt ou .json.");
+    for (const p of templateFiles) if ([".svg", ".html", ".htm", ".js"].includes(extOf(p))) add("E", "TEMPLATE_TYPE_FORBIDDEN", p, `The type ${extOf(p)} is blocked in templates`, "Use .md, .txt or .json.");
   }
 
   // ---- Conhecimento
@@ -512,11 +571,11 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
     if (ext === ".md") {
       const fm = parseFrontMatter(text);
       body = fm.body;
-      if (fm.kind === "invalid") add("E", "KNOWLEDGE_FRONTMATTER_INVALID", p, `Front-matter inválido: ${fm.error}`, "Use um bloco --- com linhas 'chave: valor'.");
+      if (fm.kind === "invalid") add("E", "KNOWLEDGE_FRONTMATTER_INVALID", p, `Invalid front-matter: ${fm.error}`, "Use a --- block with 'key: value' lines.");
       else if (fm.kind === "ok") {
         for (const key of ["source_date", "valid_until"] as const) {
           const v = fm.data[key];
-          if (v !== undefined && (typeof v !== "string" || !isIsoDate(v))) add("E", "KNOWLEDGE_DATE_INVALID", p, `${key} precisa ser uma data AAAA-MM-DD válida`, "Escreva a data como 2026-09-30.");
+          if (v !== undefined && (typeof v !== "string" || !isIsoDate(v))) add("E", "KNOWLEDGE_DATE_INVALID", p, `${key} must be a valid YYYY-MM-DD date`, "Write the date as 2026-09-30.");
         }
         const sd = fm.data.source_date;
         if (typeof sd === "string" && isIsoDate(sd)) {
@@ -525,28 +584,28 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
         const vu = fm.data.valid_until;
         if (typeof vu === "string" && isIsoDate(vu) && vu < todayInSaoPaulo(now)) {
           expired += 1;
-          add("A", "KNOWLEDGE_EXPIRED", p, `O conteúdo venceu em ${vu}`, "Atualize o arquivo ou remova-o.");
+          add("A", "KNOWLEDGE_EXPIRED", p, `The content expired on ${vu}`, "Update the file or remove it.");
         }
-        if (strict && typeof fm.data.source !== "string") add("E", "KNOWLEDGE_SOURCE_MISSING", p, "Falta 'source' no front-matter", "Informe a fonte (ex.: source: Banco Central do Brasil).");
+        if (strict && typeof fm.data.source !== "string") add("E", "KNOWLEDGE_SOURCE_MISSING", p, "'source' is missing from the front-matter", "Provide the source (e.g. source: World Bank).");
       } else if (strict) {
-        add("E", "KNOWLEDGE_SOURCE_MISSING", p, "Sem front-matter: falta a fonte do conteúdo", "Acrescente um bloco --- com source e source_date.");
+        add("E", "KNOWLEDGE_SOURCE_MISSING", p, "No front-matter: the content source is missing", "Add a --- block with source and source_date.");
       }
     } else if (strict && !files.has(`${p}.meta.json`)) {
-      add("E", "KNOWLEDGE_SOURCE_MISSING", p, "Arquivo .txt sem nome.txt.meta.json com a fonte", "Crie o arquivo .meta.json com source e source_date.");
+      add("E", "KNOWLEDGE_SOURCE_MISSING", p, "A .txt file without a name.txt.meta.json holding the source", "Create the .meta.json file with source and source_date.");
     }
     stats.knowledgeChunksEstimate += chunkMarkdown(body).length;
     scanText(p, text, "knowledge");
   }
   if (stats.knowledgeChunksEstimate > limits.knowledgeChunks) {
-    add("E", "KNOWLEDGE_TOO_BIG", "knowledge/", `O conhecimento gera ${stats.knowledgeChunksEstimate} trechos (teto ${limits.knowledgeChunks})`, "Reduza o conteúdo ou dê prioridade ao essencial.");
+    add("E", "KNOWLEDGE_TOO_BIG", "knowledge/", `The knowledge base produces ${stats.knowledgeChunksEstimate} chunks (limit ${limits.knowledgeChunks})`, "Reduce the content or prioritize the essentials.");
   }
-  if (strict && m.knowledge && !isIsoDate(m.knowledge.updatedAt)) add("E", "KNOWLEDGE_DATE_INVALID", mp("knowledge.updatedAt"), "updatedAt precisa ser uma data AAAA-MM-DD válida", "Escreva a data como 2026-09-30.");
+  if (strict && m.knowledge && !isIsoDate(m.knowledge.updatedAt)) add("E", "KNOWLEDGE_DATE_INVALID", mp("knowledge.updatedAt"), "updatedAt must be a valid YYYY-MM-DD date", "Write the date as 2026-09-30.");
 
   // ---- Onboarding
   if (m.onboarding) {
-    if (m.usesMemory !== true) add("E", "ONBOARDING_NEEDS_MEMORY", mp("usesMemory"), "onboarding exige usesMemory: true (o perfil fica na memória)", 'Acrescente "usesMemory": true.');
+    if (m.usesMemory !== true) add("E", "ONBOARDING_NEEDS_MEMORY", mp("usesMemory"), "onboarding requires usesMemory: true (the profile is kept in memory)", 'Add "usesMemory": true.');
     for (const [i, q] of m.onboarding.questions.entries()) {
-      if (sensitiveQuestion(`${q.ask} ${q.why} ${(q.options ?? []).join(" ")}`)) add("A", "ONBOARDING_SENSITIVE", mp(`onboarding.questions.${i}`), "A pergunta parece pedir dado sensível", "Não peça senhas, documentos ou credenciais na calibragem.");
+      if (sensitiveQuestion(`${q.ask} ${q.why} ${(q.options ?? []).join(" ")}`)) add("A", "ONBOARDING_SENSITIVE", mp(`onboarding.questions.${i}`), "The question seems to ask for sensitive data", "Do not ask for passwords, documents or credentials during calibration.");
     }
   }
 
@@ -560,7 +619,7 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
     const why = evalCaseProblem(text, caseIds);
     if (why) add("E", "EVAL_CASE_INVALID", p, why, "Use { id, input, checks: [{ type, value, description }] }.");
   }
-  if (caseFiles.length < limits.minEvalCases) add(L("E"), "EVAL_TOO_FEW_CASES", "evals/cases/", `Há ${caseFiles.length} casos de teste (mínimo ${limits.minEvalCases})`, "Escreva mais casos cobrindo os pedidos típicos.");
+  if (caseFiles.length < limits.minEvalCases) add(L("E"), "EVAL_TOO_FEW_CASES", "evals/cases/", `There are ${caseFiles.length} test cases (minimum ${limits.minEvalCases})`, "Write more cases covering typical requests.");
 
   // ---- Diferenciais
   const joined = stepTexts.join("\n");
@@ -575,20 +634,20 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
   stats.differentiators = proven;
   const declaredDiffs = m.differentiators ?? [];
   for (const d of declaredDiffs) {
-    if (!proven.includes(d)) add("A", "MANIFEST_DIFFERENTIATOR_UNPROVEN", mp("differentiators"), `O diferencial "${d}" não foi comprovado pelo pacote`, diffHint(d));
+    if (!proven.includes(d)) add("A", "MANIFEST_DIFFERENTIATOR_UNPROVEN", mp("differentiators"), `The differentiator "${d}" is not proven by the package`, diffHint(d));
   }
-  if (strict && proven.length < 2) add("A", "MANIFEST_DIFFERENTIATORS_FEW", mp("differentiators"), `Só ${proven.length} diferencial(is) comprovado(s); o critério é ter pelo menos 2`, "Acrescente conhecimento datado, calibragem, atendimento do criador ou ferramenta.");
+  if (strict && proven.length < 2) add("A", "MANIFEST_DIFFERENTIATORS_FEW", mp("differentiators"), `Only ${proven.length} differentiator(s) proven; the criterion is at least 2`, "Add dated knowledge, calibration, creator support or a tool.");
 
   // ---- packageContents x realidade
   const pc = m.packageContents.join(" ").toLowerCase();
-  const mismatch = (cond: boolean, what: string) => cond && add("A", "CONTENTS_MISMATCH", mp("packageContents"), `packageContents cita ${what}, mas o pacote não tem`, "Ajuste a lista ao que o pacote realmente entrega.");
-  mismatch(/template|modelo/.test(pc) && declared.length === 0 && templateFiles.length === 0, "templates/modelos");
-  mismatch(/ferramenta/.test(pc) && m.tools.length === 0, "ferramentas");
-  mismatch(/garantia/.test(pc) && !m.guarantee?.available, "garantia");
+  const mismatch = (cond: boolean, what: string) => cond && add("A", "CONTENTS_MISMATCH", mp("packageContents"), `packageContents mentions ${what}, but the package has none`, "Adjust the list to what the package really delivers.");
+  mismatch(/template|modelo/.test(pc) && declared.length === 0 && templateFiles.length === 0, "templates");
+  mismatch(/ferramenta|\btools?\b/.test(pc) && m.tools.length === 0, "tools");
+  mismatch(/garantia|guarantee/.test(pc) && !m.guarantee?.available, "a guarantee");
   // usesMemory ausente é deduzido das etapas (como o carregador faz).
   const usesMemory = m.usesMemory ?? /(save_memory|get_memory)/.test(joined);
-  mismatch(/mem(ó|o)ria|calibra/.test(pc) && !usesMemory && !m.onboarding, "memória");
-  mismatch(/base|conhecimento|fontes?\b/.test(pc) && stats.knowledgeFiles === 0, "base de conhecimento");
+  mismatch(/mem(ó|o)ria|calibra|memory/.test(pc) && !usesMemory && !m.onboarding, "memory");
+  mismatch(/base|conhecimento|fontes?\b|knowledge|sources?\b/.test(pc) && stats.knowledgeFiles === 0, "a knowledge base");
 
   return finish();
 }
@@ -596,34 +655,34 @@ export function validatePackage(input: PackageInput, opts: ValidateOptions = {})
 function diffHint(d: string): string {
   switch (d) {
     case "liveData":
-      return "Mantenha knowledge.updatedAt dentro de reviewEveryDays, sem arquivos vencidos, e ponha source_date em pelo menos metade dos arquivos.";
+      return "Keep knowledge.updatedAt within reviewEveryDays, with no expired files, and put source_date on at least half of the files.";
     case "memory":
-      return "Declare onboarding e faça pelo menos uma etapa usar o perfil do usuário.";
+      return "Declare onboarding and make at least one step use the user's profile.";
     case "escalation":
-      return "Ative escalation.enabled e vincule o Telegram no perfil do criador.";
+      return "Turn on escalation.enabled and link Telegram in the creator profile.";
     case "tool":
-      return "Declare ferramentas em tools e use-as nas etapas.";
+      return "Declare tools in tools and use them in the steps.";
     default:
-      return "Declare a garantia por testes (só pacotes da plataforma).";
+      return "Declare the test-based guarantee (platform packages only).";
   }
 }
 
 /** JSON Schema do criador roda no servidor: sem $ref remoto, sem pattern (ReDoS), profundidade e tamanho limitados. */
 function schemaUnsafe(schema: unknown): string | null {
   const size = JSON.stringify(schema).length;
-  if (size > 20_000) return `O schema tem ${size} caracteres (máximo 20.000)`;
+  if (size > 20_000) return `The schema has ${size} characters (maximum 20,000)`;
   let problem: string | null = null;
   const walk = (node: unknown, depth: number) => {
     if (problem) return;
     if (depth > 6) {
-      problem = "O schema passa de 6 níveis de profundidade";
+      problem = "The schema is deeper than 6 levels";
       return;
     }
     if (Array.isArray(node)) return node.forEach((x) => walk(x, depth + 1));
     if (node && typeof node === "object") {
       for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-        if (key === "$ref" && !(typeof value === "string" && value.startsWith("#"))) problem = "O schema usa $ref remoto";
-        else if (key === "pattern" || key === "patternProperties") problem = `O schema usa ${key} (risco de expressão regular lenta)`;
+        if (key === "$ref" && !(typeof value === "string" && value.startsWith("#"))) problem = "The schema uses a remote $ref";
+        else if (key === "pattern" || key === "patternProperties") problem = `The schema uses ${key} (risk of a slow regular expression)`;
         else walk(value, depth + 1);
         if (problem) return;
       }
@@ -638,14 +697,14 @@ function httpHostProblem(http: NonNullable<ToolView["http"]>): string | null {
   try {
     url = new URL(http.url);
   } catch {
-    return `URL inválida: ${http.url}`;
+    return `Invalid URL: ${http.url}`;
   }
-  if (url.protocol !== "https:") return "Só https é permitido";
-  if (url.port && url.port !== "443") return "Só a porta 443 é permitida";
+  if (url.protocol !== "https:") return "Only https is allowed";
+  if (url.port && url.port !== "443") return "Only port 443 is allowed";
   const host = url.hostname.toLowerCase();
-  if (host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return "Endereço IP ou localhost não é permitido";
-  if (!http.allowedHosts.map((h) => h.toLowerCase()).includes(host)) return `O host ${host} não está em allowedHosts`;
-  if (SHARED_HOSTING.some((s) => host.endsWith(s))) return `Domínio de hospedagem compartilhada (${host}) não serve como prova de controle`;
+  if (host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return "IP addresses and localhost are not allowed";
+  if (!http.allowedHosts.map((h) => h.toLowerCase()).includes(host)) return `The host ${host} is not in allowedHosts`;
+  if (SHARED_HOSTING.some((s) => host.endsWith(s))) return `A shared-hosting domain (${host}) does not prove control`;
   return null;
 }
 
@@ -654,24 +713,24 @@ function evalCaseProblem(text: string, seen: Set<string>): string | null {
   try {
     c = JSON.parse(text);
   } catch {
-    return "JSON inválido";
+    return "invalid JSON";
   }
-  if (!c || typeof c !== "object") return "o caso precisa ser um objeto";
+  if (!c || typeof c !== "object") return "the case must be an object";
   const o = c as { id?: unknown; input?: unknown; checks?: unknown };
-  if (typeof o.id !== "string" || !o.id) return "falta id";
-  if (seen.has(o.id)) return `id repetido: ${o.id}`;
+  if (typeof o.id !== "string" || !o.id) return "id is missing";
+  if (seen.has(o.id)) return `duplicate id: ${o.id}`;
   seen.add(o.id);
-  if (typeof o.input !== "string" || o.input.length < 3) return "falta input";
-  if (!Array.isArray(o.checks) || o.checks.length === 0) return "falta checks";
+  if (typeof o.input !== "string" || o.input.length < 3) return "input is missing";
+  if (!Array.isArray(o.checks) || o.checks.length === 0) return "checks is missing";
   for (const k of o.checks as { type?: unknown; value?: unknown; description?: unknown }[]) {
-    if (!k || !["regex", "contains", "not_contains"].includes(String(k.type))) return `checagem com type inválido: ${String(k?.type)}`;
-    if (typeof k.value !== "string" || !k.value) return "checagem sem value";
-    if (typeof k.description !== "string" || !k.description) return "checagem sem description";
+    if (!k || !["regex", "contains", "not_contains"].includes(String(k.type))) return `check with invalid type: ${String(k?.type)}`;
+    if (typeof k.value !== "string" || !k.value) return "check without value";
+    if (typeof k.description !== "string" || !k.description) return "check without description";
     if (k.type === "regex") {
       try {
         new RegExp(k.value, "iu");
       } catch {
-        return `regex inválida: ${k.value}`;
+        return `invalid regex: ${k.value}`;
       }
     }
   }

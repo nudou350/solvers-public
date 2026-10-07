@@ -3,6 +3,7 @@ import {
   AdminSubmissionRow,
   Agent,
   AgentAccess,
+  type CatalogLang,
   AgentDetail,
   ConnectorStatus,
   Creator,
@@ -71,6 +72,9 @@ export type WalletLike = {
   signTransaction(tx: Uint8Array, opts?: { network?: "mainnet" }): Promise<Uint8Array>;
 };
 
+/** `?lang=` dos textos de catálogo (en = manifest, pt = locales/pt.json); sem idioma, o servidor decide pelo Accept-Language. */
+const withLang = (path: string, lang?: CatalogLang): string => (lang ? `${path}${path.includes("?") ? "&" : "?"}lang=${lang}` : path);
+
 const toB64 = (b: Uint8Array) => {
   let s = "";
   b.forEach((x) => (s += String.fromCharCode(x)));
@@ -108,17 +112,17 @@ export function createApi(opts: ApiOptions = {}) {
   const api = {
     // ----- Loja (público) -----
     getConfig: () => req(PublicConfig, "/api/config"),
-    getAgents: (q: { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number } = {}) => {
+    getAgents: (q: { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number; lang?: CatalogLang } = {}) => {
       const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
       return req(z.array(Agent), `/api/agents${p.size ? `?${p}` : ""}`);
     },
     getCategories: () => req(z.array(z.object({ category: z.string(), count: z.number() })), "/api/categories"),
-    getAgent: (idOrSlug: string) => req(AgentDetail, `/api/agents/${encodeURIComponent(idOrSlug)}`),
+    getAgent: (idOrSlug: string, lang?: CatalogLang) => req(AgentDetail, withLang(`/api/agents/${encodeURIComponent(idOrSlug)}`, lang)),
     getReviews: (idOrSlug: string) => req(z.array(Review), `/api/agents/${encodeURIComponent(idOrSlug)}/reviews`),
-    search: (need: string) => post(z.array(Agent), "/api/search", { need }),
-    getCreator: (id: string) => req(CreatorProfile, `/api/creators/${encodeURIComponent(id)}`),
+    search: (need: string, lang?: CatalogLang) => post(z.array(Agent), withLang("/api/search", lang), { need }),
+    getCreator: (id: string, lang?: CatalogLang) => req(CreatorProfile, withLang(`/api/creators/${encodeURIComponent(id)}`, lang)),
     /** Criadores com especialista na vitrine: monte um mapa por id para os cards (nome e reputação). */
-    getCreators: () => req(z.array(Creator), "/api/creators"),
+    getCreators: (lang?: CatalogLang) => req(z.array(Creator), withLang("/api/creators", lang)),
 
     // ----- Login com carteira (SIWS) -----
     async login(wallet: WalletLike) {
@@ -132,7 +136,7 @@ export function createApi(opts: ApiOptions = {}) {
     // ----- Minha conta -----
     getMyLicenses: () => req(z.array(License), "/api/me/licenses"),
     getMyEscrows: () => req(z.array(Escrow), "/api/me/escrows"),
-    getMyEscrow: (id: string) => req(EscrowDetail, `/api/me/escrows/${id}`),
+    getMyEscrow: (id: string, lang?: CatalogLang) => req(EscrowDetail, withLang(`/api/me/escrows/${id}`, lang)),
     downloadDeliverable: (escrowId: string, index: number) =>
       req(z.object({ files: z.record(z.string()) }), `/api/me/escrows/${escrowId}/milestones/${index}/download`),
     getMyUsage: () => req(z.array(UsageSummary), "/api/me/usage"),
@@ -148,17 +152,19 @@ export function createApi(opts: ApiOptions = {}) {
      * Anúncios ativos de revenda (um por licença), do mais barato ao mais caro (teto de 200 na listagem geral);
      * `agent` = slug para filtrar um especialista; `license` = id da licença (o anúncio ativo dela, sem o teto).
      */
-    getResaleListings: (params?: { agent?: string; license?: string }) => {
+    getResaleListings: (params?: { agent?: string; license?: string; lang?: CatalogLang }) => {
       const qs = new URLSearchParams();
       if (params?.agent) qs.set("agent", params.agent);
       if (params?.license) qs.set("license", params.license);
+      if (params?.lang) qs.set("lang", params.lang);
       const q = qs.toString();
       return req(z.array(ResaleListing), `/api/market/listings${q ? `?${q}` : ""}`);
     },
     /** O anúncio ativo de uma licença (checkout de revenda); null quando não há (vendido, cancelado ou inexistente). */
-    getResaleListing: async (licenseId: string) => (await req(z.array(ResaleListing), `/api/market/listings?${new URLSearchParams({ license: licenseId })}`))[0] ?? null,
+    getResaleListing: async (licenseId: string, lang?: CatalogLang) =>
+      (await req(z.array(ResaleListing), `/api/market/listings?${new URLSearchParams({ license: licenseId, ...(lang ? { lang } : {}) })}`))[0] ?? null,
     getReputation: () => req(UserReputation, "/api/me/reputation"),
-    getProfile: () => req(Profile, "/api/me/profile"),
+    getProfile: (lang?: CatalogLang) => req(Profile, withLang("/api/me/profile", lang)),
     updateProfile: (data: { displayName?: string | null; email?: string | null }) =>
       req(z.object({ ok: z.boolean() }), "/api/me/profile", { method: "PATCH", body: JSON.stringify(data) }),
     getBalance: () => req(z.object({ usdc: z.number() }), "/api/me/balance"),
@@ -195,7 +201,7 @@ export function createApi(opts: ApiOptions = {}) {
 
     getConnector: () => req(ConnectorStatus, "/api/connector"),
     revokeConnector: () => post(z.object({ revoked: z.number() }), "/api/connector/revoke"),
-    getCreatorDashboard: () => req(CreatorDashboard, "/api/creator/dashboard"),
+    getCreatorDashboard: (lang?: CatalogLang) => req(CreatorDashboard, withLang("/api/creator/dashboard", lang)),
 
     // ----- Transações: o servidor monta e paga a taxa; a carteira só assina -----
     /** Compra da licença vitalícia (único tipo de compra). Erros extras: `sold_out` 409 (teto de licenças atingido, ver `SUPPLY_ERROR_CODES`), `price_changed` 409. */

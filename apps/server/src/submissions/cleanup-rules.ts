@@ -40,6 +40,6 @@ export function orphanFolderStale(hasRow: boolean, mtimeMs: number, now: Date = 
 }
 
 /** Nota gravada em `reviewer_notes` e em `package_reviews` quando o sistema expira uma submissão parada. */
-export const EXPIRED_NOTE = "Envio expirado: ficou mais de 30 dias parado, esperando o criador. O slug foi liberado; envie o pacote de novo se ainda quiser publicar.";
+export const EXPIRED_NOTE = "Submission expired: it sat idle for more than 30 days, waiting for the creator. The slug has been released; submit the package again if you still want to publish.";
 /** Carteira que assina as ações do sistema em `package_reviews`. */
 export const SYSTEM_REVIEWER = "system";

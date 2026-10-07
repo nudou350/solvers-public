@@ -80,7 +80,7 @@ function loadAcceptance(m: typeof schema.milestones.$inferSelect): Files | null 
     console.error(`[verifier] bateria de aceite ausente ou diferente do hash combinado (${m.escrowId}/${m.idx})`);
     throw new HttpError(
       500,
-      "A bateria de aceite combinada para esta etapa não está disponível. A verificação foi interrompida; fale com o suporte.",
+      "The agreed acceptance test suite for this step is not available. The check was stopped; please contact support.",
       "acceptance_unavailable",
     );
   }
@@ -149,12 +149,12 @@ export function submitDeliverable(input: SubmitInput) {
 
 async function submitLocked(input: SubmitInput, files: Files) {
   const [escrow] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, input.escrowId));
-  if (!escrow) throw notFound("Tarefa com garantia não encontrada");
-  if (escrow.buyerWallet !== input.wallet) throw forbidden("Esta garantia pertence a outra carteira");
-  if (escrow.agentId !== input.agentId) throw badRequest("Esta garantia é de outro especialista");
+  if (!escrow) throw notFound("Guaranteed task not found");
+  if (escrow.buyerWallet !== input.wallet) throw forbidden("This guarantee belongs to another wallet");
+  if (escrow.agentId !== input.agentId) throw badRequest("This guarantee belongs to another specialist");
   const where = and(eq(schema.milestones.escrowId, escrow.id), eq(schema.milestones.idx, input.index));
   const [m] = await db.select().from(schema.milestones).where(where);
-  if (!m) throw notFound("Etapa não encontrada");
+  if (!m) throw notFound("Step not found");
 
   const hash = filesHash(files);
   const hashHex = hash.toString("hex");
@@ -169,7 +169,7 @@ async function submitLocked(input: SubmitInput, files: Files) {
       autoReleaseAt: escrow.autoReleaseAt?.toISOString() ?? null,
     };
   }
-  if (!["pending", "submitted"].includes(m.status) && !sameDelivery) throw badRequest(`Esta etapa já está ${m.status}`);
+  if (!["pending", "submitted"].includes(m.status) && !sameDelivery) throw badRequest(`This step is already ${m.status}`);
 
   // Só o estado off-chain muda aqui; nada da tentativa anterior em disco é tocado antes de passar.
   const onlySubmitted = and(where, eq(schema.milestones.status, "submitted"));
@@ -208,7 +208,7 @@ async function submitLocked(input: SubmitInput, files: Files) {
   const plan = planMarkPassed(await readChainMilestone(escrow.id, input.index), hashHex);
   if (plan === "conflict") {
     await backToPending();
-    throw badRequest("Esta etapa já foi marcada on-chain com outra entrega.", "milestone_conflict");
+    throw badRequest("This step was already marked on-chain with a different delivery.", "milestone_conflict");
   }
 
   // Persiste entrega, prévia e relatório ANTES do mark_passed. A rota /preview só serve com a etapa
@@ -254,7 +254,7 @@ async function submitLocked(input: SubmitInput, files: Files) {
           }
           await backToPending();
           await syncEscrow(escrowAddr).catch(() => undefined);
-          throw badRequest("Esta etapa já foi marcada on-chain com outra entrega.", "milestone_conflict");
+          throw badRequest("This step was already marked on-chain with a different delivery.", "milestone_conflict");
         }
         // Resultado incerto (a transação ainda pode entrar): mantém esta entrega salva, coerente com o que
         // será aprovado; o syncEscrow preserva "passed" se ela entrar.
@@ -273,6 +273,6 @@ async function submitLocked(input: SubmitInput, files: Files) {
   }
 
   const [after] = await db.select().from(schema.escrows).where(eq(schema.escrows.id, escrow.id));
-  void notifyCreator(escrow.agentId, `Solvers: etapa ${input.index + 1} da garantia ${escrow.id.slice(0, 8)}… passou na verificação.`);
+  void notifyCreator(escrow.agentId, `Solvers: step ${input.index + 1} of guarantee ${escrow.id.slice(0, 8)}… passed verification.`);
   return { passed: true as const, report: finalReport, previewUrl, autoReleaseAt: after?.autoReleaseAt?.toISOString() ?? null };
 }

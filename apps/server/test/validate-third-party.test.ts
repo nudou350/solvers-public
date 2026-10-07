@@ -140,6 +140,45 @@ describe("modo third_party: erros do envio de terceiros", () => {
       assert.ok(r.errors.some((i) => i.code === "STEP_SECTION_MISSING" && i.message.includes(title)), show(r));
     });
   }
+  it("a mensagem de seção faltando vem em inglês, com o título em inglês e a menção ao título em português", () => {
+    const f = baseFiles();
+    f["steps/02-classificar.md"] = (f["steps/02-classificar.md"] as string).replace("## Objetivo", "## Objective");
+    const r = run(f);
+    const issue = r.errors.find((i) => i.code === "STEP_SECTION_MISSING");
+    assert.match(issue?.message ?? "", /^Missing the "## Goal" section \(the Portuguese title "## Objetivo" is also accepted\)/);
+    assert.match(issue?.fix ?? "", /^Add a "## Goal" section/);
+  });
+  const EN_HEADINGS: [string, string][] = [
+    ["## Objetivo", "## Goal"],
+    ["## O que perguntar ao usuário", "## What to ask the user"],
+    ["## Como executar", "## How to run"],
+    ["## Erros comuns", "## Common mistakes"],
+    ["## Formato do result_summary", "## result_summary format"],
+  ];
+  it("etapas com os títulos de seção em inglês (padrão) não geram STEP_SECTION_MISSING", () => {
+    const f = baseFiles();
+    for (const key of Object.keys(f)) {
+      if (!key.startsWith("steps/")) continue;
+      let text = f[key] as string;
+      for (const [pt, en] of EN_HEADINGS) text = text.replace(pt, en);
+      f[key] = text;
+    }
+    const r = run(f);
+    assert.equal(r.ok, true, show(r));
+    assert.ok(![...codes(r, "E"), ...codes(r, "A")].includes("STEP_SECTION_MISSING"), show(r));
+  });
+  it("etapas com os títulos antigos em português continuam passando sem STEP_SECTION_MISSING", () => {
+    const r = run(baseFiles());
+    assert.equal(r.ok, true, show(r));
+    assert.ok(![...codes(r, "E"), ...codes(r, "A")].includes("STEP_SECTION_MISSING"), show(r));
+  });
+  it("etapa sem a seção Goal (nem Objetivo) é erro; a mesma etapa com Goal passa", () => {
+    const f = baseFiles();
+    f["steps/02-classificar.md"] = (f["steps/02-classificar.md"] as string).replace("## Objetivo", "## Outra coisa");
+    assert.ok(codes(run(f), "E").includes("STEP_SECTION_MISSING"));
+    f["steps/02-classificar.md"] = (f["steps/02-classificar.md"] as string).replace("## Outra coisa", "## Goal");
+    assert.ok(!codes(run(f), "E").includes("STEP_SECTION_MISSING"));
+  });
   it("seções opcionais ausentes continuam sendo aviso", () => {
     const f = baseFiles();
     f["steps/02-classificar.md"] = (f["steps/02-classificar.md"] as string).replace("## Erros comuns", "## Notas");

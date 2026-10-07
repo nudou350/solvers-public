@@ -35,7 +35,7 @@ export type ValidatePackageOutput = {
   errors: Issue[];
   warnings: Issue[];
   stats: ValidationResult["stats"];
-  /** Em português, curta: o que corrigir primeiro. */
+  /** Em inglês, curta: o que corrigir primeiro. */
   summary: string;
 };
 
@@ -45,7 +45,7 @@ const enc = new TextEncoder();
 export function buildPackage(input: ValidatePackageInput): PackageInput {
   const contents = new Map<string, Uint8Array>();
   const put = (path: string, text: string) => {
-    if (contents.has(path)) throw badRequest(`O arquivo ${path} veio mais de uma vez na entrada (steps, knowledge, templates e evals não podem repetir caminho).`);
+    if (contents.has(path)) throw badRequest(`The file ${path} appeared more than once in the input (steps, knowledge, templates and evals can't repeat a path).`);
     contents.set(path, enc.encode(text));
   };
   put("manifest.json", JSON.stringify(input.manifest));
@@ -57,7 +57,7 @@ export function buildPackage(input: ValidatePackageInput): PackageInput {
   // `files` dá o tamanho real de cada arquivo (inclusive os que só vieram como lista); sem ele, vale o tamanho do conteúdo recebido.
   const sizes = new Map<string, number>();
   for (const f of input.files ?? []) {
-    if (sizes.has(f.path)) throw badRequest(`O arquivo ${f.path} está repetido em files.`);
+    if (sizes.has(f.path)) throw badRequest(`The file ${f.path} is repeated in files.`);
     sizes.set(f.path, f.size);
   }
   const entries = new Map<string, number>(sizes);
@@ -92,34 +92,34 @@ function priority(code: string): number {
 
 const SHOWN = 5;
 
-/** Resumo curto em português: o que corrigir primeiro. Puro. */
+/** Resumo curto em inglês: o que corrigir primeiro. Puro. */
 export function summarize(errors: readonly Issue[], warnings: readonly Issue[], notes: readonly string[] = []): string {
   const tail = notes.length ? ` ${notes.join(" ")}` : "";
   if (errors.length === 0) {
-    const w = warnings.length ? ` Há ${warnings.length} ${warnings.length === 1 ? "aviso" : "avisos"} (o revisor vai ler).` : "";
-    return `Manifesto e etapas sem erros.${w} Falta a validação completa (conhecimento inteiro, evals e ZIP), que roda no envio pelo site ou no script solvers validate.${tail}`;
+    const w = warnings.length ? ` There ${warnings.length === 1 ? "is" : "are"} ${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"} (the reviewer will read ${warnings.length === 1 ? "it" : "them"}).` : "";
+    return `Manifest and steps have no errors.${w} The full validation (whole knowledge base, evals and ZIP) is still missing; it runs on upload through the site or with the solvers validate script.${tail}`;
   }
   const ordered = errors.map((e, i) => ({ e, i })).sort((a, b) => priority(a.e.code) - priority(b.e.code) || a.i - b.i).map((x) => x.e);
-  const lines = ordered.slice(0, SHOWN).map((e, i) => `${i + 1}) ${e.code}${e.path ? ` em ${e.path}` : ""}: ${e.message}. Corrija: ${e.fix}`);
-  const more = ordered.length > SHOWN ? ` Depois de corrigir estes, valide de novo (restam ${ordered.length - SHOWN}).` : " Depois de corrigir, valide de novo.";
-  return `${errors.length} ${errors.length === 1 ? "erro" : "erros"} para corrigir. Comece por:\n${lines.join("\n")}${more}${tail}`;
+  const lines = ordered.slice(0, SHOWN).map((e, i) => `${i + 1}) ${e.code}${e.path ? ` at ${e.path}` : ""}: ${e.message}. Fix: ${e.fix}`);
+  const more = ordered.length > SHOWN ? ` After fixing these, validate again (${ordered.length - SHOWN} left).` : " After fixing, validate again.";
+  return `${errors.length} ${errors.length === 1 ? "error" : "errors"} to fix. Start with:\n${lines.join("\n")}${more}${tail}`;
 }
 
 /** Executa a validação do Criador. Entrada inválida vira ZodError (o executor responde 400 com o motivo). */
 export function validatePackageTool(raw: unknown): ValidatePackageOutput {
   const input = ValidatePackageInput.parse(raw);
   const bytes = enc.encode(JSON.stringify(input)).byteLength;
-  if (bytes > MAX_INPUT_BYTES) throw badRequest(`A entrada tem ${bytes} bytes e o limite é ${MAX_INPUT_BYTES}. Mande só o começo dos arquivos de conhecimento e valide os casos de eval em outra chamada.`);
+  if (bytes > MAX_INPUT_BYTES) throw badRequest(`The input is ${bytes} bytes and the limit is ${MAX_INPUT_BYTES}. Send only the beginning of the knowledge files and validate the eval cases in another call.`);
   const has = { files: input.files !== undefined, knowledge: input.knowledge !== undefined, templates: input.templates !== undefined, evals: input.evals !== undefined };
   const result = validatePackage(buildPackage(input), { mode: "third_party", minPriceUsdc: MIN_PRICE_USDC });
   const keep = (i: Issue) => !outOfScope(i.code, i.message, has);
   const errors = result.errors.filter(keep);
   const warnings = result.warnings.filter(keep);
   const notes: string[] = [];
-  if (!has.knowledge) notes.push("O conhecimento não foi enviado, então não foi conferido.");
-  if (!has.evals) notes.push("Os casos de eval não foram enviados, então não foram conferidos.");
+  if (!has.knowledge) notes.push("The knowledge base was not sent, so it was not checked.");
+  if (!has.evals) notes.push("The eval cases were not sent, so they were not checked.");
   // Caminho curto (sem a pasta) é o erro mais comum de quem monta a entrada à mão: o arquivo entra, mas não conta como caso nem como conhecimento.
-  if (input.evals?.length && !input.evals.some((e) => /^evals\/cases\/[^/]+\.json$/.test(e.path))) notes.push("Nenhum eval veio com o caminho completo evals/cases/NN-nome.json, e só assim ele conta como caso de teste.");
-  if (input.knowledge?.length && !input.knowledge.some((k) => k.path.startsWith("knowledge/"))) notes.push("Nenhum arquivo de conhecimento veio com o caminho completo knowledge/nome.md, e só assim ele é conferido como conhecimento.");
+  if (input.evals?.length && !input.evals.some((e) => /^evals\/cases\/[^/]+\.json$/.test(e.path))) notes.push("No eval came with the full path evals/cases/NN-name.json, and only that counts as a test case.");
+  if (input.knowledge?.length && !input.knowledge.some((k) => k.path.startsWith("knowledge/"))) notes.push("No knowledge file came with the full path knowledge/name.md, and only that is checked as knowledge.");
   return { ok: errors.length === 0, errors, warnings, stats: result.stats, summary: summarize(errors, warnings, notes) };
 }

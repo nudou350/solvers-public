@@ -20,7 +20,7 @@ export type ZipIssue = { code: string; path: string; message: string; fix: strin
 /** Códigos do catálogo (Apêndice A) mais `ZIP_UNREADABLE` (ZIP corrompido, cifrado ou com compressão não suportada). */
 export class ZipError extends Error {
   constructor(readonly issues: ZipIssue[]) {
-    super(issues[0]?.message ?? "ZIP inválido");
+    super(issues[0]?.message ?? "Invalid ZIP");
     this.name = "ZipError";
   }
 }
@@ -73,7 +73,7 @@ function openZip(zipPath: string): Promise<yauzl.ZipFile> {
   return new Promise((ok, fail) => {
     // decodeStrings:false -> o nome chega como Buffer e é decodificado/validado aqui (o yauzl trocaria `\` por `/` em silêncio).
     // validateEntrySizes:false -> o tamanho real é contado por nós, em streaming, contra os tetos.
-    yauzl.open(zipPath, { lazyEntries: true, autoClose: false, decodeStrings: false, validateEntrySizes: false }, (err, zf) => (err || !zf ? fail(err ?? new Error("ZIP vazio")) : ok(zf)));
+    yauzl.open(zipPath, { lazyEntries: true, autoClose: false, decodeStrings: false, validateEntrySizes: false }, (err, zf) => (err || !zf ? fail(err ?? new Error("empty ZIP")) : ok(zf)));
   });
 }
 
@@ -87,7 +87,7 @@ function readEntries(zf: yauzl.ZipFile, maxEntries: number): Promise<yauzl.Entry
       all.push(e);
       if (all.length > maxEntries) {
         zf.removeAllListeners("end");
-        fail(new ZipError([issue("ZIP_TOO_MANY_FILES", "", `O ZIP tem mais de ${maxEntries} entradas`, "Junte arquivos pequenos de conhecimento.")]));
+        fail(new ZipError([issue("ZIP_TOO_MANY_FILES", "", `The ZIP has more than ${maxEntries} entries`, "Merge small knowledge files.")]));
         return;
       }
       zf.readEntry();
@@ -97,7 +97,7 @@ function readEntries(zf: yauzl.ZipFile, maxEntries: number): Promise<yauzl.Entry
 }
 
 function openEntry(zf: yauzl.ZipFile, e: yauzl.Entry) {
-  return new Promise<NodeJS.ReadableStream>((ok, fail) => zf.openReadStream(e, (err, s) => (err || !s ? fail(err ?? new Error("sem stream")) : ok(s))));
+  return new Promise<NodeJS.ReadableStream>((ok, fail) => zf.openReadStream(e, (err, s) => (err || !s ? fail(err ?? new Error("no stream")) : ok(s))));
 }
 
 /**
@@ -106,18 +106,18 @@ function openEntry(zf: yauzl.ZipFile, e: yauzl.Entry) {
 export async function extractZip(zipPath: string, destDir: string, limits: ZipLimits = NUCLEO_ZIP_LIMITS): Promise<ExtractedZip> {
   const st = await stat(zipPath);
   if (st.size > limits.zipBytes) {
-    throw new ZipError([issue("ZIP_TOO_LARGE", "", `ZIP de ${st.size} bytes passa do teto de ${limits.zipBytes}`, "Reduza o conhecimento ou divida o conteúdo.")]);
+    throw new ZipError([issue("ZIP_TOO_LARGE", "", `The ZIP is ${st.size} bytes, over the ${limits.zipBytes} byte limit`, "Reduce the knowledge base or split the content.")]);
   }
   let zf: yauzl.ZipFile | undefined;
   try {
     try {
       zf = await openZip(zipPath);
     } catch (e) {
-      throw new ZipError([issue("ZIP_UNREADABLE", "", `Não consegui abrir o ZIP: ${(e as Error).message}`, "Gere o ZIP de novo (selecione a pasta do pacote e compacte).")]);
+      throw new ZipError([issue("ZIP_UNREADABLE", "", `Could not open the ZIP: ${(e as Error).message}`, "Create the ZIP again (select the package folder and compress it).")]);
     }
     const entries = await readEntries(zf, limits.files * 2 + 100).catch((e) => {
       if (e instanceof ZipError) throw e;
-      throw new ZipError([issue("ZIP_UNREADABLE", "", `ZIP corrompido: ${(e as Error).message}`, "Gere o ZIP de novo.")]);
+      throw new ZipError([issue("ZIP_UNREADABLE", "", `Corrupted ZIP: ${(e as Error).message}`, "Create the ZIP again.")]);
     });
     const { items, rootName, warnings } = plan(entries, limits);
     const root = resolve(destDir);
@@ -149,7 +149,7 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
     try {
       name = decoder.decode(entry.fileName as unknown as Buffer);
     } catch {
-      problems.push(issue("ZIP_BAD_PATH", "(nome ilegível)", "O nome de um arquivo não é UTF-8 válido", "Renomeie sem acentos ou compacte com outro programa (ex.: o compactador do sistema)."));
+      problems.push(issue("ZIP_BAD_PATH", "(unreadable name)", "A file name is not valid UTF-8", "Rename it without accents or compress with another program (for example, your system's built-in compressor)."));
       continue;
     }
     const isDir = name.endsWith("/");
@@ -158,35 +158,35 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
       const key = name.startsWith("__MACOSX") ? "__MACOSX/" : name;
       if (!warned.has(key)) {
         warned.add(key);
-        warnings.push(issue("ZIP_IGNORED_FILE", key, "Arquivo de sistema removido da extração", "Não precisa fazer nada; evite compactar pelo Finder sem limpar."));
+        warnings.push(issue("ZIP_IGNORED_FILE", key, "System file removed from the extraction", "Nothing to do; avoid compressing with Finder without cleaning up first."));
       }
       continue;
     }
     if (isDir) {
       // Pastas não são extraídas (nascem com os arquivos), mas o nome precisa ser seguro como qualquer outro caminho.
       const why = pathProblem(name.slice(0, -1).normalize("NFC"));
-      if (why) problems.push(issue("ZIP_BAD_PATH", name, `Caminho inválido: ${why}`, "Renomeie a pasta com letras, dígitos, hífen, sublinhado e ponto."));
+      if (why) problems.push(issue("ZIP_BAD_PATH", name, `Invalid path: ${why}`, "Rename the folder using letters, digits, hyphens, underscores and dots."));
       continue;
     }
     const nfc = name.normalize("NFC");
     const unixMode = entry.versionMadeBy >> 8 === 3 ? (entry.externalFileAttributes >>> 16) & 0o170000 : 0;
     if (unixMode === 0o120000) {
-      problems.push(issue("ZIP_SYMLINK", nfc, "Link simbólico não é permitido", "Troque o link pelo arquivo real."));
+      problems.push(issue("ZIP_SYMLINK", nfc, "Symbolic links are not allowed", "Replace the link with the real file."));
       continue;
     }
     const why = pathProblem(nfc);
     if (why) {
-      problems.push(issue("ZIP_BAD_PATH", nfc, `Caminho inválido: ${why}`, "Renomeie o arquivo com letras, dígitos, hífen, sublinhado e ponto."));
+      problems.push(issue("ZIP_BAD_PATH", nfc, `Invalid path: ${why}`, "Rename the file using letters, digits, hyphens, underscores and dots."));
       continue;
     }
     const key = nfc.toLowerCase();
     if (seen.has(key)) {
-      problems.push(issue("ZIP_DUPLICATE_ENTRY", nfc, `Repete o arquivo ${seen.get(key)} (NFC, sem distinguir maiúsculas)`, "Deixe só uma versão do arquivo."));
+      problems.push(issue("ZIP_DUPLICATE_ENTRY", nfc, `Duplicates the file ${seen.get(key)} (NFC, case-insensitive)`, "Keep only one version of the file."));
       continue;
     }
     seen.set(key, nfc);
     if (entry.isEncrypted()) {
-      problems.push(issue("ZIP_UNREADABLE", nfc, "Arquivo cifrado com senha", "Gere o ZIP sem senha."));
+      problems.push(issue("ZIP_UNREADABLE", nfc, "Password-protected file", "Create the ZIP without a password."));
       continue;
     }
     staged.push({ entry, name: nfc, declared: entry.uncompressedSize });
@@ -194,10 +194,10 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
   }
 
   if (staged.length > limits.files) {
-    problems.push(issue("ZIP_TOO_MANY_FILES", "", `${staged.length} arquivos passam do teto de ${limits.files}`, "Junte arquivos pequenos de conhecimento."));
+    problems.push(issue("ZIP_TOO_MANY_FILES", "", `${staged.length} files exceed the limit of ${limits.files}`, "Merge small knowledge files."));
   }
   if (declaredTotal > limits.expandedBytes) {
-    problems.push(issue("ZIP_EXPANDS_TOO_MUCH", "", `O conteúdo extraído passaria de ${limits.expandedBytes} bytes`, "Reduza o tamanho dos arquivos."));
+    problems.push(issue("ZIP_EXPANDS_TOO_MUCH", "", `The extracted content would exceed ${limits.expandedBytes} bytes`, "Reduce the size of the files."));
   }
 
   // Raiz única: toda entrada começa pela mesma pasta, e essa pasta tem o manifest.json.
@@ -205,10 +205,10 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
   const flat = staged.filter((s) => !s.name.includes("/"));
   const rootName = [...roots][0] ?? "";
   if (staged.length === 0 || roots.size !== 1 || flat.length > 0) {
-    problems.push(issue("ZIP_BAD_ROOT", "", `O ZIP precisa ter exatamente 1 pasta raiz com o manifest.json (achei ${flat.length ? "arquivos soltos na raiz" : `${roots.size} raízes`})`, "Coloque tudo dentro de uma única pasta com o manifest.json."));
+    problems.push(issue("ZIP_BAD_ROOT", "", `The ZIP must have exactly 1 root folder containing manifest.json (found ${flat.length ? "loose files at the root" : `${roots.size} roots`})`, "Put everything inside a single folder that contains manifest.json."));
   } else if (!staged.some((s) => s.name === `${rootName}/manifest.json`)) {
     // Nome exato: `MANIFEST.JSON` passaria numa comparação sem caixa, mas o resto do sistema lê `manifest.json`.
-    problems.push(issue("ZIP_BAD_ROOT", `${rootName}/manifest.json`, "Falta o manifest.json (com este nome exato, em minúsculas) dentro da pasta raiz", "Coloque o manifest.json direto na pasta raiz do pacote."));
+    problems.push(issue("ZIP_BAD_ROOT", `${rootName}/manifest.json`, "manifest.json is missing from the root folder (exact name, lowercase)", "Put manifest.json directly in the package root folder."));
   }
 
   // Um caminho que é arquivo e pasta ao mesmo tempo (`a/b` e `a/b/c.md`) não existe em disco: erro limpo, não EISDIR/ENOTDIR.
@@ -221,16 +221,16 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
       if (fileKeys.has(prefix.toLowerCase())) clash.add(prefix);
     }
   }
-  for (const p of clash) problems.push(issue("ZIP_BAD_PATH", p, "O mesmo caminho aparece como arquivo e como pasta", "Renomeie o arquivo ou a pasta para que não colidam."));
+  for (const p of clash) problems.push(issue("ZIP_BAD_PATH", p, "The same path appears as both a file and a folder", "Rename the file or the folder so they don't collide."));
 
   const items: Item[] = [];
   for (const s of staged) {
     const rel = s.name.slice(s.name.indexOf("/") + 1);
     if (!limits.allowedExtensions.includes(extOf(rel))) {
-      problems.push(issue("FILE_TYPE_NOT_ALLOWED", rel, `Tipo de arquivo não permitido (${extOf(rel) || "sem extensão"})`, "Use só .json, .md e .txt (converta PDF e HTML para .md)."));
+      problems.push(issue("FILE_TYPE_NOT_ALLOWED", rel, `File type not allowed (${extOf(rel) || "no extension"})`, "Use only .json, .md and .txt (convert PDF and HTML to .md)."));
     }
     if (s.declared > limits.fileBytes) {
-      problems.push(issue("FILE_TOO_LARGE", rel, `Arquivo de ${s.declared} bytes passa do teto de ${limits.fileBytes}`, "Divida o arquivo em partes menores."));
+      problems.push(issue("FILE_TOO_LARGE", rel, `File of ${s.declared} bytes exceeds the limit of ${limits.fileBytes}`, "Split the file into smaller parts."));
     }
     items.push({ entry: s.entry, rel, declared: s.declared });
   }
@@ -242,10 +242,10 @@ function plan(entries: yauzl.Entry[], limits: ZipLimits): { items: Item[]; rootN
 function pathProblem(p: string): string | null {
   const why = relativePathProblem(p, [""]);
   if (why) return why;
-  if (!/^[\p{L}\p{N}._\-/ ]+$/u.test(p)) return "tem caractere fora de letras, dígitos, . _ - e espaço";
+  if (!/^[\p{L}\p{N}._\-/ ]+$/u.test(p)) return "contains a character other than letters, digits, . _ - and space";
   const segs = p.split("/");
-  if (segs.some((s) => s.startsWith("."))) return "nome começa com ponto";
-  if (segs.some((s) => s.endsWith(" ") || s.endsWith("."))) return "nome termina em ponto ou espaço";
+  if (segs.some((s) => s.startsWith("."))) return "name starts with a dot";
+  if (segs.some((s) => s.endsWith(" ") || s.endsWith("."))) return "name ends with a dot or space";
   return null;
 }
 
@@ -255,7 +255,7 @@ async function extractItems(zf: yauzl.ZipFile, items: Item[], root: string, limi
   for (const it of items) {
     const dest = resolve(join(root, ...it.rel.split("/")));
     // Cinto de segurança: depois de resolvido, o destino tem que estar dentro da raiz (o nome já foi conferido).
-    if (!dest.startsWith(root + sep)) throw new ZipError([issue("ZIP_BAD_PATH", it.rel, "Caminho sai da pasta do pacote", "Renomeie o arquivo.")]);
+    if (!dest.startsWith(root + sep)) throw new ZipError([issue("ZIP_BAD_PATH", it.rel, "Path escapes the package folder", "Rename the file.")]);
     await mkdir(dirname(dest), { recursive: true, mode: 0o750 });
     let size = 0;
     const utf8 = new TextDecoder("utf-8", { fatal: true });
@@ -263,12 +263,12 @@ async function extractItems(zf: yauzl.ZipFile, items: Item[], root: string, limi
       transform(chunk: Buffer, _enc, cb) {
         size += chunk.length;
         total += chunk.length;
-        if (total > limits.expandedBytes) return cb(new ZipError([issue("ZIP_EXPANDS_TOO_MUCH", it.rel, `O conteúdo extraído passou de ${limits.expandedBytes} bytes`, "Reduza o tamanho dos arquivos.")]));
-        if (size > limits.fileBytes) return cb(new ZipError([issue("FILE_TOO_LARGE", it.rel, `Arquivo passa de ${limits.fileBytes} bytes`, "Divida o arquivo em partes menores.")]));
+        if (total > limits.expandedBytes) return cb(new ZipError([issue("ZIP_EXPANDS_TOO_MUCH", it.rel, `The extracted content exceeded ${limits.expandedBytes} bytes`, "Reduce the size of the files.")]));
+        if (size > limits.fileBytes) return cb(new ZipError([issue("FILE_TOO_LARGE", it.rel, `File exceeds ${limits.fileBytes} bytes`, "Split the file into smaller parts.")]));
         try {
           utf8.decode(chunk, { stream: true });
         } catch {
-          return cb(new ZipError([issue("FILE_NOT_UTF8", it.rel, "O arquivo não é UTF-8 válido", "Salve o arquivo como UTF-8.")]));
+          return cb(new ZipError([issue("FILE_NOT_UTF8", it.rel, "The file is not valid UTF-8", "Save the file as UTF-8.")]));
         }
         cb(null, chunk);
       },
@@ -276,7 +276,7 @@ async function extractItems(zf: yauzl.ZipFile, items: Item[], root: string, limi
         try {
           utf8.decode();
         } catch {
-          return cb(new ZipError([issue("FILE_NOT_UTF8", it.rel, "O arquivo não é UTF-8 válido", "Salve o arquivo como UTF-8.")]));
+          return cb(new ZipError([issue("FILE_NOT_UTF8", it.rel, "The file is not valid UTF-8", "Save the file as UTF-8.")]));
         }
         cb();
       },
@@ -288,11 +288,11 @@ async function extractItems(zf: yauzl.ZipFile, items: Item[], root: string, limi
       if (e instanceof ZipError) throw e;
       // O detalhe (pode trazer caminho de disco) fica no log; o criador recebe texto fixo.
       console.error(`[zip] falha ao extrair ${it.rel}:`, (e as Error).message);
-      throw new ZipError([issue("ZIP_UNREADABLE", it.rel, "Não consegui extrair este arquivo do ZIP.", "Gere o ZIP de novo.")]);
+      throw new ZipError([issue("ZIP_UNREADABLE", it.rel, "Could not extract this file from the ZIP.", "Create the ZIP again.")]);
     }
     if (size !== it.declared) {
       // O cabeçalho mentiu sobre o tamanho: ZIP adulterado ou corrompido.
-      throw new ZipError([issue(size > it.declared ? "ZIP_EXPANDS_TOO_MUCH" : "ZIP_UNREADABLE", it.rel, `O tamanho real (${size}) não bate com o declarado (${it.declared})`, "Gere o ZIP de novo.")]);
+      throw new ZipError([issue(size > it.declared ? "ZIP_EXPANDS_TOO_MUCH" : "ZIP_UNREADABLE", it.rel, `The actual size (${size}) does not match the declared size (${it.declared})`, "Create the ZIP again.")]);
     }
     out.push({ path: it.rel, size });
   }

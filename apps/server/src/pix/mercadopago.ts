@@ -25,7 +25,7 @@ export type MpOrder = {
 };
 
 async function mp<T>(path: string, init: RequestInit & { idempotencyKey?: string } = {}): Promise<T> {
-  if (!env.MP_ACCESS_TOKEN) throw new HttpError(503, "Mercado Pago não configurado", "pix_unavailable");
+  if (!env.MP_ACCESS_TOKEN) throw new HttpError(503, "Mercado Pago is not configured", "pix_unavailable");
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -38,7 +38,7 @@ async function mp<T>(path: string, init: RequestInit & { idempotencyKey?: string
   const body = (await res.json().catch(() => ({}))) as T & { message?: string; errors?: unknown };
   if (!res.ok) {
     console.error("[mercadopago]", init.method ?? "GET", path, res.status, JSON.stringify(body).slice(0, 500));
-    throw new HttpError(502, "O Mercado Pago recusou a cobrança Pix. Tente de novo em instantes.", "pix_provider_error");
+    throw new HttpError(502, "Mercado Pago declined the Pix charge. Please try again in a moment.", "pix_provider_error");
   }
   return body;
 }

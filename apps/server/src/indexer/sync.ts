@@ -343,7 +343,7 @@ export async function syncEscrow(
       await db.insert(schema.milestones).values({
         escrowId: escrowAddr,
         idx,
-        title: `Etapa ${idx + 1}`,
+        title: `Step ${idx + 1}`,
         criteria: "",
         criteriaHash: bytesToHexStr(m.criteriaHash),
         amount: m.amount,

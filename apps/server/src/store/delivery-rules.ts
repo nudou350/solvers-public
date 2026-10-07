@@ -17,7 +17,7 @@ export function deliveryIntact(fileCount: number, actualHashHex: string, expecte
 export function resolveDeliveryDays(days: number | undefined): number {
   if (days === undefined || days === 0) return DEFAULT_DELIVERY_DAYS;
   if (!Number.isInteger(days) || days < 0 || days > MAX_DELIVERY_DAYS) {
-    throw badRequest(`O prazo de entrega precisa ser de 1 a ${MAX_DELIVERY_DAYS} dias (ou omitido, para ${DEFAULT_DELIVERY_DAYS} dias).`, "invalid_delivery_days");
+    throw badRequest(`The delivery deadline must be between 1 and ${MAX_DELIVERY_DAYS} days (or omitted, for ${DEFAULT_DELIVERY_DAYS} days).`, "invalid_delivery_days");
   }
   return days;
 }
@@ -48,8 +48,8 @@ export function canCancelUndelivered(
   return !escrow.closed && milestone.status === "pending" && !!escrow.deliveryDeadline && now.getTime() > escrow.deliveryDeadline.getTime();
 }
 
-/** Data e hora em pt-BR (horário de Brasília), para mensagens ao usuário e à IA. */
-export const formatDeadline = (d: Date) => d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+/** Data e hora em UTC (AAAA-MM-DD HH:MM UTC, sem ambiguidade de formato), para mensagens ao usuário e à IA. */
+export const formatDeadline = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
 /** Mensagem de por que a etapa não pode ser cancelada agora (null: pode). */
 export function cancelUndeliveredBlock(
@@ -57,9 +57,9 @@ export function cancelUndeliveredBlock(
   milestone: { status: string },
   now: Date,
 ): string | null {
-  if (escrow.closed) return "Esta tarefa já foi encerrada.";
-  if (milestone.status !== "pending") return "Só dá para cancelar uma etapa que ainda não foi entregue.";
-  if (!escrow.deliveryDeadline) return "Esta tarefa foi criada sem prazo de entrega, então não tem cancelamento por atraso.";
-  if (now.getTime() <= escrow.deliveryDeadline.getTime()) return `O prazo de entrega só vence em ${formatDeadline(escrow.deliveryDeadline)}. Depois disso você pode cancelar e receber de volta.`;
+  if (escrow.closed) return "This task is already closed.";
+  if (milestone.status !== "pending") return "Only a step that hasn't been delivered yet can be canceled.";
+  if (!escrow.deliveryDeadline) return "This task was created without a delivery deadline, so it has no cancellation for late delivery.";
+  if (now.getTime() <= escrow.deliveryDeadline.getTime()) return `The delivery deadline only passes on ${formatDeadline(escrow.deliveryDeadline)}. After that you can cancel and get a refund.`;
   return null;
 }

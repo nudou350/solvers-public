@@ -94,7 +94,7 @@ describe("ZIP: manifest exato e caminho que é arquivo e pasta", () => {
 
   it("MANIFEST.JSON (outra caixa) é recusado com ZIP_BAD_ROOT", async () => {
     const issues = await codes([{ name: "pkg/MANIFEST.JSON", data: "{}" }, { name: "pkg/steps/01-a.md", data: "x" }]);
-    assert.ok(issues.some((i) => i.code === "ZIP_BAD_ROOT" && /exato/.test(i.message)));
+    assert.ok(issues.some((i) => i.code === "ZIP_BAD_ROOT" && /exact/.test(i.message)));
     assert.deepEqual(await codes([{ name: "pkg/manifest.json", data: "{}" }]), []);
   });
 
@@ -152,7 +152,7 @@ describe("regras da faxina e versão", () => {
     assert.equal(staleOpen("awaiting_creator_signature", ago(31), now), true);
     assert.equal(staleOpen("changes_requested", ago(30), now), false);
     for (const s of ["pending_review", "awaiting_onchain_approval", "publishing", "publish_failed", "published", "submitted", "validating"]) assert.equal(staleOpen(s, ago(400), now), false, s);
-    assert.match(EXPIRED_NOTE, /expirad/);
+    assert.match(EXPIRED_NOTE, /expired/);
   });
   it("partFileStale e orphanFolderStale: um dia de folga", () => {
     assert.equal(partFileStale("package.zip.abc.part", ago(2).getTime(), now), true);

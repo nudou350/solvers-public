@@ -37,7 +37,7 @@ export function buildSiwsMessage(p: {
     `${p.domain} wants you to sign in with your Solana account:`,
     p.wallet,
     "",
-    p.statement ?? "Entrar no Solvers. Isto não autoriza pagamentos nem custa nada.",
+    p.statement ?? "Sign in to Solvers. This does not authorize any payments and costs nothing.",
     "",
     `URI: ${p.uri ?? `https://${p.domain}`}`,
     "Version: 1",
@@ -74,14 +74,14 @@ export function assertWallet(wallet: string): Uint8Array {
     if (bytes.length !== 32) throw new Error();
     return bytes;
   } catch {
-    throw badRequest("Carteira inválida");
+    throw badRequest("Invalid wallet");
   }
 }
 
 /** Candidatos de 64 bytes para a assinatura: base58, base64/base64url, hex ou array de bytes. */
 function signatureCandidates(sig: string | number[]): Uint8Array[] {
   if (Array.isArray(sig)) {
-    if (sig.length !== 64 || sig.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) throw badRequest("Assinatura em formato inválido");
+    if (sig.length !== 64 || sig.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) throw badRequest("Signature has an invalid format");
     return [Uint8Array.from(sig)];
   }
   const out: Uint8Array[] = [];
@@ -96,7 +96,7 @@ function signatureCandidates(sig: string | number[]): Uint8Array[] {
   if (/^[0-9a-f]{128}$/i.test(sig)) add(() => Uint8Array.from(Buffer.from(sig, "hex")));
   add(() => Uint8Array.from(getBase58Encoder().encode(sig)));
   add(() => Uint8Array.from(Buffer.from(sig.replace(/-/g, "+").replace(/_/g, "/"), "base64")));
-  if (out.length === 0) throw badRequest("Assinatura em formato inválido");
+  if (out.length === 0) throw badRequest("Signature has an invalid format");
   return out;
 }
 
@@ -124,22 +124,22 @@ export async function verifySiws(
   const { wallet, message, signature } = input;
   const lines = message.split("\n");
   const domain = /^(.+) wants you to sign in with your Solana account:$/.exec(lines[0] ?? "")?.[1];
-  if (!domain || !allowedDomains().includes(domain)) throw unauthorized("Domínio da mensagem não confere");
-  if ((lines[1] ?? "").trim() !== wallet) throw unauthorized("Carteira da mensagem não confere");
+  if (!domain || !allowedDomains().includes(domain)) throw unauthorized("Message domain does not match");
+  if ((lines[1] ?? "").trim() !== wallet) throw unauthorized("Message wallet does not match");
   const nonce = field(message, "Nonce");
-  if (!nonce) throw unauthorized("Mensagem sem nonce");
+  if (!nonce) throw unauthorized("Message has no nonce");
   const chain = field(message, "Chain ID");
-  if (chain && chain !== chainId() && chain !== `solana:${chainId()}`) throw unauthorized("Rede da mensagem não confere");
+  if (chain && chain !== chainId() && chain !== `solana:${chainId()}`) throw unauthorized("Message network does not match");
   const issued = Date.parse(field(message, "Issued At") ?? "");
-  if (!Number.isFinite(issued)) throw unauthorized("Mensagem sem data de emissão");
-  if (Date.now() - issued > NONCE_TTL_MS + 60_000 || issued - Date.now() > 60_000) throw unauthorized("Mensagem fora do prazo");
+  if (!Number.isFinite(issued)) throw unauthorized("Message has no issue date");
+  if (Date.now() - issued > NONCE_TTL_MS + 60_000 || issued - Date.now() > 60_000) throw unauthorized("Message is outside its validity window");
   const expRaw = field(message, "Expiration Time");
   if (expRaw !== undefined) {
     const exp = Date.parse(expRaw);
-    if (!Number.isFinite(exp) || exp < Date.now()) throw unauthorized("Mensagem expirada");
+    if (!Number.isFinite(exp) || exp < Date.now()) throw unauthorized("Message expired");
   }
 
-  if (!verifySignature(wallet, message, signature)) throw unauthorized("Assinatura inválida");
+  if (!verifySignature(wallet, message, signature)) throw unauthorized("Invalid signature");
 
   const consumed = await db
     .delete(schema.authNonces)
@@ -152,6 +152,6 @@ export async function verifySiws(
       ),
     )
     .returning();
-  if (consumed.length === 0) throw unauthorized("Nonce inválido ou já usado");
+  if (consumed.length === 0) throw unauthorized("Invalid or already used nonce");
   return wallet;
 }

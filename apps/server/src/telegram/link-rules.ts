@@ -97,16 +97,16 @@ export type LinkOutcome =
 export function replyText(o: LinkOutcome): string {
   switch (o.kind) {
     case "linked":
-      return `Pronto! Seu Telegram foi vinculado ao Solvers como ${o.name}.`;
+      return `Done! Your Telegram is now linked to Solvers as ${o.name}.`;
     case "invalid":
-      return "Esse código não vale: pode estar errado, vencido ou já usado. Gere um novo no site, em Criador > Publicar, e envie aqui.";
+      return "That code isn't valid: it may be wrong, expired or already used. Generate a new one on the site, under Creator > Publish, and send it here.";
     case "chat_taken":
-      return "Este Telegram já está vinculado a outro criador do Solvers. Use outra conta do Telegram ou fale com a equipe.";
+      return "This Telegram account is already linked to another Solvers creator. Use another Telegram account or contact the team.";
     case "throttled":
-      return "Muitas tentativas com código errado. Espere uma hora e gere um novo código no site.";
+      return "Too many attempts with a wrong code. Wait an hour and generate a new code on the site.";
     case "usage":
-      return "Envie o comando com o código que aparece no site, assim: /vincular LINK-ABCD2345";
+      return "Send the command with the code shown on the site, like this: /vincular LINK-ABCD2345";
     case "help":
-      return "Para vincular o seu Telegram, gere um código no site do Solvers (Criador > Publicar) e envie aqui: /vincular SEU-CODIGO";
+      return "To link your Telegram, generate a code on the Solvers site (Creator > Publish) and send it here: /vincular YOUR-CODE";
   }
 }

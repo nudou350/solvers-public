@@ -86,9 +86,9 @@ describe("assertNotPlatformAgent", () => {
 
 describe("acesso platform: texto e disponibilidade", () => {
   it("a linha de acesso diz que é gratuito, sem licença", () => {
-    assert.match(paidAccessLine("platform"), /gratuito/);
-    assert.match(paidAccessLine("platform"), /Solver da plataforma/);
-    assert.match(paidAccessLine("license"), /licença vitalícia/);
+    assert.match(paidAccessLine("platform"), /free/);
+    assert.match(paidAccessLine("platform"), /platform Solver/);
+    assert.match(paidAccessLine("license"), /lifetime license/);
   });
 
   it("aposentado ainda serve o acesso platform (não é teste); suspenso corta tudo", () => {

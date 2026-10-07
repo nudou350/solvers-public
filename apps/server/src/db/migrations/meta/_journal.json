@@ -141,6 +141,13 @@
       "when": 1790958767688,
       "tag": "0019_telegram_link",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791339052830,
+      "tag": "0020_agent_translations",
+      "breakpoints": true
     }
   ]
 }

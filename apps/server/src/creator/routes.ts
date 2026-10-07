@@ -69,11 +69,11 @@ creatorRouter.post(
   h(async (req): Promise<TelegramLink> => {
     const wallet = requireWallet(req);
     const bot = await botUsername();
-    if (!bot) throw new HttpError(503, "A vinculação pelo Telegram está indisponível agora. Tente de novo em alguns minutos ou fale com a equipe.", "telegram_unavailable");
+    if (!bot) throw new HttpError(503, "Telegram linking is unavailable right now. Try again in a few minutes or contact the team.", "telegram_unavailable");
     const r = await issueLinkCode(wallet);
-    if (r.status === "no_profile") throw new HttpError(403, "Salve o seu cadastro de criador antes de vincular o Telegram.", "profile_required");
+    if (r.status === "no_profile") throw new HttpError(403, "Save your creator profile before linking Telegram.", "profile_required");
     if (r.status === "limited") {
-      throw new HttpError(429, `Você já gerou ${LINK_MAX_PER_WINDOW} códigos na última hora. Tente de novo em ${Math.ceil(r.retryAfterSec / 60)} min.`, "too_many_codes", { retryAfterSec: r.retryAfterSec });
+      throw new HttpError(429, `You have already generated ${LINK_MAX_PER_WINDOW} codes in the last hour. Try again in ${Math.ceil(r.retryAfterSec / 60)} min.`, "too_many_codes", { retryAfterSec: r.retryAfterSec });
     }
     return { code: r.code, expiresAt: r.expiresAt.toISOString(), botUsername: bot, deepLink: deepLinkOf(bot, r.code) };
   }),
@@ -100,7 +100,7 @@ creatorRouter.post(
           .where(eq(schema.creators.id, existing.id));
         return;
       }
-      if (!body.inviteCode) throw new HttpError(400, "Informe o código de convite para criar seu perfil de criador.", "invite_required");
+      if (!body.inviteCode) throw new HttpError(400, "Enter your invite code to create your creator profile.", "invite_required");
       const code = normalizeInviteCode(body.inviteCode);
       const claimed = await tx
         .update(schema.creatorInvites)
@@ -109,8 +109,8 @@ creatorRouter.post(
         .returning({ code: schema.creatorInvites.code });
       if (claimed.length === 0) {
         const [known] = await tx.select({ code: schema.creatorInvites.code }).from(schema.creatorInvites).where(eq(schema.creatorInvites.code, code));
-        if (known) throw new HttpError(409, "Este convite já foi usado.", "invite_used");
-        throw new HttpError(400, "Convite inválido. Confira o código que você recebeu.", "invite_invalid");
+        if (known) throw new HttpError(409, "This invite has already been used.", "invite_used");
+        throw new HttpError(400, "Invalid invite. Check the code you received.", "invite_invalid");
       }
       const now = new Date();
       if (existing) {
@@ -146,10 +146,10 @@ creatorRouter.get(
   h(async (req): Promise<SubmissionView> => {
     const wallet = requireWallet(req);
     const id = String(req.params.id);
-    if (!SUBMISSION_ID_RE.test(id)) throw notFound("Envio não encontrado.");
+    if (!SUBMISSION_ID_RE.test(id)) throw notFound("Submission not found.");
     const [row] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
     // Envio de outro criador responde 404, não 403: não confirma que o id existe.
-    if (!row || row.creatorWallet !== wallet) throw notFound("Envio não encontrado.");
+    if (!row || row.creatorWallet !== wallet) throw notFound("Submission not found.");
     return toSubmissionView(row, await isNewAgent(row.agentId));
   }),
 );

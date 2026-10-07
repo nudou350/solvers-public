@@ -36,7 +36,7 @@ const ORDER_ID = /^ord_[0-9a-f]{24}$/;
 
 function setup(): { custody: string; usdcMint: string; network: string } {
   const custody = chain().custodyAddress;
-  if (!env.X402_ENABLED || !custody) throw new HttpError(503, "Compra por x402 indisponível.", "x402_disabled");
+  if (!env.X402_ENABLED || !custody) throw new HttpError(503, "Purchase via x402 is unavailable.", "x402_disabled");
   return { custody, usdcMint: chain().usdcMint, network: env.X402_NETWORK };
 }
 
@@ -52,7 +52,7 @@ type AgentRow = Awaited<ReturnType<typeof findAgentRow>>;
 async function sellableAgent(idOrSlug: string): Promise<AgentRow> {
   const row = await findAgentRow(idOrSlug);
   assertNotPlatformAgent(row); // Solver gratuito da plataforma: não se vende por x402 (409 platform_agent_not_for_sale)
-  if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
+  if (!agentIsAvailable(row)) throw new HttpError(409, "This specialist is not available for purchase right now.", "agent_unavailable");
   assertListedAndLoadable(row); // sem catálogo nem pacote não se vende (409 agent_not_listed)
   await assertFreshPrice(row);
   // Teto de licenças atingido: 409 sold_out ANTES de qualquer ordem ou cobrança (o programa também recusaria, mas aí o agente já teria pago).
@@ -71,7 +71,7 @@ function paymentRequired(order: OrderRow, row: AgentRow, reqs: OrderRequirements
     error,
     resource: {
       url: `${env.PUBLIC_API_URL.replace(/\/$/, "")}/api/x402/solvers/${row.id}/license`,
-      description: `Licença vitalícia do Solver ${row.name}`,
+      description: `Lifetime license for the Solver ${row.name}`,
       mimeType: "application/json",
     },
     accepts: [reqs as unknown as PaymentRequirements],
@@ -133,7 +133,7 @@ x402Router.get(
     res.setHeader("Cache-Control", NO_STORE);
     const id = String(req.params.id);
     const order = ORDER_ID.test(id) ? await getOrder(id) : null;
-    if (!order) throw notFound("Ordem não encontrada");
+    if (!order) throw notFound("Order not found");
     return {
       orderId: order.id,
       status: order.status,
@@ -167,7 +167,7 @@ async function openOrder(req: Request, res: Response) {
   const row = await sellableAgent(String(req.params.idOrSlug));
   const b = await bounds();
   if (!priceInBounds(row.price, b)) {
-    throw badRequest("O preço deste especialista está fora dos limites da compra por x402.", "price_out_of_range", {
+    throw badRequest("This specialist's price is outside the limits for x402 purchases.", "price_out_of_range", {
       priceUsdc: String(unitsToUsdc(row.price)),
       minUsdc: String(unitsToUsdc(b.min)),
       maxUsdc: String(unitsToUsdc(b.max)),
@@ -175,7 +175,7 @@ async function openOrder(req: Request, res: Response) {
   }
   const ip = clientIp(req);
   if (ip && (await countOpenOrders(ip)) >= env.X402_MAX_OPEN_ORDERS_PER_IP) {
-    throw new HttpError(429, "Muitas ordens abertas. Pague uma delas ou aguarde o vencimento.", "too_many_open_orders");
+    throw new HttpError(429, "Too many open orders. Pay one of them or wait for them to expire.", "too_many_open_orders");
   }
   const feePayer = await facilitator().feePayer(s.network);
   const order = await createOrder({ agentId: row.id, price: row.price, ttlSecs: env.X402_ORDER_TTL_SECS, clientIp: ip });
@@ -192,31 +192,31 @@ async function pay(req: Request, res: Response, header: string) {
   try {
     payload = decodePaymentSignatureHeader(header);
   } catch {
-    throw badRequest("PAYMENT-SIGNATURE inválido.", "invalid_payment");
+    throw badRequest("Invalid PAYMENT-SIGNATURE.", "invalid_payment");
   }
   const orderId = memoOf(payload.accepted);
-  if (!orderId) throw badRequest("O pagamento não referencia uma ordem (memo).", "order_invalid");
+  if (!orderId) throw badRequest("The payment doesn't reference an order (memo).", "order_invalid");
 
   await assertEntriesOpen("x402");
 
   // 1) A ordem precisa existir, estar aberta e valer.
   let order = await getOrder(orderId);
-  if (!order) throw new HttpError(409, "Ordem não encontrada. Peça uma nova.", "order_invalid");
+  if (!order) throw new HttpError(409, "Order not found. Request a new one.", "order_invalid");
   if (order.status !== "created") {
     if (order.status === "minted") {
-      throw new HttpError(409, "Esta ordem já foi paga e a licença emitida.", "order_already_fulfilled", { orderId, asset: order.asset, owner: order.payer });
+      throw new HttpError(409, "This order was already paid and the license issued.", "order_already_fulfilled", { orderId, asset: order.asset, owner: order.payer });
     }
     if (order.status === "expired" || order.status === "failed" || order.status === "refunded") {
-      throw new HttpError(409, "Esta ordem não vale mais. Peça uma nova.", "order_invalid", { status: order.status });
+      throw new HttpError(409, "This order is no longer valid. Request a new one.", "order_invalid", { status: order.status });
     }
-    throw new HttpError(409, "Esta ordem já está sendo processada. Consulte o estado dela.", "order_in_progress", { orderId, status: order.status });
+    throw new HttpError(409, "This order is already being processed. Check its status.", "order_in_progress", { orderId, status: order.status });
   }
   if (orderExpired(order)) {
     await move(orderId, "created", "expired");
-    throw new HttpError(409, "A ordem venceu. Peça uma nova.", "order_expired");
+    throw new HttpError(409, "The order has expired. Request a new one.", "order_expired");
   }
   const row = await findAgentRow(order.agentId);
-  if (!agentIsAvailable(row)) throw new HttpError(409, "Este especialista não está disponível para compra no momento.", "agent_unavailable");
+  if (!agentIsAvailable(row)) throw new HttpError(409, "This specialist is not available for purchase right now.", "agent_unavailable");
   // O teto pode ter sido atingido depois de a ordem abrir: barra antes de verify/settle (ninguém paga por uma licença que não sai).
   assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
 
@@ -224,13 +224,13 @@ async function pay(req: Request, res: Response, header: string) {
   const feePayer = await facilitator().feePayer(s.network);
   const reqs = requirementsOf(order, feePayer);
   const mismatch = requirementsMismatch(payload.accepted, reqs);
-  if (mismatch) throw badRequest("O pagamento não corresponde à ordem.", "payment_mismatch", { field: mismatch });
+  if (mismatch) throw badRequest("The payment doesn't match the order.", "payment_mismatch", { field: mismatch });
 
   // 3) Preço travado vs. on-chain: se o criador mudou o preço depois da ordem, pagar levaria a falha na emissão.
   const onchain = await chain().fetchMaybeAgent(order.agentId);
   if (!onchain.exists || onchain.data.price !== order.price) {
     await move(orderId, "created", "expired");
-    throw new HttpError(409, "O preço deste especialista mudou. Peça uma nova ordem.", "price_changed", {
+    throw new HttpError(409, "This specialist's price has changed. Request a new order.", "price_changed", {
       priceUsdc: onchain.exists ? String(unitsToUsdc(onchain.data.price)) : undefined,
     });
   }
@@ -241,7 +241,7 @@ async function pay(req: Request, res: Response, header: string) {
     verified = await facilitator().verify(payload, reqs as unknown as PaymentRequirements);
   } catch (e) {
     console.error("[x402] verify indisponível:", (e as Error).message);
-    throw new HttpError(502, "Não foi possível conferir o pagamento agora. Tente de novo.", "facilitator_unavailable");
+    throw new HttpError(502, "We couldn't verify the payment right now. Please try again.", "facilitator_unavailable");
   }
   if (!verified.isValid || !verified.payer) {
     send402(res, paymentRequired(order, row, reqs, verified.reason ?? "invalid_payment"));
@@ -250,12 +250,12 @@ async function pay(req: Request, res: Response, header: string) {
   const payer = verified.payer;
 
   // 5) Guardas com o pagador, ANTES de liquidar: quem não pode comprar não perde dinheiro.
-  if (payer === s.custody || payer === chain().feePayer.address) throw badRequest("Esta carteira não pode comprar.", "payer_not_allowed");
+  if (payer === s.custody || payer === chain().feePayer.address) throw badRequest("This wallet can't buy.", "payer_not_allowed");
   await assertCanPurchase(payer, row); // already_owned (409) / creator_cannot_buy (400)
 
   // 6) Reserva atômica: um pagamento por ordem. Quem perde não liquida nada.
   const claimed = await move(orderId, "created", "settling", { payer });
-  if (!claimed) throw new HttpError(409, "Esta ordem já está sendo processada.", "order_in_use");
+  if (!claimed) throw new HttpError(409, "This order is already being processed.", "order_in_use");
   order = claimed;
 
   // 7) Liquida.
@@ -274,7 +274,7 @@ async function pay(req: Request, res: Response, header: string) {
   }
   if (outcome === "ambiguous" || !settled?.transaction) {
     // Pode ter entrado: a ordem fica `settling` e a reconciliação decide pela cadeia. O agente consulta o estado.
-    res.status(202).json({ code: "payment_pending", error: "Pagamento em confirmação. Consulte o estado da ordem.", orderId, status: "settling" });
+    res.status(202).json({ code: "payment_pending", error: "Payment is being confirmed. Check the order status.", orderId, status: "settling" });
     return undefined;
   }
   if (settled.payer && settled.payer !== payer) {
@@ -287,9 +287,9 @@ async function pay(req: Request, res: Response, header: string) {
   } catch (e) {
     // A assinatura é única no banco: o mesmo pagamento já pertence a outra ordem. Nada é emitido; fica para revisão manual.
     console.error(`[x402][ALERTA] ordem ${orderId}: pagamento ${paySignature} já registrado em outra ordem`, (e as Error).message);
-    throw new HttpError(409, "Este pagamento já foi usado em outra ordem.", "duplicate_payment");
+    throw new HttpError(409, "This payment was already used for another order.", "duplicate_payment");
   }
-  if (!paid) throw new HttpError(409, "Esta ordem já está sendo processada.", "order_in_use");
+  if (!paid) throw new HttpError(409, "This order is already being processed.", "order_in_use");
 
   // 8) Emite a licença (ou reembolsa se não for possível).
   const result = await fulfilOrder(orderId);
@@ -306,7 +306,7 @@ async function pay(req: Request, res: Response, header: string) {
   }
   if (result.status === "refunded") {
     res.status(502).json({
-      error: "Não foi possível emitir a licença. O pagamento foi devolvido.",
+      error: "We couldn't issue the license. The payment was refunded.",
       code: "mint_failed",
       refunded: true,
       refundSignature: result.refundSignature,
@@ -314,6 +314,6 @@ async function pay(req: Request, res: Response, header: string) {
     });
     return undefined;
   }
-  res.status(202).json({ code: "mint_pending", error: "Pagamento recebido. A licença está sendo emitida; consulte o estado da ordem.", orderId, status: "minting" });
+  res.status(202).json({ code: "mint_pending", error: "Payment received. The license is being issued; check the order status.", orderId, status: "minting" });
   return undefined;
 }

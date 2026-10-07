@@ -334,7 +334,7 @@ describe("envio de pacotes com banco", { skip: url ? false : "defina TEST_DATABA
       const chunks = await db.select().from(schema.knowledgeChunks).where(eq(schema.knowledgeChunks.version, `staging:${id}`));
       assert.ok(chunks.length >= 2 && chunks.every((c) => c.agentId === s.agentId));
       assert.ok(sent.some((t) => t.includes("espera revisão")), "avisa o admin");
-      assert.ok(sent.some((t) => t.includes("fila de revisão")), "avisa o criador");
+      assert.ok(sent.some((t) => t.includes("review queue")), "avisa o criador");
     });
 
     it("o mesmo criador reaproveita o agentId do slug nas versões seguintes; versão repetida é recusada", async () => {
@@ -405,7 +405,7 @@ describe("envio de pacotes com banco", { skip: url ? false : "defina TEST_DATABA
       let s = await row(id);
       assert.equal(s.status, "validating");
       // O criador vê texto fixo; o detalhe ("modelo caiu") fica no log e em ingest_jobs.
-      assert.match(s.error ?? "", /ingestão do conhecimento falhou/i);
+      assert.match(s.error ?? "", /knowledge ingestion failed/i);
       assert.doesNotMatch(s.error ?? "", /modelo caiu/);
       const [job] = await db.select().from(schema.ingestJobs).where(eq(schema.ingestJobs.submissionId, id));
       assert.deepEqual([job!.status, job!.filesDone], ["failed", 1]);

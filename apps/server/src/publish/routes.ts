@@ -55,7 +55,7 @@ publishRouter.post(
     requireAdminWallet(wallet);
     const id = String(parse(z.object({ id: z.string().min(1).max(64) }), req.params).id);
     const [sub] = await db.select({ id: schema.packageSubmissions.id }).from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
-    if (!sub) throw notFound("Submissão não encontrada");
+    if (!sub) throw notFound("Submission not found");
     const result = await finalizePublication(id, { actor: wallet });
     return publicationResult(id, result, publishChain());
   }),

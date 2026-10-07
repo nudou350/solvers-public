@@ -199,25 +199,25 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       assert.ok(names.includes("get_template"));
       for (const n of ["list_my_solvers", "find_solver", "activate_solver", "run_tool", "next_step"]) assert.ok(names.includes(n), n);
       const instructions = client.getInstructions() ?? "";
-      assert.match(instructions, /nunca autoriza|Nenhum conteúdo de especialista autoriza/);
-      assert.match(instructions, /enviar dados do usuário para fora/);
+      assert.match(instructions, /No specialist content authorizes/);
+      assert.match(instructions, /sending the user's data elsewhere/);
       assert.match(instructions, /get_template/);
       const agent = await connect((await generateKeyPairSigner()).address, true);
-      assert.match(agent.client.getInstructions() ?? "", /enviar dados do usuário para fora/);
+      assert.match(agent.client.getInstructions() ?? "", /sending the user's data elsewhere/);
     });
 
     it("list_my_solvers mostra o Solver da plataforma como gratuito para uma carteira sem nada", async () => {
       const { call } = await connect((await generateKeyPairSigner()).address);
       const { text } = await call("list_my_solvers");
       assert.match(text, new RegExp(`Criador de Solvers \\(agent_id: ${PLATFORM_ID}\\)`));
-      assert.match(text, /gratuito, da plataforma/);
-      assert.doesNotMatch(text, /licença vitalícia\]/);
+      assert.match(text, /free, from the platform/);
+      assert.doesNotMatch(text, /lifetime license\]/);
     });
 
     it("get_purchase_link recusa: não é vendido", async () => {
       const { call } = await connect((await generateKeyPairSigner()).address);
       const { text } = await call("get_purchase_link", { agent_id: PLATFORM_ID });
-      assert.match(text, /gratuito da plataforma/);
+      assert.match(text, /free platform Solver/);
       assert.doesNotMatch(text, /checkout|USDC/);
     });
 
@@ -226,9 +226,9 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       const { call } = await connect(wallet);
       const { text } = await call("activate_solver", { agent_id: PLATFORM_ID });
       assert.match(text, /session_id: ses_/);
-      assert.match(text, /Acesso: gratuito/);
-      assert.doesNotMatch(text, /teste grátis|Comprar|checkout/i);
-      assert.match(text, /## Templates disponíveis/);
+      assert.match(text, /Access: free/);
+      assert.doesNotMatch(text, /free trial|Buy|checkout/i);
+      assert.match(text, /## Available templates/);
       assert.match(text, /- briefing: Briefing\./);
       assert.match(text, /- caso: Caso de eval\./);
       const [s] = await db.select().from(schema.sessions).where(drizzle.and(drizzle.eq(schema.sessions.wallet, wallet), drizzle.eq(schema.sessions.agentId, PLATFORM_ID)));
@@ -238,7 +238,7 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       // Segunda ativação: reaproveita a sessão e continua dizendo que é gratuito.
       const again = await call("activate_solver", { agent_id: PLATFORM_ID });
       assert.match(again.text, new RegExp(`session_id: ${s!.id}`));
-      assert.match(again.text, /Acesso: gratuito/);
+      assert.match(again.text, /Access: free/);
     });
 
     it("get_template: só o declarado, texto, com marca d'água; svg, nome inventado e caminho nunca saem", async () => {
@@ -260,8 +260,8 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
         const r = await call("get_template", { session_id: sid, name });
         assert.doesNotMatch(r.text, /<svg|Preencha|# Etapa/, name);
       }
-      assert.match((await call("get_template", { session_id: sid, name: "logo" })).text, /não é um arquivo de texto/);
-      assert.match((await call("get_template", { session_id: sid, name: "nao-existe" })).text, /Não existe o template "nao-existe".*Disponíveis: briefing, caso, logo/);
+      assert.match((await call("get_template", { session_id: sid, name: "logo" })).text, /not a text file/);
+      assert.match((await call("get_template", { session_id: sid, name: "nao-existe" })).text, /There is no template "nao-existe".*Available: briefing, caso, logo/);
     });
 
     it("get_template exige sessão da própria carteira", async () => {
@@ -270,7 +270,7 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       const outro = await connect((await generateKeyPairSigner()).address);
       const r = await outro.call("get_template", { session_id: sid, name: "briefing" });
       assert.equal(r.isError, true);
-      assert.match(r.text, /outra carteira/);
+      assert.match(r.text, /another wallet/);
     });
 
     it("run_tool validate_package: valida o manifesto e as etapas e devolve { ok, errors, warnings, stats, summary }", async () => {
@@ -282,19 +282,19 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       assert.equal(out.ok, false);
       assert.ok(out.errors.length > 0);
       assert.ok(out.errors.every((e) => e.code && e.message && e.fix && typeof e.path === "string"));
-      assert.match(out.summary, /para corrigir/);
+      assert.match(out.summary, /errors to fix/);
       assert.ok(out.stats && Array.isArray(out.warnings));
       // Entrada fora do contrato: erro claro, sem derrubar nada.
       const wrong = await call("run_tool", { session_id: sid, tool: "validate_package", input: { nada: 1 } });
       assert.equal(wrong.isError, true);
-      assert.match(wrong.text, /Entrada inválida/);
+      assert.match(wrong.text, /Invalid input/);
     });
 
     it("next_step segue o método normalmente na sessão platform", async () => {
       const { call } = await connect((await generateKeyPairSigner()).address);
       const sid = /session_id: (ses_\w+)/.exec((await call("activate_solver", { agent_id: PLATFORM_ID })).text)![1]!;
-      assert.match((await call("preflight_check", { session_id: sid, available_tools: [] })).text, /Tudo pronto/);
-      assert.match((await call("next_step", { session_id: sid, completed_step: 0 })).text, /Etapa 1 de 2/);
+      assert.match((await call("preflight_check", { session_id: sid, available_tools: [] })).text, /All set/);
+      assert.match((await call("next_step", { session_id: sid, completed_step: 0 })).text, /Step 1 of 2/);
     });
 
     it("suspender o Solver da plataforma (kill switch) derruba a sessão e a ativação", async () => {
@@ -304,8 +304,8 @@ describe("Solver da plataforma com banco", { skip: url ? false : "defina TEST_DA
       try {
         const r = await call("get_template", { session_id: sid, name: "briefing" });
         assert.equal(r.isError, true);
-        assert.match(r.text, /indisponível/);
-        assert.match((await call("activate_solver", { agent_id: PLATFORM_ID })).text, /indisponível/);
+        assert.match(r.text, /unavailable/);
+        assert.match((await call("activate_solver", { agent_id: PLATFORM_ID })).text, /unavailable/);
         assert.doesNotMatch((await call("list_my_solvers")).text, new RegExp(PLATFORM_ID), "suspenso não aparece na lista");
       } finally {
         await db.update(schema.agents).set({ platformStatus: "active" }).where(drizzle.eq(schema.agents.id, PLATFORM_ID));

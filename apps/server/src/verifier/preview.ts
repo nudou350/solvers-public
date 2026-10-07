@@ -22,7 +22,7 @@ export function mountPreview(app: Express) {
     const idx = Number(req.params.idx);
     const token = typeof req.query.t === "string" ? req.query.t : "";
     if (!Number.isInteger(idx) || idx < 0 || idx > 4 || !token) {
-      res.status(404).type("text").send("Prévia não encontrada");
+      res.status(404).type("text").send("Preview not found");
       return;
     }
     const [m] = await db
@@ -31,7 +31,7 @@ export function mountPreview(app: Express) {
       .where(and(eq(schema.milestones.escrowId, String(req.params.escrow)), eq(schema.milestones.idx, idx)));
     // Só enquanto a etapa está aprovada nos testes ou aprovada pelo comprador (não após disputa/reembolso).
     if (!m?.previewUrl || !m.previewUrl.endsWith(`t=${token}`) || !["passed", "approved"].includes(m.status)) {
-      res.status(404).type("text").send("Prévia não encontrada");
+      res.status(404).type("text").send("Preview not found");
       return;
     }
     const previewFile = join(milestoneDir(m.escrowId, idx), "preview.html");
@@ -53,10 +53,10 @@ export function mountPreview(app: Express) {
     );
     res.setHeader("X-Content-Type-Options", "nosniff");
     const acceptanceLine = report.acceptance
-      ? `${report.acceptance.numPassed}/${report.acceptance.numTests} testes de aceite combinados`
-      : "testes escritos na própria entrega (sem bateria de aceite)";
-    res.type("html").send(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Prévia da entrega</title>
+      ? `${report.acceptance.numPassed}/${report.acceptance.numTests} agreed acceptance tests`
+      : "tests written in the delivery itself (no acceptance test suite)";
+    res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delivery preview</title>
 <style>
 body{margin:0;font:15px/1.5 system-ui,sans-serif;background:#f6f6f3;color:#1b1b1f}
 header{padding:16px 20px;border-bottom:1px solid #e5e5df;background:#fff}
@@ -68,19 +68,19 @@ main{max-width:900px;margin:20px auto;padding:0 16px}
 .ok{color:#067647;font-weight:600}
 ul{padding-left:18px}
 </style></head><body>
-<div class="band">PRÉVIA · SOLVERS</div>
-<header><strong>Etapa ${idx + 1}: ${esc(m.title)}</strong><br>
+<div class="band">PREVIEW · SOLVERS</div>
+<header><strong>Step ${idx + 1}: ${esc(m.title)}</strong><br>
 <span class="ok">${
       report.mode === "manual"
-        ? "Revisão manual: leia a entrega e aprove ou conteste dentro do prazo"
-        : `✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} testes aprovados · ${esc(acceptanceLine)}${report.mode === "simulated" ? " (verificação simulada)" : ""}`
+        ? "Manual review: read the delivery and approve or dispute it before the deadline"
+        : `✔ ${report.numPassed ?? 0}/${report.numTests ?? 0} tests passed · ${esc(acceptanceLine)}${report.mode === "simulated" ? " (simulated check)" : ""}`
     }</span></header>
 <main>
-${frame ? `<div class="frame"><iframe sandbox srcdoc="${esc(frame)}" title="Componente entregue (prévia estática)"></iframe><div class="wm">PRÉVIA</div></div>` : "<p>Prévia visual indisponível para esta entrega.</p>"}
-<h3>Arquivos entregues</h3>
+${frame ? `<div class="frame"><iframe sandbox srcdoc="${esc(frame)}" title="Delivered component (static preview)"></iframe><div class="wm">PREVIEW</div></div>` : "<p>Visual preview is not available for this delivery.</p>"}
+<h3>Delivered files</h3>
 <ul>${fileNames.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
-${report.mode === "manual" ? "" : "<p>O código completo fica disponível para download depois que você aprovar a etapa (ou quando o prazo de aprovação automática terminar).</p>"}
-<h3>Critérios combinados</h3><p>${esc(m.criteria)}</p>
+${report.mode === "manual" ? "" : "<p>The full code becomes available to download after you approve the step (or when the automatic approval deadline ends).</p>"}
+<h3>Agreed criteria</h3><p>${esc(m.criteria)}</p>
 </main></body></html>`);
   });
 }

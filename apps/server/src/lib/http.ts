@@ -13,9 +13,9 @@ export class HttpError extends Error {
 }
 
 export const badRequest = (msg: string, code = "bad_request", extra?: Record<string, unknown>) => new HttpError(400, msg, code, extra);
-export const unauthorized = (msg = "Faça login para continuar") => new HttpError(401, msg, "unauthorized");
-export const forbidden = (msg = "Acesso negado") => new HttpError(403, msg, "forbidden");
-export const notFound = (msg = "Não encontrado") => new HttpError(404, msg, "not_found");
+export const unauthorized = (msg = "Sign in to continue") => new HttpError(401, msg, "unauthorized");
+export const forbidden = (msg = "Access denied") => new HttpError(403, msg, "forbidden");
+export const notFound = (msg = "Not found") => new HttpError(404, msg, "not_found");
 
 /** Serializa bigint como número (valores de API já estão convertidos; isto é só uma rede de segurança). */
 export function jsonSafe(value: unknown): unknown {
@@ -39,7 +39,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   if (typeof status === "number" && status >= 400 && status < 500) {
     const type = (err as { type?: string }).type;
     res.status(status).json({
-      error: type === "entity.parse.failed" ? "JSON inválido" : type === "entity.too.large" ? "Corpo grande demais" : "Requisição inválida",
+      error: type === "entity.parse.failed" ? "Invalid JSON" : type === "entity.too.large" ? "Request body too large" : "Invalid request",
       code: type ?? "bad_request",
     });
     return;
@@ -54,7 +54,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
   console.error("[erro]", err);
-  res.status(500).json({ error: "Erro interno", code: "internal" });
+  res.status(500).json({ error: "Internal error", code: "internal" });
 }
 
 /** Express 5 já propaga rejeições de handlers async; este helper só tipa o handler. */

@@ -512,6 +512,6 @@ describe("revenda com banco", { skip: url ? false : "defina TEST_DATABASE_URL (b
     const res = await fetch(`${base}/api/me/profile`, { headers: { cookie: await cookie(BUYER) } });
     assert.equal(res.status, 200);
     const profile = (await res.json()) as { history: Array<{ kind: string; label: string }> };
-    assert.deepEqual(profile.history.find((h) => h.kind === "resale")?.label, "Compra de licença revendida");
+    assert.deepEqual(profile.history.find((h) => h.kind === "resale")?.label, "Resold license purchase");
   });
 });

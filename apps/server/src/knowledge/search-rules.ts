@@ -11,10 +11,10 @@ export type HitView = {
   validUntil: string | null;
 };
 
-/** AAAA-MM-DD para DD/MM/AAAA ("" se não for uma data). */
-export function dateBr(iso: string | null | undefined): string {
+/** Data AAAA-MM-DD como aparece no texto para a IA ("" se não for uma data). */
+export function dateText(iso: string | null | undefined): string {
   const m = typeof iso === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
 }
 
 const SP_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -36,12 +36,12 @@ const metaStr = (meta: HitView["meta"], k: string): string => (typeof meta?.[k] 
 export function hitText(h: HitView, index: number, now: Date): string {
   const source = metaStr(h.meta, "source");
   const title = metaStr(h.meta, "title");
-  if (!h.meta || (!source && !title && !h.validUntil)) return `### Trecho ${index} (${h.source})\n${h.content}`;
-  const head = `### Trecho ${index}: ${title || h.source}`;
+  if (!h.meta || (!source && !title && !h.validUntil)) return `### Excerpt ${index} (${h.source})\n${h.content}`;
+  const head = `### Excerpt ${index}: ${title || h.source}`;
   const url = metaStr(h.meta, "source_url");
-  const date = dateBr(metaStr(h.meta, "source_date"));
-  const fonte = `Fonte: ${source || h.source}${url ? ` (${url})` : ""}${date ? ` · data da fonte: ${date}` : ""}`;
-  const stale = isStale(h.validUntil, now) ? `\nAviso: pode estar desatualizado (válido até ${dateBr(h.validUntil)}).` : "";
+  const date = dateText(metaStr(h.meta, "source_date"));
+  const fonte = `Source: ${source || h.source}${url ? ` (${url})` : ""}${date ? ` · source date: ${date}` : ""}`;
+  const stale = isStale(h.validUntil, now) ? `\nWarning: may be out of date (valid until ${dateText(h.validUntil)}).` : "";
   return `${head}\n${fonte}${stale}\n${h.content}`;
 }
 
@@ -51,8 +51,8 @@ export function hitsText(hits: HitView[], now: Date, watermark: string): string 
   const cited = hits.some((h) => metaStr(h.meta, "source"));
   const stale = hits.some((h) => isStale(h.validUntil, now));
   const notes: string[] = [];
-  if (cited) notes.push("Cite a fonte de cada trecho que usar na resposta.");
-  if (stale) notes.push("Trechos com aviso de desatualizado: diga ao usuário que a informação pode ter mudado e sugira confirmar na fonte.");
+  if (cited) notes.push("Cite the source of each excerpt you use in your answer.");
+  if (stale) notes.push("Excerpts with an out-of-date warning: tell the user the information may have changed and suggest confirming it at the source.");
   return `${body}${notes.length ? `\n\n${notes.join(" ")}` : ""}\n\n${watermark}`;
 }
 
@@ -62,7 +62,7 @@ export function trialFilesOnly(i: { specVersion?: number; accessIsTrial: boolean
 }
 
 export const TRIAL_NO_FILES_TEXT =
-  "Nada relevante na parte da base liberada no teste grátis. A base completa do especialista vem com a licença.";
+  "Nothing relevant in the part of the knowledge base unlocked in the free trial. The specialist's full knowledge base comes with the license.";
 
 // ----- Cota diária -----
 
@@ -71,7 +71,7 @@ export const QUOTA_WINDOW_MS = 24 * 3600 * 1000;
 
 /** Resposta ao passar da cota. É sempre o mesmo texto: a contagem ignora estas respostas (não prolongam o bloqueio). */
 export const quotaText = (quota: number): string =>
-  `Limite diário atingido: este especialista permite ${quota} consultas à base por dia. Siga com o que já foi consultado e tente de novo amanhã.`;
+  `Daily limit reached: this specialist allows ${quota} knowledge base searches per day. Continue with what you already looked up and try again tomorrow.`;
 
 /** `quota` 0 desliga a cota; `used` é o que a carteira já consultou na janela. */
 export const quotaExceeded = (used: number, quota: number): boolean => quota > 0 && used >= quota;

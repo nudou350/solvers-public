@@ -34,7 +34,7 @@ describe("guaranteeTaskText", () => {
     assert.match(t, /Formulário de login/);
     assert.match(t, /Preciso de um formulário/);
     assert.ok(t.indexOf("milestone=0") < t.indexOf("milestone=1"));
-    assert.match(t, /Etapa 1 \(milestone=0\): Plano \[revisão manual; 3 USDC; passou na verificação/);
+    assert.match(t, /Step 1 \(milestone=0\): Plano \[manual review; 3 USDC; passed the check/);
     assert.match(t, /\* Valida e-mail/);
     assert.match(t, /\* mostra erro/);
   });
@@ -54,7 +54,7 @@ describe("guaranteesText", () => {
 
   it("mais de uma: aviso para informar o escrow_id e o detalhe de todas", () => {
     const t = guaranteesText([task("ESC1", "Primeira"), task("ESC2", "Segunda")]);
-    assert.match(t, /ATENÇÃO.*2 tarefas.*escrow_id/);
+    assert.match(t, /ATTENTION.*2 open guaranteed tasks.*escrow_id/);
     assert.match(t, /escrow_id: ESC1/);
     assert.match(t, /escrow_id: ESC2/);
     assert.match(t, /Primeira/);
@@ -79,9 +79,9 @@ describe("resolveEscrowId (submit_deliverable)", () => {
   it("mais de uma aberta: id omitido é erro que lista as tarefas (nunca usa a da sessão)", () => {
     assert.throws(
       () => resolveEscrowId({ sessionEscrowId: "A", open: [B, A] }),
-      (e: unknown) => e instanceof Error && /2 tarefas/.test(e.message) && /Tarefa A \(escrow_id: A\)/.test(e.message) && /Tarefa B \(escrow_id: B\)/.test(e.message),
+      (e: unknown) => e instanceof Error && /2 open guaranteed tasks/.test(e.message) && /Tarefa A \(escrow_id: A\)/.test(e.message) && /Tarefa B \(escrow_id: B\)/.test(e.message),
     );
-    assert.throws(() => resolveEscrowId({ open: [A, B] }), /informe o escrow_id/);
+    assert.throws(() => resolveEscrowId({ open: [A, B] }), /pass the escrow_id/);
   });
 
   it("id informado entre as abertas é aceito, mesmo com a sessão presa em outra (troca a sessão)", () => {
@@ -95,9 +95,9 @@ describe("resolveEscrowId (submit_deliverable)", () => {
   });
 
   it("id fora das abertas é recusado; sem nenhuma aberta também", () => {
-    assert.throws(() => resolveEscrowId({ given: "X", open: [A] }), /não está entre as abertas/);
-    assert.throws(() => resolveEscrowId({ given: "X", open: [] }), /não está aberta/);
-    assert.throws(() => resolveEscrowId({ open: [] }), /não tem tarefa com garantia aberta/);
+    assert.throws(() => resolveEscrowId({ given: "X", open: [A] }), /not among this specialist's open tasks/);
+    assert.throws(() => resolveEscrowId({ given: "X", open: [] }), /is not open/);
+    assert.throws(() => resolveEscrowId({ open: [] }), /has no open guaranteed task/);
   });
 });
 
@@ -112,18 +112,18 @@ describe("deliveryIntact (download da entrega aprovada)", () => {
 
 describe("prazo de entrega no texto da IA", () => {
   it("mostra o prazo; vencido avisa, mas não bloqueia nada; sem prazo (tarefa antiga) não mostra", () => {
-    assert.match(guaranteeTaskText(task("E")), /Prazo de entrega: 15\/01\/2099/);
-    assert.doesNotMatch(guaranteeTaskText(task("E")), /VENCIDO/);
-    assert.match(guaranteeTaskText({ ...task("E"), deliveryDeadline: new Date("2020-01-01T00:00:00Z") }), /VENCIDO/);
-    assert.doesNotMatch(guaranteeTaskText({ ...task("E"), deliveryDeadline: null }), /Prazo de entrega/);
+    assert.match(guaranteeTaskText(task("E")), /Delivery deadline: 2099-01-15/);
+    assert.doesNotMatch(guaranteeTaskText(task("E")), /OVERDUE/);
+    assert.match(guaranteeTaskText({ ...task("E"), deliveryDeadline: new Date("2020-01-01T00:00:00Z") }), /OVERDUE/);
+    assert.doesNotMatch(guaranteeTaskText({ ...task("E"), deliveryDeadline: null }), /Delivery deadline/);
   });
 });
 
 describe("milestoneDeliveryBlock", () => {
   it("etapa cancelada/reembolsada ou inexistente é recusada com mensagem clara; o resto segue (o programa decide o prazo)", () => {
     const t = { ...task("E"), milestones: [...task("E").milestones, { idx: 2, title: "Extra", criteria: "x", verify: "tests", status: "refunded", amount: 1n }] };
-    assert.match(milestoneDeliveryBlock(t, 2)!, /cancelada ou reembolsada/);
-    assert.match(milestoneDeliveryBlock(t, 4)!, /não tem a etapa/);
+    assert.match(milestoneDeliveryBlock(t, 2)!, /canceled or refunded/);
+    assert.match(milestoneDeliveryBlock(t, 4)!, /has no step/);
     assert.equal(milestoneDeliveryBlock(t, 1), null);
     assert.equal(milestoneDeliveryBlock({ ...t, deliveryDeadline: new Date("2020-01-01T00:00:00Z") }, 1), null);
   });
@@ -136,8 +136,8 @@ describe("resolveDeliveryDays", () => {
     assert.equal(resolveDeliveryDays(1), 1);
     assert.equal(resolveDeliveryDays(MAX_DELIVERY_DAYS), 60);
   });
-  it("61, negativo e fracionado são recusados em português", () => {
-    for (const d of [61, -1, 2.5, Number.NaN]) assert.throws(() => resolveDeliveryDays(d), /1 a 60 dias/);
+  it("61, negativo e fracionado são recusados com mensagem em inglês", () => {
+    for (const d of [61, -1, 2.5, Number.NaN]) assert.throws(() => resolveDeliveryDays(d), /between 1 and 60 days/);
   });
   it("deliveryDeadlineFrom soma dias", () => {
     assert.equal(deliveryDeadlineFrom(new Date("2026-01-01T00:00:00Z"), 14).toISOString(), "2026-01-15T00:00:00.000Z");
@@ -175,9 +175,9 @@ describe("disputa e cancelamento por atraso", () => {
 
   it("cancelUndeliveredBlock: null quando pode; mensagens claras (com a data) quando não", () => {
     assert.equal(cancelUndeliveredBlock({ closed: false, deliveryDeadline: past }, { status: "pending" }, now), null);
-    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: future }, { status: "pending" }, now)!, /só vence em 10\/02\/2026/);
-    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: past }, { status: "submitted" }, now)!, /ainda não foi entregue/);
-    assert.match(cancelUndeliveredBlock({ closed: true, deliveryDeadline: past }, { status: "pending" }, now)!, /encerrada/);
-    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: null }, { status: "pending" }, now)!, /sem prazo/);
+    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: future }, { status: "pending" }, now)!, /only passes on 2026-02-10/);
+    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: past }, { status: "submitted" }, now)!, /hasn't been delivered yet/);
+    assert.match(cancelUndeliveredBlock({ closed: true, deliveryDeadline: past }, { status: "pending" }, now)!, /already closed/);
+    assert.match(cancelUndeliveredBlock({ closed: false, deliveryDeadline: null }, { status: "pending" }, now)!, /without a delivery deadline/);
   });
 });

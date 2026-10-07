@@ -205,3 +205,17 @@ describe("visões", () => {
     assert.deepEqual(merged.map((w) => w.path), ["a", "b"]);
   });
 });
+
+describe("textos para o criador saem em inglês", () => {
+  it("quem ainda não pode enviar", () => {
+    assert.match(creatorNotReady(undefined) ?? "", /^Complete your creator profile/);
+    assert.match(creatorNotReady({ invited: false, termsAcceptedAt: null }) ?? "", /invited creators only/);
+    assert.match(creatorNotReady({ invited: true, termsAcceptedAt: null }) ?? "", /Accept the creator terms/);
+  });
+  it("limites de envio e transições da revisão", () => {
+    assert.match(uploadLimitProblem({ pending: 3, last24h: 0 }, { maxPending: 3, maxPerDay: 10 })?.message ?? "", /already have 3 submission/);
+    assert.match(uploadLimitProblem({ pending: 0, last24h: 10 }, { maxPending: 3, maxPerDay: 10 })?.message ?? "", /Daily limit of 10/);
+    assert.equal(reviewTransitionProblem("published", "approve"), `You can't approve a submission in "published".`);
+    assert.equal(reviewTransitionProblem("published", "request_changes"), `You can't request changes on a submission in "published".`);
+  });
+});

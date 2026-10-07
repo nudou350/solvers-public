@@ -19,8 +19,8 @@ type SubmissionRow = typeof schema.packageSubmissions.$inferSelect;
 /** A submissão tem de existir e ser da carteira autenticada. */
 export async function loadOwnedSubmission(submissionId: string, wallet: string): Promise<SubmissionRow> {
   const [sub] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, submissionId));
-  if (!sub) throw notFound("Submissão não encontrada");
-  if (sub.creatorWallet !== wallet) throw forbidden("Esta submissão pertence a outra carteira");
+  if (!sub) throw notFound("Submission not found");
+  if (sub.creatorWallet !== wallet) throw forbidden("This submission belongs to another wallet");
   return sub;
 }
 
@@ -34,7 +34,7 @@ export async function isNewAgent(sub: Pick<SubmissionRow, "id" | "agentId">): Pr
   return !prior;
 }
 
-const wrongState = (status: string) => new HttpError(409, "Esta versão não está esperando a sua assinatura agora.", "submission_state", { status });
+const wrongState = (status: string) => new HttpError(409, "This version is not waiting for your signature right now.", "submission_state", { status });
 
 /**
  * Monta a transação do passo pedido. Confere, nesta ordem: a carteira (dono da submissão), o estado
@@ -45,16 +45,16 @@ export async function buildPublicationTx(kind: CreatorSigningStep, wallet: strin
   const sub = await loadOwnedSubmission(submissionId, wallet);
   if (!SIGNABLE_STATUSES.includes(sub.status as SubmissionStatus)) throw wrongState(sub.status);
   const approved = parseApproved(sub.approved);
-  if (!approved) throw new HttpError(409, "Esta versão ainda não foi aprovada pela revisão.", "not_approved");
+  if (!approved) throw new HttpError(409, "This version has not been approved by the review yet.", "not_approved");
 
   const state = await port.fetchAgentState(sub.agentId);
   const step = nextPublicationStep(approved, state, wallet);
   if (step === "blocked") {
-    throw new HttpError(409, "Este Solver está bloqueado na rede (suspenso ou de outra carteira); fale com a equipe.", "publication_blocked");
+    throw new HttpError(409, "This Solver is blocked on the network (suspended or owned by another wallet); contact the team.", "publication_blocked");
   }
   const expected = stepMismatch(kind, step);
   if (expected) {
-    throw new HttpError(409, "Este não é o passo certo agora.", "wrong_step", { expected, requested: kind });
+    throw new HttpError(409, "This is not the right step right now.", "wrong_step", { expected, requested: kind });
   }
 
   let built: BuiltTx;
@@ -63,7 +63,7 @@ export async function buildPublicationTx(kind: CreatorSigningStep, wallet: strin
     const stake = await port.minStake();
     const balance = await port.usdcBalance(wallet);
     if (balance < stake) {
-      throw new HttpError(400, "Saldo de USDC insuficiente para o depósito do Solver", "insufficient_funds", {
+      throw new HttpError(400, "Not enough USDC balance for the Solver deposit", "insufficient_funds", {
         balanceUsdc: unitsToUsdc(balance),
         neededUsdc: unitsToUsdc(stake),
         faucetEnabled: env.FAUCET_ENABLED,
@@ -114,7 +114,7 @@ const KIND_TO_TOUCH = { "register-agent": "registered", "update-version": "versi
 /** Resumo do resultado (estado da submissão DEPOIS da chamada) no formato `PublicationResult`. */
 export async function publicationResult(submissionId: string, result: FinalizeResult | null, port: PublishChain | null = null): Promise<PublicationResult> {
   const [sub] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, submissionId));
-  if (!sub) throw notFound("Submissão não encontrada");
+  if (!sub) throw notFound("Submission not found");
   let step: PublicationStep | null = result?.outcome === "not_ready" ? (result.step ?? null) : null;
   if (!step && port && result === null) {
     const approved = parseApproved(sub.approved);
@@ -139,7 +139,7 @@ export async function confirmPublication(input: PublicationConfirmInput, wallet:
   const kind = input.kind ? KIND_TO_TOUCH[input.kind] : undefined;
   // O tipo de evento (quando o cliente diz qual passo foi) e o signatário (a carteira do criador) precisam bater.
   if (!(await port.signatureTouchesAgent(input.signature, sub.agentId, { kind, creatorWallet: sub.creatorWallet }))) {
-    throw badRequest("Esta transação não é deste Solver.", "signature_not_for_agent");
+    throw badRequest("This transaction does not belong to this Solver.", "signature_not_for_agent");
   }
   await port.indexSignature(input.signature).catch(() => undefined);
   const { result } = await reconcileAgent(sub.agentId, { signature: input.signature, kind: kind ?? "pricing" });

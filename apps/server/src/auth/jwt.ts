@@ -84,7 +84,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     req.tokenId = claims.jti;
     next();
   } catch {
-    next(unauthorized("Sessão expirada, entre novamente"));
+    next(unauthorized("Session expired, please sign in again"));
   }
 }
 

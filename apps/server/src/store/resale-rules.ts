@@ -24,19 +24,19 @@ export const TREND_HISTORY_SIZE = 10;
  */
 export function parseListingPrice(priceUsdc: number, minUnits?: bigint): bigint {
   const invalid = (msg: string) => new HttpError(400, msg, "validation");
-  if (typeof priceUsdc !== "number" || !Number.isFinite(priceUsdc)) throw invalid("priceUsdc: informe um número");
-  if (priceUsdc <= 0) throw invalid("priceUsdc: o preço precisa ser maior que zero");
-  if (priceUsdc > MAX_LISTING_PRICE_USDC) throw invalid("priceUsdc: o preço informado é grande demais");
+  if (typeof priceUsdc !== "number" || !Number.isFinite(priceUsdc)) throw invalid("priceUsdc: enter a number");
+  if (priceUsdc <= 0) throw invalid("priceUsdc: the price must be greater than zero");
+  if (priceUsdc > MAX_LISTING_PRICE_USDC) throw invalid("priceUsdc: the price is too large");
   // 6 casas é a precisão do USDC. Tolera só o ruído do ponto flutuante (1.1400000000000001 ecoado pelo cliente);
   // casas reais a mais (1.1234567) continuam recusadas, sem arredondar o preço do usuário em silêncio.
   const tolerance = 1e-9 + priceUsdc * 2e-16;
-  if (Math.abs(priceUsdc - Math.round(priceUsdc * 1e6) / 1e6) > tolerance) throw invalid("priceUsdc: use no máximo 6 casas decimais");
+  if (Math.abs(priceUsdc - Math.round(priceUsdc * 1e6) / 1e6) > tolerance) throw invalid("priceUsdc: use at most 6 decimal places");
   const units = usdcToUnits(priceUsdc);
-  if (units <= 0n) throw invalid("priceUsdc: o preço precisa ser maior que zero");
+  if (units <= 0n) throw invalid("priceUsdc: the price must be greater than zero");
   if (minUnits !== undefined && units < minUnits) {
     throw new HttpError(
       RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.priceTooLow],
-      `O preço mínimo para anunciar é ${unitsToUsdc(minUnits)} USDC.`,
+      `The minimum listing price is ${unitsToUsdc(minUnits)} USDC.`,
       RESALE_ERROR_CODES.priceTooLow,
       { minPriceUsdc: unitsToUsdc(minUnits) },
     );
@@ -49,7 +49,7 @@ export function assertResaleCut(royaltyBps: number, feeBps: number): void {
   if (royaltyBps + feeBps > RESALE_MAX_CUT_BPS) {
     throw new HttpError(
       RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.cutTooHigh],
-      "O royalty do criador somado à taxa da plataforma passa de 50% do preço: esta licença não pode ser anunciada agora.",
+      "The creator royalty plus the platform fee exceeds 50% of the price: this license can't be listed right now.",
       RESALE_ERROR_CODES.cutTooHigh,
     );
   }

@@ -20,12 +20,12 @@ const MAX_INPUT_PIXELS = 40_000_000;
 export type ProcessedImage = { data: Buffer; width: number; height: number };
 
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
-  if (input.length === 0) throw new ImageError("Arquivo vazio.");
-  if (input.length > MAX_IMAGE_UPLOAD_BYTES) throw new ImageError("A imagem passa de 5 MB.", "image_too_large");
+  if (input.length === 0) throw new ImageError("The file is empty.");
+  if (input.length > MAX_IMAGE_UPLOAD_BYTES) throw new ImageError("The image is larger than 5 MB.", "image_too_large");
   try {
     const img = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" });
     const meta = await img.metadata();
-    if (!meta.format || !ALLOWED_FORMATS.has(meta.format)) throw new ImageError("Use uma imagem JPG, PNG ou WebP.");
+    if (!meta.format || !ALLOWED_FORMATS.has(meta.format)) throw new ImageError("Use a JPG, PNG or WebP image.");
     const { data, info } = await img
       .rotate() // aplica a orientação do EXIF antes de ele ser descartado
       .resize({ width: IMAGE_MAX_SIDE, height: IMAGE_MAX_SIDE, fit: "inside", withoutEnlargement: true })
@@ -34,6 +34,6 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     return { data, width: info.width, height: info.height };
   } catch (e) {
     if (e instanceof ImageError) throw e;
-    throw new ImageError("Não foi possível ler esta imagem. Tente exportá-la de novo como JPG ou PNG.");
+    throw new ImageError("We couldn't read this image. Try exporting it again as JPG or PNG.");
   }
 }

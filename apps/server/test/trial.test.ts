@@ -142,20 +142,20 @@ describe("teto da entrada das ferramentas no teste", () => {
 
   it("passa do teto: texto em português sem gastar saldo, com o que foi enviado e o link", () => {
     const many = trialToolCapError("run_tests", cap, arr(5), link)!;
-    assert.match(many, /^Nada foi executado e o saldo do teste não foi gasto\./);
-    assert.match(many, /run_tests aceita até 3 arquivos e 30 KB por execução \(você enviou 5 arquivos, 1 KB\)/);
-    assert.match(many, /Comprar: https:\/\/x\/compra$/);
+    assert.match(many, /^Nothing was run and no free-trial balance was spent\./);
+    assert.match(many, /run_tests accepts up to 3 files and 30 KB per run \(you sent 5 files, 1 KB\)/);
+    assert.match(many, /Buy: https:\/\/x\/compra$/);
     const big = trialToolCapError("a11y_check", cap, arr(1, "x".repeat(31_000)), link)!;
-    assert.match(big, /você enviou 1 arquivo, 32 KB/); // 31.000 de conteúdo + o caminho, arredondado para cima
+    assert.match(big, /you sent 1 file, 32 KB/); // 31.000 de conteúdo + o caminho, arredondado para cima
     // Passou por menos de 1 KB: o enviado não pode aparecer igual ao teto.
     const barely = trialToolCapError("run_tests", cap, arr(1, "x".repeat(30_400)), link)!;
-    assert.match(barely, /aceita até 3 arquivos e 30 KB por execução \(você enviou 1 arquivo, 31 KB\)/);
+    assert.match(barely, /accepts up to 3 files and 30 KB per run \(you sent 1 file, 31 KB\)/);
     assert.ok(trialToolCapError("run_tests", { maxBytes: 10 }, { anything: "x".repeat(50) }, link));
   });
 
   it("limite só de arquivos ou só de bytes aparece sem o outro", () => {
-    assert.match(trialToolCapError("run_tests", { maxFiles: 1 }, arr(2), link)!, /aceita até 1 arquivo por execução/);
-    assert.match(trialToolCapError("run_tests", { maxBytes: 1000 }, arr(1, "x".repeat(2000)), link)!, /aceita até 1 KB por execução/);
+    assert.match(trialToolCapError("run_tests", { maxFiles: 1 }, arr(2), link)!, /accepts up to 1 file per run/);
+    assert.match(trialToolCapError("run_tests", { maxBytes: 1000 }, arr(1, "x".repeat(2000)), link)!, /accepts up to 1 KB per run/);
   });
 });
 
@@ -165,7 +165,7 @@ describe("textos do teste", () => {
   it("fim do teste: nome, o que libera, o que só a licença dá e o link", () => {
     assert.equal(
       trialEndText("Exemplo", t, "https://x/checkout"),
-      "O teste grátis de Exemplo vai até aqui: Você recebe o plano e o componente. Com a licença vitalícia você também tem: a revisão final com testes ilimitados. Comprar: https://x/checkout",
+      "The free trial of Exemplo ends here: Você recebe o plano e o componente. With the lifetime license you also get: a revisão final com testes ilimitados. Buy: https://x/checkout",
     );
   });
 
@@ -173,28 +173,28 @@ describe("textos do teste", () => {
     const line = trialAccessLine(t, { use: 1, totalSteps: 4, toolNames: ["run_tests", "a11y_check"] });
     assert.equal(
       line,
-      "Teste grátis (uso 1 de 3): libera as etapas 1 a 2 de 4, até 15 consultas à base e run_tests 1 vez no total. Depois deste, restam 2 usos grátis. Só com a licença: a11y_check. Você recebe o plano e o componente. Avise o usuário desses limites antes de começar.",
+      "Free trial (use 1 of 3): unlocks steps 1 to 2 of 4, up to 15 knowledge base searches, and run_tests 1 time in total. After this one, 2 free uses are left. License only: a11y_check. Você recebe o plano e o componente. Tell the user about these limits before you start.",
     );
   });
 
   it("linha de acesso: teto das ferramentas e escopo quando o manifest define", () => {
     const capped = trialLimits(parse({ trial: { ...trial, tools: { run_tests: 1, a11y_check: 3 }, toolLimits: { run_tests: { maxFiles: 3, maxBytes: 30000 }, a11y_check: { maxFiles: 3 } }, scope: "1 componente por uso." } }))!;
     const line = trialAccessLine(capped, { use: 1, totalSteps: 4, toolNames: ["run_tests", "a11y_check"] });
-    assert.match(line, /Limite de tamanho por execução no teste: run_tests aceita até 3 arquivos e 30 KB e a11y_check aceita até 3 arquivos\. Você recebe o plano e o componente\. Escopo do teste: 1 componente por uso\. Avise o usuário/);
+    assert.match(line, /Size limit per run in the trial: run_tests accepts up to 3 files and 30 KB and a11y_check accepts up to 3 files\. Você recebe o plano e o componente\. Trial scope: 1 componente por uso\. Tell the user/);
   });
 
   it("linha de acesso: saldo restante, etapa única e sem consultas", () => {
     const one = trialLimits(parse({ trial: { ...trial, steps: 1, searches: 0, tools: { run_tests: 2 } } }))!;
     const line = trialAccessLine(one, { use: 2, totalSteps: 4, toolNames: ["run_tests"], usage: { searchesUsed: 0, toolRuns: { run_tests: 1 } } });
-    assert.match(line, /^Teste grátis \(uso 2 de 3\): libera a etapa 1 de 4, nenhuma consulta à base e run_tests 2 vezes \(restam 1\) no total\./);
+    assert.match(line, /^Free trial \(use 2 of 3\): unlocks step 1 of 4, no knowledge base searches, and run_tests 2 times \(1 left\) in total\./);
     const all = trialLimits(parse({ trial: { ...trial, steps: 4 } }))!;
-    assert.match(trialAccessLine(all, { use: 1, totalSteps: 4, toolNames: [] }), /libera as 4 etapas, até 15 consultas/);
+    assert.match(trialAccessLine(all, { use: 1, totalSteps: 4, toolNames: [] }), /unlocks all 4 steps, up to 15 knowledge base searches/);
   });
 
   it("linha de acesso: usos que sobram e aviso do último uso", () => {
     const at = (use: number) => trialAccessLine(t, { use, totalSteps: 4, toolNames: [] });
-    assert.match(at(2), /Depois deste, resta 1 uso grátis\./);
-    assert.match(at(3), /Este é o último uso grátis\./);
+    assert.match(at(2), /After this one, 1 free use is left\./);
+    assert.match(at(3), /This is the last free use\./);
   });
 
   it("resumo para a biblioteca: usos, consultas e ferramentas que sobram", () => {
@@ -223,7 +223,7 @@ describe("acesso pago", () => {
   });
 
   it("linha de acesso pago", () => {
-    assert.equal(paidAccessLine("license"), "Acesso: licença vitalícia.");
-    assert.equal(paidAccessLine("guarantee"), "Acesso: tarefa com garantia (sem limites enquanto a garantia estiver aberta).");
+    assert.equal(paidAccessLine("license"), "Access: lifetime license.");
+    assert.equal(paidAccessLine("guarantee"), "Access: guaranteed task (no limits while the guarantee is open).");
   });
 });

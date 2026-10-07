@@ -139,28 +139,28 @@ const HOLDING_STATUSES = ["awaiting_creator_signature", "awaiting_onchain_approv
 
 /**
  * Conferência da aprovação (roda dentro da transação do revisor): o id e o slug da submissão ainda são do criador dela?
- * Devolve o motivo em português ou null. O catálogo, os Solvers da plataforma, os slugs reservados e os envios de OUTRO
+ * Devolve o motivo em inglês ou null. O catálogo, os Solvers da plataforma, os slugs reservados e os envios de OUTRO
  * criador já aprovados valem; envios apenas pendentes de outro criador não (o primeiro a ser aprovado leva).
  */
 export async function ownershipConflict(args: { submissionId: string; wallet: string; agentId: string; slug: string }): Promise<string | null> {
   const { agentId, slug } = args;
-  if (RESERVED_SLUGS.includes(slug)) return `O slug ${slug} é reservado.`;
-  if (PLATFORM_AGENT_IDS.includes(agentId)) return "O id deste Solver é reservado à plataforma.";
+  if (RESERVED_SLUGS.includes(slug)) return `The slug ${slug} is reserved.`;
+  if (PLATFORM_AGENT_IDS.includes(agentId)) return "This Solver's id is reserved for the platform.";
   const [creator] = await db.select({ id: schema.creators.id }).from(schema.creators).where(eq(schema.creators.wallet, args.wallet));
-  if (!creator) return "O perfil de criador desta submissão não existe mais.";
+  if (!creator) return "The creator profile for this submission no longer exists.";
 
   const agents = await db.select({ id: schema.agents.id, slug: schema.agents.slug, creatorId: schema.agents.creatorId }).from(schema.agents).where(or(eq(schema.agents.id, agentId), eq(schema.agents.slug, slug)));
   for (const a of agents) {
-    if (a.id !== agentId) return `O slug ${slug} já é de outro Solver no catálogo (${a.id}).`;
+    if (a.id !== agentId) return `The slug ${slug} already belongs to another Solver in the catalog (${a.id}).`;
     // A linha mínima do indexador (agente registrado antes do catálogo) guarda a carteira como dono e o id como slug.
-    if (a.creatorId !== creator.id && a.creatorId !== args.wallet) return "O id deste Solver já pertence a outro criador no catálogo.";
-    if (a.slug !== slug && a.slug !== a.id) return `Este Solver já existe no catálogo com outro slug (${a.slug}).`;
+    if (a.creatorId !== creator.id && a.creatorId !== args.wallet) return "This Solver's id already belongs to another creator in the catalog.";
+    if (a.slug !== slug && a.slug !== a.id) return `This Solver already exists in the catalog with a different slug (${a.slug}).`;
   }
 
   // Pacotes em disco: o da plataforma (pasta agents/) nunca é de criador.
   for (const key of [agentId, slug]) {
     const pkg = getPackage(key);
-    if (pkg && (pkg.platform || pkg.source === "agents")) return "O id ou o slug pertence a um Solver da plataforma.";
+    if (pkg && (pkg.platform || pkg.source === "agents")) return "The id or slug belongs to a platform Solver.";
   }
 
   const holders = await db
@@ -168,7 +168,7 @@ export async function ownershipConflict(args: { submissionId: string; wallet: st
     .from(schema.packageSubmissions)
     .where(and(ne(schema.packageSubmissions.id, args.submissionId), ne(schema.packageSubmissions.creatorWallet, args.wallet), or(eq(schema.packageSubmissions.agentId, agentId), eq(schema.packageSubmissions.slug, slug)), inArray(schema.packageSubmissions.status, HOLDING_STATUSES)))
     .limit(1);
-  if (holders.length > 0) return "Outro criador já tem uma versão aprovada com este id ou slug.";
+  if (holders.length > 0) return "Another creator already has an approved version with this id or slug.";
   return null;
 }
 

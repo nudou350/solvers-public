@@ -232,7 +232,7 @@ describe("evaluateReport", () => {
     const forged = { success: true, testResults: [file("src/acceptance.A.test.tsx", [pass("fake")])] };
     const r = evaluateReport(input({ json: forged, exitCode: 1, acceptanceFiles: ["acceptance.A.test.tsx"] }));
     assert.equal(r.passed, false);
-    assert.match(r.failures[0]!.message, /código 1/);
+    assert.match(r.failures[0]!.message, /code 1/);
   });
 
   it("timeout e estouro do relatório reprovam", () => {
@@ -244,7 +244,7 @@ describe("evaluateReport", () => {
   it("relatório ausente ou inválido vira falha de execução", () => {
     const r = evaluateReport(input({ json: null, jsonProblem: "O relatório de testes não é um JSON válido" }));
     assert.equal(r.passed, false);
-    assert.equal(r.failures[0]!.test, "execução");
+    assert.equal(r.failures[0]!.test, "execution");
     assert.match(r.failures[0]!.message, /JSON válido/);
     assert.equal(evaluateReport(input({ json: [1, 2] })).passed, false);
     assert.equal(evaluateReport(input({ json: "texto" })).passed, false);

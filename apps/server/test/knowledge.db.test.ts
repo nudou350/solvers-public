@@ -164,8 +164,8 @@ describe("conhecimento com banco", { skip: url ? false : "defina TEST_DATABASE_U
     const planilha = all.find((h) => h.source === "knowledge/sub/planilha.txt")!;
     assert.equal(planilha.validUntil, "2020-01-01");
     const text = rules.hitsText([planilha], new Date("2026-10-02T00:00:00Z"), "MARCA");
-    assert.match(text, /pode estar desatualizado \(válido até 01\/01\/2020\)/);
-    assert.match(text, /Cite a fonte/);
+    assert.match(text, /may be out of date \(valid until 2020-01-01\)/);
+    assert.match(text, /Cite the source/);
 
     const trial = await search.searchKnowledge(AGENT, "1.0.0", "planilha orçamento renda", 5, { trialOnly: true });
     assert.ok(trial.length >= 1);
@@ -200,7 +200,7 @@ describe("conhecimento com banco", { skip: url ? false : "defina TEST_DATABASE_U
       await event(2, "resposta qualquer");
       assert.equal(await quota.searchQuotaBlock(WALLET, AGENT, 3), null);
       await event(1, "outra resposta");
-      assert.match((await quota.searchQuotaBlock(WALLET, AGENT, 3))!, /Limite diário atingido/);
+      assert.match((await quota.searchQuotaBlock(WALLET, AGENT, 3))!, /Daily limit reached/);
     });
 
     it("cota 0 desliga", async () => {

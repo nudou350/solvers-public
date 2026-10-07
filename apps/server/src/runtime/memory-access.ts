@@ -11,4 +11,4 @@ export type MemoryAccessFacts = {
 
 export const canUseMemory = (f: MemoryAccessFacts): boolean => f.licensed || f.openSession;
 
-export const MEMORY_NO_ACCESS_TEXT = "Para usar a memória deste especialista, ative-o antes com activate_solver (teste grátis ou licença).";
+export const MEMORY_NO_ACCESS_TEXT = "To use this specialist's memory, activate it first with activate_solver (free trial or license).";

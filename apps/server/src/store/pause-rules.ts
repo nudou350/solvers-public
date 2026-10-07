@@ -6,11 +6,11 @@ import { HttpError } from "../lib/http.js";
  * `Paused`); aqui o servidor só evita montar uma transação que vai falhar e responde antes, em português.
  *
  * Decisão pura (`assertNotPaused`) + leitura com cache curto (`createConfigStateReader`):
- * - bit de entradas ligado: 503 `platform_paused` "Compras pausadas temporariamente";
+ * - bit de entradas ligado: 503 `platform_paused` "Purchases are temporarily paused";
  * - fail-open: Config ilegível (RPC fora, v1 ainda não migrada, tamanho desconhecido) NÃO bloqueia; o programa continua
  *   sendo a barreira e a simulação (`simulation-gate.ts`) já devolve a mensagem amigável de `Paused` como 409.
  */
-export const PAUSED_MESSAGE = "Compras pausadas temporariamente";
+export const PAUSED_MESSAGE = "Purchases are temporarily paused";
 
 export function assertNotPaused(
   state: ConfigState | null,

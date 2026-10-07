@@ -15,9 +15,9 @@ const MAX_TOTAL_BYTES = 300_000;
 /** Caminho relativo e sem "..": barra inicial, letra de unidade e "\\" iniciais são rejeitados. */
 function badPath(path: string): string | null {
   const p = path.replace(/\\/g, "/");
-  if (!p.trim()) return "caminho vazio";
-  if (p.startsWith("/") || /^[a-z]:/i.test(p)) return "caminho absoluto não é permitido";
-  if (p.split("/").some((seg) => seg === "..")) return 'caminho com ".." não é permitido';
+  if (!p.trim()) return "empty path";
+  if (p.startsWith("/") || /^[a-z]:/i.test(p)) return "absolute paths are not allowed";
+  if (p.split("/").some((seg) => seg === "..")) return 'paths with ".." are not allowed';
   return null;
 }
 
@@ -26,25 +26,25 @@ const FileEntry = z.object({ path: z.string().min(1).max(200), content: z.string
 export const FilesInput = z
   .object({
     files: z.union([z.array(FileEntry).min(1).max(MAX_FILES), z.record(z.string())], {
-      errorMap: () => ({ message: 'use files: [{ path, content }] ou files: { "Nome.tsx": "conteúdo" }' }),
+      errorMap: () => ({ message: 'use files: [{ path, content }] or files: { "Name.tsx": "content" }' }),
     }),
   })
   .transform(({ files }, ctx) => {
     const entries = Array.isArray(files) ? files.map((f) => [f.path, f.content] as const) : Object.entries(files);
     const out: Record<string, string> = {};
     if (entries.length > MAX_FILES) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: `no máximo ${MAX_FILES} arquivos` });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: `at most ${MAX_FILES} files` });
       return out;
     }
     entries.forEach(([path, content], i) => {
       const err = badPath(path);
       if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files", i], message: `${path}: ${err}` });
-      else if (path in out) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files", i], message: `${path}: arquivo repetido` });
+      else if (path in out) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files", i], message: `${path}: duplicate file` });
       else out[path] = content;
     });
-    if (entries.length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "envie ao menos um arquivo" });
+    if (entries.length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "send at least one file" });
     const bytes = entries.reduce((a, [path, content]) => a + Buffer.byteLength(path) + Buffer.byteLength(content), 0);
-    if (bytes > MAX_TOTAL_BYTES) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "arquivos grandes demais (máx. 300 KB no total)" });
+    if (bytes > MAX_TOTAL_BYTES) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "files too large (max. 300 KB in total)" });
     return out;
   });
 
@@ -79,7 +79,7 @@ export function parseColor(input: string): Rgba {
       if (ok) return { r: r!, g: g!, b: b!, a };
     }
   }
-  throw badRequest(`Cor inválida: ${input} (use #RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgb() ou rgba())`);
+  throw badRequest(`Invalid color: ${input} (use #RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgb() or rgba())`);
 }
 
 const luminance = ({ r, g, b }: Rgba) => {
@@ -103,7 +103,7 @@ const toHex = ({ r, g, b }: Rgba) => `#${[r, g, b].map((c) => Math.round(c).toSt
 /** Razão exata (sem arredondar), para comparar com os limites sem "arredondar para cima". */
 function exactRatio(fgRaw: string, bgRaw: string) {
   const bg = parseColor(bgRaw);
-  if (bg.a < 1) throw badRequest(`Fundo com transparência (${bgRaw}): informe a cor de fundo opaca resultante`);
+  if (bg.a < 1) throw badRequest(`Background with transparency (${bgRaw}): provide the resulting opaque background color`);
   const fgParsed = parseColor(fgRaw);
   const fg = fgParsed.a < 1 ? composite(fgParsed, bg) : fgParsed;
   const [hi, lo] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
@@ -134,7 +134,7 @@ export function contrastCheck(input: unknown) {
     const parsed = ContrastPair.safeParse(raw);
     const echo = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     if (!parsed.success) {
-      return { fg: echo.fg, bg: echo.bg, use: echo.use, error: parsed.error.issues.map((i) => `${i.path.join(".") || "par"}: ${i.message}`).join("; ") };
+      return { fg: echo.fg, bg: echo.bg, use: echo.use, error: parsed.error.issues.map((i) => `${i.path.join(".") || "pair"}: ${i.message}`).join("; ") };
     }
     const p = parsed.data;
     const kind = p.kind ?? (p.large ? "texto-grande" : "texto");
@@ -449,19 +449,19 @@ export function a11yCheck(files: Record<string, string>) {
           if (closeTok) labelEnds.push(closeTok.end);
           break;
         case "img":
-          if (!t.spread && !attr(t, "alt")) push(file, "img-alt", "error", 'Imagem sem atributo alt (use alt="" se for decorativa)', text(t));
+          if (!t.spread && !attr(t, "alt")) push(file, "img-alt", "error", 'Image without an alt attribute (use alt="" if it is decorative)', text(t));
           break;
         case "button": {
           // Botão dentro de botão é inválido: só o externo é avaliado (mantém a passada linear).
           if (t.start < buttonEnd || t.spread || truthy(t, "aria-label", "aria-labelledby", "title")) break;
           if (t.selfClosing) {
-            push(file, "button-name", "error", "Botão sem texto acessível (ícone sem aria-label, aria-labelledby ou title)", text(t));
+            push(file, "button-name", "error", "Button without accessible text (icon without aria-label, aria-labelledby or title)", text(t));
             break;
           }
           if (!closeTok) break;
           buttonEnd = closeTok.end;
           if (!contentHasName(src, tokens, pair, k + 1, pair[k]!, closeTok.start)) {
-            push(file, "button-name", "error", "Botão sem texto acessível (ícone sem aria-label, aria-labelledby ou title)", src.slice(t.start, Math.min(closeTok.end, t.start + 200)));
+            push(file, "button-name", "error", "Button without accessible text (icon without aria-label, aria-labelledby or title)", src.slice(t.start, Math.min(closeTok.end, t.start + 200)));
           }
           break;
         }
@@ -474,19 +474,19 @@ export function a11yCheck(files: Record<string, string>) {
           const id = attrValue(attr(t, "id"));
           if (id && forValues.has(id)) break;
           if (labelEnds.length > 0) break;
-          push(file, "label", "error", "Campo sem rótulo associado (label htmlFor, label envolvendo o campo ou aria-label)", text(t));
+          push(file, "label", "error", "Field without an associated label (label htmlFor, a label wrapping the field, or aria-label)", text(t));
           break;
         }
         case "div":
         case "span":
           if (attr(t, "onClick") && (!attr(t, "role") || !attr(t, "tabIndex", "tabindex"))) {
-            push(file, "interactive-div", "error", `${t.name} clicável sem role e tabIndex; prefira <button>`, text(t));
+            push(file, "interactive-div", "error", `Clickable ${t.name} without role and tabIndex; prefer <button>`, text(t));
           }
           break;
       }
     }
 
-    for (const m of src.matchAll(/tabIndex=\{?\s*["']?([1-9]\d*)/gi)) push(file, "tabindex", "error", "tabIndex positivo quebra a ordem de foco", m[0]);
+    for (const m of src.matchAll(/tabIndex=\{?\s*["']?([1-9]\d*)/gi)) push(file, "tabindex", "error", "A positive tabIndex breaks the focus order", m[0]);
     checkOutline(file, src, push);
   }
   const issues = all.filter((i) => i.severity === "error");
@@ -503,8 +503,8 @@ const OUTLINE_OFF = /outline\s*:\s*["']?(?:none|0)(?=["']?[ \t]*(?:[;,}]|!import
 function checkOutline(file: string, src: string, push: (f: string, r: string, s: A11yIssue["severity"], m: string, sn: string) => void) {
   const hasFocusVisible = /focus-visible/.test(src);
   for (const m of src.matchAll(OUTLINE_OFF)) {
-    if (hasFocusVisible) push(file, "focus-visible", "warning", "outline removido; confira se o :focus-visible do arquivo cobre este elemento", m[0]);
-    else push(file, "focus-visible", "error", "Remoção de outline sem alternativa de foco visível (:focus-visible)", m[0]);
+    if (hasFocusVisible) push(file, "focus-visible", "warning", "Outline removed; check whether the file's :focus-visible covers this element", m[0]);
+    else push(file, "focus-visible", "error", "Outline removed without a visible focus alternative (:focus-visible)", m[0]);
   }
 }
 
@@ -539,13 +539,13 @@ const SPLITS: Record<"internacional" | "nacional", Record<Profile, Split>> = {
 };
 
 const LABEL: Record<BudgetCategory, string> = {
-  aereo: "aéreo",
-  hospedagem: "hospedagem",
-  alimentacao: "alimentação",
-  passeios: "passeios",
-  transporteLocal: "transporte local",
-  seguro: "seguro",
-  reserva: "reserva",
+  aereo: "flights",
+  hospedagem: "lodging",
+  alimentacao: "food",
+  passeios: "activities",
+  transporteLocal: "local transport",
+  seguro: "insurance",
+  reserva: "reserve",
 };
 
 /** Diária local mínima plausível por pessoa (BRL). */
@@ -567,9 +567,9 @@ export const BudgetInput = z
     emergencyReservePct: z.number().min(0).max(50).optional(),
   })
   // Comparações em centavos inteiros, como no cálculo.
-  .refine((v) => toCents(v.total) >= 1, { message: "total precisa ser de pelo menos 0,01", path: ["total"] })
+  .refine((v) => toCents(v.total) >= 1, { message: "total must be at least 0.01", path: ["total"] })
   .refine((v) => Object.values(v.alreadyPaid ?? {}).reduce((a, b) => a + toCents(b ?? 0), 0) <= toCents(v.total), {
-    message: "a soma de alreadyPaid passa do total",
+    message: "the sum of alreadyPaid exceeds the total",
     path: ["alreadyPaid"],
   });
 
@@ -588,7 +588,7 @@ function splitCents<K extends string>(cents: number, weights: Record<K, number>)
   return out;
 }
 
-const brl = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const brl = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
  * Divide o orçamento por categoria. Valores já pagos (alreadyPaid) ficam fixos na categoria e saem do
@@ -602,7 +602,7 @@ export function budgetSplit(input: unknown) {
 
   let reservePct = v.emergencyReservePct ?? 10;
   if (reservePct < 10) {
-    alerts.push(`Reserva de emergência ajustada de ${reservePct}% para o mínimo de 10%.`);
+    alerts.push(`Emergency reserve raised from ${reservePct}% to the 10% minimum.`);
     reservePct = 10;
   }
 
@@ -622,7 +622,7 @@ export function budgetSplit(input: unknown) {
   if (freeCents < 0) {
     reserveCents = Math.max(0, reserveCents + freeCents);
     freeCents = 0;
-    alerts.push(`Os valores já pagos não deixam espaço para a reserva completa de ${reservePct}%: o orçamento não fecha.`);
+    alerts.push(`The amounts already paid leave no room for the full ${reservePct}% reserve: the budget doesn't add up.`);
   }
 
   const openWeights = Object.fromEntries(PAID_CATEGORIES.filter((c) => paid[c] == null).map((c) => [c, idealPct[c]])) as Record<string, number>;
@@ -635,8 +635,8 @@ export function budgetSplit(input: unknown) {
     const zeroOpen = Object.keys(openWeights).map((c) => LABEL[c as PaidCategory]);
     alerts.push(
       zeroOpen.length
-        ? `As categorias com valor sugerido já estão pagas (${zeroOpen.join(", ")} fica sem valor neste perfil): a sobra de ${leftover} foi somada à reserva.`
-        : `Todas as categorias já estão pagas: a sobra de ${leftover} foi somada à reserva.`,
+        ? `The categories with a suggested amount are already paid (${zeroOpen.join(", ")} gets no amount in this profile): the leftover of ${leftover} was added to the reserve.`
+        : `All categories are already paid: the leftover of ${leftover} was added to the reserve.`,
     );
   }
 
@@ -648,7 +648,7 @@ export function budgetSplit(input: unknown) {
     if (paid[c] == null) continue;
     const ideal = Math.round((totalCents * idealPct[c]) / 100);
     if (paid[c]! > ideal) {
-      alerts.push(`${LABEL[c]}: já pago (${money(paid[c]! / 100)}) acima do sugerido para o perfil (${money(ideal / 100)}); as outras categorias ficaram menores.`);
+      alerts.push(`${LABEL[c]}: already paid (${money(paid[c]! / 100)}) above what is suggested for the profile (${money(ideal / 100)}); the other categories got smaller.`);
     }
   }
 
@@ -663,7 +663,7 @@ export function budgetSplit(input: unknown) {
     const min = MIN_DAILY_BRL[v.destinationType];
     if (perPersonPerDayLocal < min) {
       alerts.push(
-        `Diária no destino de ${money(perPersonPerDayLocal)} por pessoa está abaixo do mínimo plausível para viagem ${v.destinationType} (~${money(min)}). Considere reduzir dias, baixa temporada, outro destino ou hospedagem com cozinha.`,
+        `A daily spend at the destination of ${money(perPersonPerDayLocal)} per person is below the plausible minimum for a ${v.destinationType === "nacional" ? "domestic" : "international"} trip (~${money(min)}). Consider fewer days, low season, another destination, or lodging with a kitchen.`,
       );
     }
   }

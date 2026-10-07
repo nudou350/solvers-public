@@ -56,9 +56,9 @@ export type CreatorGate = { invited: boolean; termsAcceptedAt: Date | null } | u
 
 /** Motivo pelo qual o criador ainda não pode enviar pacote, ou null. */
 export function creatorNotReady(c: CreatorGate): string | null {
-  if (!c) return "Complete seu perfil de criador antes de enviar um pacote.";
-  if (!c.invited) return "O envio de pacotes é só para criadores convidados.";
-  if (!c.termsAcceptedAt) return "Aceite os termos do criador antes de enviar um pacote.";
+  if (!c) return "Complete your creator profile before submitting a package.";
+  if (!c.invited) return "Submitting packages is for invited creators only.";
+  if (!c.termsAcceptedAt) return "Accept the creator terms before submitting a package.";
   return null;
 }
 
@@ -67,10 +67,10 @@ export type UploadLimits = { maxPending: number; maxPerDay: number };
 /** 429 quando o criador já tem pendentes demais ou enviou demais nas últimas 24 h. */
 export function uploadLimitProblem(counts: { pending: number; last24h: number }, limits: UploadLimits): { code: string; message: string } | null {
   if (counts.pending >= limits.maxPending) {
-    return { code: "too_many_pending", message: `Você já tem ${counts.pending} envio(s) em andamento (limite: ${limits.maxPending}). Aguarde a revisão antes de enviar outro.` };
+    return { code: "too_many_pending", message: `You already have ${counts.pending} submission(s) in progress (limit: ${limits.maxPending}). Wait for the review before submitting another.` };
   }
   if (counts.last24h >= limits.maxPerDay) {
-    return { code: "too_many_per_day", message: `Limite de ${limits.maxPerDay} envios por dia atingido. Tente de novo amanhã.` };
+    return { code: "too_many_per_day", message: `Daily limit of ${limits.maxPerDay} submissions reached. Try again tomorrow.` };
   }
   return null;
 }
@@ -165,21 +165,21 @@ export function planApproval(args: {
 }): ApprovalPlan {
   const fail = (status: number, code: string, message: string): ApprovalPlan => ({ ok: false, status, code, message });
   if (reviewTransitionProblem(args.status, "approve")) {
-    return fail(409, "invalid_state", `Não dá para aprovar uma submissão em "${args.status}".`);
+    return fail(409, "invalid_state", `You can't approve a submission in "${args.status}".`);
   }
-  if (!(args.validation as ValidationReport | null)?.ok) return fail(409, "validation_failed", "O validador não aprovou este pacote.");
-  if (!reviewChecklistComplete(args.checklist)) return fail(400, "checklist_incomplete", "Marque todo o checklist da revisão para aprovar.");
+  if (!(args.validation as ValidationReport | null)?.ok) return fail(409, "validation_failed", "The validator did not approve this package.");
+  if (!reviewChecklistComplete(args.checklist)) return fail(400, "checklist_incomplete", "Check every item on the review checklist to approve.");
   const m = args.manifest;
-  if (!m) return fail(409, "no_manifest", "A submissão não tem manifesto.");
+  if (!m) return fail(409, "no_manifest", "The submission has no manifest.");
   const pricing = (m.pricing ?? {}) as { priceUsdc?: unknown; royaltyBps?: unknown };
   const units = priceToUnits(pricing.priceUsdc);
-  if (units === null) return fail(400, "price_invalid", "O preço do manifesto não é um valor em USDC válido (até 6 casas decimais).");
-  if (units < args.minPriceUnits) return fail(400, "price_below_min", `O preço está abaixo do mínimo da plataforma (${Number(args.minPriceUnits) / 1_000_000} USDC).`);
+  if (units === null) return fail(400, "price_invalid", "The manifest price is not a valid USDC amount (up to 6 decimal places).");
+  if (units < args.minPriceUnits) return fail(400, "price_below_min", `The price is below the platform minimum (${Number(args.minPriceUnits) / 1_000_000} USDC).`);
   const bps = pricing.royaltyBps;
   if (typeof bps !== "number" || !Number.isInteger(bps) || bps < 0 || bps > MAX_ROYALTY_BPS) {
-    return fail(400, "royalty_invalid", `royaltyBps precisa ser um inteiro de 0 a ${MAX_ROYALTY_BPS}.`);
+    return fail(400, "royalty_invalid", `royaltyBps must be an integer from 0 to ${MAX_ROYALTY_BPS}.`);
   }
-  if (typeof m.name !== "string" || typeof m.version !== "string") return fail(409, "no_manifest", "O manifesto não tem nome e versão válidos.");
+  if (typeof m.name !== "string" || typeof m.version !== "string") return fail(409, "no_manifest", "The manifest has no valid name and version.");
   return { ok: true, priceUnits: units, approved: { versionHash: args.versionHash, priceUsdc: units.toString(), royaltyBps: bps, name: m.name, version: m.version } };
 }
 
@@ -197,8 +197,8 @@ export function reviewTransitionProblem(from: string, action: keyof typeof REVIE
   const rule = REVIEW_TRANSITIONS[action];
   const allowed = (rule.from as readonly string[]).includes(from) && canTransition(from as SubmissionStatus, rule.to);
   if (allowed) return null;
-  const what = action === "approve" ? "aprovar" : action === "reject" ? "recusar" : action === "revoke" ? "revogar a aprovação de" : "pedir mudanças em";
-  return `Não dá para ${what} uma submissão em "${from}".`;
+  const what = action === "approve" ? "approve" : action === "reject" ? "reject" : action === "revoke" ? "revoke the approval of" : "request changes on";
+  return `You can't ${what} a submission in "${from}".`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -206,7 +206,7 @@ export function reviewTransitionProblem(from: string, action: keyof typeof REVIE
 
 /** Caminho pedido pela tela de revisão (`?path=`): relativo, sem `..`, dentro do pacote. */
 export function reviewPathProblem(path: unknown): string | null {
-  if (typeof path !== "string") return "informe o caminho do arquivo";
+  if (typeof path !== "string") return "provide the file path";
   return relativePathProblem(path, [""]);
 }
 

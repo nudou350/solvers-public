@@ -60,7 +60,7 @@ async function receiveBody(req: Request, dest: string, max: number): Promise<num
   const counter = new Transform({
     transform(chunk: Buffer, _enc, cb) {
       size += chunk.length;
-      if (size > max) return cb(err(413, `O ZIP passa do limite de ${Math.floor(max / (1024 * 1024))} MB.`, "payload_too_large", { maxBytes: max }));
+      if (size > max) return cb(err(413, `The ZIP exceeds the ${Math.floor(max / (1024 * 1024))} MB limit.`, "payload_too_large", { maxBytes: max }));
       cb(null, chunk);
     },
   });
@@ -103,16 +103,16 @@ const handler: RequestHandler = async (req, res) => {
 
   const type = (req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
   if (!ZIP_TYPES.has(type)) {
-    throw err(415, "Envie o ZIP como corpo cru com Content-Type: application/zip.", "unsupported_media_type");
+    throw err(415, "Send the ZIP as the raw request body with Content-Type: application/zip.", "unsupported_media_type");
   }
 
   const resubmit = typeof req.query.resubmit === "string" ? req.query.resubmit : undefined;
   let existing: typeof schema.packageSubmissions.$inferSelect | undefined;
   if (resubmit !== undefined) {
-    if (!SUBMISSION_ID_RE.test(resubmit)) throw err(400, "Identificador de envio inválido.", "bad_request");
+    if (!SUBMISSION_ID_RE.test(resubmit)) throw err(400, "Invalid submission identifier.", "bad_request");
     [existing] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, resubmit));
-    if (!existing || existing.creatorWallet !== wallet) throw err(404, "Envio não encontrado.", "not_found");
-    if (!canResubmit(existing.status)) throw err(409, "Só dá para reenviar um pacote em que o revisor pediu mudanças.", "not_resubmittable", { status: existing.status });
+    if (!existing || existing.creatorWallet !== wallet) throw err(404, "Submission not found.", "not_found");
+    if (!canResubmit(existing.status)) throw err(409, "You can only resubmit a package on which the reviewer requested changes.", "not_resubmittable", { status: existing.status });
   } else {
     const limited = uploadLimitProblem(await uploadCounts(wallet), { maxPending: env.SUBMISSION_MAX_PENDING, maxPerDay: env.SUBMISSION_MAX_PER_DAY });
     if (limited) throw err(429, limited.message, limited.code);
@@ -120,11 +120,11 @@ const handler: RequestHandler = async (req, res) => {
 
   const max = env.SUBMISSION_MAX_ZIP_BYTES;
   const declared = req.headers["content-length"] === undefined ? undefined : Number(req.headers["content-length"]);
-  if (declared !== undefined && (!Number.isFinite(declared) || declared < 0)) throw err(400, "Content-Length inválido.", "bad_request");
+  if (declared !== undefined && (!Number.isFinite(declared) || declared < 0)) throw err(400, "Invalid Content-Length.", "bad_request");
   if (declared !== undefined && declared > max) {
-    throw err(413, `O ZIP passa do limite de ${Math.floor(max / (1024 * 1024))} MB.`, "payload_too_large", { maxBytes: max });
+    throw err(413, `The ZIP exceeds the ${Math.floor(max / (1024 * 1024))} MB limit.`, "payload_too_large", { maxBytes: max });
   }
-  if (declared === 0) throw err(400, "O corpo da requisição está vazio.", "empty_body");
+  if (declared === 0) throw err(400, "The request body is empty.", "empty_body");
 
   const id = existing?.id ?? randomId(12);
   const dir = submissionDir(id);
@@ -138,8 +138,8 @@ const handler: RequestHandler = async (req, res) => {
   let size: number;
   try {
     size = await receiveBody(req, part, max);
-    if (size === 0) throw err(400, "O corpo da requisição está vazio.", "empty_body");
-    if (!looksLikeZip(part)) throw err(400, "O arquivo enviado não é um ZIP.", "not_a_zip");
+    if (size === 0) throw err(400, "The request body is empty.", "empty_body");
+    if (!looksLikeZip(part)) throw err(400, "The uploaded file is not a ZIP.", "not_a_zip");
   } catch (e) {
     await cleanup();
     throw e;
@@ -167,7 +167,7 @@ const handler: RequestHandler = async (req, res) => {
     }
     if (!replaced) {
       await rm(part, { force: true });
-      throw err(409, "Este envio não aceita mais um ZIP novo.", "not_resubmittable");
+      throw err(409, "This submission no longer accepts a new ZIP.", "not_resubmittable");
     }
     await notifyAdmin(adminMessage("resubmitted", { id, slug: existing.slug, version: existing.version, creatorWallet: wallet, name: (existing.manifest?.name as string | undefined) ?? null }));
     void kick(id);

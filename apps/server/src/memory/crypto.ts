@@ -107,7 +107,7 @@ export async function updateMemory<T>(
       cur = readPayload(JSON.parse(open(key, row.iv, row.tag, row.ciphertext, aadOf(wallet, agentId)).toString("utf8")));
     } catch {
       // Não abre com esta chave: regravar apagaria a memória existente.
-      throw new HttpError(409, "Não consegui abrir a memória já guardada com esta conexão. Peça ao usuário para reconectar o Solvers e confirmar a assinatura da memória.", "memory_key_mismatch");
+      throw new HttpError(409, "I couldn't open the memory already stored for this connection. Ask the user to reconnect Solvers and confirm the memory signature.", "memory_key_mismatch");
     }
     let applied: { next: MemoryPayload; result: T };
     try {

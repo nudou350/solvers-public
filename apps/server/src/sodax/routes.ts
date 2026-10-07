@@ -26,7 +26,7 @@ export function sodaxConfig(): SodaxConfig {
 const client = createSodaxClient({ baseUrl: env.SODAX_API_URL });
 
 function assertEnabled() {
-  if (!sodaxConfig().enabled) throw badRequest("O pagamento por SODAX só existe na demo.", "sodax_unavailable");
+  if (!sodaxConfig().enabled) throw badRequest("Paying with SODAX is only available in the demo.", "sodax_unavailable");
 }
 
 const Purchase = z
@@ -46,7 +46,7 @@ sodaxRouter.get(
       req.query,
     );
     const need = await neededUnits(wallet, q.agentId, q.type);
-    if (need === 0n) throw badRequest("Você já tem saldo suficiente para esta compra.", "balance_sufficient");
+    if (need === 0n) throw badRequest("You already have enough balance for this purchase.", "balance_sufficient");
     const quote = await client.quoteForTarget(q.source, need);
     return {
       source: quote.source,
@@ -66,10 +66,10 @@ sodaxRouter.post(
     assertEnabled();
     const wallet = requireWallet(req);
     const body = parse(Purchase, req.body);
-    if (!sodaxSources().some((s) => s.key === body.source)) throw badRequest("Forma de pagamento SODAX desconhecida.", "sodax_source");
+    if (!sodaxSources().some((s) => s.key === body.source)) throw badRequest("Unknown SODAX payment method.", "sodax_source");
 
     const need = await neededUnits(wallet, body.agentId, body.type);
-    if (need === 0n) throw badRequest("Você já tem saldo suficiente para esta compra.", "balance_sufficient");
+    if (need === 0n) throw badRequest("You already have enough balance for this purchase.", "balance_sufficient");
     // Falta pouco: credita o mínimo que o SODAX aceita (um pouco mais que o necessário), como o Pix faz.
     const units = need < MIN_TARGET_UNITS ? MIN_TARGET_UNITS : need;
     const rate = await brlPerUsd();
@@ -84,7 +84,7 @@ sodaxRouter.post(
       .from(schema.pixCharges)
       .where(and(eq(schema.pixCharges.wallet, wallet), eq(schema.pixCharges.status, "pending"), gt(schema.pixCharges.expiresAt, new Date())));
     if (n >= MAX_PENDING) {
-      throw new HttpError(429, `Você já tem ${MAX_PENDING} cobranças em aberto. Pague ou espere expirarem.`, "pix_pending_limit");
+      throw new HttpError(429, `You already have ${MAX_PENDING} open charges. Pay them or wait for them to expire.`, "pix_pending_limit");
     }
 
     const id = `pix_${randomBytes(12).toString("hex")}`;
@@ -110,12 +110,12 @@ sodaxRouter.post(
   "/sodax/charges/:id/simulate",
   requireAuth,
   h(async (req): Promise<PixCharge> => {
-    if (isMainnet() || !env.SODAX_SIMULATE) throw badRequest("O pagamento de teste está desativado neste servidor.", "sodax_simulate_disabled");
+    if (isMainnet() || !env.SODAX_SIMULATE) throw badRequest("Test payments are disabled on this server.", "sodax_simulate_disabled");
     const row = await ownCharge(requireWallet(req), String(req.params.id));
-    if (row.provider !== "sodax") throw badRequest("Esta cobrança não é do SODAX.", "sodax_charge");
-    if (row.status === "failed") throw badRequest("Esta cobrança falhou; crie outra.", "pix_failed");
+    if (row.provider !== "sodax") throw badRequest("This charge is not from SODAX.", "sodax_charge");
+    if (row.status === "failed") throw badRequest("This charge failed; create a new one.", "pix_failed");
     if (row.status === "expired" || (row.status === "pending" && row.expiresAt.getTime() < Date.now())) {
-      throw badRequest("Esta cobrança expirou; crie outra.", "pix_expired");
+      throw badRequest("This charge expired; create a new one.", "pix_expired");
     }
     await markApproved(row.id);
     await credit(row.id);

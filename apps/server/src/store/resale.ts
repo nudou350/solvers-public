@@ -19,6 +19,7 @@ import { refreshLicenseOwner, syncListing } from "../indexer/sync.js";
 import { badRequest, h, HttpError, parse } from "../lib/http.js";
 import { agentIsAvailable } from "../runtime/availability.js";
 import { findAgentRow, mapAgents } from "./catalog.js";
+import { catalogLangOf } from "./lang-rules.js";
 import { toLicense, toReputation } from "./mappers.js";
 import { assertEntriesOpen } from "./pause-gate.js";
 import { assertResaleCut, decideFreshListing, isOwnListing, isResaleError, listingTrendPct, parseListingPrice, TREND_HISTORY_SIZE, withResaleErrors } from "./resale-rules.js";
@@ -34,7 +35,7 @@ function assertResaleEnabled(): void {
   if (!env.RESALE_ENABLED) {
     throw new HttpError(
       RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.resaleDisabled],
-      "A revenda de licenças ainda não está disponível.",
+      "License resale is not available yet.",
       RESALE_ERROR_CODES.resaleDisabled,
     );
   }
@@ -43,7 +44,7 @@ function assertResaleEnabled(): void {
 async function assertBalance(wallet: Address, needed: bigint) {
   const balance = await chain().usdcBalance(wallet);
   if (balance < needed) {
-    throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.insufficientFunds], "Saldo de USDC insuficiente", RESALE_ERROR_CODES.insufficientFunds, {
+    throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.insufficientFunds], "Insufficient USDC balance", RESALE_ERROR_CODES.insufficientFunds, {
       balanceUsdc: unitsToUsdc(balance),
       neededUsdc: unitsToUsdc(needed),
       faucetEnabled: env.FAUCET_ENABLED,
@@ -64,13 +65,13 @@ async function assertFreshListing(listing: typeof schema.listings.$inferSelect, 
   if (decision.kind === "gone") {
     throw new HttpError(
       RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.listingNotFound],
-      "Este anúncio não existe mais: a licença foi vendida ou o anúncio foi cancelado.",
+      "This listing no longer exists: the license was sold or the listing was canceled.",
       RESALE_ERROR_CODES.listingNotFound,
     );
   }
   throw new HttpError(
     RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.listingChanged],
-    "O preço do anúncio mudou. Confira o novo valor para continuar.",
+    "The listing price has changed. Check the new amount to continue.",
     RESALE_ERROR_CODES.listingChanged,
     { priceUsdc: unitsToUsdc(decision.priceUnits) },
   );
@@ -88,15 +89,16 @@ const licenseIdSchema = z
     } catch {
       return false;
     }
-  }, "não é um endereço válido");
+  }, "not a valid address");
 
 // ---------- Vitrine do mercado ----------
 
 /** Anúncios ativos (mais baratos primeiro), com a licença, o solver, a reputação do vendedor e a tendência do preço. */
 resaleRouter.get(
   "/market/listings",
-  h(async (req): Promise<ResaleListing[]> => {
+  h(async (req, res): Promise<ResaleListing[]> => {
     if (!env.RESALE_ENABLED) return [];
+    const lang = catalogLangOf(req, res);
     const q = parse(z.object({ agent: z.string().max(80).optional(), license: licenseIdSchema.optional() }), req.query);
     const conds = [eq(schema.listings.status, "active")];
     // Um anúncio por licença (o checkout busca direto, sem depender do teto da listagem geral).
@@ -119,7 +121,7 @@ resaleRouter.get(
     const agentRows = await db.select().from(schema.agents).where(inArray(schema.agents.id, agentIds));
     // Solver suspenso ou aposentado não vende (nem revenda): o anúncio some da vitrine até voltar.
     const available = agentRows.filter(agentIsAvailable);
-    const agents = new Map((await mapAgents(available)).map((a) => [a.id, a]));
+    const agents = new Map((await mapAgents(available, lang)).map((a) => [a.id, a]));
 
     // Últimas vendas de cada solver (mais recentes primeiro): referência da tendência.
     const sold = await db
@@ -173,12 +175,12 @@ resaleRouter.post(
     await assertEntriesOpen("list"); // pausa de emergência: 503 antes de montar a transação
     const body = parse(z.object({ licenseId: licenseIdSchema, priceUsdc: z.number() }), req.body);
     const [lic] = await db.select().from(schema.licenses).where(eq(schema.licenses.id, body.licenseId));
-    if (!lic) throw badRequest("Licença não encontrada.", RESALE_ERROR_CODES.licenseInvalid);
+    if (!lic) throw badRequest("License not found.", RESALE_ERROR_CODES.licenseInvalid);
     const row = await findAgentRow(lic.agentId);
-    if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível no momento.", RESALE_ERROR_CODES.agentUnavailable);
+    if (!agentIsAvailable(row)) throw badRequest("This specialist is not available right now.", RESALE_ERROR_CODES.agentUnavailable);
     // Dono de verdade (on-chain): transferência por fora não pode virar anúncio de quem já não tem a licença.
     if ((await refreshLicenseOwner(lic.id)) !== wallet) {
-      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.notOwner], "Esta licença não está na sua carteira.", RESALE_ERROR_CODES.notOwner);
+      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.notOwner], "This license is not in your wallet.", RESALE_ERROR_CODES.notOwner);
     }
     const c = chain();
     const config = await c.fetchConfig().catch(() => null);
@@ -219,12 +221,12 @@ resaleRouter.post(
       .from(schema.listings)
       .where(and(eq(schema.listings.licenseId, body.licenseId), eq(schema.listings.status, "active")));
     if (!listing) {
-      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.listingNotFound], "Este anúncio não existe mais.", RESALE_ERROR_CODES.listingNotFound);
+      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.listingNotFound], "This listing no longer exists.", RESALE_ERROR_CODES.listingNotFound);
     }
     const row = await findAgentRow(listing.agentId);
-    if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", RESALE_ERROR_CODES.agentUnavailable);
+    if (!agentIsAvailable(row)) throw badRequest("This specialist is not available for purchase right now.", RESALE_ERROR_CODES.agentUnavailable);
     if (isOwnListing(listing.sellerWallet, wallet)) {
-      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.ownListing], "Você não pode comprar a sua própria licença anunciada.", RESALE_ERROR_CODES.ownListing);
+      throw new HttpError(RESALE_ERROR_HTTP_STATUS[RESALE_ERROR_CODES.ownListing], "You can't buy your own listed license.", RESALE_ERROR_CODES.ownListing);
     }
     await assertFreshListing(listing, expected);
     await assertBalance(wallet, expected);

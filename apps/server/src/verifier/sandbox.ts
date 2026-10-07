@@ -30,24 +30,24 @@ const WATCH_MS = 1_000;
 
 function normalizeName(name: string): string {
   const norm = posix.normalize(name.replace(/\\/g, "/")).replace(/^\/+/, "");
-  if (norm.startsWith("..") || norm.includes("/../") || !ALLOWED_EXT.test(norm)) throw badRequest(`Arquivo não permitido: ${name}`);
+  if (norm.startsWith("..") || norm.includes("/../") || !ALLOWED_EXT.test(norm)) throw badRequest(`File not allowed: ${name}`);
   return norm;
 }
 
 /** Valida nomes (sem ../, sem caminho absoluto, sem nomes reservados) e tamanho da entrega. */
 export function sanitizeFiles(files: Files): Files {
   const entries = Object.entries(files);
-  if (entries.length === 0) throw badRequest("Entrega sem arquivos");
-  if (entries.length > MAX_FILES) throw badRequest(`No máximo ${MAX_FILES} arquivos por entrega`);
+  if (entries.length === 0) throw badRequest("Delivery has no files");
+  if (entries.length > MAX_FILES) throw badRequest(`At most ${MAX_FILES} files per delivery`);
   let total = 0;
   const out: Files = {};
   for (const [name, content] of entries) {
     const norm = normalizeName(name);
-    if (RESERVED.test(posix.basename(norm))) throw badRequest(`Nome reservado para a bateria de aceite: ${name}`);
+    if (RESERVED.test(posix.basename(norm))) throw badRequest(`Name reserved for the acceptance test suite: ${name}`);
     total += Buffer.byteLength(content);
     out[norm] = content;
   }
-  if (total > MAX_TOTAL_BYTES) throw badRequest("Entrega grande demais (máx. 300 KB)");
+  if (total > MAX_TOTAL_BYTES) throw badRequest("Delivery too large (max. 300 KB)");
   return out;
 }
 
@@ -56,10 +56,10 @@ export function sanitizeAcceptance(files: Files): Files {
   const out: Files = {};
   for (const [name, content] of Object.entries(files)) {
     const norm = normalizeName(name);
-    if (!/\.test\.(tsx?|jsx?)$/.test(norm) || norm.includes("/")) throw badRequest(`Teste de aceite inválido: ${name} (use Nome.test.tsx)`);
+    if (!/\.test\.(tsx?|jsx?)$/.test(norm) || norm.includes("/")) throw badRequest(`Invalid acceptance test: ${name} (use Name.test.tsx)`);
     out[`acceptance.${norm}`] = content;
   }
-  if (Object.keys(out).length === 0) throw badRequest("Bateria de aceite vazia");
+  if (Object.keys(out).length === 0) throw badRequest("Acceptance test suite is empty");
   return out;
 }
 
@@ -149,7 +149,7 @@ function simulate(files: Files, acceptance: Files | null): RunResult {
       numPassed: passed ? count : 0,
       numFailed: passed ? 0 : 1,
       acceptance: acceptance ? { numTests: accCount, numPassed: passed ? accCount : 0 } : null,
-      failures: passed ? [] : [{ test: "estrutura", message: "A entrega precisa de um componente e de testes (*.test.tsx)." }],
+      failures: passed ? [] : [{ test: "structure", message: "The delivery needs a component and tests (*.test.tsx)." }],
       durationMs: 0,
     },
     previewHtml: null,
@@ -263,7 +263,7 @@ export async function runTests(rawFiles: Files, opts: { acceptance?: Files | nul
       const read = readRegularJson(join(report, "vitest.json"), MAX_JSON_BYTES);
       const testReport = evaluateReport({
         json: read.ok ? read.value : null,
-        jsonProblem: read.ok ? undefined : describeReadFailure("O relatório de testes", read),
+        jsonProblem: read.ok ? undefined : describeReadFailure("The test report", read),
         exitCode: r.code,
         timedOut,
         overflow,

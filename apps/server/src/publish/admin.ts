@@ -7,5 +7,5 @@ import { isAdminIn } from "./admin-rules.js";
 export const isAdminWallet = (wallet: string): boolean => isAdminIn(wallet, env.ADMIN_WALLETS);
 
 export function requireAdminWallet(wallet: string): void {
-  if (!isAdminWallet(wallet)) throw forbidden("Somente a equipe pode fazer isso");
+  if (!isAdminWallet(wallet)) throw forbidden("Only the team can do this");
 }

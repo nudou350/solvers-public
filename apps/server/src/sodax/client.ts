@@ -19,10 +19,10 @@ interface Source extends SodaxSource {
 }
 
 const SOURCES: Source[] = [
-  { key: "eth-base", label: "ETH na Base", network: "Base", symbol: "ETH", chainKey: "0x2105.base", token: NATIVE, decimals: 18, ref: 10n ** 16n },
+  { key: "eth-base", label: "ETH on Base", network: "Base", symbol: "ETH", chainKey: "0x2105.base", token: NATIVE, decimals: 18, ref: 10n ** 16n },
   {
     key: "usdc-base",
-    label: "USDC na Base",
+    label: "USDC on Base",
     network: "Base",
     symbol: "USDC",
     chainKey: "0x2105.base",
@@ -30,10 +30,10 @@ const SOURCES: Source[] = [
     decimals: 6,
     ref: 10_000_000n,
   },
-  { key: "eth-arbitrum", label: "ETH na Arbitrum", network: "Arbitrum", symbol: "ETH", chainKey: "0xa4b1.arbitrum", token: NATIVE, decimals: 18, ref: 10n ** 16n },
+  { key: "eth-arbitrum", label: "ETH on Arbitrum", network: "Arbitrum", symbol: "ETH", chainKey: "0xa4b1.arbitrum", token: NATIVE, decimals: 18, ref: 10n ** 16n },
   {
     key: "usdc-arbitrum",
-    label: "USDC na Arbitrum",
+    label: "USDC on Arbitrum",
     network: "Arbitrum",
     symbol: "USDC",
     chainKey: "0xa4b1.arbitrum",
@@ -77,7 +77,7 @@ export function sizeInput(target: bigint, rate: number, margin = MARGIN): bigint
   return BigInt(Math.ceil((Number(target) / rate) * margin));
 }
 
-const unavailable = (msg = "Não foi possível consultar o SODAX agora. Tente de novo em instantes.") =>
+const unavailable = (msg = "We couldn't reach SODAX right now. Please try again in a moment.") =>
   new HttpError(502, msg, "sodax_unavailable");
 
 export function createSodaxClient({ baseUrl, fetchImpl = fetch, now = Date.now }: SodaxClientOptions) {
@@ -103,7 +103,7 @@ export function createSodaxClient({ baseUrl, fetchImpl = fetch, now = Date.now }
     } catch {
       throw unavailable();
     }
-    if (res.status === 429) throw new HttpError(503, "O SODAX está recebendo muitas consultas. Tente de novo em instantes.", "sodax_rate_limited");
+    if (res.status === 429) throw new HttpError(503, "SODAX is getting too many requests. Please try again in a moment.", "sodax_rate_limited");
     const json = await res.json().catch(() => null);
     if (!res.ok) {
       console.error("[sodax] cotação recusada", res.status, JSON.stringify(json)?.slice(0, 200));
@@ -130,7 +130,7 @@ export function createSodaxClient({ baseUrl, fetchImpl = fetch, now = Date.now }
   /** Cotação para receber `need` USDC (unidades de 6 casas) na Solana pagando em `sourceKey`. */
   async function quoteForTarget(sourceKey: string, need: bigint): Promise<TargetQuote> {
     const src = SOURCES.find((s) => s.key === sourceKey);
-    if (!src) throw new HttpError(400, "Forma de pagamento SODAX desconhecida.", "sodax_source");
+    if (!src) throw new HttpError(400, "Unknown SODAX payment method.", "sodax_source");
     const minApplied = need < MIN_TARGET_UNITS;
     const target = minApplied ? MIN_TARGET_UNITS : need;
 
@@ -145,7 +145,7 @@ export function createSodaxClient({ baseUrl, fetchImpl = fetch, now = Date.now }
       payUnits = BigInt(Math.ceil((Number(payUnits) * Number(target)) / Number(receive) * 1.002));
       receive = await quoteExactInput(src, payUnits);
     }
-    if (receive < target) throw unavailable("O SODAX não conseguiu cotar este valor agora. Tente de novo em instantes.");
+    if (receive < target) throw unavailable("SODAX couldn't quote this amount right now. Please try again in a moment.");
 
     const value: TargetQuote = {
       source: { key: src.key, label: src.label, network: src.network, symbol: src.symbol },

@@ -42,6 +42,7 @@ import {
   listReviews,
   mapAgents,
 } from "./catalog.js";
+import { catalogLangOf } from "./lang-rules.js";
 import { toLicense, toReputation } from "./mappers.js";
 import { trialUsage } from "../runtime/access.js";
 import { agentIsAvailable } from "../runtime/availability.js";
@@ -90,7 +91,7 @@ storeRouter.get(
 
 storeRouter.get(
   "/agents",
-  h(async (req) => {
+  h(async (req, res) => {
     const q = parse(
       z.object({
         q: z.string().max(200).optional(),
@@ -100,7 +101,7 @@ storeRouter.get(
       }),
       req.query,
     );
-    return listAgents(q);
+    return listAgents({ ...q, lang: catalogLangOf(req, res) });
   }),
 );
 
@@ -133,19 +134,19 @@ storeRouter.get(
   }),
 );
 
-storeRouter.get("/agents/:idOrSlug", h(async (req) => getAgentDetail(String(req.params.idOrSlug))));
+storeRouter.get("/agents/:idOrSlug", h(async (req, res) => getAgentDetail(String(req.params.idOrSlug), catalogLangOf(req, res))));
 
 storeRouter.post(
   "/search",
-  h(async (req) => {
+  h(async (req, res) => {
     const { need } = parse(z.object({ need: z.string().min(3).max(500) }), req.body);
-    return mapAgents(await searchAgentRows(need, 3));
+    return mapAgents(await searchAgentRows(need, 3), catalogLangOf(req, res));
   }),
 );
 
-storeRouter.get("/creators", h(async () => listCreators()));
+storeRouter.get("/creators", h(async (req, res) => listCreators(catalogLangOf(req, res))));
 
-storeRouter.get("/creators/:id", h(async (req) => getCreatorProfile(String(req.params.id))));
+storeRouter.get("/creators/:id", h(async (req, res) => getCreatorProfile(String(req.params.id), catalogLangOf(req, res))));
 
 // ---------- Autenticado ----------
 
@@ -181,20 +182,21 @@ storeRouter.get(
 );
 
 const KIND_LABEL: Record<string, string> = {
-  purchase: "Compra de licença",
-  credits: "Compra de créditos",
-  review: "Avaliação publicada",
-  escrow: "Tarefa com garantia criada",
-  milestone: "Etapa de garantia atualizada",
-  dispute_resolved: "Contestação resolvida",
-  resale: "Compra de licença revendida",
+  purchase: "License purchase",
+  credits: "Credits purchase",
+  review: "Review published",
+  escrow: "Guaranteed task created",
+  milestone: "Guarantee step updated",
+  dispute_resolved: "Dispute resolved",
+  resale: "Resold license purchase",
 };
 
 storeRouter.get(
   "/me/profile",
   requireAuth,
-  h(async (req): Promise<Profile> => {
+  h(async (req, res): Promise<Profile> => {
     const wallet = requireWallet(req);
+    const lang = catalogLangOf(req, res);
     const [rep] = await db.select().from(schema.userReputation).where(eq(schema.userReputation.wallet, wallet));
     const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
     const profile = await ensureProfile(wallet);
@@ -205,7 +207,7 @@ storeRouter.get(
       email: profile.email,
       memberSince: profile.createdAt.toISOString(),
       reputation: toReputation(wallet, rep),
-      creator: creatorRow ? await getCreator(creatorRow.id) : null,
+      creator: creatorRow ? await getCreator(creatorRow.id, lang) : null,
       explorerUrl: explorerUrl("address", wallet),
       history: txs.map((t) => ({
         kind: t.kind,
@@ -344,7 +346,7 @@ storeRouter.get(
 async function assertBalance(wallet: Address, needed: bigint) {
   const balance = await chain().usdcBalance(wallet);
   if (balance < needed) {
-    throw new HttpError(400, "Saldo de USDC insuficiente", "insufficient_funds", {
+    throw new HttpError(400, "Insufficient USDC balance", "insufficient_funds", {
       balanceUsdc: unitsToUsdc(balance),
       neededUsdc: unitsToUsdc(needed),
       faucetEnabled: env.FAUCET_ENABLED,
@@ -363,7 +365,7 @@ storeRouter.post(
     const row = await findAgentRow(body.agentId);
     assertNotPlatformAgent(row); // Solver gratuito da plataforma: 409 platform_agent_not_for_sale (não há licença à venda)
     // Suspenso pela plataforma (platformStatus) também não vende: a coluna `status` é só o espelho da cadeia.
-    if (!agentIsAvailable(row)) throw badRequest("Este especialista não está disponível para compra no momento.", "agent_unavailable");
+    if (!agentIsAvailable(row)) throw badRequest("This specialist is not available for purchase right now.", "agent_unavailable");
     // Teto de licenças atingido: 409 sold_out sem RPC nem montagem (o programa também barra: purchase_license falha com SoldOut).
     assertSupplyOpen(row, { resaleEnabled: env.RESALE_ENABLED });
     assertListedAndLoadable(row); // publicação incompleta (publish_failed): sem catálogo nem pacote não se vende (409 agent_not_listed)
@@ -389,7 +391,7 @@ storeRouter.post(
       // Sem resposta conclusiva da rede (timeout, erro de rede): a transação PODE ter entrado. Não diz "falhou"
       // (o front responde "nada foi cobrado" a 422/status failed): 409 com code "unconfirmed" e a assinatura.
       if (e instanceof TxError && e.phase === "unconfirmed") {
-        throw new HttpError(409, "Não conseguimos confirmar se a transação foi concluída. Confira em alguns instantes antes de tentar de novo: ela pode ter entrado.", "unconfirmed", {
+        throw new HttpError(409, "We couldn't confirm whether the transaction went through. Check again in a few moments before retrying: it may have gone through.", "unconfirmed", {
           signature: e.signature ?? "",
           explorerUrl: e.signature ? explorerUrl("tx", e.signature) : undefined,
         });
@@ -413,9 +415,9 @@ storeRouter.post(
     const tx = await chain().txLogs(signature as Signature);
     if (!tx) {
       res.status(202);
-      return { signature, status: "failed", error: "Transação ainda não encontrada; tente de novo em alguns segundos" };
+      return { signature, status: "failed", error: "Transaction not found yet; try again in a few seconds" };
     }
-    if (tx.failed) return { signature, status: "failed", error: "Transação falhou na rede" };
+    if (tx.failed) return { signature, status: "failed", error: "The transaction failed on the network" };
     const events = await processSignature(signature).catch(() => []);
     return { signature, status: "confirmed", events: events.map((e) => e.name) };
   }),
@@ -456,17 +458,17 @@ storeRouter.post(
   "/faucet",
   requireAuth,
   h(async (req) => {
-    if (!env.FAUCET_ENABLED) throw badRequest("Faucet desativado nesta rede");
+    if (!env.FAUCET_ENABLED) throw badRequest("The faucet is disabled on this network");
     const wallet = address(requireWallet(req));
     // Cooldown por carteira e por IP (carteiras novas são grátis de criar).
     if (!(await claimCooldown(`faucet:w:${wallet}`, 3600))) {
-      throw new HttpError(429, "Você já recebeu USDC de teste há pouco. Tente de novo em 1 hora.", "faucet_cooldown");
+      throw new HttpError(429, "You recently received test USDC. Try again in 1 hour.", "faucet_cooldown");
     }
     if (!(await claimCooldown(`faucet:ip:${req.ip}`, 600))) {
-      throw new HttpError(429, "Muitos pedidos de USDC de teste desta rede. Tente de novo em 10 minutos.", "faucet_cooldown");
+      throw new HttpError(429, "Too many test USDC requests from this network. Try again in 10 minutes.", "faucet_cooldown");
     }
     if ((await faucetDailyCount()) > FAUCET_DAILY_CAP) {
-      throw new HttpError(429, "O faucet atingiu o limite de hoje.", "faucet_daily_cap");
+      throw new HttpError(429, "The faucet has reached today's limit.", "faucet_daily_cap");
     }
     const signature = await chain().faucet(wallet, usdcToUnits(env.FAUCET_AMOUNT_USDC));
     return { signature, amountUsdc: env.FAUCET_AMOUNT_USDC, explorerUrl: explorerUrl("tx", signature) };

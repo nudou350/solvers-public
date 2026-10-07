@@ -253,7 +253,7 @@ describe("pacotes reais do repositório (plataforma, v1)", () => {
 describe("Apêndice A da spec x catálogo de códigos", () => {
   it("mesmos códigos e mesmos níveis", () => {
     const spec = readFileSync(resolve(import.meta.dirname, "../../../PACKAGE_SPEC.md"), "utf8");
-    const appendix = spec.slice(spec.indexOf("## Apêndice A"));
+    const appendix = spec.slice(Math.max(spec.indexOf("## Appendix A"), spec.indexOf("## Apêndice A")));
     const inSpec = new Map<string, string>();
     for (const m of appendix.matchAll(/^\| `([A-Z][A-Z0-9_]*)` \| (A\/E|A|E) \|/gm)) inSpec.set(m[1]!, m[2]!);
     const inCode = new Map(CODE_LIST.map((c) => [c as string, CODES[c].level as string]));

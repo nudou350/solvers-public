@@ -30,7 +30,7 @@ const realDeps: FreshPriceDeps = {
 
 /** 409 `price_in_review`: a cadeia tem versão/preço que a revisão ainda não aprovou (PACKAGE_SPEC.md 15.4). */
 export function priceInReview(): HttpError {
-  return new HttpError(409, "Este especialista está em revisão e não está à venda no momento. Tente de novo mais tarde.", "price_in_review");
+  return new HttpError(409, "This specialist is under review and not for sale right now. Please try again later.", "price_in_review");
 }
 
 /**
@@ -59,7 +59,7 @@ export async function assertFreshPrice(row: PricedAgent, deps: FreshPriceDeps = 
   if (flagged) await deps.sync(onchain.address);
   if (onchain.price === row.price) return;
   await deps.sync(onchain.address);
-  throw new HttpError(409, "O preço deste especialista mudou. Confira o novo valor para continuar.", "price_changed", {
+  throw new HttpError(409, "This specialist's price has changed. Check the new amount to continue.", "price_changed", {
     priceUsdc: unitsToUsdc(onchain.price),
     previousPriceUsdc: unitsToUsdc(row.price),
   });

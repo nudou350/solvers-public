@@ -96,8 +96,8 @@ const capKb = (bytes: number) => `${Math.floor(bytes / 1000)} KB`;
 const sentKb = (bytes: number) => `${Math.ceil(bytes / 1000)} KB`;
 
 function capText(cap: ToolCap): string {
-  const parts = [cap.maxFiles ? `${cap.maxFiles} ${cap.maxFiles === 1 ? "arquivo" : "arquivos"}` : "", cap.maxBytes ? capKb(cap.maxBytes) : ""].filter(Boolean);
-  return listPt(parts);
+  const parts = [cap.maxFiles ? `${cap.maxFiles} ${cap.maxFiles === 1 ? "file" : "files"}` : "", cap.maxBytes ? capKb(cap.maxBytes) : ""].filter(Boolean);
+  return listEn(parts);
 }
 
 /**
@@ -110,16 +110,17 @@ export function trialToolCapError(tool: string, cap: ToolCap | undefined, input:
   const tooMany = cap.maxFiles != null && size.files != null && size.files > cap.maxFiles;
   const tooBig = cap.maxBytes != null && size.bytes > cap.maxBytes;
   if (!tooMany && !tooBig) return null;
-  const sent = [size.files != null ? `${size.files} ${size.files === 1 ? "arquivo" : "arquivos"}` : "", sentKb(size.bytes)].filter(Boolean).join(", ");
-  return `Nada foi executado e o saldo do teste não foi gasto. No teste grátis, ${tool} aceita até ${capText(cap)} por execução (você enviou ${sent}). Envie só o componente principal e o teste dele e rode de novo. A licença vitalícia remove esse limite. Comprar: ${purchaseLink}`;
+  const sent = [size.files != null ? `${size.files} ${size.files === 1 ? "file" : "files"}` : "", sentKb(size.bytes)].filter(Boolean).join(", ");
+  return `Nothing was run and no free-trial balance was spent. In the free trial, ${tool} accepts up to ${capText(cap)} per run (you sent ${sent}). Send only the main component and its test, then run it again. The lifetime license removes this limit. Buy: ${purchaseLink}`;
 }
 
 const clause = (s: string) => s.trim().replace(/[\s.;!]+$/, "");
-export const times = (n: number) => (n === 1 ? "1 vez" : `${n} vezes`);
+export const times = (n: number) => (n === 1 ? "1 time" : `${n} times`);
 
-function listPt(items: string[]): string {
+function listEn(items: string[]): string {
   if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
 /**
@@ -127,22 +128,22 @@ function listPt(items: string[]): string {
  * a consulta à base ou a ferramenta pedida estão fora do que o teste libera.
  */
 export function trialEndText(name: string, t: Pick<TrialLimits, "summary" | "lockedSummary">, purchaseLink: string): string {
-  return `O teste grátis de ${name} vai até aqui: ${clause(t.summary)}. Com a licença vitalícia você também tem: ${clause(t.lockedSummary)}. Comprar: ${purchaseLink}`;
+  return `The free trial of ${name} ends here: ${clause(t.summary)}. With the lifetime license you also get: ${clause(t.lockedSummary)}. Buy: ${purchaseLink}`;
 }
 
 /** Quantos usos grátis sobram depois deste; no último, avisa que o teste acaba aqui. */
 function usesLeftText(left: number): string {
-  if (left <= 0) return "Este é o último uso grátis.";
-  return left === 1 ? "Depois deste, resta 1 uso grátis." : `Depois deste, restam ${left} usos grátis.`;
+  if (left <= 0) return "This is the last free use.";
+  return left === 1 ? "After this one, 1 free use is left." : `After this one, ${left} free uses are left.`;
 }
 
 function stepsText(steps: number, total: number): string {
-  if (steps >= total) return total === 1 ? "libera a etapa única" : `libera as ${total} etapas`;
-  return steps === 1 ? `libera a etapa 1 de ${total}` : `libera as etapas 1 a ${steps} de ${total}`;
+  if (steps >= total) return total === 1 ? "unlocks the single step" : `unlocks all ${total} steps`;
+  return steps === 1 ? `unlocks step 1 of ${total}` : `unlocks steps 1 to ${steps} of ${total}`;
 }
 
 /**
- * Linha de acesso do activate_solver numa sessão de teste: os limites em português, para a IA
+ * Linha de acesso do activate_solver numa sessão de teste: os limites em inglês, para a IA
  * avisar o usuário antes de começar. `use` é o número deste uso (1..uses).
  */
 export function trialAccessLine(
@@ -150,21 +151,21 @@ export function trialAccessLine(
   ctx: { use: number; totalSteps: number; toolNames: string[]; usage?: TrialUsage | null },
 ): string {
   const left = trialLeft(t, ctx.usage ?? null);
-  const rest = (limit: number, remaining: number) => (remaining < limit ? ` (restam ${remaining})` : "");
+  const rest = (limit: number, remaining: number) => (remaining < limit ? ` (${remaining} left)` : "");
   const parts = [stepsText(t.steps, ctx.totalSteps)];
-  parts.push(t.searches > 0 ? `até ${t.searches} ${t.searches === 1 ? "consulta" : "consultas"} à base${rest(t.searches, left.searchesLeft)}` : "nenhuma consulta à base");
+  parts.push(t.searches > 0 ? `up to ${t.searches} knowledge base ${t.searches === 1 ? "search" : "searches"}${rest(t.searches, left.searchesLeft)}` : "no knowledge base searches");
   for (const [name, limit] of Object.entries(t.tools)) parts.push(`${name} ${times(limit)}${rest(limit, left.toolsLeft[name] ?? 0)}`);
   const blocked = ctx.toolNames.filter((n) => !(n in t.tools));
-  const capped = Object.entries(t.toolCaps).map(([name, cap]) => `${name} aceita até ${capText(cap)}`);
+  const capped = Object.entries(t.toolCaps).map(([name, cap]) => `${name} accepts up to ${capText(cap)}`);
   const lines = [
-    `Teste grátis (uso ${ctx.use} de ${t.uses}): ${listPt(parts)} no total.`,
+    `Free trial (use ${ctx.use} of ${t.uses}): ${listEn(parts)} in total.`,
     usesLeftText(t.uses - ctx.use),
-    blocked.length ? `Só com a licença: ${listPt(blocked)}.` : "",
-    capped.length ? `Limite de tamanho por execução no teste: ${listPt(capped)}.` : "",
-    t.templates.length ? `Templates liberados no teste (get_template): ${listPt(t.templates)}.` : "",
+    blocked.length ? `License only: ${listEn(blocked)}.` : "",
+    capped.length ? `Size limit per run in the trial: ${listEn(capped)}.` : "",
+    t.templates.length ? `Templates available in the trial (get_template): ${listEn(t.templates)}.` : "",
     `${clause(t.summary)}.`,
-    t.scope ? `Escopo do teste: ${clause(t.scope)}.` : "",
-    "Avise o usuário desses limites antes de começar.",
+    t.scope ? `Trial scope: ${clause(t.scope)}.` : "",
+    "Tell the user about these limits before you start.",
   ];
   return lines.filter(Boolean).join(" ");
 }

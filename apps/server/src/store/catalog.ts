@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Agent, AgentDetail, Creator, CreatorProfile, GuaranteeOffer } from "@solvers/shared";
-import { unitsToUsdc, averageRating, splitGuaranteeAmounts } from "@solvers/shared";
+import type { Agent, AgentDetail, AgentTranslations, CatalogLang, Creator, CreatorProfile, GuaranteeOffer } from "@solvers/shared";
+import { unitsToUsdc, averageRating, creatorBioFor, splitGuaranteeAmounts } from "@solvers/shared";
 import { env } from "../env.js";
 import { db, schema } from "../db/index.js";
 import { toImageRefs } from "../images/refs.js";
@@ -53,12 +53,13 @@ export async function agentExtras(ids: string[]): Promise<Map<string, AgentExtra
   return out;
 }
 
-export async function mapAgents(rows: AgentRow[]): Promise<Agent[]> {
+/** `lang`: idioma dos textos de catálogo (pt sobrepõe a tradução do pacote; en, o padrão, é o do manifest). */
+export async function mapAgents(rows: AgentRow[], lang: CatalogLang = "en"): Promise<Agent[]> {
   const extras = await agentExtras(rows.map((r) => r.id));
-  return rows.map((r) => toAgent(r, extras.get(r.id)!));
+  return rows.map((r) => toAgent(r, extras.get(r.id)!, lang));
 }
 
-export type ListQuery = { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number };
+export type ListQuery = { q?: string; category?: string; sort?: "rating" | "uses" | "trend" | "new"; limit?: number; lang?: CatalogLang };
 
 /** Usos (ativações) dos últimos 7 dias contra os 7 anteriores, calculado no banco para ordenar. */
 const trendSql = sql`(
@@ -88,6 +89,9 @@ export async function listAgents(query: ListQuery): Promise<Agent[]> {
         sql`to_tsvector('portuguese', ${schema.agents.searchText}) @@ plainto_tsquery('portuguese', ${query.q})`,
         sql`${schema.agents.name} ilike ${like}`,
         sql`${schema.agents.tagline} ilike ${like}`,
+        // Tradução em português (locales/pt.json): quem busca pelo nome ou frase em português também acha.
+        sql`${schema.agents.translations} -> 'pt' ->> 'name' ilike ${like}`,
+        sql`${schema.agents.translations} -> 'pt' ->> 'tagline' ilike ${like}`,
       )!,
     );
   }
@@ -105,7 +109,7 @@ export async function listAgents(query: ListQuery): Promise<Agent[]> {
     .where(and(...conds))
     .orderBy(...order)
     .limit(query.limit ?? 100);
-  return mapAgents(rows);
+  return mapAgents(rows, query.lang);
 }
 
 /**
@@ -118,7 +122,7 @@ export async function findAgentRow(idOrSlug: string): Promise<AgentRow> {
     .from(schema.agents)
     .where(isAgentId(idOrSlug) ? eq(schema.agents.id, idOrSlug) : eq(schema.agents.slug, idOrSlug))
     .limit(1);
-  if (!row) throw notFound("Especialista não encontrado");
+  if (!row) throw notFound("Specialist not found");
   return row;
 }
 
@@ -141,14 +145,28 @@ export async function creatorStats(creatorId: string): Promise<CreatorStats> {
   };
 }
 
-export async function getCreator(creatorId: string) {
+/** Traduções (da mais antiga para a mais nova) dos especialistas de cada criador: só buscadas quando o idioma não é o padrão. */
+async function creatorTranslations(creatorIds: string[], lang: CatalogLang): Promise<Map<string, AgentTranslations[]>> {
+  const out = new Map<string, AgentTranslations[]>();
+  if (lang === "en" || creatorIds.length === 0) return out;
+  const rows = await db
+    .select({ creatorId: schema.agents.creatorId, translations: schema.agents.translations })
+    .from(schema.agents)
+    .where(and(inArray(schema.agents.creatorId, creatorIds), sql`${schema.agents.translations} -> 'pt' ->> 'creatorBio' is not null`))
+    .orderBy(asc(schema.agents.createdAt));
+  for (const r of rows) out.set(r.creatorId, [...(out.get(r.creatorId) ?? []), r.translations]);
+  return out;
+}
+
+export async function getCreator(creatorId: string, lang: CatalogLang = "en") {
   const [row] = await db.select().from(schema.creators).where(eq(schema.creators.id, creatorId));
   if (!row) return null;
-  return toCreator(row, await creatorStats(creatorId));
+  const bio = creatorBioFor(row.bio, (await creatorTranslations([creatorId], lang)).get(creatorId) ?? [], lang);
+  return toCreator(row, await creatorStats(creatorId), bio);
 }
 
 /** Todos os criadores com especialista na vitrine (para os cards mostrarem nome e reputação). */
-export async function listCreators(): Promise<Creator[]> {
+export async function listCreators(lang: CatalogLang = "en"): Promise<Creator[]> {
   const rows = await db
     .select()
     .from(schema.creators)
@@ -156,17 +174,18 @@ export async function listCreators(): Promise<Creator[]> {
       sql`exists (select 1 from ${schema.agents} a where a.creator_id = ${schema.creators.id} and a.status = 'active' and a.platform_status = 'active' and a.listed)`,
     )
     .orderBy(schema.creators.name);
-  return Promise.all(rows.map(async (r) => toCreator(r, await creatorStats(r.id))));
+  const translations = await creatorTranslations(rows.map((r) => r.id), lang);
+  return Promise.all(rows.map(async (r) => toCreator(r, await creatorStats(r.id), creatorBioFor(r.bio, translations.get(r.id) ?? [], lang))));
 }
 
-export async function getCreatorProfile(creatorId: string): Promise<CreatorProfile> {
-  const creator = await getCreator(creatorId);
-  if (!creator) throw notFound("Criador não encontrado");
+export async function getCreatorProfile(creatorId: string, lang: CatalogLang = "en"): Promise<CreatorProfile> {
+  const creator = await getCreator(creatorId, lang);
+  if (!creator) throw notFound("Creator not found");
   const rows = await db
     .select()
     .from(schema.agents)
     .where(and(eq(schema.agents.creatorId, creatorId), eq(schema.agents.status, "active"), eq(schema.agents.platformStatus, "active"), eq(schema.agents.listed, true)));
-  return { creator, agents: await mapAgents(rows) };
+  return { creator, agents: await mapAgents(rows, lang) };
 }
 
 export async function listReviews(agentId: string, limit = 50) {
@@ -196,14 +215,14 @@ export async function listReviews(agentId: string, limit = 50) {
   return rows.map((r) => toReview(textMatchesHash(r.text, r.contentHash) ? r : { ...r, text: "" }, nameOf.get(r.authorWallet) ?? null, imagesOf(r.id)));
 }
 
-export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
+export async function getAgentDetail(idOrSlug: string, lang: CatalogLang = "en"): Promise<AgentDetail> {
   const row = await findAgentRow(idOrSlug);
   const extras = (await agentExtras([row.id])).get(row.id)!;
-  const agent = toAgent(row, extras);
+  const agent = toAgent(row, extras, lang);
   const creator =
-    (await getCreator(row.creatorId)) ?? {
+    (await getCreator(row.creatorId, lang)) ?? {
       id: row.creatorId,
-      name: "Criador",
+      name: "Creator",
       avatarUrl: null,
       bio: "",
       reputationScore: 50,
@@ -232,7 +251,7 @@ export async function getAgentDetail(idOrSlug: string): Promise<AgentDetail> {
     images: toImageRefs(await db.select().from(schema.agentImages).where(eq(schema.agentImages.agentId, row.id)).orderBy(asc(schema.agentImages.position))),
     beforeAfter: row.details.beforeAfter ?? [],
     versions: row.details.versions ?? [
-      { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Versão atual", evalScore: agent.evalScore },
+      { version: row.version, versionHash: row.versionHash, releasedAt: row.createdAt.toISOString(), notes: "Current version", evalScore: agent.evalScore },
     ],
     trial: agentTrial(row.id),
     priceBrl: Math.round(unitsToUsdc(row.price) * rate * 100) / 100,

@@ -39,7 +39,7 @@ export async function escalate(wallet: string, agentId: string, sessionId: strin
   const [agent] = await db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
   const notified = await notifyCreator(
     agentId,
-    `Solvers: novo chamado ${id}\nSolver: ${agent?.name ?? agentId}\nCarteira: ${wallet.slice(0, 4)}…${wallet.slice(-4)}\n\n${summary.slice(0, 3000)}`,
+    `Solvers: new help request ${id}\nSolver: ${agent?.name ?? agentId}\nWallet: ${wallet.slice(0, 4)}…${wallet.slice(-4)}\n\n${summary.slice(0, 3000)}`,
   );
   await db.insert(schema.escalations).values({ id, wallet, agentId, sessionId, summary: summary.slice(0, 8000), notified });
   return { protocol: id, notified };

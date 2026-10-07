@@ -3,15 +3,16 @@ import { DELIST_MAX_RATING, DELIST_MIN_REVIEWS, usdcToUnits } from "@solvers/sha
 import { db, schema } from "../db/index.js";
 import { embed } from "../knowledge/embeddings.js";
 import type { SolverPackage } from "../runtime/packages.js";
+import { fullSearchText, manifestSearchText, searchPhrasesOf } from "./catalog-rules.js";
 
 // Catálogo (tabela `agents` e vetores de busca) a partir de um pacote. Extraído do `cli:publish` para servir também
 // à finalização do site (publish/finalize.ts): os dois montam a MESMA linha, e o comportamento dos pacotes da
 // plataforma (agents/) não muda. Em duas fases: `prepareCatalog` faz o que é lento e pode falhar (vetores de busca,
 // sem tocar no banco) e `writeCatalog` grava, aceitando uma transação para o chamador trocar tudo de uma vez.
 
+/** `agents.search_text`: o inglês do manifest mais o português de locales/pt.json (ver catalog-rules.ts). */
 export function searchText(pkg: SolverPackage): string {
-  const m = pkg.manifest;
-  return [m.name, m.tagline, m.description, m.category, ...m.packageContents, ...m.requirements.map((r) => r.label)].join("\n");
+  return fullSearchText(pkg.manifest, pkg.translations);
 }
 
 type Exec = Pick<typeof db, "insert" | "update" | "delete">;
@@ -41,8 +42,9 @@ export type PreparedCatalog = {
 export async function prepareCatalog(pkg: SolverPackage): Promise<PreparedCatalog> {
   const m = pkg.manifest;
   const text = searchText(pkg);
-  const phrases = [`${m.name}: ${m.tagline}`, ...m.searchPhrases];
-  const [vec = null, ...phraseVecs] = (await embed([text, ...phrases], "passage")) ?? [];
+  // Vetor principal só do inglês; o português entra como vetores extras (frases + texto todo): quem busca em português acha o Solver.
+  const phrases = searchPhrasesOf(m, pkg.translations);
+  const [vec = null, ...phraseVecs] = (await embed([manifestSearchText(m), ...phrases], "passage")) ?? [];
   return { pkg, text, phrases, vec, phraseVecs };
 }
 
@@ -50,7 +52,7 @@ export function agentDetails(pkg: SolverPackage) {
   const m = pkg.manifest;
   return {
     beforeAfter: m.beforeAfter,
-    versions: (m.versions.length ? m.versions : [{ version: m.version, releasedAt: new Date().toISOString(), notes: "Primeira versão" }]).map((v) => ({
+    versions: (m.versions.length ? m.versions : [{ version: m.version, releasedAt: new Date().toISOString(), notes: "First release" }]).map((v) => ({
       version: v.version,
       versionHash: v.version === m.version ? pkg.versionHash : "",
       releasedAt: v.releasedAt,
@@ -62,7 +64,7 @@ export function agentDetails(pkg: SolverPackage) {
     guaranteeTemplate: m.guarantee.available
       ? {
           priceUsdc: m.guarantee.priceUsdc ?? m.pricing.priceUsdc,
-          milestones: m.guarantee.milestones ?? [{ title: "Entrega", criteria: m.guarantee.defaultCriteria, sharePct: 100, verify: "tests" as const }],
+          milestones: m.guarantee.milestones ?? [{ title: "Delivery", criteria: m.guarantee.defaultCriteria, sharePct: 100, verify: "tests" as const }],
         }
       : undefined,
     catalogOnly: m.catalogOnly ?? false,
@@ -95,6 +97,7 @@ export async function writeCatalog(prepared: PreparedCatalog, creatorWallet: str
     royaltyBps: m.pricing.royaltyBps,
     requirements: m.requirements,
     packageContents: m.packageContents,
+    translations: pkg.translations,
     guaranteeAvailable: m.guarantee.available,
     details: agentDetails(pkg),
     searchText: text,

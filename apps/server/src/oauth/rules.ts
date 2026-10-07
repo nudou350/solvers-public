@@ -7,8 +7,8 @@ export type RefreshTokenRow = { clientId: string; revoked: boolean; expiresAt: D
  * token vencido) nunca consome o token do cliente legítimo. null = pode rotacionar.
  */
 export function refreshRejection(tok: RefreshTokenRow | undefined, clientId: string | undefined, now: Date): string | null {
-  if (!tok || tok.revoked || tok.expiresAt < now) return "Refresh token inválido ou expirado";
-  if (clientId && clientId !== tok.clientId) return "Refresh token de outro cliente";
+  if (!tok || tok.revoked || tok.expiresAt < now) return "Invalid or expired refresh token";
+  if (clientId && clientId !== tok.clientId) return "Refresh token belongs to another client";
   return null;
 }
 
@@ -16,7 +16,7 @@ export function refreshRejection(tok: RefreshTokenRow | undefined, clientId: str
 export const AGENT_CLIENT_ID = "agent";
 
 /** Statement SIWS do login do agente: a mensagem diz o que a assinatura autoriza (e o que não). */
-export const AGENT_SIWS_STATEMENT = "Autorizar este agente a usar os especialistas do Solvers. Isto não autoriza pagamentos.";
+export const AGENT_SIWS_STATEMENT = "Authorize this agent to use Solvers specialists. This does not authorize payments.";
 
 /** O token pertence a um agente autônomo (login SIWS direto), não a um assistente de IA conectado por um humano? */
 export function isAgentClient(clientId: string | null | undefined): boolean {

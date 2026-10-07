@@ -22,17 +22,17 @@ const uploadLimit = rateLimit({
   limit: 12,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { error: "Muitos envios de imagem. Aguarde um pouco e tente de novo.", code: "rate_limited" },
+  message: { error: "Too many image uploads. Please wait a moment and try again.", code: "rate_limited" },
   keyGenerator: (req) => req.wallet ?? ipKeyGenerator(req.ip ?? "0.0.0.0"),
 });
 
 const rawImage = express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: MAX_IMAGE_UPLOAD_BYTES });
 
-const LIMIT_MSG = `Cada avaliação aceita até ${MAX_REVIEW_IMAGES} fotos.`;
+const LIMIT_MSG = `Each review accepts up to ${MAX_REVIEW_IMAGES} photos.`;
 
 function requireStore(): ImageStore {
   const store = imageStore();
-  if (!store) throw new HttpError(503, "O envio de imagens não está disponível agora.", "image_unavailable");
+  if (!store) throw new HttpError(503, "Image upload is not available right now.", "image_unavailable");
   return store;
 }
 
@@ -43,12 +43,12 @@ async function myReview(wallet: string, idOrSlug: string) {
     .select()
     .from(schema.reviews)
     .where(and(eq(schema.reviews.agentId, agent.id), eq(schema.reviews.authorWallet, wallet), eq(schema.reviews.onchain, true)));
-  if (!review) throw new HttpError(409, "Publique a sua avaliação antes de anexar fotos.", "review_required");
+  if (!review) throw new HttpError(409, "Publish your review before attaching photos.", "review_required");
   const [license] = await db
     .select({ id: schema.licenses.id })
     .from(schema.licenses)
     .where(and(eq(schema.licenses.ownerWallet, wallet), eq(schema.licenses.agentId, agent.id)));
-  if (!license) throw forbidden("Só quem comprou este especialista pode anexar fotos.");
+  if (!license) throw forbidden("Only people who bought this specialist can attach photos.");
   return review;
 }
 
@@ -91,7 +91,7 @@ imagesRouter.post(
   h(async (req) => {
     const store = requireStore();
     const review = await myReview(requireWallet(req), String(req.params.idOrSlug));
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new ImageError("Envie uma imagem JPG, PNG ou WebP.");
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new ImageError("Send a JPG, PNG or WebP image.");
     if (firstFreePosition(await usedPositions(review.id), MAX_REVIEW_IMAGES) === null) throw new HttpError(409, LIMIT_MSG, "image_limit");
 
     const img = await processImage(req.body);
@@ -116,7 +116,7 @@ imagesRouter.delete(
       .delete(schema.reviewImages)
       .where(and(eq(schema.reviewImages.id, String(req.params.imageId)), eq(schema.reviewImages.reviewId, review.id)))
       .returning();
-    if (!img) throw notFound("Foto não encontrada");
+    if (!img) throw notFound("Photo not found");
     const store = imageStore();
     if (store) await store.delete(img.key).catch((err) => console.error("[imagens] não removeu do CDN", img.key, err));
     return listMine(review.id);

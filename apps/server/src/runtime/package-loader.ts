@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
+import { localeFilePath, PACKAGE_LOCALE_LANGS, PackageLocale, type AgentTranslations } from "@solvers/shared";
 import { Manifest } from "./manifest.js";
 import { resolveInsidePackage } from "./package-paths.js";
 import { platformVerdict } from "./platform-agents.js";
@@ -29,6 +30,8 @@ export type SolverPackage = {
   /** Calculado sob demanda (lê todos os arquivos do pacote): o boot não paga por isso. */
   versionHash: string;
   evalReport: { scoreBps: number; hash: string } | null;
+  /** Textos de catálogo traduzidos (locales/<lang>.json); vazio = só o inglês do manifest. */
+  translations: AgentTranslations;
   usesMemory: boolean;
   /** De onde veio: pasta da plataforma (AGENTS_DIR) ou pacotes publicados de criadores (PUBLISHED_DIR). Padrão: agents. */
   source?: PackageSource;
@@ -92,7 +95,15 @@ export function packagesStamp(roots: readonly string[]): string {
       if (name.startsWith(".") || name.startsWith("_")) continue;
       try {
         const st = statSync(join(root, name, "manifest.json"));
-        parts.push(`${root}|${name}|${st.ino}|${Math.trunc(st.mtimeMs)}|${st.size}`);
+        // As traduções de catálogo (locales/pt.json) também entram: editá-las sem mexer no manifest recarrega o pacote.
+        let loc = "";
+        try {
+          const ls = statSync(join(root, name, localeFilePath("pt")));
+          loc = `|${Math.trunc(ls.mtimeMs)}|${ls.size}`;
+        } catch {
+          // sem traduções
+        }
+        parts.push(`${root}|${name}|${st.ino}|${Math.trunc(st.mtimeMs)}|${st.size}${loc}`);
       } catch {
         // sem manifest.json (pasta solta ou troca em andamento): não entra
       }
@@ -114,6 +125,31 @@ function parseManifest(raw: unknown): Manifest & ManifestExtras {
   return Manifest.parse(raw);
 }
 
+/**
+ * Traduções de catálogo do pacote (`locales/<lang>.json`, só pt por ora). O arquivo é opcional; presente e inválido
+ * recusa o pacote (o validador do envio já barra antes: aqui só protege o que está em disco).
+ */
+export function loadLocales(dir: string): AgentTranslations {
+  const out: AgentTranslations = {};
+  for (const lang of PACKAGE_LOCALE_LANGS) {
+    const rel = localeFilePath(lang);
+    // Nunca segue link simbólico: o caminho é fixo, mas a pasta vem de um ZIP de terceiros.
+    const path = join(dir, rel);
+    if (!existsSync(path)) continue;
+    if (lstatSync(path).isSymbolicLink()) throw new Error(`link simbólico não é permitido no pacote: ${rel}`);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(path, "utf8"));
+    } catch (e) {
+      throw new Error(`${rel}: JSON inválido (${(e as Error).message})`);
+    }
+    const parsed = PackageLocale.safeParse(raw);
+    if (!parsed.success) throw new Error(`${rel}: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ")}`);
+    out[lang] = parsed.data;
+  }
+  return out;
+}
+
 export function loadPackage(dir: string, opts: { source?: PackageSource } = {}): SolverPackage {
   const source = opts.source ?? "agents";
   const manifest = parseManifest(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")));
@@ -127,7 +163,7 @@ export function loadPackage(dir: string, opts: { source?: PackageSource } = {}):
   const steps = manifest.steps.map((s, i) => {
     // O caminho vem do manifesto: nunca junta direto (../ e links simbólicos escapariam da pasta).
     const body = readFileSync(resolveInsidePackage(dir, s.file, ["steps/"]), "utf8");
-    const title = s.title ?? /^#\s+(.+)$/m.exec(body)?.[1] ?? `Etapa ${i + 1}`;
+    const title = s.title ?? /^#\s+(.+)$/m.exec(body)?.[1] ?? `Step ${i + 1}`;
     return { title, body, gate: s.gate };
   });
   const reportPath = join(dir, "evals", "report.json");
@@ -148,6 +184,7 @@ export function loadPackage(dir: string, opts: { source?: PackageSource } = {}):
       return (hash ??= packageHash(dir));
     },
     evalReport,
+    translations: loadLocales(dir),
     usesMemory,
     source,
     platform: verdict.platform,

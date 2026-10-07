@@ -10,7 +10,7 @@ describe("assertSessionCurrent", () => {
     assert.doesNotThrow(() => assertSessionCurrent("1.0.0", "1.0.0", "X"));
     assert.throws(
       () => assertSessionCurrent("1.0.0", "1.1.0", "Especialista X"),
-      (e: unknown) => e instanceof HttpError && e.status === 409 && /Especialista X foi atualizado.*activate_solver/.test(e.message),
+      (e: unknown) => e instanceof HttpError && e.status === 409 && /Especialista X was updated.*activate_solver/.test(e.message),
     );
   });
 });

@@ -49,13 +49,13 @@ export function templateProblemText(reason: Exclude<TemplateLookup, { ok: true }
   const list = available.map((t) => t.name).join(", ");
   switch (reason) {
     case "none_declared":
-      return "Este especialista não tem templates.";
+      return "This specialist has no templates.";
     case "unknown":
-      return `Não existe o template "${name}" neste especialista.${list ? ` Disponíveis: ${list}.` : ""}`;
+      return `There is no template "${name}" for this specialist.${list ? ` Available: ${list}.` : ""}`;
     case "type_not_allowed":
-      return `O template "${name}" não é um arquivo de texto (.md, .txt ou .json) e não pode ser entregue por aqui.`;
+      return `The template "${name}" is not a text file (.md, .txt or .json) and can't be delivered here.`;
     case "not_in_trial":
-      return `O template "${name}" não faz parte do teste grátis.${list ? ` Liberados no teste: ${list}.` : ""}`;
+      return `The template "${name}" is not part of the free trial.${list ? ` Available in the trial: ${list}.` : ""}`;
   }
 }
 
@@ -65,9 +65,9 @@ export function templatesOverview(decls: readonly TemplateDecl[], trial: { templ
   const visible = visibleTemplates(decls, trial);
   const locked = decls.length - visible.length;
   const lines = visible.map((t) => `- ${t.name}: ${t.title}. ${t.description}`);
-  if (locked > 0) lines.push(`- (mais ${locked} ${locked === 1 ? "template" : "templates"} só com a licença)`);
+  if (locked > 0) lines.push(`- (${locked} more ${locked === 1 ? "template" : "templates"} with the license only)`);
   if (visible.length === 0 && locked === 0) return [];
-  return ["", "## Templates disponíveis (peça o conteúdo com get_template)", ...lines];
+  return ["", "## Available templates (request the content with get_template)", ...lines];
 }
 
 /** Lê o arquivo do template de dentro da pasta do pacote (caminho já contido por package-paths; texto UTF-8, com teto). */

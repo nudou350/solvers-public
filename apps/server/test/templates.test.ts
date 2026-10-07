@@ -61,22 +61,22 @@ describe("lookupTemplate", () => {
 
 describe("textos para a IA", () => {
   it("o erro cita o que existe, e no teste só os liberados", () => {
-    assert.match(templateProblemText("unknown", "x", [md, json]), /Disponíveis: briefing, caso/);
-    assert.match(templateProblemText("not_in_trial", "caso", [md]), /não faz parte do teste grátis.*Liberados no teste: briefing/);
-    assert.match(templateProblemText("none_declared", "x", []), /não tem templates/);
-    assert.match(templateProblemText("type_not_allowed", "logo", []), /arquivo de texto/);
+    assert.match(templateProblemText("unknown", "x", [md, json]), /Available: briefing, caso/);
+    assert.match(templateProblemText("not_in_trial", "caso", [md]), /not part of the free trial.*Available in the trial: briefing/);
+    assert.match(templateProblemText("none_declared", "x", []), /has no templates/);
+    assert.match(templateProblemText("type_not_allowed", "logo", []), /not a text file/);
   });
 
   it("a visão geral lista os templates; no teste, só os liberados e quantos ficam para a licença", () => {
     const all = templatesOverview([md, json], null).join("\n");
-    assert.match(all, /## Templates disponíveis \(peça o conteúdo com get_template\)/);
+    assert.match(all, /## Available templates \(request the content with get_template\)/);
     assert.match(all, /- briefing: Briefing\. Modelo do briefing/);
     assert.match(all, /- caso: Caso de eval/);
 
     const trial = templatesOverview([md, json], { templates: ["briefing"] }).join("\n");
     assert.match(trial, /briefing/);
     assert.doesNotMatch(trial, /- caso:/);
-    assert.match(trial, /mais 1 template só com a licença/);
+    assert.match(trial, /1 more template with the license only/);
   });
 
   it("sem templates (ou nenhum liberado e nenhum bloqueado) a seção some", () => {
@@ -159,7 +159,7 @@ describe("trial.templates no manifesto", () => {
   it("a linha de acesso do teste lista os templates liberados (e só quando há)", () => {
     const withT = trialLimits({ trial: { available: true, uses: 3, steps: 1, searches: 1, tools: {}, toolLimits: {}, summary: "Etapa 1.", lockedSummary: "O resto.", templates: ["briefing"] } } as never)!;
     const noT = trialLimits({ trial: { available: true, uses: 3, steps: 1, searches: 1, tools: {}, toolLimits: {}, summary: "Etapa 1.", lockedSummary: "O resto." } } as never)!;
-    assert.match(trialAccessLine(withT, { use: 1, totalSteps: 2, toolNames: [] }), /Templates liberados no teste \(get_template\): briefing/);
+    assert.match(trialAccessLine(withT, { use: 1, totalSteps: 2, toolNames: [] }), /Templates available in the trial \(get_template\): briefing/);
     assert.doesNotMatch(trialAccessLine(noT, { use: 1, totalSteps: 2, toolNames: [] }), /Templates liberados/);
   });
 });

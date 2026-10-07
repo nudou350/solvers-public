@@ -17,7 +17,7 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
-import type { AgentVersion, BeforeAfter, Requirement } from "@solvers/shared";
+import type { AgentTranslations, AgentVersion, BeforeAfter, Requirement } from "@solvers/shared";
 
 // Espelho do estado on-chain + dados off-chain (INSTRUCTIONS.md 5.12).
 // Valores de USDC em unidades de 6 casas (bigint), convertidos para número só na API.
@@ -196,6 +196,8 @@ export const agents = pgTable(
     stake: u64("stake").notNull().default(sql`0`),
     requirements: jsonb("requirements").$type<Requirement[]>().notNull().default([]),
     packageContents: jsonb("package_contents").$type<string[]>().notNull().default([]),
+    /** Textos de catálogo por idioma (locales/<lang>.json do pacote): { pt: {...} }. O inglês é o das colunas acima. Vazio = só inglês. */
+    translations: jsonb("translations").$type<AgentTranslations>().notNull().default({}),
     guaranteeAvailable: boolean("guarantee_available").notNull().default(false),
     /** Só aparece na loja depois que o catálogo (publish-agent) preencheu os dados. */
     listed: boolean("listed").notNull().default(false),
@@ -527,7 +529,10 @@ export const knowledgeChunks = pgTable(
   ],
 );
 
-/** Vetores extras da busca na vitrine (tagline e searchPhrases): o solver vale pelo que casar melhor. */
+/**
+ * Vetores extras da busca na vitrine (tagline e searchPhrases, e os mesmos em português de locales/pt.json): o solver vale pelo
+ * que casar melhor. São regravados a cada `cli:publish`/finalização (publish/catalog.ts); não há reindex à parte.
+ */
 export const agentSearchVectors = pgTable(
   "agent_search_vectors",
   {

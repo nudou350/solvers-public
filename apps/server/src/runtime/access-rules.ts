@@ -32,6 +32,6 @@ export function blockBeforeTrial(i: { licenseUnknown: boolean; allowTrial: boole
 
 /** Linha de acesso do activate_solver para acesso pago (ou gratuito de Solver da plataforma). */
 export function paidAccessLine(kind: PaidAccess["kind"] | PlatformAccess["kind"]): string {
-  if (kind === "platform") return "Acesso: gratuito (Solver da plataforma, sem licença e sem limites de teste).";
-  return kind === "license" ? "Acesso: licença vitalícia." : "Acesso: tarefa com garantia (sem limites enquanto a garantia estiver aberta).";
+  if (kind === "platform") return "Access: free (platform Solver, no license and no trial limits).";
+  return kind === "license" ? "Access: lifetime license." : "Access: guaranteed task (no limits while the guarantee is open).";
 }

@@ -39,14 +39,14 @@ describe("blockBeforeTrial", () => {
   });
 });
 
-describe("rótulo da nota de desempenho (P5)", () => {
-  it("sem nota: sem avaliações ainda, nunca 0% nem verificado", () => {
-    assert.equal(evalLabel(0), "desempenho: sem avaliações ainda");
-    assert.doesNotMatch(evalLabel(0), /0%|verificad/i);
+describe("performance score label (P5)", () => {
+  it("no score: no ratings yet, never 0% nor verified", () => {
+    assert.equal(evalLabel(0), "performance: no ratings yet");
+    assert.doesNotMatch(evalLabel(0), /0%|verified/i);
   });
-  it("com nota: teste interno da equipe, nunca verificado", () => {
-    assert.equal(evalLabel(8250), "teste interno da equipe (checagens automáticas): 83%");
-    assert.doesNotMatch(evalLabel(8250), /verificad/i);
+  it("with a score: internal team test, never verified", () => {
+    assert.equal(evalLabel(8250), "internal team test (automated checks): 83%");
+    assert.doesNotMatch(evalLabel(8250), /verified/i);
   });
 });
 
@@ -65,22 +65,22 @@ describe("textos do agente", () => {
     assert.match(t, /PAYMENT-SIGNATURE/);
     assert.match(t, /solana-devnet/);
     assert.match(t, /12\.5 USDC/);
-    assert.match(t, /activate_solver de novo/);
+    assert.match(t, /activate_solver again/);
   });
 
   it("nenhum texto de agente manda mostrar ao usuário ou usa o checkout", () => {
     for (const t of [agentPurchaseText(p), agentPurchaseLine(p), AGENT_SERVER_INSTRUCTIONS, AGENT_STEP_NOTE]) {
       assert.doesNotMatch(t, /\/checkout/);
-      assert.doesNotMatch(t, /mostre (o link )?ao usuário|mostre o link/i);
+      assert.doesNotMatch(t, /show (the )?(link )?to the user|show the link/i);
     }
   });
 
   it("o cabeçalho das etapas manda decidir pelo contexto e registrar a suposição", () => {
-    assert.match(AGENT_STEP_NOTE, /agente autônomo/);
+    assert.match(AGENT_STEP_NOTE, /autonomous agent/);
     assert.match(AGENT_STEP_NOTE, /result_summary/);
   });
 
   it("as instruções do conector avisam que não há teste grátis", () => {
-    assert.match(AGENT_SERVER_INSTRUCTIONS, /não têm teste grátis/);
+    assert.match(AGENT_SERVER_INSTRUCTIONS, /no free trial/);
   });
 });

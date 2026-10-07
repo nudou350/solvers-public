@@ -23,7 +23,7 @@ import { differentiatorsOf, isAdminWallet, reviewPathProblem, toAdminListRow, to
 export const adminRouter: Router = Router();
 
 function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  if (!isAdminWallet(req.wallet, env.ADMIN_WALLETS)) return next(forbidden("Só administradores revisam pacotes."));
+  if (!isAdminWallet(req.wallet, env.ADMIN_WALLETS)) return next(forbidden("Only administrators can review packages."));
   next();
 }
 
@@ -37,13 +37,13 @@ adminRouter.use("/admin", noSniff, requireAuth, requireAdmin);
 
 const idParam = (req: Request): string => {
   const id = String(req.params.id ?? "");
-  if (!SUBMISSION_ID_RE.test(id)) throw notFound("Submissão não encontrada.");
+  if (!SUBMISSION_ID_RE.test(id)) throw notFound("Submission not found.");
   return id;
 };
 
 async function loadRow(id: string) {
   const [row] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
-  if (!row) throw notFound("Submissão não encontrada.");
+  if (!row) throw notFound("Submission not found.");
   return row;
 }
 
@@ -126,16 +126,16 @@ adminRouter.get(
     await loadRow(id);
     const path = req.query.path;
     const why = reviewPathProblem(path);
-    if (why) throw badRequest(`Caminho inválido: ${why}`, "bad_path");
+    if (why) throw badRequest(`Invalid path: ${why}`, "bad_path");
     const rel = path as string;
     let real: string;
     try {
       real = resolveInsidePackage(extractedDirOf(id), rel, [""]);
     } catch (e) {
-      if (e instanceof PackagePathError) throw notFound("Arquivo não encontrado no pacote.");
+      if (e instanceof PackagePathError) throw notFound("File not found in the package.");
       throw e;
     }
-    if (statSync(real).size > env.SUBMISSION_MAX_UNZIPPED_BYTES) throw new HttpError(413, "Arquivo grande demais para a prévia.", "payload_too_large");
+    if (statSync(real).size > env.SUBMISSION_MAX_UNZIPPED_BYTES) throw new HttpError(413, "File too large to preview.", "payload_too_large");
     return { path: rel, content: await readFile(real, "utf8") };
   }),
 );

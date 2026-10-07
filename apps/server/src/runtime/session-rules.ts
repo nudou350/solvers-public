@@ -7,7 +7,7 @@ export function assertSessionCurrent(sessionVersion: string, currentVersion: str
   if (sessionVersion === currentVersion) return;
   throw new HttpError(
     409,
-    `${name} foi atualizado (v${sessionVersion} para v${currentVersion}) e esta sessão ficou desatualizada. Chame activate_solver de novo para abrir uma sessão na versão atual.`,
+    `${name} was updated (v${sessionVersion} to v${currentVersion}) and this session is out of date. Call activate_solver again to open a session on the current version.`,
     "session_outdated",
   );
 }
@@ -24,7 +24,7 @@ export type NextStepPlan = { kind: "advance"; index: number } | { kind: "replay"
 export function planNextStep(stepIndex: number, completedStep?: number): NextStepPlan {
   if (completedStep === undefined || completedStep === stepIndex) return { kind: "advance", index: stepIndex };
   if (completedStep > stepIndex) {
-    throw badRequest(`completed_step=${completedStep} é maior que as etapas já entregues (${stepIndex}). Use o número da última etapa que você concluiu.`, "invalid_completed_step");
+    throw badRequest(`completed_step=${completedStep} is greater than the steps already delivered (${stepIndex}). Use the number of the last step you completed.`, "invalid_completed_step");
   }
   return { kind: "replay", index: completedStep };
 }

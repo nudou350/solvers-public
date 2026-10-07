@@ -11,7 +11,7 @@ export const HELP_PER_HOUR = 3;
 const contactField = z
   .string()
   .transform((v) => v.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/g, " ").trim())
-  .pipe(z.string().max(HELP_CONTACT_MAX_CHARS, `O contato aceita até ${HELP_CONTACT_MAX_CHARS} caracteres.`));
+  .pipe(z.string().max(HELP_CONTACT_MAX_CHARS, `The contact field accepts up to ${HELP_CONTACT_MAX_CHARS} characters.`));
 
 export const HelpRequest = z.object({
   message: z
@@ -20,14 +20,14 @@ export const HelpRequest = z.object({
     .pipe(
       z
         .string()
-        .min(HELP_MIN_CHARS, `Conte um pouco mais (pelo menos ${HELP_MIN_CHARS} caracteres).`)
-        .max(HELP_MAX_CHARS, `A mensagem aceita até ${HELP_MAX_CHARS} caracteres.`),
+        .min(HELP_MIN_CHARS, `Tell us a bit more (at least ${HELP_MIN_CHARS} characters).`)
+        .max(HELP_MAX_CHARS, `The message accepts up to ${HELP_MAX_CHARS} characters.`),
     ),
   contact: contactField.optional(),
 });
 
 /** Texto do chamado: a mensagem do cliente e, se houver, como ele quer ser respondido. */
 export function buildHelpSummary(message: string, contact?: string): string {
-  const head = `Pedido de ajuda pelo site.${contact ? `\nContato para resposta: ${contact}` : "\nSem contato informado."}`;
+  const head = `Help request from the site.${contact ? `\nContact for reply: ${contact}` : "\nNo contact provided."}`;
   return `${head}\n\n${message}`;
 }

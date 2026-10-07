@@ -88,7 +88,7 @@ export const MAX_ATTEMPTS = 3;
 /** Teto de tempo de uma passada por submissão (checado entre as etapas e a cada arquivo ingerido). */
 export const SUBMISSION_TIMEOUT_MS = 15 * 60_000;
 /** Texto que o criador vê quando o sistema (não o pacote) falhou: o detalhe vai só para o log. */
-export const SYSTEM_FAILURE_MESSAGE = "Não consegui processar este envio por um erro interno. Reenvie o pacote; se o erro se repetir, fale com a equipe.";
+export const SYSTEM_FAILURE_MESSAGE = "We couldn't process this submission because of an internal error. Resubmit the package; if the error repeats, contact the team.";
 
 /** A passada passou do tempo permitido (conta como falha de sistema). */
 export class SubmissionTimeout extends Error {
@@ -140,7 +140,7 @@ async function refundAttempt(id: string): Promise<void> {
 
 /** Rejeita por falha de sistema repetida: erro genérico ao criador, detalhe só no log. Devolve true se passou a `rejected_validation`. */
 async function rejectExhausted(row: Row, deps: ProcessDeps): Promise<boolean> {
-  const validation = reportFromZip([{ code: "PROCESSING_FAILED", path: "", message: SYSTEM_FAILURE_MESSAGE, fix: "Reenvie o pacote." }]);
+  const validation = reportFromZip([{ code: "PROCESSING_FAILED", path: "", message: SYSTEM_FAILURE_MESSAGE, fix: "Resubmit the package." }]);
   const moved = await setStatus(row.id, "validating", "rejected_validation", { error: SYSTEM_FAILURE_MESSAGE, validation });
   if (!moved) return false;
   await rm(extractedDirOf(row.id), { recursive: true, force: true }).catch(() => undefined);
@@ -219,7 +219,7 @@ async function run(row: Row, deps: ProcessDeps, deadline: number): Promise<Submi
   const id = row.id;
   const [creator] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, row.creatorWallet));
   if (!creator) {
-    await setStatus(id, "validating", "rejected_validation", { error: "Perfil de criador não encontrado.", validation: reportFromZip([{ code: "CREATOR_NOT_FOUND", path: "", message: "Perfil de criador não encontrado.", fix: "Complete o perfil de criador." }]) });
+    await setStatus(id, "validating", "rejected_validation", { error: "Creator profile not found.", validation: reportFromZip([{ code: "CREATOR_NOT_FOUND", path: "", message: "Creator profile not found.", fix: "Complete your creator profile." }]) });
     return "rejected_validation";
   }
   const subject = (r: Row) => ({ id, slug: r.slug, version: r.version, creatorWallet: r.creatorWallet, name: (r.manifest?.name as string | undefined) ?? null });
@@ -280,7 +280,7 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
     if (e instanceof ZipError) return { ok: false, validation: reportFromZip(e.issues), manifest: null, ...keep };
     // ZIP sumiu do disco ou erro de sistema: reprovar com um motivo claro (o criador reenvia).
     console.error(`[worker] falha ao ler o ZIP de ${row.id}:`, e);
-    return { ok: false, validation: reportFromZip([{ code: "ZIP_UNREADABLE", path: "", message: "Não consegui ler o ZIP enviado.", fix: "Envie o pacote de novo." }]), manifest: null, ...keep };
+    return { ok: false, validation: reportFromZip([{ code: "ZIP_UNREADABLE", path: "", message: "We couldn't read the uploaded ZIP.", fix: "Upload the package again." }]), manifest: null, ...keep };
   }
 
   const input = packageFromFolder(extracted.root);
@@ -290,7 +290,7 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
   } catch {
     // Sem `manifest.json` com este nome exato: erro de validação (não de sistema), senão a submissão repetiria para sempre.
     await rm(extracted.root, { recursive: true, force: true });
-    return { ok: false, validation: reportFromZip([{ code: "ZIP_BAD_ROOT", path: "manifest.json", message: "Falta o manifest.json (com este nome exato, em minúsculas) na pasta raiz do pacote.", fix: "Coloque o manifest.json direto na pasta raiz do pacote." }]), manifest: null, ...keep };
+    return { ok: false, validation: reportFromZip([{ code: "ZIP_BAD_ROOT", path: "manifest.json", message: "manifest.json is missing from the package root folder (exact name, lowercase).", fix: "Put manifest.json directly in the package root folder." }]), manifest: null, ...keep };
   }
   const raw = parseJson(text);
   const rawObj = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
@@ -319,11 +319,11 @@ async function validateStage(row: Row, creator: typeof schema.creators.$inferSel
   // Id do Solver: o do criador para esse slug; senão o `id` do manifesto (se for dele ou de ninguém); senão o do envio.
   let agentId = own.ownAgentId ?? (manifestId && (own.idOwner.get(manifestId) === undefined || own.idOwner.get(manifestId) === creator.id) ? manifestId : row.agentId);
   if (manifestId && own.ownAgentId && manifestId !== own.ownAgentId) {
-    validation.errors.push({ code: "MANIFEST_ID_OWNER", path: "manifest.json#id", message: "O id do manifesto não é o do Solver que usa este slug.", fix: "Use o id do seu Solver ou remova o campo id." });
+    validation.errors.push({ code: "MANIFEST_ID_OWNER", path: "manifest.json#id", message: "The manifest id is not the id of the Solver that uses this slug.", fix: "Use your Solver's id or remove the id field." });
   }
   if (own.idOwner.get(agentId) === PLATFORM_OWNER) agentId = row.agentId;
   if (fields.version && (await duplicateVersion({ submissionId: row.id, wallet: row.creatorWallet, agentId, version: fields.version }))) {
-    validation.errors.push({ code: "MANIFEST_VERSION_NOT_GREATER", path: "manifest.json#version", message: `Já existe outro envio seu da versão ${fields.version} deste Solver.`, fix: "Reenvie pelo envio que pediu mudanças ou suba a versão." });
+    validation.errors.push({ code: "MANIFEST_VERSION_NOT_GREATER", path: "manifest.json#version", message: `You already have another submission of version ${fields.version} of this Solver.`, fix: "Resubmit through the submission that requested changes, or bump the version." });
   }
   validation.ok = validation.errors.length === 0;
 
@@ -397,7 +397,7 @@ async function ingestStage(row: Row, dir: string, deps: ProcessDeps, deadline: n
     const message = (e as Error).message.slice(0, 500);
     console.error(`[worker] ingestão de ${id} falhou:`, message);
     await db.update(schema.ingestJobs).set({ status: "failed", error: message }).where(eq(schema.ingestJobs.submissionId, id));
-    await db.update(schema.packageSubmissions).set({ error: "A ingestão do conhecimento falhou; o sistema tenta de novo em instantes.", updatedAt: new Date() }).where(eq(schema.packageSubmissions.id, id));
+    await db.update(schema.packageSubmissions).set({ error: "Knowledge ingestion failed; the system will try again shortly.", updatedAt: new Date() }).where(eq(schema.packageSubmissions.id, id));
     throw e;
   }
 }

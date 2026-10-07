@@ -39,7 +39,7 @@ describe("POST /api/creator/telegram-link sem banco", () => {
     assert.equal(res.status, 503);
     const body = (await res.json()) as { code: string; error: string };
     assert.equal(body.code, "telegram_unavailable");
-    assert.match(body.error, /indisponível/);
+    assert.match(body.error, /unavailable/);
   });
 
   it("getMe falhando (Telegram fora do ar): 503, e a falha não vaza o motivo nem o token", async () => {

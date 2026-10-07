@@ -317,7 +317,7 @@ export async function delistLowRatedOnce(): Promise<number> {
     )
     .returning({ id: schema.agents.id, name: schema.agents.name });
   for (const r of rows) {
-    void notifyCreator(r.id, `Solvers: "${r.name}" saiu da vitrine porque a nota média ficou abaixo de ${DELIST_MAX_RATING}. Quem já comprou continua usando normalmente.`);
+    void notifyCreator(r.id, `Solvers: "${r.name}" was removed from the storefront because its average rating dropped below ${DELIST_MAX_RATING}. People who already bought it can keep using it normally.`);
   }
   return rows.length;
 }

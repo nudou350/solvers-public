@@ -20,7 +20,7 @@ export function isRowSoldOut(row: Pick<SupplyRow, "totalSales" | "maxLicenses">)
 /** Texto para a tela e para a IA; `null` quando ilimitado. */
 export function supplyLabel(s: AgentSupply): string | null {
   if (s.max == null || s.left == null) return null;
-  return s.left === 0 ? "esgotado" : `${s.left} de ${s.max} licenças restantes`;
+  return s.left === 0 ? "sold out" : `${s.left} of ${s.max} licenses left`;
 }
 
 export { soldOutText };

@@ -89,12 +89,12 @@ export function statusAfterChain(current: SubmissionStatus, step: PublicationSte
 
 /** Rótulo curto do passo para o criador/admin (o web mostra; nunca é código de decisão). */
 export const STEP_LABEL: Record<PublicationStep, string> = {
-  "register-agent": "Registrar o Solver na rede (sua assinatura)",
-  "update-version": "Publicar a nova versão na rede (sua assinatura)",
-  "update-pricing": "Atualizar o preço na rede (sua assinatura)",
-  "await-admin-approval": "Aguardando a aprovação final da equipe",
-  ready: "Pronto para ir ao ar",
-  blocked: "Bloqueado: o Solver está suspenso ou pertence a outra carteira na rede",
+  "register-agent": "Register the Solver on the network (your signature)",
+  "update-version": "Publish the new version on the network (your signature)",
+  "update-pricing": "Update the price on the network (your signature)",
+  "await-admin-approval": "Waiting for the team's final approval",
+  ready: "Ready to go live",
+  blocked: "Blocked: the Solver is suspended or belongs to another wallet on the network",
 };
 
 /** O passo pedido pela rota bate com o que a cadeia diz? Devolve o passo esperado quando não bate. */

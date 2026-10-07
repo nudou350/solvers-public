@@ -68,7 +68,7 @@ export class PublishCheckError extends Error {
 }
 
 /** O que o criador vê (coluna `error`, respostas da API) quando a publicação falha por erro interno: o detalhe (caminhos, banco) vai só ao log e ao admin. */
-export const PUBLISH_FAILED_TEXT = "A publicação falhou por um erro interno. A equipe foi avisada e vai tentar de novo.";
+export const PUBLISH_FAILED_TEXT = "Publishing failed because of an internal error. The team has been notified and will try again.";
 
 /** Troca de estado condicionada ao estado visto (e a `canTransition`): quem perdeu a corrida não sobrescreve. */
 export async function moveSubmission(id: string, from: SubmissionStatus, to: SubmissionStatus, extra: Partial<SubmissionRow> = {}): Promise<boolean> {
@@ -146,7 +146,7 @@ async function run(id: string, actor: string | undefined, deps: FinalizeDeps): P
   }
   try {
     const version = await publish(sub, approved, actor, deps);
-    await deps.notifyCreator(sub.agentId, `Solvers: seu Solver ${approved.name} v${version} está no ar.`).catch(() => undefined);
+    await deps.notifyCreator(sub.agentId, `Solvers: your Solver ${approved.name} v${version} is live.`).catch(() => undefined);
     return { outcome: "published", version };
   } catch (e) {
     const detail = short(e);
@@ -169,8 +169,8 @@ async function publish(sub: SubmissionRow, approved: ApprovedRecord, actor: stri
   if (!alreadyThere) {
     // A pasta que está no ar neste slug é deste Solver? E a versão aprovada não é menor que a ativa (nada de rebaixar)?
     const current = existsSync(join(target, "manifest.json")) ? publishedIdentityOf(target) : null;
-    if (current?.id && current.id !== sub.agentId) throw new PublishCheckError("a pasta publicada deste slug pertence a outro Solver; nada foi trocado");
-    if (current?.version && versionGreater(current.version, approved.version)) throw new PublishCheckError(`a versão aprovada (${approved.version}) é menor que a publicada (${current.version}); nada foi trocado`);
+    if (current?.id && current.id !== sub.agentId) throw new PublishCheckError("the published folder for this slug belongs to another Solver; nothing was changed");
+    if (current?.version && versionGreater(current.version, approved.version)) throw new PublishCheckError(`the approved version (${approved.version}) is lower than the published one (${current.version}); nothing was changed`);
     const root = findPackageRoot(join(deps.submissionsDir, id, "extracted"));
     const staged = stagePackage(root, incomingParent(deps.publishedDir, id), sub.slug);
     // Confere ANTES de tocar na pasta publicada: o que vai ao ar é byte a byte o que o revisor aprovou.
@@ -240,10 +240,10 @@ async function publish(sub: SubmissionRow, approved: ApprovedRecord, actor: stri
 /** O pacote carregado é o aprovado? Hash, id, slug e versão (o hash cobre o conteúdo; o resto, a identidade). */
 function checkPackage(pkg: SolverPackage, sub: SubmissionRow, approved: ApprovedRecord): void {
   const m = pkg.manifest;
-  if (pkg.versionHash !== approved.versionHash) throw new PublishCheckError(`o conteúdo do pacote mudou depois da aprovação (hash ${pkg.versionHash.slice(0, 12)}… ≠ ${approved.versionHash.slice(0, 12)}…)`);
-  if (m.id !== sub.agentId) throw new PublishCheckError(`o id do manifesto (${m.id}) não é o do Solver (${sub.agentId})`);
-  if (m.slug !== sub.slug) throw new PublishCheckError(`o slug do manifesto (${m.slug}) não é o da submissão (${sub.slug})`);
-  if (m.version !== approved.version) throw new PublishCheckError(`a versão do manifesto (${m.version}) não é a aprovada (${approved.version})`);
+  if (pkg.versionHash !== approved.versionHash) throw new PublishCheckError(`the package content changed after approval (hash ${pkg.versionHash.slice(0, 12)}… ≠ ${approved.versionHash.slice(0, 12)}…)`);
+  if (m.id !== sub.agentId) throw new PublishCheckError(`the manifest id (${m.id}) is not the Solver's id (${sub.agentId})`);
+  if (m.slug !== sub.slug) throw new PublishCheckError(`the manifest slug (${m.slug}) is not the submission's slug (${sub.slug})`);
+  if (m.version !== approved.version) throw new PublishCheckError(`the manifest version (${m.version}) is not the approved one (${approved.version})`);
 }
 
 /** Atalho: a submissão (mais recente) em estado de finalização de um Solver, para o evento da cadeia e o CLI. */

@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { chunkMarkdown, chunkPlainText } from "../src/knowledge/chunk.js";
 import { isKnowledgeFile, normalizeMeta, parseKnowledgeFile } from "../src/knowledge/file-rules.js";
-import { QUOTA_WINDOW_MS, dateBr, hitText, hitsText, isStale, quotaExceeded, quotaText, trialFilesOnly } from "../src/knowledge/search-rules.js";
+import { QUOTA_WINDOW_MS, dateText, hitText, hitsText, isStale, quotaExceeded, quotaText, trialFilesOnly } from "../src/knowledge/search-rules.js";
 
 // Regras puras do conhecimento (PACKAGE_SPEC.md 6): leitura de .md/.txt, front-matter, aviso de validade,
 // teste grátis v1 e cota diária. Sem env nem banco.
@@ -106,8 +106,8 @@ describe("aviso de validade e texto dos trechos", () => {
   const meta = { title: "Rotativo", source: "BCB, Res. 4.549", source_url: "https://bcb.gov.br/x", source_date: "2026-09-01" };
 
   it("dateBr e isStale (o dia de valid_until ainda vale)", () => {
-    assert.equal(dateBr("2026-12-31"), "31/12/2026");
-    assert.equal(dateBr(null), "");
+    assert.equal(dateText("2026-12-31"), "2026-12-31");
+    assert.equal(dateText(null), "");
     assert.equal(isStale("2026-10-01", new Date("2026-10-02T12:00:00Z")), true);
     assert.equal(isStale("2026-10-02", new Date("2026-10-02T23:59:00Z")), false);
     // O dia é o de Brasília: 22h de 02/10 lá já é 03/10 em UTC, e o dia de validade ainda vale.
@@ -116,32 +116,32 @@ describe("aviso de validade e texto dos trechos", () => {
     assert.equal(isStale(null, new Date()), false);
   });
 
-  it("trecho vencido traz 'pode estar desatualizado (válido até DD/MM/AAAA)'", () => {
+  it("trecho vencido traz 'may be out of date (valid until AAAA-MM-DD)'", () => {
     const t = hitText({ source: "knowledge/a.md", content: "corpo", meta, validUntil: "2026-10-01" }, 1, new Date("2026-10-05T00:00:00Z"));
-    assert.match(t, /pode estar desatualizado \(válido até 01\/10\/2026\)/);
-    assert.match(t, /Fonte: BCB, Res\. 4\.549/);
-    assert.match(t, /data da fonte: 01\/09\/2026/);
-    assert.match(t, /### Trecho 1: Rotativo/);
+    assert.match(t, /may be out of date \(valid until 2026-10-01\)/);
+    assert.match(t, /Source: BCB, Res\. 4\.549/);
+    assert.match(t, /source date: 2026-09-01/);
+    assert.match(t, /### Excerpt 1: Rotativo/);
   });
 
   it("trecho dentro da validade não traz aviso", () => {
     const t = hitText({ source: "knowledge/a.md", content: "corpo", meta, validUntil: "2026-12-31" }, 1, new Date("2026-10-05T00:00:00Z"));
-    assert.doesNotMatch(t, /desatualizado/);
+    assert.doesNotMatch(t, /out of date/);
   });
 
   it("pacote v0 (sem meta): cabeçalho antigo, sem instrução de citar", () => {
     const hits = [{ source: "knowledge/a.md", content: "corpo", meta: null, validUntil: null }];
-    assert.equal(hitText(hits[0]!, 2, new Date()), "### Trecho 2 (knowledge/a.md)\ncorpo");
+    assert.equal(hitText(hits[0]!, 2, new Date()), "### Excerpt 2 (knowledge/a.md)\ncorpo");
     const all = hitsText(hits, new Date(), "MARCA");
-    assert.doesNotMatch(all, /Cite a fonte/);
+    assert.doesNotMatch(all, /Cite the source/);
     assert.ok(all.endsWith("\n\nMARCA"));
   });
 
   it("com fonte: instrução de citar, no máximo o que veio e marca d'água ao final", () => {
     const hits = [{ source: "knowledge/a.md", content: "corpo", meta, validUntil: "2026-01-01" }];
     const all = hitsText(hits, new Date("2026-10-05T00:00:00Z"), "MARCA");
-    assert.match(all, /Cite a fonte de cada trecho/);
-    assert.match(all, /sugira confirmar na fonte/);
+    assert.match(all, /Cite the source of each excerpt/);
+    assert.match(all, /suggesting confirming it at the source|suggest confirming it at the source/);
     assert.ok(all.endsWith("\n\nMARCA"));
   });
 });
@@ -157,7 +157,7 @@ describe("teste grátis e cota", () => {
     assert.equal(quotaExceeded(10_000, 0), false);
     assert.equal(quotaExceeded(299, 300), false);
     assert.equal(quotaExceeded(300, 300), true);
-    assert.match(quotaText(300), /Limite diário atingido/);
+    assert.match(quotaText(300), /Daily limit reached/);
     assert.equal(QUOTA_WINDOW_MS, 86_400_000);
   });
 });

@@ -35,17 +35,17 @@ const RUNNERS: Record<string, Runner> = {
 export async function runServerTool(pkg: SolverPackage, toolName: string, input: unknown) {
   const tool = pkg.manifest.tools.find((t) => t.name === toolName);
   if (!tool) {
-    const names = pkg.manifest.tools.map((t) => t.name).join(", ") || "nenhuma";
-    throw badRequest(`Ferramenta "${toolName}" não existe neste solver. Disponíveis: ${names}`);
+    const names = pkg.manifest.tools.map((t) => t.name).join(", ") || "none";
+    throw badRequest(`Tool "${toolName}" does not exist in this solver. Available: ${names}`);
   }
   const runner = RUNNERS[tool.runner];
   // Pacote de criador (PUBLISHED_DIR) nunca roda executor interno: monopolizaria o Docker ou a validação do servidor.
-  if (!runner || pkg.source === "published") throw badRequest(`Executor ${tool.runner} indisponível neste servidor`);
+  if (!runner || pkg.source === "published") throw badRequest(`Runner ${tool.runner} is not available on this server`);
   try {
     return await runner(input);
   } catch (e) {
     if (e instanceof z.ZodError) {
-      throw badRequest(`Entrada inválida para ${toolName}: ${e.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      throw badRequest(`Invalid input for ${toolName}: ${e.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
     }
     throw e;
   }

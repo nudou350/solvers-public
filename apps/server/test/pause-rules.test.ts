@@ -20,13 +20,13 @@ const run = (state: ConfigState | null, bit = PAUSE_ENTRIES) => {
 };
 
 describe("assertNotPaused", () => {
-  it("bit de entradas ligado: 503 platform_paused com a mensagem em português", () => {
+  it("bit de entradas ligado: 503 platform_paused com a mensagem em inglês", () => {
     const { thrown } = run(v2(PAUSE_ENTRIES));
     assert.ok(thrown instanceof HttpError);
     assert.equal(thrown.status, 503);
     assert.equal(thrown.code, "platform_paused");
-    assert.equal(thrown.message, "Compras pausadas temporariamente");
-    assert.equal(PAUSED_MESSAGE, "Compras pausadas temporariamente");
+    assert.equal(thrown.message, "Purchases are temporarily paused");
+    assert.equal(PAUSED_MESSAGE, "Purchases are temporarily paused");
   });
 
   it("pausa de pagamentos sozinha não bloqueia compras; liberada segue sem log", () => {

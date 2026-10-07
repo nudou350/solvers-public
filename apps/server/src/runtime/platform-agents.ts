@@ -45,7 +45,7 @@ export function platformVerdict(m: { id: string; slug: string; platform?: boolea
 }
 
 export const PLATFORM_NOT_FOR_SALE_CODE = "platform_agent_not_for_sale";
-export const PLATFORM_NOT_FOR_SALE_TEXT = "Este é um Solver gratuito da plataforma: não é vendido nem tem licença. Basta ativá-lo com activate_solver.";
+export const PLATFORM_NOT_FOR_SALE_TEXT = "This is a free platform Solver: it is not sold and has no license. Just activate it with activate_solver.";
 
 /** Barra compra, garantia, Pix e x402 de um Solver da plataforma (409 `platform_agent_not_for_sale`). */
 export function assertNotPlatformAgent(row: { id: string }): void {

@@ -11,7 +11,7 @@ import { randomId, randomToken, sha256Hex } from "../lib/crypto.js";
 import { mcpAudience, signAccessToken, verifyToken } from "../auth/jwt.js";
 import { createNonce, decodeVerifiedSignature, MEMORY_KEY_MESSAGE, verifySiws } from "../auth/siws.js";
 import { deriveMemoryKey, storeMemoryKey, wrapKey, type DbExecutor } from "../memory/crypto.js";
-import { authorizePage } from "./page.js";
+import { authorizePage, pageLang } from "./page.js";
 import { AGENT_CLIENT_ID, AGENT_SIWS_STATEMENT, refreshRejection } from "./rules.js";
 
 // Autorização do conector MCP (INSTRUCTIONS.md 5.2): o /mcp é um resource server e este app
@@ -117,7 +117,7 @@ async function loadAuthRequest(id: string): Promise<AuthRequest> {
     .select()
     .from(schema.kv)
     .where(and(eq(schema.kv.key, `oauth:req:${id}`), gt(schema.kv.updatedAt, new Date(Date.now() - AUTH_REQ_TTL_MS))));
-  if (!row) throw new OAuthError("invalid_request", "Pedido de autorização expirou. Volte ao Claude/ChatGPT e conecte de novo.");
+  if (!row) throw new OAuthError("invalid_request", "The authorization request has expired. Go back to Claude/ChatGPT and connect again.");
   return row.value as AuthRequest;
 }
 
@@ -154,7 +154,7 @@ const agentNonceLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => (typeof req.query.wallet === "string" ? req.query.wallet.slice(0, 64) : "anon"),
   validate: { keyGeneratorIpFallback: false },
-  message: { error: "too_many_requests", error_description: "Muitas tentativas para esta carteira. Aguarde um minuto." },
+  message: { error: "too_many_requests", error_description: "Too many attempts for this wallet. Please wait a minute." },
 });
 
 oauthRouter.use(
@@ -164,7 +164,7 @@ oauthRouter.use(
     standardHeaders: "draft-8",
     legacyHeaders: false,
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
-    message: { error: "too_many_requests", error_description: "Muitas tentativas. Aguarde um minuto." },
+    message: { error: "too_many_requests", error_description: "Too many attempts. Please wait a minute." },
   }),
 );
 
@@ -174,14 +174,14 @@ oauthRouter.post(
   express.json(),
   h(async (req, res) => {
     const body = RegisterBody.safeParse(req.body);
-    if (!body.success) throw new OAuthError("invalid_client_metadata", body.error.issues[0]?.message ?? "metadados inválidos");
+    if (!body.success) throw new OAuthError("invalid_client_metadata", body.error.issues[0]?.message ?? "invalid metadata");
     for (const uri of body.data.redirect_uris) {
-      if (!allowedRedirect(uri)) throw new OAuthError("invalid_redirect_uri", `redirect_uri não permitido: ${uri}`);
+      if (!allowedRedirect(uri)) throw new OAuthError("invalid_redirect_uri", `redirect_uri not allowed: ${uri}`);
     }
     const clientId = `cli_${randomId(12)}`;
     const metadata = {
       redirect_uris: body.data.redirect_uris,
-      client_name: body.data.client_name ?? "Cliente MCP",
+      client_name: body.data.client_name ?? "MCP client",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
@@ -198,19 +198,19 @@ oauthRouter.get(
   h(async (req, res) => {
     const q = AuthorizeQuery.safeParse(req.query);
     if (!q.success) {
-      res.status(400).type("html").send(authorizePage({ error: "Pedido de autorização inválido. Tente conectar de novo pelo Claude ou ChatGPT." }));
+      res.status(400).type("html").send(authorizePage({ lang: pageLang(req.query.lang, req.headers["accept-language"]), error: "Invalid authorization request. Try connecting again from Claude or ChatGPT." }));
       return;
     }
     const client = await getClient(q.data.client_id);
     if (!client || !client.meta.redirect_uris.includes(q.data.redirect_uri)) {
-      res.status(400).type("html").send(authorizePage({ error: "Aplicativo não reconhecido. Tente conectar de novo." }));
+      res.status(400).type("html").send(authorizePage({ lang: pageLang(req.query.lang, req.headers["accept-language"]), error: "App not recognized. Try connecting again." }));
       return;
     }
     if (q.data.resource && q.data.resource.replace(/\/$/, "") !== mcpAudience()) {
-      res.status(400).type("html").send(authorizePage({ error: "Recurso solicitado não pertence a este servidor." }));
+      res.status(400).type("html").send(authorizePage({ lang: pageLang(req.query.lang, req.headers["accept-language"]), error: "The requested resource does not belong to this server." }));
       return;
     }
-    const clientName = client.meta.client_name ?? "Seu assistente de IA";
+    const clientName = client.meta.client_name ?? "Your AI assistant";
     const id = await saveAuthRequest({ ...q.data, clientName });
     // A autorização acontece na vitrine (/connect), onde o login por e-mail (Privy) e a carteira embutida funcionam.
     res.redirect(302, `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/connect?req=${encodeURIComponent(id)}`);
@@ -223,13 +223,14 @@ oauthRouter.get(
   h(async (req) => {
     const { req: id } = parse(z.object({ req: z.string() }), req.query);
     const ar = await loadAuthRequest(id);
+    const lang = pageLang(req.query.lang, req.headers["accept-language"]);
     const { host, verified } = redirectInfo(ar.redirect_uri);
     return {
       clientName: ar.clientName,
       redirectHost: host,
       verified,
       memoryMessage: MEMORY_KEY_MESSAGE,
-      extensionUrl: `${base()}/oauth/authorize/extension?req=${encodeURIComponent(id)}`,
+      extensionUrl: `${base()}/oauth/authorize/extension?req=${encodeURIComponent(id)}&lang=${lang}`,
     };
   }),
 );
@@ -241,14 +242,15 @@ oauthRouter.get(
     const id = typeof req.query.req === "string" ? req.query.req : "";
     res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
     res.setHeader("X-Frame-Options", "DENY");
+    const lang = pageLang(req.query.lang, req.headers["accept-language"]);
     const ar = await loadAuthRequest(id).catch(() => null);
     if (!ar) {
-      res.status(400).type("html").send(authorizePage({ error: "Pedido de autorização expirou. Volte ao Claude/ChatGPT e conecte de novo." }));
+      res.status(400).type("html").send(authorizePage({ lang, error: "The authorization request has expired. Go back to Claude/ChatGPT and connect again." }));
       return;
     }
     const { host, verified } = redirectInfo(ar.redirect_uri);
     res.type("html").send(
-      authorizePage({ requestId: id, clientName: ar.clientName, redirectHost: host, verified, apiBase: base(), webUrl: env.PUBLIC_WEB_URL, memoryMessage: MEMORY_KEY_MESSAGE }),
+      authorizePage({ lang, requestId: id, clientName: ar.clientName, redirectHost: host, verified, apiBase: base(), webUrl: env.PUBLIC_WEB_URL, memoryMessage: MEMORY_KEY_MESSAGE }),
     );
   }),
 );
@@ -260,7 +262,7 @@ oauthRouter.get(
     const ar = await loadAuthRequest(id);
     const { host } = redirectInfo(ar.redirect_uri);
     // A mensagem assinada diz para quem o acesso vai; o nonce fica ligado a este pedido.
-    const n = await createNonce(wallet, "oauth", `Autorizar ${ar.clientName} (${host}) a usar seus especialistas do Solvers. Isto não autoriza pagamentos.`);
+    const n = await createNonce(wallet, "oauth", `Authorize ${ar.clientName} (${host}) to use your Solvers specialists. This does not authorize payments.`);
     await db.update(schema.kv).set({ value: { ...ar, nonce: n.nonce } }).where(eq(schema.kv.key, `oauth:req:${id}`));
     return n;
   }),
@@ -281,13 +283,13 @@ oauthRouter.post(
       req.body,
     );
     const ar = await loadAuthRequest(body.req);
-    if (!ar.nonce || !body.message.includes(`Nonce: ${ar.nonce}`)) throw new OAuthError("invalid_request", "Assinatura não pertence a este pedido de autorização");
+    if (!ar.nonce || !body.message.includes(`Nonce: ${ar.nonce}`)) throw new OAuthError("invalid_request", "This signature does not belong to this authorization request");
     const wallet = await verifySiws({ wallet: body.wallet, message: body.message, signature: body.signature }, "oauth");
 
     let wrapped: Buffer | null = null;
     if (body.memorySignature) {
       const sig = decodeVerifiedSignature(wallet, MEMORY_KEY_MESSAGE, body.memorySignature);
-      if (!sig) throw new OAuthError("access_denied", "Assinatura da chave de memória inválida", 401);
+      if (!sig) throw new OAuthError("access_denied", "Invalid memory key signature", 401);
       wrapped = wrapKey(deriveMemoryKey(sig, wallet));
     }
 
@@ -344,7 +346,7 @@ oauthRouter.post(
     let wrapped: Buffer | null = null;
     if (body.memorySignature) {
       const sig = decodeVerifiedSignature(wallet, MEMORY_KEY_MESSAGE, body.memorySignature);
-      if (!sig) throw new OAuthError("access_denied", "Assinatura da chave de memória inválida", 401);
+      if (!sig) throw new OAuthError("access_denied", "Invalid memory key signature", 401);
       wrapped = wrapKey(deriveMemoryKey(sig, wallet));
     }
     return issueTokens(AGENT_CLIENT_ID, wallet, wrapped);
@@ -360,17 +362,17 @@ oauthRouter.post(
     res.setHeader("Cache-Control", "no-store");
     const b = req.body as Record<string, string>;
     if (b.grant_type === "authorization_code") {
-      if (!b.code || !b.code_verifier || !b.client_id) throw new OAuthError("invalid_request", "code, code_verifier e client_id são obrigatórios");
+      if (!b.code || !b.code_verifier || !b.client_id) throw new OAuthError("invalid_request", "code, code_verifier and client_id are required");
       const [row] = await db.delete(schema.oauthCodes).where(eq(schema.oauthCodes.code, b.code)).returning();
-      if (!row || row.expiresAt < new Date()) throw new OAuthError("invalid_grant", "Código inválido ou expirado");
-      if (row.clientId !== b.client_id) throw new OAuthError("invalid_grant", "Código de outro cliente");
-      if (b.redirect_uri && b.redirect_uri !== row.redirectUri) throw new OAuthError("invalid_grant", "redirect_uri não confere");
-      if (s256(b.code_verifier) !== row.codeChallenge) throw new OAuthError("invalid_grant", "PKCE inválido");
-      if (b.resource && b.resource.replace(/\/$/, "") !== mcpAudience()) throw new OAuthError("invalid_target", "Recurso inválido");
+      if (!row || row.expiresAt < new Date()) throw new OAuthError("invalid_grant", "Invalid or expired code");
+      if (row.clientId !== b.client_id) throw new OAuthError("invalid_grant", "Code belongs to another client");
+      if (b.redirect_uri && b.redirect_uri !== row.redirectUri) throw new OAuthError("invalid_grant", "redirect_uri does not match");
+      if (s256(b.code_verifier) !== row.codeChallenge) throw new OAuthError("invalid_grant", "Invalid PKCE");
+      if (b.resource && b.resource.replace(/\/$/, "") !== mcpAudience()) throw new OAuthError("invalid_target", "Invalid resource");
       return issueTokens(row.clientId, row.wallet, row.memoryKey ?? null);
     }
     if (b.grant_type === "refresh_token") {
-      if (!b.refresh_token) throw new OAuthError("invalid_request", "refresh_token é obrigatório");
+      if (!b.refresh_token) throw new OAuthError("invalid_request", "refresh_token is required");
       const refreshHash = sha256Hex(b.refresh_token);
       // Rotação tudo ou nada: revogar o refresh antigo, mover a chave de memória e emitir o sucessor numa só
       // transação. Falha no meio desfaz tudo e o cliente continua com o refresh antigo válido. A linha fica
@@ -379,13 +381,13 @@ oauthRouter.post(
         const [tok] = await tx.select().from(schema.oauthTokens).where(eq(schema.oauthTokens.refreshHash, refreshHash)).for("update");
         // Valida antes de revogar: pedido inválido não consome o token do cliente legítimo.
         const rejection = refreshRejection(tok, b.client_id, new Date());
-        if (rejection || !tok) throw new OAuthError("invalid_grant", rejection ?? "Refresh token inválido ou expirado");
+        if (rejection || !tok) throw new OAuthError("invalid_grant", rejection ?? "Invalid or expired refresh token");
         await tx.update(schema.oauthTokens).set({ revoked: true }).where(eq(schema.oauthTokens.id, tok.id));
         const [mk] = await tx.delete(schema.memoryKeys).where(eq(schema.memoryKeys.tokenId, tok.id)).returning();
         return issueTokens(tok.clientId, tok.wallet, mk?.wrappedKey ?? null, tx);
       });
     }
-    throw new OAuthError("unsupported_grant_type", "grant_type não suportado");
+    throw new OAuthError("unsupported_grant_type", "Unsupported grant_type");
   }),
 );
 

@@ -95,7 +95,7 @@ describe("pedido de ajuda com banco", { skip: url ? false : "defina TEST_DATABAS
     const [row] = await db.select().from(schema.escalations).where(eq(schema.escalations.id, body.protocol));
     assert.equal(row!.wallet, BUYER);
     assert.equal(row!.agentId, AGENT);
-    assert.match(row!.summary, /Contato para resposta: ana@exemplo\.com/);
+    assert.match(row!.summary, /Contact for reply: ana@exemplo\.com/);
     assert.match(row!.summary, /Travei no passo 2 da instalação/);
   });
 

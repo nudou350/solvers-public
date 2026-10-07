@@ -19,19 +19,19 @@ export function parseFrontMatter(text: string): FrontMatterResult {
       break;
     }
   }
-  if (end === -1) return { kind: "invalid", error: "bloco '---' aberto e não fechado", body: src };
+  if (end === -1) return { kind: "invalid", error: "'---' block opened but never closed", body: src };
   const body = lines.slice(end + 1).join("\n");
   const data: FrontMatter = {};
   for (let i = 1; i < end; i++) {
     const raw = lines[i]!;
     if (raw.trim() === "" || raw.trim().startsWith("#")) continue;
     const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/.exec(raw);
-    if (!m) return { kind: "invalid", error: `linha ${i + 1} não é 'chave: valor': ${raw.trim().slice(0, 60)}`, body };
+    if (!m) return { kind: "invalid", error: `line ${i + 1} is not 'key: value': ${raw.trim().slice(0, 60)}`, body };
     const key = m[1]!;
     const value = m[2]!.trim();
-    if (key in data) return { kind: "invalid", error: `chave repetida: ${key}`, body };
+    if (key in data) return { kind: "invalid", error: `duplicate key: ${key}`, body };
     if (value.startsWith("[")) {
-      if (!value.endsWith("]")) return { kind: "invalid", error: `lista sem ']' em ${key}`, body };
+      if (!value.endsWith("]")) return { kind: "invalid", error: `list without ']' in ${key}`, body };
       data[key] = value
         .slice(1, -1)
         .split(",")

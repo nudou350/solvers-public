@@ -55,6 +55,17 @@ export type PrivateWithdrawProblem =
   | "sol_insufficient";
 
 export const PRIVATE_WITHDRAW_PROBLEM_TEXT: Record<PrivateWithdrawProblem, string> = {
+  amount_invalid: "Enter an amount in USDC, for example 2 or 2.50.",
+  amount_too_small: "The minimum amount is 1 USDC.",
+  amount_too_large: "For safety, private withdrawals are limited to 1,000 USDC at a time while the feature is new.",
+  destination_invalid: "That destination address doesn't look valid.",
+  destination_same_as_wallet: "Use an address different from your own wallet, otherwise there is nothing to hide.",
+  usdc_insufficient: "You don't have that USDC balance on the real network.",
+  sol_insufficient: "You need a little SOL (0.005) on the real network to cover network fees.",
+};
+
+/** Os mesmos textos em português (pt-BR). */
+export const PRIVATE_WITHDRAW_PROBLEM_TEXT_PT: Record<PrivateWithdrawProblem, string> = {
   amount_invalid: "Digite um valor em USDC, por exemplo 2 ou 2,50.",
   amount_too_small: "O valor mínimo é 1 USDC.",
   amount_too_large: "Por segurança, o saque privado está limitado a 1.000 USDC por vez enquanto o recurso é novo.",

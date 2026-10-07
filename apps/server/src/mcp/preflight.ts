@@ -32,13 +32,13 @@ export function evaluatePreflight(requirements: PreflightRequirement[], availabl
   for (const r of requirements) {
     if (r.type === "connector") {
       const guide = installGuide(r);
-      if (connectorAvailable(r.key ?? r.label, availableTools)) ok.push(`${r.label}: conectado`);
-      else if (r.optional) warnings.push(`${r.label} não conectado: siga o caminho sem conector da etapa 1. Se o usuário preferir conectar:\n${guide}`);
-      else missing.push(`${r.label}: NÃO encontrado.\n${guide}`);
+      if (connectorAvailable(r.key ?? r.label, availableTools)) ok.push(`${r.label}: connected`);
+      else if (r.optional) warnings.push(`${r.label} not connected: follow the no-connector path in step 1. If the user prefers to connect it:\n${guide}`);
+      else missing.push(`${r.label}: NOT found.\n${guide}`);
     } else if (r.type === "plan") {
-      ok.push(`${r.label}: recomendado (não bloqueia)`);
+      ok.push(`${r.label}: recommended (does not block)`);
     } else {
-      ok.push(`${r.label}: ok`);
+      ok.push(`${r.label}: OK`);
     }
   }
   return { ok, missing, warnings, blocked: missing.length > 0 };
@@ -53,10 +53,10 @@ export function preflightText(
 ): string {
   const { ok, missing, warnings } = evaluatePreflight(requirements, availableTools);
   const list = (items: string[]) => items.map((m) => `- ${m}`).join("\n");
-  const warnText = warnings.length ? `\n\nAvisos (não bloqueiam):\n${list(warnings)}` : "";
+  const warnText = warnings.length ? `\n\nWarnings (do not block):\n${list(warnings)}` : "";
   if (missing.length) {
-    return `Faltam requisitos:\n${list(missing)}\n\nOriente o usuário a instalar e, quando ele confirmar, rode preflight_check de novo. Não avance para next_step antes disso.${warnText}${ok.length ? `\n\nJá ok:\n${list(ok)}` : ""}`;
+    return `Missing requirements:\n${list(missing)}\n\nGuide the user through installing them and, once they confirm, run preflight_check again. Do not move on to next_step before that.${warnText}${ok.length ? `\n\nAlready OK:\n${list(ok)}` : ""}`;
   }
   const memoryText = memory ? `\n\n${memoryStartInstruction(memory.agentId, memory.onboarding)}` : "";
-  return `Tudo pronto:\n${list(ok) || "- sem requisitos"}${warnText}${memoryText}\n\nAgora chame next_step com session_id="${sessionId}" para receber a etapa 1.`;
+  return `All set:\n${list(ok) || "- no requirements"}${warnText}${memoryText}\n\nNow call next_step with session_id="${sessionId}" to get step 1.`;
 }

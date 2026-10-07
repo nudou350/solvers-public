@@ -63,15 +63,15 @@ export function evaluateReport(i: EvalInput): TestReport {
     numPassed: 0,
     numFailed: 0,
     acceptance: i.acceptanceFiles ? { numTests: 0, numPassed: 0 } : null,
-    failures: [{ test: "execução", message: message.slice(0, 1500) }],
+    failures: [{ test: "execution", message: message.slice(0, 1500) }],
     log: i.out.slice(-2000) || undefined,
   });
 
-  if (i.timedOut) return execFailure("A verificação passou do tempo limite e foi interrompida.");
-  if (i.overflow) return execFailure("A execução gerou arquivos demais no relatório e foi interrompida.");
+  if (i.timedOut) return execFailure("The check exceeded the time limit and was stopped.");
+  if (i.overflow) return execFailure("The run produced too many files in the report and was stopped.");
   const json = i.json;
   if (json == null || typeof json !== "object" || Array.isArray(json)) {
-    return execFailure(i.jsonProblem ?? (tail || "Sem relatório de testes"));
+    return execFailure(i.jsonProblem ?? (tail || "No test report"));
   }
 
   const files = Array.isArray((json as VitestJson).testResults) ? ((json as VitestJson).testResults as VitestFile[]) : [];
@@ -93,11 +93,11 @@ export function evaluateReport(i: EvalInput): TestReport {
       const ok = a?.status === "passed";
       if (!ok) anyFailed = true;
       const msgs = Array.isArray(a?.failureMessages) ? (a.failureMessages as unknown[]).map((m) => str(m)).join("\n") : "";
-      rows.push({ file, name: str(a?.fullName) || str(a?.title) || "teste", ok, msg: msgs });
+      rows.push({ file, name: str(a?.fullName) || str(a?.title) || "test", ok, msg: msgs });
     }
     // Arquivo que nem carregou (erro de importação/sintaxe): o vitest marca o arquivo como falho, sem testes.
     if (str(fr.status) === "failed" && !anyFailed) {
-      failures.push({ test: file, message: (str(fr.message) || "O arquivo de teste falhou ao carregar.").slice(0, 800) });
+      failures.push({ test: file, message: (str(fr.message) || "The test file failed to load.").slice(0, 800) });
     }
     if (expected.has(file)) seenExpected.set(file, { assertions: assertions.length });
   }
@@ -110,7 +110,7 @@ export function evaluateReport(i: EvalInput): TestReport {
     const seen = seenExpected.get(f);
     if (!seen || seen.assertions === 0) {
       accOk = false;
-      failures.push({ test: f.replace(/^src\//, ""), message: "Arquivo da bateria de aceite não rodou ou não tem testes." });
+      failures.push({ test: f.replace(/^src\//, ""), message: "The acceptance test file didn't run or has no tests." });
     } else if (rows.some((r) => r.file === f && !r.ok)) {
       accOk = false;
     }
@@ -119,10 +119,10 @@ export function evaluateReport(i: EvalInput): TestReport {
 
   // Só detalha o código quando nenhum teste explica a falha (ex: erro não tratado depois dos testes).
   if (i.exitCode !== 0 && failures.length === 0) {
-    failures.push({ test: "execução", message: `O vitest terminou com código ${i.exitCode}.${tail ? ` ${tail}` : ""}`.slice(0, 1500) });
+    failures.push({ test: "execution", message: `Vitest exited with code ${i.exitCode}.${tail ? ` ${tail}` : ""}`.slice(0, 1500) });
   }
   if ((json as VitestJson).success === false && failures.length === 0) {
-    failures.push({ test: "execução", message: "O vitest reportou a execução como malsucedida." });
+    failures.push({ test: "execution", message: "Vitest reported the run as unsuccessful." });
   }
 
   const numPassed = rows.filter((r) => r.ok).length;

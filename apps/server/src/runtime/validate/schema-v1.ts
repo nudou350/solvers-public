@@ -21,7 +21,7 @@ const Gate = z.union([
 
 const Tool = z
   .object({
-    name: z.string().regex(/^[a-z][a-z0-9_]*$/, "nome de ferramenta: minúsculas, dígitos e _"),
+    name: z.string().regex(/^[a-z][a-z0-9_]*$/, "tool name: lowercase letters, digits and _"),
     description: z.string(),
     runner: z.string(),
     inputSchema: z.record(z.unknown()).optional(),
@@ -85,21 +85,21 @@ export type ManifestV1 = z.infer<typeof ManifestV1Base>;
 export function manifestV1CrossChecks(m: ManifestV1, ctx: z.RefinementCtx): void {
   if (!m.trial) return;
   if (m.trial.steps > m.steps.length) {
-    ctx.addIssue({ code: "custom", path: ["trial", "steps"], message: `trial.steps (${m.trial.steps}) maior que o número de etapas (${m.steps.length})` });
+    ctx.addIssue({ code: "custom", path: ["trial", "steps"], message: `trial.steps (${m.trial.steps}) is greater than the number of steps (${m.steps.length})` });
   }
   for (const name of Object.keys(m.trial.tools)) {
     if (!m.tools.some((t) => t.name === name)) {
-      ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: ferramenta "${name}" não existe em tools` });
+      ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: tool "${name}" does not exist in tools` });
     }
   }
   for (const name of Object.keys(m.trial.toolLimits)) {
     if (!m.tools.some((t) => t.name === name)) {
-      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: ferramenta "${name}" não existe em tools` });
+      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: tool "${name}" does not exist in tools` });
     }
   }
   for (const name of m.trial.templates) {
     if (!m.templates.some((t) => t.name === name)) {
-      ctx.addIssue({ code: "custom", path: ["trial", "templates", name], message: `trial.templates: template "${name}" não existe em templates` });
+      ctx.addIssue({ code: "custom", path: ["trial", "templates", name], message: `trial.templates: template "${name}" does not exist in templates` });
     }
   }
 }

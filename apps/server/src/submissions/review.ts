@@ -38,7 +38,7 @@ const subjectOf = (r: Row) => ({ id: r.id, slug: r.slug, version: r.version, cre
 
 async function load(id: string): Promise<Row> {
   const [row] = await db.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
-  if (!row) throw new HttpError(404, "Submissão não encontrada.", "not_found");
+  if (!row) throw new HttpError(404, "Submission not found.", "not_found");
   return row;
 }
 
@@ -46,7 +46,7 @@ async function load(id: string): Promise<Row> {
 async function lockPending(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], id: string): Promise<Row> {
   await tx.execute(sql`select id from package_submissions where id = ${id} for update`);
   const [row] = await tx.select().from(schema.packageSubmissions).where(eq(schema.packageSubmissions.id, id));
-  if (!row) throw new HttpError(404, "Submissão não encontrada.", "not_found");
+  if (!row) throw new HttpError(404, "Submission not found.", "not_found");
   return row;
 }
 
@@ -58,11 +58,11 @@ async function lockPending(tx: Parameters<Parameters<typeof db.transaction>[0]>[
 export async function approveSubmission(ctx: ReviewCtx, deps: ReviewDeps = defaultReviewDeps): Promise<{ id: string; status: "awaiting_creator_signature"; approved: Approved }> {
   const row = await load(ctx.id);
   // Separação de papéis: quem enviou o pacote não o aprova (nem sendo admin).
-  if (ctx.reviewerWallet === row.creatorWallet) throw new HttpError(403, "Você não pode aprovar o seu próprio envio: outro administrador precisa revisá-lo.", "self_review");
+  if (ctx.reviewerWallet === row.creatorWallet) throw new HttpError(403, "You can't approve your own submission: another administrator has to review it.", "self_review");
   const bad = reviewTransitionProblem(row.status, "approve");
   if (bad) throw new HttpError(409, bad, "invalid_state");
   const dir = extractedDirOf(ctx.id);
-  if (!existsSync(dir)) throw new HttpError(409, "Os arquivos extraídos desta submissão não existem mais no servidor.", "files_missing");
+  if (!existsSync(dir)) throw new HttpError(409, "The extracted files for this submission no longer exist on the server.", "files_missing");
 
   // O hash é calculado AQUI, sobre a pasta que o revisor viu: é o `versionHash` que vai on-chain.
   const versionHash = packageHashOf(packageFromFolder(dir));
@@ -80,7 +80,7 @@ export async function approveSubmission(ctx: ReviewCtx, deps: ReviewDeps = defau
     // A versão precisa ser MAIOR que a do catálogo: igual sobrescreveria o hash de uma versão em produção; menor seria rebaixar.
     const [live] = await tx.select({ version: schema.agents.version }).from(schema.agents).where(eq(schema.agents.id, fresh.agentId));
     if (live && !versionGreater(plan.approved.version, live.version)) {
-      throw new HttpError(409, `A versão ${plan.approved.version} não é maior que a ${live.version}, já publicada. Peça ao criador para subir a versão.`, "version_already_published");
+      throw new HttpError(409, `Version ${plan.approved.version} is not greater than the already published ${live.version}. Ask the creator to bump the version.`, "version_already_published");
     }
     // Dono do slug e do id: o catálogo, a plataforma e outros envios aprovados valem agora, não o que valia no upload.
     const conflict = await ownershipConflict({ submissionId: fresh.id, wallet: fresh.creatorWallet, agentId: fresh.agentId, slug: fresh.slug });

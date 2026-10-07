@@ -24,8 +24,8 @@ describe("supplyOfRow / isRowSoldOut / supplyLabel", () => {
   });
 
   it("texto para a IA", () => {
-    assert.equal(supplyLabel(supplyOfRow({ totalSales: 7n, maxLicenses: 10 })), "3 de 10 licenças restantes");
-    assert.equal(supplyLabel(supplyOfRow({ totalSales: 10n, maxLicenses: 10 })), "esgotado");
+    assert.equal(supplyLabel(supplyOfRow({ totalSales: 7n, maxLicenses: 10 })), "3 of 10 licenses left");
+    assert.equal(supplyLabel(supplyOfRow({ totalSales: 10n, maxLicenses: 10 })), "sold out");
   });
 });
 

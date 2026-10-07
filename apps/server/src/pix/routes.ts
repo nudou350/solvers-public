@@ -114,7 +114,7 @@ async function sync(row: Row): Promise<Row> {
 export async function neededUnits(wallet: string, agentId: string, type: "permanent" | "guarantee"): Promise<bigint> {
   const row = await findAgentRow(agentId);
   assertNotPlatformAgent(row); // Solver gratuito da plataforma: nada a cobrar por Pix/SODAX (409 platform_agent_not_for_sale)
-  if (!agentIsAvailable(row)) throw badRequest("Este especialista ainda não está disponível para compra.");
+  if (!agentIsAvailable(row)) throw badRequest("This specialist is not available for purchase yet.");
   let total: bigint;
   if (type === "permanent") {
     // Esgotado: não cobra Pix (nem SODAX, que usa esta função) por uma compra que o programa recusaria.
@@ -127,7 +127,7 @@ export async function neededUnits(wallet: string, agentId: string, type: "perman
   else {
     assertListedAndLoadable(row);
     const offer = guaranteeOffer(row, 1);
-    if (!offer) throw badRequest("Este especialista não oferece tarefa com garantia.");
+    if (!offer) throw badRequest("This specialist doesn't offer guaranteed tasks.");
     total = usdcToUnits(offer.priceUsdc);
   }
   const balance = await chain().usdcBalance(address(wallet));
@@ -141,10 +141,10 @@ pixRouter.post(
   requireAuth,
   h(async (req): Promise<PixCharge> => {
     if (isMainnet()) {
-      throw badRequest("Pix não está disponível na mainnet: aqui ele só existe na demo, com USDC de teste.", "pix_unavailable");
+      throw badRequest("Pix is not available on mainnet: here it only exists in the demo, with test USDC.", "pix_unavailable");
     }
     const cfg = pixConfig();
-    if (!cfg.enabled) throw badRequest("Pix não está configurado neste servidor.", "pix_unavailable");
+    if (!cfg.enabled) throw badRequest("Pix is not configured on this server.", "pix_unavailable");
     const wallet = requireWallet(req);
     const body = parse(
       z.union([
@@ -161,19 +161,19 @@ pixRouter.post(
       units = usdcToUnits(body.usdc);
     } else {
       units = await neededUnits(wallet, body.agentId, body.type);
-      if (units === 0n) throw badRequest("Você já tem saldo suficiente para esta compra.", "balance_sufficient");
+      if (units === 0n) throw badRequest("You already have enough balance for this purchase.", "balance_sufficient");
       purpose = { agentId: (await findAgentRow(body.agentId)).id, type: body.type };
     }
     // Centavo mais próximo, igual ao total que a vitrine mostra (units tem 6 casas: centavos = units * cotação / 10^4).
     // O USDC creditado é sempre o valor exato; a diferença de meio centavo fica por conta da plataforma.
     let cents = Math.round(Number(units) * rate / 10_000);
     if (cents < MIN_CENTS) {
-      if ("usdc" in body) throw badRequest(`O valor mínimo do Pix é R$ ${(MIN_CENTS / 100).toFixed(2)}.`, "pix_min");
+      if ("usdc" in body) throw badRequest(`The minimum Pix amount is R$ ${(MIN_CENTS / 100).toFixed(2)}.`, "pix_min");
       // Falta pouco para a compra: cobra o mínimo e credita o equivalente (um pouco mais que o necessário).
       cents = MIN_CENTS;
       units = BigInt(Math.floor((MIN_CENTS * 10_000) / rate));
     }
-    if (cents > MAX_CENTS) throw badRequest(`O valor máximo por Pix é R$ ${(MAX_CENTS / 100).toFixed(2)}.`, "pix_max");
+    if (cents > MAX_CENTS) throw badRequest(`The maximum amount per Pix is R$ ${(MAX_CENTS / 100).toFixed(2)}.`, "pix_max");
 
     // Expira as pendentes vencidas e limita as abertas por carteira.
     await db
@@ -185,7 +185,7 @@ pixRouter.post(
       .from(schema.pixCharges)
       .where(and(eq(schema.pixCharges.wallet, wallet), eq(schema.pixCharges.status, "pending"), gt(schema.pixCharges.expiresAt, new Date())));
     if (n >= MAX_PENDING) {
-      throw new HttpError(429, `Você já tem ${MAX_PENDING} cobranças Pix em aberto. Pague ou espere expirarem.`, "pix_pending_limit");
+      throw new HttpError(429, `You already have ${MAX_PENDING} open Pix charges. Pay them or wait for them to expire.`, "pix_pending_limit");
     }
 
     const id = `pix_${randomBytes(12).toString("hex")}`;
@@ -231,7 +231,7 @@ pixRouter.post(
 
 export async function ownCharge(wallet: string, id: string): Promise<Row> {
   const row = await load(id);
-  if (!row || row.wallet !== wallet) throw notFound("Cobrança Pix não encontrada");
+  if (!row || row.wallet !== wallet) throw notFound("Pix charge not found");
   return row;
 }
 
@@ -248,14 +248,14 @@ pixRouter.post(
   "/pix/charges/:id/simulate",
   requireAuth,
   h(async (req): Promise<PixCharge> => {
-    if (isMainnet() || !env.PIX_SIMULATE) throw badRequest("Simulação de pagamento desativada neste servidor.", "pix_simulate_disabled");
+    if (isMainnet() || !env.PIX_SIMULATE) throw badRequest("Payment simulation is disabled on this server.", "pix_simulate_disabled");
     const row = await ownCharge(requireWallet(req), String(req.params.id));
     if (simulateBlockReason(row.provider)) {
-      throw badRequest("Esta cobrança é do Mercado Pago e só é aprovada quando o Pix for pago de verdade.", "pix_not_simulated");
+      throw badRequest("This charge is from Mercado Pago and is only approved when the Pix is actually paid.", "pix_not_simulated");
     }
-    if (row.status === "failed") throw badRequest("Esta cobrança falhou; crie outra.", "pix_failed");
+    if (row.status === "failed") throw badRequest("This charge failed; create a new one.", "pix_failed");
     if (row.status === "expired" || (row.status === "pending" && row.expiresAt.getTime() < Date.now())) {
-      throw badRequest("Esta cobrança expirou; crie outra.", "pix_expired");
+      throw badRequest("This charge expired; create a new one.", "pix_expired");
     }
     await markApproved(row.id);
     await credit(row.id);
@@ -279,7 +279,7 @@ pixWebhookRouter.post(
       dataId: queryId,
       secret: env.MP_WEBHOOK_SECRET,
     });
-    if (!ok) throw unauthorized("assinatura do webhook inválida");
+    if (!ok) throw unauthorized("invalid webhook signature");
     // Só usamos o id (coberto pela assinatura quando vem na query); o estado vem do GET da order.
     const orderId = queryId ?? (typeof body.data?.id === "string" ? body.data.id : undefined);
     const type = (typeof q.type === "string" ? q.type : undefined) ?? body.type;

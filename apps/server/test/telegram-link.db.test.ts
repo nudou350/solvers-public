@@ -171,7 +171,7 @@ describe("vinculação do Telegram com banco", { skip: url ? false : "defina TES
     // Digitado em minúsculas e sem o prefixo: o bot entende.
     const out = await poller.processUpdate(dm(5551, `/vincular ${code.slice(5).toLowerCase()}`), deps());
     assert.equal(out, "replied");
-    assert.deepEqual(sent, [{ chatId: "5551", text: "Pronto! Seu Telegram foi vinculado ao Solvers como Ana Souza." }]);
+    assert.deepEqual(sent, [{ chatId: "5551", text: "Done! Your Telegram is now linked to Solvers as Ana Souza." }]);
     const c = await row("a");
     assert.equal(c.telegramChatId, "5551");
     assert.equal(c.telegramLinkHash, null);
@@ -184,7 +184,7 @@ describe("vinculação do Telegram com banco", { skip: url ? false : "defina TES
     const code = await link(W("b"));
     sent.length = 0;
     await poller.processUpdate(dm(5552, `/start ${code}`), deps());
-    assert.match(sent[0]!.text, /^Pronto! .* como Criador b\.$/);
+    assert.match(sent[0]!.text, /^Done! .* as Criador b\.$/);
     await poller.processUpdate(dm(5553, `/vincular ${code}`), deps());
     await poller.processUpdate(dm(5553, "/vincular LINK-ZZZZ2222"), deps());
     assert.equal(sent[1]!.text, rules.replyText({ kind: "invalid" }));

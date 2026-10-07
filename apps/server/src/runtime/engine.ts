@@ -104,8 +104,8 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
     .returning();
   if (!s) {
     const [other] = await db.select({ id: schema.sessions.id }).from(schema.sessions).where(eq(schema.sessions.id, sessionId));
-    if (other) throw forbidden("Esta sessão pertence a outra carteira.");
-    throw notFound("Sessão não encontrada. Ative o solver de novo com activate_solver.");
+    if (other) throw forbidden("This session belongs to another wallet.");
+    throw notFound("Session not found. Activate the solver again with activate_solver.");
   }
   // Kill switch (PACKAGE_SPEC.md 15.4): especialista suspenso (plataforma ou cadeia) derruba as sessões abertas na hora.
   const [agent] = await db
@@ -119,17 +119,17 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
     if (paid) s = await promoteSession(s, paid);
   }
   assertAgentCanServe(availability, s.access as AccessKind);
-  if (s.expiresAt < new Date()) throw forbidden("Sessão expirada. Ative o solver de novo com activate_solver.");
+  if (s.expiresAt < new Date()) throw forbidden("Session expired. Activate the solver again with activate_solver.");
   if (s.access === "trial" && s.calls > TRIAL_MAX_CALLS) {
     // Só no momento de bloquear: quem comprou durante o teste segue na mesma sessão, sem limites.
     const paid = await paidAccessById(wallet, s.agentId);
     if (paid) return promoteSession(s, paid);
-    throw forbidden("Limite do teste grátis atingido nesta sessão. Para continuar, o usuário pode comprar o especialista.");
+    throw forbidden("Free trial limit reached in this session. To continue, the user can buy the specialist.");
   }
   if (s.access === "guarantee") {
     const escrowId = (s.context as { escrowId?: unknown }).escrowId;
     if (typeof escrowId !== "string" || !(await escrowIsOpen(escrowId))) {
-      throw forbidden("A tarefa com garantia deste especialista foi encerrada. Ative o solver de novo com activate_solver.");
+      throw forbidden("This specialist's guaranteed task has been closed. Activate the solver again with activate_solver.");
     }
   }
   if (s.access === "license") {
@@ -139,7 +139,7 @@ export async function getSession(sessionId: string, wallet: string): Promise<Ses
     if (licenseRecheckDue(licenseChecked.get(key), Date.now())) {
       if (!s.licenseId || !(await sessionGrantValid(s))) {
         licenseChecked.delete(key);
-        throw forbidden("A licença deste especialista não pertence mais a esta carteira.");
+        throw forbidden("This specialist's license no longer belongs to this wallet.");
       }
       if (licenseChecked.size > 2000) for (const [k, t] of licenseChecked) if (licenseRecheckDue(t, Date.now())) licenseChecked.delete(k);
       licenseChecked.set(key, Date.now());
@@ -179,14 +179,14 @@ export async function saveSummary(session: Session, slot: number, summary: strin
 }
 
 const WATERMARKS = [
-  "Siga o método do solver na ordem e confirme cada item do checklist antes de avançar.",
-  "Conclua o checklist desta etapa antes de seguir para a próxima.",
-  "Antes de avançar, confira todos os itens do checklist desta etapa.",
-  "Só passe para a etapa seguinte depois de validar o checklist abaixo.",
-  "Confirme o checklist desta etapa; ele é o critério para avançar.",
-  "Valide cada item do checklist com o usuário antes de continuar.",
-  "O checklist abaixo define quando esta etapa está concluída.",
-  "Use o checklist a seguir como condição para passar à próxima etapa.",
+  "Follow the solver's method in order and confirm each checklist item before moving on.",
+  "Complete this step's checklist before moving on to the next one.",
+  "Before moving on, check every item on this step's checklist.",
+  "Only go to the next step after you have validated the checklist below.",
+  "Confirm this step's checklist; it is the criterion for moving on.",
+  "Validate each checklist item with the user before continuing.",
+  "The checklist below defines when this step is done.",
+  "Use the checklist that follows as the condition for moving to the next step.",
 ];
 
 /**
@@ -202,15 +202,15 @@ export function watermark(wallet: string, agentId: string): string {
 export function overview(pkg: SolverPackage, trial: { templates: string[] } | null = null): string {
   const m = pkg.manifest;
   const steps = pkg.steps.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
-  const tools = m.tools.length ? m.tools.map((t) => `- ${t.name}: ${t.description}`).join("\n") : "- (nenhuma)";
+  const tools = m.tools.length ? m.tools.map((t) => `- ${t.name}: ${t.description}`).join("\n") : "- (none)";
   return [
     `# ${m.name} v${m.version}`,
     m.tagline,
     "",
-    "## Etapas do método",
+    "## Method steps",
     steps,
     "",
-    "## Ferramentas de servidor disponíveis (use com run_tool)",
+    "## Available server tools (use with run_tool)",
     tools,
     ...templatesOverview(declaredTemplates(m), trial),
   ].join("\n");
@@ -220,27 +220,27 @@ export function renderStep(pkg: SolverPackage, session: Session, index: number):
   const total = pkg.steps.length;
   if (index >= total) {
     const text = [
-      `# Encerramento (${total}/${total} etapas concluídas)`,
+      `# Wrap-up (${total}/${total} steps completed)`,
       "",
-      "- Resuma para o usuário o que foi entregue e as decisões tomadas.",
-      "- Se aprendeu preferências duráveis do usuário, salve com save_memory (sem dados sensíveis).",
-      "- Pergunte se o usuário quer avaliar o especialista na loja.",
-      "- Se algo ficou fora do alcance, ofereça escalate_to_creator.",
+      "- Summarize for the user what was delivered and the decisions made.",
+      "- If you learned lasting preferences of the user, save them with save_memory (no sensitive data).",
+      "- Ask whether the user wants to rate the specialist in the store.",
+      "- If something was out of scope, offer escalate_to_creator.",
     ].join("\n");
     return { text, done: true };
   }
   const step = pkg.steps[index]!;
-  const gate = step.gate.length ? step.gate.map((g) => `- [ ] ${g}`).join("\n") : "- [ ] Objetivo da etapa cumprido";
+  const gate = step.gate.length ? step.gate.map((g) => `- [ ] ${g}`).join("\n") : "- [ ] Step goal achieved";
   const text = [
-    `# Etapa ${index + 1} de ${total}: ${step.title}`,
+    `# Step ${index + 1} of ${total}: ${step.title}`,
     "",
     step.body.trim(),
     "",
-    "## Checklist de saída (gate)",
+    "## Exit checklist (gate)",
     watermark(session.wallet, pkg.manifest.id),
     gate,
     "",
-    `Quando o checklist estiver completo, chame next_step com session_id="${session.id}", completed_step=${index + 1} e result_summary no formato pedido acima.`,
+    `When the checklist is complete, call next_step with session_id="${session.id}", completed_step=${index + 1} and result_summary in the format requested above.`,
   ].join("\n");
   return { text, done: false };
 }

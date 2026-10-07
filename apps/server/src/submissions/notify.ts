@@ -27,7 +27,7 @@ export async function notifyCreatorWallet(wallet: string, text: string): Promise
 
 type Subject = { id: string; slug: string; version: string; creatorWallet: string; name?: string | null };
 
-const label = (s: Subject) => `${s.name ?? (s.slug || "(sem nome)")} ${s.version ? `v${s.version}` : ""}`.trim();
+const label = (s: Subject) => `${s.name ?? (s.slug || "(unnamed)")} ${s.version ? `v${s.version}` : ""}`.trim();
 
 /** Texto de cada mudança de estado para o admin. */
 export function adminMessage(event: "submitted" | "pending_review" | "rejected_validation" | "creator_signed" | "resubmitted", s: Subject, extra?: string): string {
@@ -50,14 +50,14 @@ export function creatorMessage(event: "pending_review" | "rejected_validation" |
   const what = label(s);
   switch (event) {
     case "pending_review":
-      return `Solvers: seu pacote ${what} passou na validação e entrou na fila de revisão (meta: 5 dias úteis).`;
+      return `Solvers: your package ${what} passed validation and is now in the review queue (target: 5 business days).`;
     case "rejected_validation":
-      return `Solvers: seu pacote ${what} não passou na validação. Abra o envio no site para ver os erros e corrigir.`;
+      return `Solvers: your package ${what} did not pass validation. Open the submission on the site to see the errors and fix them.`;
     case "changes_requested":
-      return `Solvers: o revisor pediu mudanças em ${what}.${notes ? `\n\n${notes.slice(0, 600)}` : ""}`;
+      return `Solvers: the reviewer requested changes to ${what}.${notes ? `\n\n${notes.slice(0, 600)}` : ""}`;
     case "rejected":
-      return `Solvers: ${what} não foi aprovado.${notes ? `\n\n${notes.slice(0, 600)}` : ""}`;
+      return `Solvers: ${what} was not approved.${notes ? `\n\n${notes.slice(0, 600)}` : ""}`;
     case "approved":
-      return `Solvers: ${what} foi aprovado na revisão. Falta você assinar o registro no site para publicar.`;
+      return `Solvers: ${what} was approved in review. You still need to sign the registration on the site to publish it.`;
   }
 }

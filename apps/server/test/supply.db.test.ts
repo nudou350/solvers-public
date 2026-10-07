@@ -144,14 +144,14 @@ describe("teto de licenças com banco", { skip: url ? false : "defina TEST_DATAB
     const open = await row(ids.open);
     const sold = await row(ids.soldOut);
     const free = await row(ids.unlimited);
-    assert.match(describeAgent(open), /1 de 3 licenças restantes/);
-    assert.match(describeAgent(sold), /esgotado/);
-    assert.doesNotMatch(describeAgent(free), /restantes|esgotado/);
+    assert.match(describeAgent(open), /1 of 3 licenses left/);
+    assert.match(describeAgent(sold), /sold out/);
+    assert.doesNotMatch(describeAgent(free), /licenses left|sold out/);
     assert.match(purchaseLinkFor(open), /\/checkout\?agent=/);
     assert.doesNotMatch(purchaseLinkFor(sold), /checkout/);
-    assert.match(purchaseLinkFor(sold), /esgotadas/);
+    assert.match(purchaseLinkFor(sold), /sold out/);
     const advice = soldOutAdvice(sold);
-    assert.match(advice, /Não ofereça link de compra/);
+    assert.match(advice, /Do not offer a purchase link/);
     assert.match(advice, /limite atual/);
     assert.match(advice, /mercado de revenda/); // RESALE_ENABLED=true neste teste
     assert.doesNotMatch(advice, /só existirão|apenas \d+ existem/);

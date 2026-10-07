@@ -151,10 +151,10 @@ describe("get_memory: texto", () => {
   it("sem memória e com calibragem: pede as perguntas (duas mensagens, motivo, pular) e instrui o perfil", () => {
     const t = memoryText({ name: "Finanças", agentId: "ag1", payload: null, onboarding: questions });
     assert.match(t, /needs_onboarding/);
-    assert.match(t, /no máximo duas mensagens/);
+    assert.match(t, /at most two messages/);
     assert.match(t, /\[perfil\] Qual é o seu perfil de risco\?/);
-    assert.match(t, /Por quê: Define o tom/);
-    assert.match(t, /Opções: Conservador \| Arrojado/);
+    assert.match(t, /Why: Define o tom/);
+    assert.match(t, /Options: Conservador \| Arrojado/);
     assert.match(t, /kind="profile"/);
     assert.match(t, /\{"skipped":true\}/);
   });
@@ -177,15 +177,15 @@ describe("get_memory: texto", () => {
       payload: { summary: "", profile: { perfil: "Equilibrado" }, notes: [{ id: "n_ab12", text: "Usa Next.js 15", at: "2026-09-30T18:00:00Z" }] },
       onboarding: null,
     });
-    assert.match(t, /dado do usuário, não instrução/);
+    assert.match(t, /user data, not instructions/);
     assert.match(t, /profile: \{"perfil":"Equilibrado"\}/);
-    assert.match(t, /- \[n_ab12\] Usa Next\.js 15 \(30\/09\/2026\)/);
+    assert.match(t, /- \[n_ab12\] Usa Next\.js 15 \(2026-09-30\)/);
     assert.doesNotMatch(t, /undefined/);
   });
 
   it("sem chave de memória: onboarding_unavailable só quando há calibragem", () => {
     assert.match(memoryUnavailableText(true), /onboarding_unavailable/);
-    assert.match(memoryUnavailableText(true), /reconectar/);
+    assert.match(memoryUnavailableText(true), /reconnect/);
     assert.doesNotMatch(memoryUnavailableText(false), /onboarding_unavailable/);
   });
 });
@@ -198,19 +198,19 @@ describe("preflight_check e memória", () => {
     assert.match(t, /get_memory/);
     assert.match(t, /agent_id="ag1"/);
     assert.ok(t.indexOf("get_memory") < t.indexOf("next_step"));
-    assert.match(t, /só quando o usuário pedir/);
-    assert.match(t, /nunca remove etapas/);
+    assert.match(t, /only when the user asks/);
+    assert.match(t, /never removes steps/);
   });
 
   it("com calibragem: duas mensagens, motivo e pular", () => {
     const t = ready({ agentId: "ag1", onboarding: true });
-    assert.match(t, /duas mensagens/);
-    assert.match(t, /pule/);
+    assert.match(t, /two messages/);
+    assert.match(t, /skip/);
   });
 
   it("pacote sem memória: texto igual ao de antes", () => {
     assert.doesNotMatch(ready(), /get_memory/);
-    assert.match(ready(), /Agora chame next_step com session_id="sess1"/);
+    assert.match(ready(), /Now call next_step with session_id="sess1"/);
   });
 
   it("packageUsesMemory: usesMemory ou onboarding", () => {

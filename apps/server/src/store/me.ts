@@ -9,6 +9,7 @@ import { decodeVerifiedSignature, MEMORY_KEY_MESSAGE } from "../auth/siws.js";
 import { h, HttpError, notFound, parse, unauthorized } from "../lib/http.js";
 import { deleteAllMemories, deleteMemory, deriveMemoryKey, memoryKeyFor, readMemories, storeMemoryKey, wrapKey } from "../memory/crypto.js";
 import { getCreator } from "./catalog.js";
+import { catalogLangOf } from "./lang-rules.js";
 import { supplyOfRow } from "./supply-rules.js";
 import { chain } from "../chain/index.js";
 
@@ -22,10 +23,10 @@ meRouter.post(
   requireAuth,
   h(async (req) => {
     const wallet = requireWallet(req);
-    if (!req.tokenId) throw unauthorized("Sessão sem identificador; entre novamente");
+    if (!req.tokenId) throw unauthorized("Session has no identifier; please sign in again");
     const { signature } = parse(z.object({ signature: z.union([z.string(), z.array(z.number())]) }), req.body);
     const sig = decodeVerifiedSignature(wallet, MEMORY_KEY_MESSAGE, signature);
-    if (!sig) throw unauthorized("Assinatura inválida");
+    if (!sig) throw unauthorized("Invalid signature");
     await storeMemoryKey(req.tokenId, wallet, wrapKey(deriveMemoryKey(sig, wallet)), new Date(Date.now() + 24 * 3600 * 1000));
     return { ok: true };
   }),
@@ -38,7 +39,7 @@ meRouter.get(
     const wallet = requireWallet(req);
     const key = await memoryKeyFor(req.tokenId, wallet);
     if (!key) {
-      throw new HttpError(409, "Para ver suas memórias, confirme a assinatura na carteira.", "memory_key_required", {
+      throw new HttpError(409, "To see your memories, confirm the signature in your wallet.", "memory_key_required", {
         message: MEMORY_KEY_MESSAGE,
       });
     }
@@ -64,7 +65,7 @@ meRouter.delete(
   "/me/memories/:id",
   requireAuth,
   h(async (req) => {
-    if (!(await deleteMemory(requireWallet(req), String(req.params.id)))) throw notFound("Memória não encontrada");
+    if (!(await deleteMemory(requireWallet(req), String(req.params.id)))) throw notFound("Memory not found");
     return { ok: true };
   }),
 );
@@ -119,8 +120,9 @@ meRouter.post(
 meRouter.get(
   "/creator/dashboard",
   requireAuth,
-  h(async (req): Promise<CreatorDashboard> => {
+  h(async (req, res): Promise<CreatorDashboard> => {
     const wallet = requireWallet(req);
+    const lang = catalogLangOf(req, res);
     const [creatorRow] = await db.select().from(schema.creators).where(eq(schema.creators.wallet, wallet));
     const empty: CreatorDashboard = {
       creator: null,
@@ -146,7 +148,7 @@ meRouter.get(
     const creatorCut = sql`case when ${tx.kind} = 'resale' then coalesce(${tx.creatorAmount}, 0) else coalesce(${tx.creatorAmount}, ${tx.amount} - (${tx.amount} * coalesce(${tx.feeBps}, ${sql.raw(String(Math.trunc(feeBps)))}) / 10000)) end`;
     empty.creatorSharePct = Math.round(share * 1000) / 10;
     const agents = await db.select().from(schema.agents).where(eq(schema.agents.creatorId, creatorRow.id));
-    if (agents.length === 0) return { ...empty, creator: await getCreator(creatorRow.id) };
+    if (agents.length === 0) return { ...empty, creator: await getCreator(creatorRow.id, lang) };
     const ids = agents.map((a) => a.id);
 
     // Contestações de etapas de garantia dos especialistas deste criador.
@@ -196,7 +198,7 @@ meRouter.get(
     const perAgent = agents.map((a) => ({
       agentId: a.id,
       slug: a.slug,
-      name: a.name,
+      name: (lang === "pt" ? a.translations?.pt?.name : undefined) || a.name,
       category: a.category,
       version: a.version,
       status: (["active", "pending", "suspended", "retired"].includes(a.status) ? a.status : "pending") as "active" | "pending" | "suspended" | "retired",
@@ -278,7 +280,7 @@ meRouter.get(
 
     const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + f(x), 0);
     return {
-      creator: await getCreator(creatorRow.id),
+      creator: await getCreator(creatorRow.id, lang),
       totals: {
         sales: sum(perAgent, (a) => a.sales),
         uses: sum(perAgent, (a) => a.uses),

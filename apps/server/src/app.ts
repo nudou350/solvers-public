@@ -46,7 +46,7 @@ export function createApp(mounts: Mount[] = []): Express {
     limit: env.RATE_LIMIT_PER_MINUTE * 3,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    message: { error: "Muitas requisições. Aguarde um pouco e tente de novo.", code: "rate_limited" },
+    message: { error: "Too many requests. Please wait a moment and try again.", code: "rate_limited" },
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
   });
   const byWallet = rateLimit({
@@ -54,7 +54,7 @@ export function createApp(mounts: Mount[] = []): Express {
     limit: env.RATE_LIMIT_PER_MINUTE * 2,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    message: { error: "Muitas requisições. Aguarde um pouco e tente de novo.", code: "rate_limited" },
+    message: { error: "Too many requests. Please wait a moment and try again.", code: "rate_limited" },
     skip: (req) => !req.wallet,
     keyGenerator: (req) => req.wallet ?? "anon",
   });
@@ -64,7 +64,7 @@ export function createApp(mounts: Mount[] = []): Express {
     limit: 20,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    message: { error: "Muitas requisições. Aguarde um pouco e tente de novo.", code: "rate_limited" },
+    message: { error: "Too many requests. Please wait a moment and try again.", code: "rate_limited" },
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? "0.0.0.0"),
   });
 
@@ -87,7 +87,7 @@ export function createApp(mounts: Mount[] = []): Express {
   for (const mount of mounts) mount(app);
 
   app.use((_req, res) => {
-    res.status(404).json({ error: "Rota não encontrada", code: "not_found" });
+    res.status(404).json({ error: "Route not found", code: "not_found" });
   });
   app.use(errorHandler);
   return app;

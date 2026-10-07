@@ -31,10 +31,10 @@ describe("HelpRequest", () => {
 
 describe("buildHelpSummary", () => {
   it("põe o contato antes da mensagem", () => {
-    assert.equal(buildHelpSummary("Travei no passo 2", "ana@x.com"), "Pedido de ajuda pelo site.\nContato para resposta: ana@x.com\n\nTravei no passo 2");
+    assert.equal(buildHelpSummary("Travei no passo 2", "ana@x.com"), "Help request from the site.\nContact for reply: ana@x.com\n\nTravei no passo 2");
   });
 
   it("sem contato, diz que não há", () => {
-    assert.match(buildHelpSummary("Travei no passo 2"), /Sem contato informado\./);
+    assert.match(buildHelpSummary("Travei no passo 2"), /No contact provided\./);
   });
 });

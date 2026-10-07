@@ -191,8 +191,8 @@ describe("correções do fluxo de criação com banco", { skip: url ? false : "d
     });
 
     it("id reservado da plataforma e slug reservado não passam", async () => {
-      assert.match((await lookup.ownershipConflict({ submissionId: "x", wallet: A, agentId: "c71ad0a50f750e75c71ad0a50f750e75", slug: `${P}-livre` })) ?? "", /plataforma/);
-      assert.match((await lookup.ownershipConflict({ submissionId: "x", wallet: A, agentId: hex(16), slug: "solvers" })) ?? "", /reservado/);
+      assert.match((await lookup.ownershipConflict({ submissionId: "x", wallet: A, agentId: "c71ad0a50f750e75c71ad0a50f750e75", slug: `${P}-livre` })) ?? "", /platform/);
+      assert.match((await lookup.ownershipConflict({ submissionId: "x", wallet: A, agentId: hex(16), slug: "solvers" })) ?? "", /reserved/);
       assert.equal(await lookup.ownershipConflict({ submissionId: "x", wallet: A, agentId: hex(16), slug: `${P}-livre2` }), null);
     });
 
@@ -225,7 +225,7 @@ describe("correções do fluxo de criação com banco", { skip: url ? false : "d
       for (const s of [a, b]) {
         const r = await row(s.id);
         assert.equal(r.status, "rejected");
-        assert.match(r.reviewerNotes ?? "", /expirad/i);
+        assert.match(r.reviewerNotes ?? "", /expired/i);
         const rv = await reviews(s.id);
         assert.deepEqual(rv.map((x) => [x.action, x.reviewerWallet]), [["expire", "system"]]);
       }

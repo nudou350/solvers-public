@@ -17,14 +17,14 @@ describe("files: formatos aceitos", () => {
   it("rejeita .., caminho absoluto e repetido", () => {
     assert.throws(() => normalizeFiles({ files: [{ path: "../x.tsx", content: "" }] }), /\.\./);
     assert.throws(() => normalizeFiles({ files: { "a/../../x.tsx": "" } }), /\.\./);
-    assert.throws(() => normalizeFiles({ files: [{ path: "/etc/passwd", content: "" }] }), /absoluto/);
-    assert.throws(() => normalizeFiles({ files: [{ path: "C:\\x.tsx", content: "" }] }), /absoluto/);
-    assert.throws(() => normalizeFiles({ files: [{ path: "A.tsx", content: "" }, { path: "A.tsx", content: "" }] }), /repetido/);
+    assert.throws(() => normalizeFiles({ files: [{ path: "/etc/passwd", content: "" }] }), /absolute/);
+    assert.throws(() => normalizeFiles({ files: [{ path: "C:\\x.tsx", content: "" }] }), /absolute/);
+    assert.throws(() => normalizeFiles({ files: [{ path: "A.tsx", content: "" }, { path: "A.tsx", content: "" }] }), /duplicate/);
     assert.throws(() => normalizeFiles({ files: "A.tsx" }));
   });
   it("limita quantidade e tamanho total também na forma objeto", () => {
     const many = Object.fromEntries(Array.from({ length: 41 }, (_, i) => [`F${i}.tsx`, "x"]));
-    assert.throws(() => normalizeFiles({ files: many }), /40 arquivos/);
+    assert.throws(() => normalizeFiles({ files: many }), /40 files/);
     assert.throws(() => normalizeFiles({ files: { "A.tsx": "x".repeat(300_001) } }), /300 KB/);
     assert.throws(() => normalizeFiles({ files: [{ path: "A.tsx", content: "x".repeat(200_000) }, { path: "B.tsx", content: "x".repeat(200_000) }] }), /300 KB/);
     assert.equal(Object.keys(normalizeFiles({ files: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`F${i}.tsx`, "x"])) })).length, 40);
@@ -201,9 +201,9 @@ describe("contrast_check", () => {
         { fg: "azul", bg: "#fff" },
       ],
     }) as any[];
-    assert.match(out[0].error, /transparência/);
+    assert.match(out[0].error, /transparency/);
     assert.equal(out[1].ratio, 21);
-    assert.match(out[2].error, /Cor inválida/);
+    assert.match(out[2].error, /Invalid color/);
   });
 });
 
@@ -221,7 +221,7 @@ describe("budget_split", () => {
     const r = budgetSplit({ total: 10000, days: 5, profile: "economico", emergencyReservePct: 5 });
     assert.equal(r.categories.reserva, 1000);
     assert.equal(r.emergencyReservePct, 10);
-    assert.ok(r.alerts.some((a) => /Reserva de emergência ajustada/.test(a)));
+    assert.ok(r.alerts.some((a) => /Emergency reserve raised/.test(a)));
     const padrao = budgetSplit({ total: 10000, days: 5 });
     assert.equal(padrao.categories.reserva, 1000);
   });
@@ -245,18 +245,18 @@ describe("budget_split", () => {
     assert.equal(r.categories.aereo, 20000);
     assert.equal(r.categories.reserva, 4500);
     assert.equal(sum(r.categories), 45000);
-    assert.ok(r.alerts.some((a) => /aéreo: já pago/.test(a)));
+    assert.ok(r.alerts.some((a) => /flights: already paid/.test(a)));
   });
 
   it("diária local baixa gera alerta; perPersonPerDayLocal = (alim+passeios+transp)/dias/pessoas", () => {
     const r = budgetSplit({ total: 5000, days: 10, travelers: 2, profile: "economico" });
     const c = r.categories;
     assert.equal(r.perPersonPerDayLocal, Math.round(((c.alimentacao + c.passeios + c.transporteLocal) * 100) / 20) / 100);
-    assert.ok(r.alerts.some((a) => /Diária no destino/.test(a)));
+    assert.ok(r.alerts.some((a) => /daily spend at the destination/.test(a)));
   });
 
   it("comparações em centavos: total que vira 0 centavo é rejeitado; alreadyPaid igual ao total em centavos passa", () => {
-    assert.throws(() => budgetSplit({ total: 0.004, days: 1 }), /0,01/);
+    assert.throws(() => budgetSplit({ total: 0.004, days: 1 }), /0\.01/);
     const r = budgetSplit({ total: 100.004, days: 1, alreadyPaid: { aereo: 100.001 } });
     assert.equal(sum(r.categories), 100);
     assert.equal(r.categories.aereo, 100);
@@ -283,15 +283,15 @@ describe("budget_split", () => {
     assert.equal(sum(r.categories), 10000);
     assert.equal(r.categories.seguro, 0);
     assert.equal(r.categories.reserva, 2000);
-    const alert = r.alerts.find((a) => /sobra/.test(a))!;
-    assert.match(alert, /seguro/);
-    assert.doesNotMatch(alert, /Todas as categorias já estão pagas/);
+    const alert = r.alerts.find((a) => /leftover/.test(a))!;
+    assert.match(alert, /insurance/);
+    assert.doesNotMatch(alert, /All categories are already paid/);
     const all = budgetSplit({
       total: 10000,
       days: 5,
       alreadyPaid: { aereo: 2000, hospedagem: 3000, alimentacao: 1500, passeios: 1000, transporteLocal: 500, seguro: 100 },
     });
-    assert.ok(all.alerts.some((a) => /Todas as categorias já estão pagas/.test(a)));
+    assert.ok(all.alerts.some((a) => /All categories are already paid/.test(a)));
   });
 
   it("alreadyPaid maior que o total é rejeitado", () => {
@@ -313,7 +313,7 @@ describe("preflight_check", () => {
   it("conector obrigatório ausente bloqueia", () => {
     const r = evaluatePreflight([figma], ["search_web"]);
     assert.equal(r.blocked, true);
-    assert.match(preflightText([figma], [], "s1"), /Não avance para next_step/);
+    assert.match(preflightText([figma], [], "s1"), /Do not move on to next_step/);
   });
 
   it("conector opcional ausente só avisa e libera next_step", () => {
@@ -322,9 +322,9 @@ describe("preflight_check", () => {
     assert.equal(r.blocked, false);
     assert.equal(r.warnings.length, 1);
     const text = preflightText(req, ["search_web"], "s1");
-    assert.match(text, /Figma não conectado: siga o caminho sem conector da etapa 1/);
-    assert.match(text, /chame next_step com session_id="s1"/);
-    assert.doesNotMatch(text, /Não avance/);
+    assert.match(text, /Figma not connected: follow the no-connector path in step 1/);
+    assert.match(text, /call next_step with session_id="s1"/);
+    assert.doesNotMatch(text, /Do not move on/);
   });
 
   it("chave com espaço casa com nomes de ferramenta com underscore", () => {
@@ -347,26 +347,26 @@ describe("preflight_check", () => {
     const drive = { type: "connector" as const, label: "Google Drive", key: "google_drive" };
     const r = evaluatePreflight([drive], ["search_web"]);
     assert.equal(r.blocked, true);
-    assert.match(r.missing[0], /Como conectar o Google Drive/);
+    assert.match(r.missing[0], /How to connect Google Drive/);
     assert.match(r.missing[0], /Claude:.*ChatGPT:/s);
     const o = evaluatePreflight([{ ...drive, optional: true }], ["search_web"]);
     assert.equal(o.blocked, false);
-    assert.match(o.warnings[0], /Google Drive não conectado.*Como conectar o Google Drive/s);
+    assert.match(o.warnings[0], /Google Drive not connected.*How to connect Google Drive/s);
   });
 
   it("howTo do criador prevalece sobre o catálogo e inclui a ajuda oficial", () => {
     const req = { type: "connector" as const, label: "Notion", key: "notion", howTo: "Ative o Notion e escolha a página do projeto.", helpUrl: "https://ajuda.exemplo.com/notion" };
     const g = installGuide(req);
     assert.match(g, /^Ative o Notion e escolha a página do projeto\./);
-    assert.match(g, /Ajuda oficial: https:\/\/ajuda\.exemplo\.com\/notion/);
-    assert.doesNotMatch(g, /Como conectar/);
+    assert.match(g, /Official help: https:\/\/ajuda\.exemplo\.com\/notion/);
+    assert.doesNotMatch(g, /How to connect/);
     assert.match(evaluatePreflight([req], []).missing[0], /Ative o Notion/);
   });
 
   it("catálogo com helpUrl e conector fora do catálogo sem howTo usam o texto genérico", () => {
-    assert.match(installGuide({ label: "Slack", key: "slack", helpUrl: "https://ajuda.exemplo.com/slack" }), /Como conectar o Slack[\s\S]*Ajuda oficial: https:\/\/ajuda\.exemplo\.com\/slack/);
-    assert.equal(installGuide({ label: "Trello" }), "Peça ao usuário para adicionar o conector Trello nas configurações da IA.");
-    assert.match(installGuide({ label: "Trello", helpUrl: "https://ajuda.exemplo.com/t" }), /configurações da IA\.\nAjuda oficial: https:\/\/ajuda\.exemplo\.com\/t$/);
+    assert.match(installGuide({ label: "Slack", key: "slack", helpUrl: "https://ajuda.exemplo.com/slack" }), /How to connect Slack[\s\S]*Official help: https:\/\/ajuda\.exemplo\.com\/slack/);
+    assert.equal(installGuide({ label: "Trello" }), "Ask the user to add the Trello connector in their AI assistant's settings.");
+    assert.match(installGuide({ label: "Trello", helpUrl: "https://ajuda.exemplo.com/t" }), /settings\.\nOfficial help: https:\/\/ajuda\.exemplo\.com\/t$/);
   });
 
   it("guias do catálogo existem para os conectores do wizard", () => {

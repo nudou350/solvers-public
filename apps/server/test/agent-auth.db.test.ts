@@ -117,7 +117,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
     assert.equal(tok.scope, "solvers");
     assert.ok(tok.refresh_token);
     const init = await rpc(tok.access_token, "initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "agente", version: "1" } });
-    assert.match(init.instructions ?? "", /agente autônomo/);
+    assert.match(init.instructions ?? "", /autonomous agent/);
     const tools = await rpc(tok.access_token, "tools/list");
     assert.ok((tools.tools?.length ?? 0) >= 10);
     // O token é do cliente "agent" (a base do isAgent) e a chave de memória foi guardada.
@@ -167,7 +167,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
   it("a mensagem do nonce diz que não autoriza pagamentos", async () => {
     const w = await generateKeyPairSigner();
     const n = (await (await fetch(`${base}/oauth/agent/nonce?wallet=${w.address}`)).json()) as { message: string };
-    assert.match(n.message, /Isto não autoriza pagamentos/);
+    assert.match(n.message, /does not authorize payments/);
   });
 
   it("carteira inválida no nonce: 400", async () => {
@@ -189,7 +189,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
     assert.notEqual(second.refresh_token, first.refresh_token);
     assert.equal((await refresh(first.refresh_token)).status, 400); // o antigo foi revogado
     // O sucessor continua sendo token de agente e o antigo access token deixou de valer.
-    assert.match(await callText(second.access_token, "list_my_solvers", {}), /Você ainda não tem especialistas/);
+    assert.match(await callText(second.access_token, "list_my_solvers", {}), /don't have any specialists yet/);
     const old = await fetch(`${base}/mcp`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${first.access_token}` },
@@ -227,7 +227,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
     for (const [name, args] of [["find_solver", { need: "componentes react acessíveis" }], ["get_purchase_link", { agent_id: AGENT }]] as const) {
       const t = await callText(tok.access_token, name, args);
       assert.doesNotMatch(t, /\/checkout/, name);
-      assert.doesNotMatch(t, /[Mm]ostre o link|mostre ao usuário/, name);
+      assert.doesNotMatch(t, /show (the |them the )?link|show (it )?to the user/i, name);
     }
   });
 
@@ -236,7 +236,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
     const human = await issueHuman(w.address);
     const out = await callText(human.access_token, "activate_solver", { agent_id: AGENT });
     assert.match(out, /session_id:/);
-    assert.match(out, /[Tt]este grátis/);
+    assert.match(out, /free trial/i);
     assert.equal((await db.select().from(schema.trials).where(eq(schema.trials.wallet, w.address))).length, 1);
     const link = await callText(human.access_token, "get_purchase_link", { agent_id: AGENT });
     assert.match(link, /\/checkout\?agent=/);
@@ -258,7 +258,7 @@ describe("login do agente com banco", { skip: url ? false : "defina TEST_DATABAS
       const w = await generateKeyPairSigner();
       const token = mode === "agente" ? ((await (await login(w)).json()) as { access_token: string }).access_token : (await issueHuman(w.address)).access_token;
       const out = await callText(token, "activate_solver", { agent_id: AGENT2 });
-      assert.match(out, /Não consegui confirmar sua licença/, mode);
+      assert.match(out, /couldn't confirm your license/, mode);
       assert.doesNotMatch(out, /\/checkout|x402|Comprar/, mode);
       assert.equal((await db.select().from(schema.trials).where(eq(schema.trials.wallet, w.address))).length, 0, mode);
     }

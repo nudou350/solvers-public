@@ -74,11 +74,11 @@ export function readRegularJson(path: string, maxBytes: number): SafeJson {
 /** Texto legível do motivo de uma leitura recusada (vai no relatório de falha). */
 export function describeReadFailure(what: string, r: { reason: string; detail?: string }): string {
   const why: Record<string, string> = {
-    missing: "não foi gerado",
-    not_regular: `não é um arquivo comum (${r.detail ?? "inválido"})`,
-    too_large: `passou do limite de tamanho (${r.detail ?? ""})`,
-    invalid_json: `não é um JSON válido (${r.detail ?? ""})`,
-    error: `não pôde ser lido (${r.detail ?? ""})`,
+    missing: "was not generated",
+    not_regular: `is not a regular file (${r.detail ?? "invalid"})`,
+    too_large: `exceeded the size limit (${r.detail ?? ""})`,
+    invalid_json: `is not valid JSON (${r.detail ?? ""})`,
+    error: `could not be read (${r.detail ?? ""})`,
   };
   return `${what} ${why[r.reason] ?? r.reason}`;
 }

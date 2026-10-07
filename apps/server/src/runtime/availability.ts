@@ -13,8 +13,8 @@ export function agentIsAvailable(a: AgentAvailabilityFields): boolean {
   return a.status === "active" && a.platformStatus === PLATFORM_ACTIVE;
 }
 
-export const UNAVAILABLE_TEXT = "Este especialista está temporariamente indisponível.";
-export const RETIRED_TEXT = "Este especialista foi aposentado pelo criador: não está mais à venda nem tem teste grátis. Quem já tem licença ou uma tarefa com garantia aberta segue usando.";
+export const UNAVAILABLE_TEXT = "This specialist is temporarily unavailable.";
+export const RETIRED_TEXT = "This specialist has been retired by its creator: it is no longer for sale and has no free trial. People who already have a license or an open guaranteed task can keep using it.";
 
 /**
  * Quem pode ser atendido (decisão pura). `status` "retired" (criador pediu saída do depósito) continua servindo o

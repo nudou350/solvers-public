@@ -23,12 +23,18 @@ const CHAR_W = 0.6;
 
 const HUE: Record<string, [string, string]> = {
   Desenvolvimento: ["#6d5cff", "#2dd4bf"],
+  Development: ["#6d5cff", "#2dd4bf"],
   Design: ["#ec4899", "#f59e0b"],
   "Dia a dia": ["#f97316", "#a855f7"],
+  "Everyday life": ["#f97316", "#a855f7"],
   Negócios: ["#22c55e", "#0ea5e9"],
+  Business: ["#22c55e", "#0ea5e9"],
   Viagens: ["#0ea5e9", "#6366f1"],
+  Travel: ["#0ea5e9", "#6366f1"],
   Conteúdo: ["#f43f5e", "#f59e0b"],
+  Content: ["#f43f5e", "#f59e0b"],
   Escrita: ["#f43f5e", "#f59e0b"],
+  Writing: ["#f43f5e", "#f59e0b"],
 };
 const accentOf = (category: string): [string, string] => HUE[category] ?? ["#6d5cff", "#2dd4bf"];
 
@@ -83,7 +89,7 @@ function frame(input: ArtInput, label: string, body: string, footer = true): str
 <rect width="${ART_W}" height="${ART_H}" fill="url(#bg)"/><rect width="${ART_W}" height="${ART_H}" fill="url(#glow)"/>
 <rect x="0" y="0" width="${ART_W}" height="8" fill="url(#ac)"/>
 ${text(80, 84, 26, [label.toUpperCase()], { fill: "#a9a4c9", weight: 700 })}
-${footer ? text(80, ART_H - 44, 24, [`${input.name} · por ${input.creatorName}`], { fill: "#8d89aa" }) : ""}
+${footer ? text(80, ART_H - 44, 24, [`${input.name} · by ${input.creatorName}`], { fill: "#8d89aa" }) : ""}
 ${body}
 </svg>`;
 }
@@ -106,13 +112,13 @@ function coverSlide(i: ArtInput): string {
     .join("");
   return frame(
     i,
-    "Especialista para a sua IA",
+    "A specialist for your AI",
     `<rect x="80" y="130" rx="22" ry="22" width="${Math.min(520, 70 + i.category.length * 17)}" height="52" fill="${a}" fill-opacity="0.22" stroke="${a}" stroke-opacity="0.7"/>
 ${text(106, 165, 26, [i.category], { fill: "#fff", weight: 700 })}
 ${text(80, 290, 84, title, { weight: 700, lh: 1.15 })}
 ${text(80, titleBottom + 100, 38, sub, { fill: "#cfcbe8", lh: 1.4 })}
 ${marks}
-${text(80, ART_H - 44, 26, [`Versão ${i.version}  ·  funciona no Claude ou no ChatGPT  ·  por ${i.creatorName}`], { fill: "#a9a4c9" })}`,
+${text(80, ART_H - 44, 26, [`Version ${i.version}  ·  works in Claude or ChatGPT  ·  by ${i.creatorName}`], { fill: "#a9a4c9" })}`,
     false,
   );
 }
@@ -121,7 +127,7 @@ function stepsSlide(i: ArtInput): string {
   const many = i.steps.length >= 3;
   const rows = i.steps.slice(0, 5).map((s) => ({ title: s.title, sub: many ? s.gate.slice(0, 1) : s.gate.slice(0, 4) }));
   let y = 160;
-  const out: string[] = [text(80, y, 56, ["Como funciona"], { weight: 700 })];
+  const out: string[] = [text(80, y, 56, ["How it works"], { weight: 700 })];
   y += 100;
   rows.forEach((r, idx) => {
     const t = wrap(r.title, charsFor(1160, 34), 2);
@@ -136,7 +142,7 @@ function stepsSlide(i: ArtInput): string {
     }
     y += rows.length >= 5 ? 64 : many ? 78 : 70;
   });
-  return frame(i, "O método", out.join(""));
+  return frame(i, "The method", out.join(""));
 }
 
 function beforeAfterSlide(i: ArtInput): string {
@@ -144,21 +150,21 @@ function beforeAfterSlide(i: ArtInput): string {
   const prompt = wrap(`“${truncate(ex.prompt, 150)}”`, charsFor(1280, 28), 2);
   const colW = 600;
   const cols = [
-    { x: 80, head: "Sem o Solver", color: "#fb7185", body: truncate(ex.withoutSolver, 300) },
-    { x: 760, head: "Com o Solver", color: "#34d399", body: truncate(ex.withSolver, 380) },
+    { x: 80, head: "Without the Solver", color: "#fb7185", body: truncate(ex.withoutSolver, 300) },
+    { x: 760, head: "With the Solver", color: "#34d399", body: truncate(ex.withSolver, 380) },
   ];
-  const out: string[] = [text(80, 150, 40, ["Um exemplo real do criador"], { weight: 700 }), text(80, 215, 28, prompt, { fill: "#cfcbe8", lh: 1.3 })];
+  const out: string[] = [text(80, 150, 40, ["A real example from the creator"], { weight: 700 }), text(80, 215, 28, prompt, { fill: "#cfcbe8", lh: 1.3 })];
   for (const c of cols) {
     out.push(`<rect x="${c.x}" y="300" rx="24" ry="24" width="${colW}" height="480" fill="#ffffff" fill-opacity="0.06" stroke="${c.color}" stroke-opacity="0.6"/>`);
     out.push(text(c.x + 32, 354, 28, [c.head], { fill: c.color, weight: 700 }));
     out.push(text(c.x + 32, 410, 25, wrap(c.body, charsFor(colW - 64, 25), 11), { fill: "#e6e3f7", lh: 1.35 }));
   }
-  return frame(i, "Antes e depois", out.join(""));
+  return frame(i, "Before and after", out.join(""));
 }
 
 function contentsSlide(i: ArtInput): string {
   let y = 160;
-  const out: string[] = [text(80, y, 56, ["O que vem no pacote"], { weight: 700 })];
+  const out: string[] = [text(80, y, 56, ["What's in the package"], { weight: 700 })];
   y += 84;
   for (const item of i.packageContents.slice(0, 7)) {
     const lines = wrap(item, charsFor(1180, 30), 2);
@@ -166,7 +172,7 @@ function contentsSlide(i: ArtInput): string {
     out.push(text(146, y, 30, lines, { lh: 1.25 }));
     y += (lines.length - 1) * 37 + 76;
   }
-  return frame(i, "Conteúdo", out.join(""));
+  return frame(i, "Contents", out.join(""));
 }
 
 /** Os cartões de galeria de um especialista, na ordem em que devem aparecer (a capa primeiro). */

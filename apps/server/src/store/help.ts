@@ -26,7 +26,7 @@ helpRouter.post(
       .from(schema.escalations)
       .where(and(eq(schema.escalations.wallet, wallet), gt(schema.escalations.createdAt, new Date(Date.now() - 3600_000))));
     if (n >= HELP_PER_HOUR) {
-      throw new HttpError(429, "Você já enviou alguns pedidos agora há pouco. Aguarde uma hora ou espere a resposta.", "rate_limited");
+      throw new HttpError(429, "You've already sent a few requests a moment ago. Wait an hour or wait for the reply.", "rate_limited");
     }
 
     const { protocol, notified } = await escalate(wallet, agent.id, null, buildHelpSummary(message, contact || undefined));
