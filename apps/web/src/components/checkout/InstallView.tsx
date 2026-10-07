@@ -2,7 +2,7 @@
 // Instalação guiada (design: instalacao-guiada). Endereço único do conector (getConfig().connectorUrl),
 // passo a passo para Claude e ChatGPT e checklist com o teste real da conexão (getConnector()).
 import type { AgentDetail, ConnectorStatus } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -369,7 +369,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                 {agent && trial?.owned ? (
                   <div className="tiny faint" style={{ marginTop: 4 }}>
                     Depois de usar,{" "}
-                    <Link className="link" href={`/especialistas/${agent.slug}#avaliar`}>
+                    <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
                       conte como foi
                     </Link>
                     .
@@ -389,7 +389,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                       peça ajuda a {creator.name}
                     </button>
                   ) : (
-                    <Link className="link" href={`/criadores/${creator.id}`}>
+                    <Link className="link" href={`/creators/${creator.id}`}>
                       veja quem é {creator.name}
                     </Link>
                   )}
@@ -397,7 +397,7 @@ export function InstallView({ detail }: { detail: AgentDetail | null }) {
                 </>
               ) : (
                 <>
-                  Travou em algum passo? Confira se o endereço do passo 1 foi colado inteiro e se você autorizou com a mesma conta. <Link className="link" href="/biblioteca">Ver minha biblioteca</Link>
+                  Travou em algum passo? Confira se o endereço do passo 1 foi colado inteiro e se você autorizou com a mesma conta. <Link className="link" href="/library">Ver minha biblioteca</Link>
                 </>
               )}
             </span>

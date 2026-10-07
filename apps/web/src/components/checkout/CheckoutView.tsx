@@ -3,8 +3,8 @@
 // Entrar → (garantia: descrever a tarefa) → forma de pagamento (saldo em USDC ou Pix) → revisar e pagar.
 // Com `listing` é a compra de uma licença usada do mercado de revenda (/checkout?listing=<licença>): só saldo em USDC.
 import type { AgentDetail, GuaranteeStatus, PixCharge, ResaleListing, SodaxQuote } from "@solvers/api-client";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { SwitchAccount } from "@/components/layout/SwitchAccount";
 import { Button } from "@/components/ui/Button";
@@ -168,7 +168,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
     const paid = typeof meta.priceUsdc === "number" ? meta.priceUsdc : typeof meta.totalUsdc === "number" ? meta.totalUsdc : total;
     q.set("usdc", String(paid));
     if (r.explorerUrl) q.set("explorer", r.explorerUrl);
-    router.push(`/checkout/concluido?${q}`);
+    router.push(`/checkout/done?${q}`);
   }, [tx, isG, listing, listingPrice, api, agent.id, agent.slug, title, desc, deliveryDays, total, router, loadAccount]);
 
   const chargeWalletRef = useRef(chargeWallet);
@@ -331,7 +331,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
   return (
     <>
       <div className="wrap" style={{ paddingTop: 28 }}>
-        <Link className="link-btn" href={isR ? "/revenda" : `/especialistas/${agent.slug}`}>
+        <Link className="link-btn" href={isR ? "/resale" : `/solvers/${agent.slug}`}>
           <Icon name="arrow-left" size="s" />
           {isR ? "Voltar para o mercado de revenda" : "Voltar para o especialista"}
         </Link>
@@ -382,10 +382,10 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 title="Você já tem este especialista"
                 actions={
                   <>
-                    <Button size="sm" href={`/instalar?agent=${agent.slug}`}>
+                    <Button size="sm" href={`/install?agent=${agent.slug}`}>
                       Conectar à minha IA
                     </Button>
-                    <Button size="sm" variant="secondary" href="/biblioteca">
+                    <Button size="sm" variant="secondary" href="/library">
                       Ver minha biblioteca
                     </Button>
                   </>
@@ -402,11 +402,11 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 title="Acabaram as vagas"
                 actions={
                   config?.resaleEnabled ? (
-                    <Button size="sm" href="/revenda">
+                    <Button size="sm" href="/resale">
                       Ver licenças usadas
                     </Button>
                   ) : (
-                    <Button size="sm" variant="secondary" href="/especialistas">
+                    <Button size="sm" variant="secondary" href="/solvers">
                       Ver outros especialistas
                     </Button>
                   )
@@ -424,7 +424,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 role="alert"
                 title="Esse anúncio não está mais disponível"
                 actions={
-                  <Button size="sm" href="/revenda">
+                  <Button size="sm" href="/resale">
                     Ver outros anúncios
                   </Button>
                 }
@@ -437,7 +437,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                 tone="info"
                 title="Este anúncio é seu"
                 actions={
-                  <Button size="sm" variant="secondary" href="/biblioteca">
+                  <Button size="sm" variant="secondary" href="/library">
                     Ver minha biblioteca
                   </Button>
                 }
@@ -778,7 +778,7 @@ export function CheckoutView({ detail, type, listing = null }: { detail: AgentDe
                   title={tx.error.title}
                   actions={
                     tx.error.code === "listing_not_found" ? (
-                      <Button size="sm" href="/revenda">
+                      <Button size="sm" href="/resale">
                         Ver outros anúncios
                       </Button>
                     ) : tx.error.action === "faucet" && faucet.enabled ? (

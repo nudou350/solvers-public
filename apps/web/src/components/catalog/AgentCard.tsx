@@ -1,5 +1,5 @@
 import type { Agent } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Stars } from "@/components/ui/Stars";
 import { Tile } from "@/components/ui/Tile";

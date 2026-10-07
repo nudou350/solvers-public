@@ -133,13 +133,13 @@ export function Licenses() {
               <div className="row wrapx" style={{ "--gap": "8px", justifyContent: "flex-end", ...(resaleOn ? { maxWidth: 340 } : {}) } as React.CSSProperties}>
                 {a ? (
                   <>
-                    <Button variant="secondary" href={`/instalar?agent=${encodeURIComponent(a.slug)}`}>
+                    <Button variant="secondary" href={`/install?agent=${encodeURIComponent(a.slug)}`}>
                       Abrir instalação
                     </Button>
                     <Button variant="ghost" icon="star" aria-expanded={reviewing === l.id} onClick={() => setReviewing(reviewing === l.id ? null : l.id)}>
                       Avaliar
                     </Button>
-                    <Button variant="ghost" href={`/especialistas/${encodeURIComponent(a.slug)}`}>
+                    <Button variant="ghost" href={`/solvers/${encodeURIComponent(a.slug)}`}>
                       Ver especialista
                     </Button>
                     {resaleOn ? (

@@ -1,7 +1,7 @@
 "use client";
-// Lista de envios do criador (/criador/envios): cada pacote enviado, em que ponto está e o que falta.
+// Lista de envios do criador (/creator/submissions): cada pacote enviado, em que ponto está e o que falta.
 import type { SubmissionView } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { Ago } from "@/components/ui/Ago";
@@ -78,7 +78,7 @@ export function SubmissionsView() {
 function List({ items }: { items: SubmissionView[] }) {
   if (items.length === 0)
     return (
-      <Empty icon="upload" title="Você ainda não enviou nenhum pacote" action={<Button href="/criador/publicar" iconRight="arrow-right">Publicar especialista</Button>}>
+      <Empty icon="upload" title="Você ainda não enviou nenhum pacote" action={<Button href="/creator/publish" iconRight="arrow-right">Publicar especialista</Button>}>
         Monte o pacote com o Criador de Solvers e envie o ZIP. O andamento aparece aqui.
       </Empty>
     );
@@ -90,7 +90,7 @@ function List({ items }: { items: SubmissionView[] }) {
       <div className="card pad-s" style={{ padding: "8px 24px" }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
           <h2 className="h3">Seus envios</h2>
-          <Button variant="secondary" href="/criador/publicar" icon="plus">
+          <Button variant="secondary" href="/creator/publish" icon="plus">
             Enviar novo pacote
           </Button>
         </div>
@@ -103,7 +103,7 @@ function List({ items }: { items: SubmissionView[] }) {
               <li key={it.id} className="rowline start" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
                 <div className="grow col" style={gap(6, { minWidth: 220 })}>
                   <div className="row wrapx" style={gap(10)}>
-                    <Link className="bold" href={`/criador/envios/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
+                    <Link className="bold" href={`/creator/submissions/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                       <Untrusted>{it.name || it.slug}</Untrusted>
                     </Link>
                     <span className="tiny faint">v{it.version}</span>
@@ -115,7 +115,7 @@ function List({ items }: { items: SubmissionView[] }) {
                     {errors ? ` · ${errors} ${errors === 1 ? "erro" : "erros"}` : ""}
                   </span>
                 </div>
-                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/criador/envios/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={`${act ?? "Ver detalhes"}: $<Untrusted>{it.name || it.slug}</Untrusted>`}>
+                <Button variant={act ? "primary" : "secondary"} size="sm" href={`/creator/submissions/${encodeURIComponent(it.id)}`} iconRight="arrow-right" aria-label={`${act ?? "Ver detalhes"}: $<Untrusted>{it.name || it.slug}</Untrusted>`}>
                   {act ?? "Ver detalhes"}
                 </Button>
               </li>

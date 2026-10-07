@@ -6,7 +6,7 @@ export function ListingMissing({ reason }: { reason: "gone" | "disabled" | "unav
   return (
     <section className="wrap" style={{ paddingTop: 56, paddingBottom: 72 }}>
       {reason === "unavailable" ? (
-        <Empty icon="warning" title="Não deu para carregar o anúncio" action={<Button href="/revenda">Ver o mercado de revenda</Button>}>
+        <Empty icon="warning" title="Não deu para carregar o anúncio" action={<Button href="/resale">Ver o mercado de revenda</Button>}>
           O servidor não respondeu agora. Tente de novo em instantes.
         </Empty>
       ) : reason === "disabled" ? (
@@ -14,7 +14,7 @@ export function ListingMissing({ reason }: { reason: "gone" | "disabled" | "unav
           O mercado de revenda está fechado por enquanto. Você ainda pode comprar a licença de um especialista novo.
         </Empty>
       ) : (
-        <Empty icon="tag" title="Esse anúncio não está mais disponível" action={<Button href="/revenda">Ver outros anúncios</Button>}>
+        <Empty icon="tag" title="Esse anúncio não está mais disponível" action={<Button href="/resale">Ver outros anúncios</Button>}>
           Ele foi vendido, cancelado ou mudou. Nada foi cobrado.
         </Empty>
       )}

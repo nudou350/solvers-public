@@ -10,8 +10,8 @@ export function creatorMap(list: Creator[]): CreatorMap {
   return Object.fromEntries(list.map((c) => [c.id, { name: c.name, reputationScore: c.reputationScore }]));
 }
 
-export const agentHref = (slug: string) => `/especialistas/${encodeURIComponent(slug)}`;
-export const creatorHref = (id: string) => `/criadores/${encodeURIComponent(id)}`;
+export const agentHref = (slug: string) => `/solvers/${encodeURIComponent(slug)}`;
+export const creatorHref = (id: string) => `/creators/${encodeURIComponent(id)}`;
 
 /** "Nenhuma contestação perdida" / "1 contestação perdida" / "3 contestações perdidas". */
 export function disputesText(n: number): string {

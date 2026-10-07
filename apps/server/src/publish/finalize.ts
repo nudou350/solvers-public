@@ -154,7 +154,7 @@ async function run(id: string, actor: string | undefined, deps: FinalizeDeps): P
     // Erro de conferência tem texto próprio e seguro; qualquer outro (disco, banco) é interno: o criador vê texto fixo.
     const error = e instanceof PublishCheckError ? detail : PUBLISH_FAILED_TEXT;
     await moveSubmission(id, "publishing", "publish_failed", { error });
-    await deps.notifyAdmin(`Solvers: a publicação de ${sub.slug} v${approved.version} falhou: ${detail}\nTente de novo em /admin/revisoes (Concluir).`).catch(() => undefined);
+    await deps.notifyAdmin(`Solvers: a publicação de ${sub.slug} v${approved.version} falhou: ${detail}\nTente de novo em /admin/reviews (Concluir).`).catch(() => undefined);
     return { outcome: "failed", error };
   }
 }

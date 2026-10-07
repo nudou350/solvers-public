@@ -1,9 +1,9 @@
 "use client";
-// Fluxo real de publicação (/criador/publicar), em cinco etapas: entrar, cadastro, montar o pacote, enviar o ZIP, acompanhar.
+// Fluxo real de publicação (/creator/publish), em cinco etapas: entrar, cadastro, montar o pacote, enviar o ZIP, acompanhar.
 // Substitui o assistente de pré-visualização antigo: aqui tudo vai para o servidor (PACKAGE_SPEC.md 14 e 22, fase P8).
 // O estado de cada etapa vem do servidor (GET /creator/me), não de rascunhos locais.
 import type { CreatorMe } from "@solvers/api-client";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -151,7 +151,7 @@ export function PublishFlow() {
 
         {step === 4 && creator ? (
           creator.canSubmit ? (
-            <ZipUploader onDone={(id) => router.push(`/criador/envios/${encodeURIComponent(id)}`)} />
+            <ZipUploader onDone={(id) => router.push(`/creator/submissions/${encodeURIComponent(id)}`)} />
           ) : (
             <div className="col" style={gap(16)}>
               <Notice tone="warn" title="Falta completar o cadastro" actions={<Button variant="secondary" size="sm" onClick={() => go(2)}>Voltar ao cadastro</Button>}>
@@ -232,10 +232,10 @@ function StepBuild({ onNext, canSend }: { onNext: () => void; canSend: boolean }
           Ele conversa com você em sete etapas: a promessa e o público, os diferenciais, o processo, o conhecimento, as ferramentas, a primeira conversa e os casos de teste. No fim, entrega o pacote pronto e já conferido pelo mesmo validador do site.
         </p>
         <div className="row wrapx" style={gap(10)}>
-          <Button href={`/instalar?agent=${CREATOR_SOLVER_SLUG}`} iconRight="arrow-right">
+          <Button href={`/install?agent=${CREATOR_SOLVER_SLUG}`} iconRight="arrow-right">
             Instalar na minha IA
           </Button>
-          <Button variant="secondary" href={`/especialistas/${CREATOR_SOLVER_SLUG}`}>
+          <Button variant="secondary" href={`/solvers/${CREATOR_SOLVER_SLUG}`}>
             Conhecer o Criador de Solvers
           </Button>
         </div>
@@ -265,7 +265,7 @@ function StepBuild({ onNext, canSend }: { onNext: () => void; canSend: boolean }
               </a>
             </li>
             <li>
-              <a className="link" href={`/especialistas/${CREATOR_SOLVER_SLUG}`}>
+              <a className="link" href={`/solvers/${CREATOR_SOLVER_SLUG}`}>
                 Guia completo do formato, dentro do Criador de Solvers
               </a>
             </li>
@@ -296,7 +296,7 @@ function StepTrack() {
       </p>
       <Timeline status="submitted" />
       <div className="row wrapx" style={gap(12)}>
-        <Button size="lg" href="/criador/envios" iconRight="arrow-right">
+        <Button size="lg" href="/creator/submissions" iconRight="arrow-right">
           Ver meus envios
         </Button>
       </div>

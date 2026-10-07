@@ -1,5 +1,5 @@
 "use client";
-// Mercado de revenda (/revenda com a revenda ligada): licenças permanentes à venda por outras pessoas.
+// Mercado de revenda (/resale com a revenda ligada): licenças permanentes à venda por outras pessoas.
 // Os anúncios vêm do servidor (on-chain, via indexer). Nada aqui é de exemplo: sem anúncio, o estado vazio diz isso.
 import type { ResaleListing } from "@solvers/api-client";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -91,7 +91,7 @@ export function ResaleMarket({ listings, rate }: { listings: ResaleListing[]; ra
           title="Nenhuma licença à venda agora"
           action={
             <>
-              <Button href="/biblioteca" variant="secondary" icon="library">
+              <Button href="/library" variant="secondary" icon="library">
                 Ver minha biblioteca
               </Button>
               <Button href="/">Explorar especialistas</Button>

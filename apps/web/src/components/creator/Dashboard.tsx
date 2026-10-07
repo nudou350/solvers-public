@@ -1,6 +1,6 @@
 "use client";
 import type { CreatorDashboard } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { AuthGate } from "@/components/ui/AuthGate";
@@ -28,7 +28,7 @@ const RESULT: Record<Dash["disputes"][number]["result"], { label: string; chip: 
   creator: { label: "Favorável ao criador", chip: "ok", tone: "ok" },
 };
 
-/** Painel do criador (/criador): exige login; sem especialistas publicados, mostra como começar. */
+/** Painel do criador (/creator): exige login; sem especialistas publicados, mostra como começar. */
 export function CreatorDashboardView() {
   const { api, status, me } = useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -56,7 +56,7 @@ export function CreatorDashboardView() {
           title="Entre para ver seu painel"
           text="Vendas, usos, receita e contestações dos seus especialistas ficam aqui."
           actions={
-            <Button variant="secondary" href="/criador/publicar">
+            <Button variant="secondary" href="/creator/publish">
               Como publicar
             </Button>
           }
@@ -126,10 +126,10 @@ function NotCreator({ sharePct }: { sharePct: number }) {
         ))}
       </div>
       <div className="row wrapx" style={gap(12)}>
-        <Button href="/criador/publicar" size="lg" iconRight="arrow-right">
+        <Button href="/creator/publish" size="lg" iconRight="arrow-right">
           Publicar especialista
         </Button>
-        <Button href="/criador/envios" size="lg" variant="secondary">
+        <Button href="/creator/submissions" size="lg" variant="secondary">
           Meus envios
         </Button>
       </div>
@@ -213,7 +213,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
             A reputação sobe com boas notas, testes aprovados e contestações resolvidas a favor do comprador. Contestações perdidas descontam pontos e reduzem a
             visibilidade.
           </p>
-          <Link className="link small" href={`/criadores/${encodeURIComponent(creator.id)}`}>
+          <Link className="link small" href={`/creators/${encodeURIComponent(creator.id)}`}>
             Ver meu perfil público
           </Link>
         </div>
@@ -222,7 +222,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
       <div className="card pad-s" style={{ padding: "8px 24px", marginBottom: 24 }}>
         <div className="row between wrapx" style={{ padding: "14px 0" }}>
           <h2 className="h3">Seus especialistas</h2>
-          <Button variant="secondary" href="/criador/publicar" icon="plus">
+          <Button variant="secondary" href="/creator/publish" icon="plus">
             Publicar novo
           </Button>
         </div>
@@ -248,7 +248,7 @@ function Overview({ data, creator }: { data: Dash; creator: NonNullable<Dash["cr
                   <span className="row" style={gap(12, { minWidth: 0 })}>
                     <Tile category={a.category} size="s" />
                     <span className="col" style={gap(4, { minWidth: 0 })}>
-                      <Link className="trunc bold" href={`/especialistas/${encodeURIComponent(a.slug)}`} style={{ fontWeight: 700 }}>
+                      <Link className="trunc bold" href={`/solvers/${encodeURIComponent(a.slug)}`} style={{ fontWeight: 700 }}>
                         {a.name}
                       </Link>
                       <span className="tiny faint">

@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "title": "Solvers: AI specialists",
+    "description": "AI specialists for the Claude and ChatGPT you already use. Buy once, use anywhere."
+  },
+  "skipToContent": "Skip to content",
+  "notFound": {
+    "title": "Page not found",
+    "home": "Go to home",
+    "body": "This address doesn't match any page on Solvers."
+  },
+  "localeSwitcher": {
+    "label": "Language",
+    "en": "English",
+    "pt": "Português"
+  }
+}

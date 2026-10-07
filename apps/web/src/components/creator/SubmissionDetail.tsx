@@ -1,10 +1,10 @@
 "use client";
-// Detalhe de um envio (/criador/envios/[id]): linha do tempo, erros do validador, recado do revisor e a ação que falta
+// Detalhe de um envio (/creator/submissions/[id]): linha do tempo, erros do validador, recado do revisor e a ação que falta
 // (reenviar corrigido, co-assinar o registro ou a atualização, esperar, ver o especialista no ar).
 import type { SubmissionView } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { Ago } from "@/components/ui/Ago";
@@ -66,13 +66,13 @@ export function SubmissionDetailView({ id }: { id: string }) {
       <CreatorHead tab="submissions" />
       <AuthGate icon="pen" title="Entre para ver este envio" text="Só quem enviou o pacote vê o andamento dele.">
         <div style={{ marginBottom: 16 }}>
-          <Link className="link small" href="/criador/envios">
+          <Link className="link small" href="/creator/submissions">
             <Icon name="arrow-left" size="s" /> Todos os meus envios
           </Link>
         </div>
         {state.kind === "loading" ? <Loading text="Carregando o envio…" /> : null}
         {state.kind === "missing" ? (
-          <Empty icon="search" title="Envio não encontrado" action={<Button href="/criador/envios">Ver meus envios</Button>}>
+          <Empty icon="search" title="Envio não encontrado" action={<Button href="/creator/submissions">Ver meus envios</Button>}>
             Este envio não existe ou não é da sua conta.
           </Empty>
         ) : null}
@@ -144,7 +144,7 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
                 <span className="small muted">Compradores já podem encontrar e usar esta versão.</span>
               </span>
             </span>
-            <Button href={`/especialistas/${encodeURIComponent(sub.slug)}`} iconRight="arrow-right">
+            <Button href={`/solvers/${encodeURIComponent(sub.slug)}`} iconRight="arrow-right">
               Ver o especialista
             </Button>
           </div>
@@ -179,7 +179,7 @@ function Detail({ sub, reload }: { sub: SubmissionView; reload: () => Promise<vo
             <ZipUploader
               resubmit={sub.status === "changes_requested" ? sub.id : undefined}
               action="Enviar pacote corrigido"
-              onDone={(newId) => (newId === sub.id ? void reload() : router.push(`/criador/envios/${encodeURIComponent(newId)}`))}
+              onDone={(newId) => (newId === sub.id ? void reload() : router.push(`/creator/submissions/${encodeURIComponent(newId)}`))}
             />
           </div>
         ) : null}

@@ -1,6 +1,6 @@
 "use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -13,14 +13,14 @@ type NavItem = { href: string; label: string; short: string; icon: IconName };
 
 export const NAV: NavItem[] = [
   { href: "/", label: "Explorar", short: "Explorar", icon: "home" },
-  { href: "/revenda", label: "Revenda", short: "Revenda", icon: "tag" },
-  { href: "/biblioteca", label: "Minha biblioteca", short: "Biblioteca", icon: "library" },
-  { href: "/garantias", label: "Garantias", short: "Garantias", icon: "shield-check" },
-  { href: "/criador", label: "Para criadores", short: "Criador", icon: "pen" },
+  { href: "/resale", label: "Revenda", short: "Revenda", icon: "tag" },
+  { href: "/library", label: "Minha biblioteca", short: "Biblioteca", icon: "library" },
+  { href: "/guarantees", label: "Garantias", short: "Garantias", icon: "shield-check" },
+  { href: "/creator", label: "Para criadores", short: "Criador", icon: "pen" },
 ];
 
 export function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/especialistas") || pathname.startsWith("/criadores");
+  if (href === "/") return pathname === "/" || pathname.startsWith("/solvers") || pathname.startsWith("/creators");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -106,11 +106,11 @@ function Account() {
               <span className="mono">{short(me.wallet)}</span>
             </span>
           </div>
-          <Link href="/perfil">
+          <Link href="/profile">
             <Icon name="user" size="s" />
             Meu perfil
           </Link>
-          <Link href="/biblioteca">
+          <Link href="/library">
             <Icon name="library" size="s" />
             Minha biblioteca
           </Link>

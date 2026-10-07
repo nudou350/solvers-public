@@ -1,8 +1,8 @@
 "use client";
-// Cartão do painel do criador (/criador): envios em andamento. Some sozinho se não há nenhum ou se a lista não carrega
+// Cartão do painel do criador (/creator): envios em andamento. Some sozinho se não há nenhum ou se a lista não carrega
 // (o painel continua útil sem ele).
 import { SUBMISSION_OPEN_STATUSES, type SubmissionView } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
 import { Ago } from "@/components/ui/Ago";
 import { Button } from "@/components/ui/Button";
@@ -36,7 +36,7 @@ export function OpenSubmissions() {
         <h2 className="h3" id="open-subs">
           Envios em andamento
         </h2>
-        <Button variant="secondary" href="/criador/envios">
+        <Button variant="secondary" href="/creator/submissions">
           Ver todos os envios
         </Button>
       </div>
@@ -45,7 +45,7 @@ export function OpenSubmissions() {
           <li key={it.id} className="rowline start" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
             <div className="grow col" style={gap(4, { minWidth: 200 })}>
               <div className="row wrapx" style={gap(10)}>
-                <Link href={`/criador/envios/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
+                <Link href={`/creator/submissions/${encodeURIComponent(it.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                   <Untrusted>{it.name || it.slug}</Untrusted>
                 </Link>
                 <span className="tiny faint">v{it.version}</span>

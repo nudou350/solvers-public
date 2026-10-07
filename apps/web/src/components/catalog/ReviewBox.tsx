@@ -2,7 +2,7 @@
 // Avaliar o especialista (estrelas + texto). Quem chama já sabe que a conta tem a licença; o servidor confere de novo.
 // A avaliação é uma por conta: se já existe, o formulário abre com ela preenchida e "Atualizar" a substitui.
 import { MAX_IMAGE_UPLOAD_BYTES, MAX_REVIEW_IMAGES, type ImageRef } from "@solvers/api-client";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";

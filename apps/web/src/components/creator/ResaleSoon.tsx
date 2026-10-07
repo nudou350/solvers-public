@@ -76,7 +76,7 @@ export function ResaleSoon() {
             </p>
           </div>
           <div>
-            <Button variant="secondary" icon="library" href="/biblioteca">
+            <Button variant="secondary" icon="library" href="/library">
               Ver minha biblioteca
             </Button>
           </div>

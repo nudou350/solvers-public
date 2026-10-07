@@ -42,8 +42,8 @@ export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" 
         aria-label="Seções do painel do criador"
         value={tab}
         tabs={[
-          { id: "overview", label: "Visão geral", href: "/criador" },
-          { id: "submissions", label: "Meus envios", href: "/criador/envios" },
+          { id: "overview", label: "Visão geral", href: "/creator" },
+          { id: "submissions", label: "Meus envios", href: "/creator/submissions" },
           {
             id: "publish",
             label: (
@@ -52,7 +52,7 @@ export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" 
                 Publicar especialista
               </>
             ),
-            href: "/criador/publicar",
+            href: "/creator/publish",
           },
           ...(CLOAK_ENABLED
             ? [
@@ -64,7 +64,7 @@ export function CreatorHead({ tab, reputation, title, name }: { tab: "overview" 
                       Saque privado
                     </>
                   ),
-                  href: "/criador/saque-privado",
+                  href: "/creator/private-withdraw",
                 },
               ]
             : []),

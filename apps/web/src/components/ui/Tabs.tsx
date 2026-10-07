@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 export type TabItem<T extends string = string> = {

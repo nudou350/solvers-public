@@ -115,7 +115,7 @@ storeRouter.get(
       name: row.name,
       symbol: "SOLVER",
       description: row.tagline,
-      external_url: `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/especialistas/${row.slug}`,
+      external_url: `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/solvers/${row.slug}`,
       attributes: [
         { trait_type: "agent_id", value: row.id },
         { trait_type: "category", value: row.category },

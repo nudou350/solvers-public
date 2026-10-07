@@ -1,6 +1,6 @@
 // Uma licença à venda no mercado de revenda (design/screens/mercado-de-revenda.html): cinco colunas no computador, empilhadas no celular.
 import type { ResaleListing } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { agentHref } from "@/components/catalog/data";
 import { Button } from "@/components/ui/Button";
 import { Chip, RepBadge } from "@/components/ui/Chip";

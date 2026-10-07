@@ -1,0 +1,30 @@
+{
+  "ago": { "months": "há {n} meses", "days": "há {n} dias", "yesterday": "ontem", "hours": "há {n} h", "justNow": "agora há pouco" },
+  "countdown": { "releasing": "Liberação automática em andamento", "text": "{h} h {m} min" },
+  "rep": { "ref": "Referência", "trust": "Confiável", "grow": "Em crescimento", "new": "Começando", "low": "Em observação" },
+  "repRange": { "low": "abaixo de 60", "new": "60 a 79", "grow": "80 a 89", "trust": "90 a 94", "ref": "95 a 100" },
+  "guaranteeLevel": { "full": "Completo", "limited": "Limitado", "none": "Sem garantia" },
+  "duration": {
+    "days": "{n, plural, one {# dia} other {# dias}}",
+    "hours": "{n, plural, one {# hora} other {# horas}}",
+    "minutes": "{n, plural, one {# minuto} other {# minutos}}"
+  },
+  "categories": {
+    "desenvolvimento": "Desenvolvimento",
+    "front_end": "Front-end",
+    "back_end": "Back-end",
+    "design": "Design",
+    "juridico": "Contratos simples",
+    "viagens": "Viagens",
+    "dia_a_dia": "Dia a dia",
+    "financas": "Finanças",
+    "escrita": "Escrita",
+    "carreira": "Carreira",
+    "estudos": "Estudos",
+    "dados": "Dados",
+    "negocios": "Negócios",
+    "marketing": "Marketing",
+    "plataforma": "Plataforma",
+    "outros": "Outros"
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 import type { AgentSupply, TrialInfo } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -30,7 +30,7 @@ export type BuyBoxProps = {
 
 /** Caixa da página de um especialista da plataforma: sem preço nem compra, só como instalar. */
 function PlatformBox({ slug }: { slug: string }) {
-  const install = `/instalar?agent=${encodeURIComponent(slug)}`;
+  const install = `/install?agent=${encodeURIComponent(slug)}`;
   return (
     <div className="card" style={{ overflow: "hidden" }}>
       <div className="sol-line" style={{ borderRadius: 0, height: 4 }} />
@@ -80,7 +80,7 @@ function PaidBox(p: BuyBoxProps) {
   const access = useMyAccess(p.slug);
   const price = p.priceBrl != null ? brlValue(p.priceBrl) : brlValue(p.priceUsdc * p.rate);
   const checkout = `/checkout?agent=${encodeURIComponent(p.slug)}&type=permanent`;
-  const install = `/instalar?agent=${encodeURIComponent(p.slug)}`;
+  const install = `/install?agent=${encodeURIComponent(p.slug)}`;
   const owned = !!access?.license;
   const usedHref = p.resale ? `/checkout?listing=${encodeURIComponent(p.resale.listingId)}` : null;
   const trialLeft = p.trial && access ? access.trialUsesLeft : null;
@@ -101,11 +101,11 @@ function PaidBox(p: BuyBoxProps) {
                 <Button href={install} size="sm" iconRight="arrow-right">
                   Ir para a instalação
                 </Button>
-                <Button href="/biblioteca" size="sm" variant="secondary">
+                <Button href="/library" size="sm" variant="secondary">
                   Minha biblioteca
                 </Button>
                 {p.resaleOn ? (
-                  <Button href="/biblioteca" size="sm" variant="ghost" icon="tag">
+                  <Button href="/library" size="sm" variant="ghost" icon="tag">
                     Anunciar minha licença
                   </Button>
                 ) : null}

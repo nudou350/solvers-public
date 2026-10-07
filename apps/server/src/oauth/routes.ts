@@ -37,7 +37,7 @@ export function protectedResourceMetadata() {
     scopes_supported: ["solvers"],
     bearer_methods_supported: ["header"],
     resource_name: "Solvers",
-    resource_documentation: `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/instalar`,
+    resource_documentation: `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/install`,
   };
 }
 
@@ -212,8 +212,8 @@ oauthRouter.get(
     }
     const clientName = client.meta.client_name ?? "Seu assistente de IA";
     const id = await saveAuthRequest({ ...q.data, clientName });
-    // A autorização acontece na vitrine (/conectar), onde o login por e-mail (Privy) e a carteira embutida funcionam.
-    res.redirect(302, `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/conectar?req=${encodeURIComponent(id)}`);
+    // A autorização acontece na vitrine (/connect), onde o login por e-mail (Privy) e a carteira embutida funcionam.
+    res.redirect(302, `${env.PUBLIC_WEB_URL.replace(/\/$/, "")}/connect?req=${encodeURIComponent(id)}`);
   }),
 );
 

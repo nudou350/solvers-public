@@ -42,14 +42,14 @@ async function main() {
       console.log("A publicação já estava concluída.");
       break;
     case "busy":
-      console.log("Outro processo está finalizando esta publicação agora (o servidor, pelo evento da cadeia). Confira o estado em /admin/revisoes.");
+      console.log("Outro processo está finalizando esta publicação agora (o servidor, pelo evento da cadeia). Confira o estado em /admin/reviews.");
       break;
     case "not_ready":
       console.log(`Ainda não dá para publicar: ${f.reason}`);
       process.exitCode = 1;
       break;
     case "failed":
-      console.error(`A finalização falhou (a submissão ficou em publish_failed): ${f.error}\nTente de novo em /admin/revisoes (Concluir) ou rodando este comando outra vez.`);
+      console.error(`A finalização falhou (a submissão ficou em publish_failed): ${f.error}\nTente de novo em /admin/reviews (Concluir) ou rodando este comando outra vez.`);
       process.exitCode = 1;
       break;
   }

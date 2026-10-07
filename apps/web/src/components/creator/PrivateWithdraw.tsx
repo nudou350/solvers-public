@@ -45,7 +45,7 @@ function download(name: string, text: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Painel do saque privado (/criador/saque-privado). Exige login; fala com a rede real por conta própria. */
+/** Painel do saque privado (/creator/private-withdraw). Exige login; fala com a rede real por conta própria. */
 export function PrivateWithdrawView() {
   return (
     <section className="wrap" style={{ paddingTop: 44, paddingBottom: 56 }}>

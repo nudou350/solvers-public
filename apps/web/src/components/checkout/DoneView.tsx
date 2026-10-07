@@ -1,7 +1,7 @@
 "use client";
 // Compra concluída (design: compra-concluida): licença ou tarefa com garantia.
 import type { AgentDetail } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Toast";
@@ -140,7 +140,7 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
                 <Button size="sm" variant="secondary" icon="refresh" onClick={() => setRecheck((n) => n + 1)}>
                   Conferir de novo
                 </Button>
-                <Button size="sm" variant="ghost" href={isEscrow ? "/garantias" : "/biblioteca"}>
+                <Button size="sm" variant="ghost" href={isEscrow ? "/guarantees" : "/library"}>
                   {isEscrow ? "Ver minhas garantias" : "Ver minha biblioteca"}
                 </Button>
               </>
@@ -212,15 +212,15 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
 
         {confirmed ? (
         <div className="row wrapx m-col" style={{ ...gap(12), justifyContent: "center", width: "100%" }}>
-          <Button size="lg" href={`/instalar?agent=${agent.slug}`} iconRight="arrow-right">
+          <Button size="lg" href={`/install?agent=${agent.slug}`} iconRight="arrow-right">
             Conectar à minha IA
           </Button>
           {isEscrow ? (
-            <Button size="lg" variant="secondary" href="/garantias" icon="shield-check">
+            <Button size="lg" variant="secondary" href="/guarantees" icon="shield-check">
               Acompanhar em Garantias
             </Button>
           ) : (
-            <Button size="lg" variant="secondary" href="/biblioteca">
+            <Button size="lg" variant="secondary" href="/library">
               Ver minha biblioteca
             </Button>
           )}
@@ -230,7 +230,7 @@ export function DoneView({ detail, kind, resale = false, sig, escrow, asset, pai
         {confirmed && !isEscrow ? (
           <p className="small muted">
             Depois de usar o especialista, conte como foi:{" "}
-            <Link className="link" href={`/especialistas/${agent.slug}#avaliar`}>
+            <Link className="link" href={`/solvers/${agent.slug}#avaliar`}>
               avaliar o {agent.name}
             </Link>
             .

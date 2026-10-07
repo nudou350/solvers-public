@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Logo } from "./Header";
 
 export function Footer() {
@@ -17,25 +17,25 @@ export function Footer() {
             <Link href="/" className="muted">
               Especialistas
             </Link>
-            <Link href="/revenda" className="muted">
+            <Link href="/resale" className="muted">
               Mercado de revenda
             </Link>
-            <Link href="/garantias" className="muted">
+            <Link href="/guarantees" className="muted">
               Garantias
             </Link>
           </div>
           <div className="col small" style={{ "--gap": "10px" } as React.CSSProperties}>
             <span className="eyebrow">Criadores</span>
-            <Link href="/criador/publicar" className="muted">
+            <Link href="/creator/publish" className="muted">
               Publicar especialista
             </Link>
-            <Link href="/criador" className="muted">
+            <Link href="/creator" className="muted">
               Painel do criador
             </Link>
           </div>
           <div className="col small" style={{ "--gap": "10px" } as React.CSSProperties}>
             <span className="eyebrow">Confiança</span>
-            <Link href="/perfil" className="muted">
+            <Link href="/profile" className="muted">
               Perfil e reputação
             </Link>
             <span className="sol-chip">

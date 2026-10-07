@@ -1,0 +1,30 @@
+{
+  "ago": { "months": "{n} months ago", "days": "{n} days ago", "yesterday": "yesterday", "hours": "{n} h ago", "justNow": "just now" },
+  "countdown": { "releasing": "Automatic release in progress", "text": "{h} h {m} min" },
+  "rep": { "ref": "Reference", "trust": "Trusted", "grow": "Growing", "new": "Getting started", "low": "Under watch" },
+  "repRange": { "low": "below 60", "new": "60 to 79", "grow": "80 to 89", "trust": "90 to 94", "ref": "95 to 100" },
+  "guaranteeLevel": { "full": "Full", "limited": "Limited", "none": "No guarantee" },
+  "duration": {
+    "days": "{n, plural, one {# day} other {# days}}",
+    "hours": "{n, plural, one {# hour} other {# hours}}",
+    "minutes": "{n, plural, one {# minute} other {# minutes}}"
+  },
+  "categories": {
+    "desenvolvimento": "Development",
+    "front_end": "Front-end",
+    "back_end": "Back-end",
+    "design": "Design",
+    "juridico": "Simple contracts",
+    "viagens": "Travel",
+    "dia_a_dia": "Everyday",
+    "financas": "Finance",
+    "escrita": "Writing",
+    "carreira": "Career",
+    "estudos": "Studies",
+    "dados": "Data",
+    "negocios": "Business",
+    "marketing": "Marketing",
+    "plataforma": "Platform",
+    "outros": "Other"
+  }
+}

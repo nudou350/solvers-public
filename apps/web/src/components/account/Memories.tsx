@@ -209,7 +209,7 @@ export function Memories() {
                   <div className="small muted">{g.items.length === 1 ? "1 memória" : `${g.items.length} memórias`}</div>
                 </div>
                 {a ? (
-                  <Button variant="ghost" size="sm" href={`/especialistas/${encodeURIComponent(a.slug)}`} className="hide-m">
+                  <Button variant="ghost" size="sm" href={`/solvers/${encodeURIComponent(a.slug)}`} className="hide-m">
                     Ver especialista
                   </Button>
                 ) : null}

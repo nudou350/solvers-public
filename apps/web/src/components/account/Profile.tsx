@@ -162,7 +162,7 @@ function Inner() {
               </RepBadge>
               <Chip>Garantia {levelText}</Chip>
               {p.creator ? (
-                <Button variant="secondary" size="sm" icon="pen" href="/criador">
+                <Button variant="secondary" size="sm" icon="pen" href="/creator">
                   Painel do criador
                 </Button>
               ) : null}

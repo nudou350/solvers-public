@@ -94,7 +94,7 @@ export function TrialBlock({ slug, trial }: { slug: string; trial: TrialInfo }) 
 
         {owned || (left && left.trialUsesLeft <= 0) ? null : (
           <div>
-            <Button href={`/instalar?agent=${encodeURIComponent(slug)}`} variant="secondary" icon="play">
+            <Button href={`/install?agent=${encodeURIComponent(slug)}`} variant="secondary" icon="play">
               Testar grátis
             </Button>
           </div>

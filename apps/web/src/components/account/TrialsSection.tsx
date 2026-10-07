@@ -77,7 +77,7 @@ function TrialCard({ trial: t, agent: a }: { trial: MyTrial; agent: Agent | unde
       {slug ? (
         <div className="row wrapx" style={gap("8px", { justifyContent: "flex-end" })}>
           {done ? null : (
-            <Button variant="secondary" icon="play" href={`/instalar?agent=${slug}`}>
+            <Button variant="secondary" icon="play" href={`/install?agent=${slug}`}>
               Continuar testando
             </Button>
           )}

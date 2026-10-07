@@ -1,7 +1,7 @@
 "use client";
-// Fila de revisão (/admin/revisoes). Todo texto que vem do criador (nome, slug) entra como texto escapado, sem links.
+// Fila de revisão (/admin/reviews). Todo texto que vem do criador (nome, slug) entra como texto escapado, sem links.
 import type { AdminSubmissionRow, SubmissionStatus } from "@solvers/api-client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { StatusChip } from "@/components/creator/SubmissionParts";
 import creator from "@/components/creator/creator.module.css";
@@ -103,7 +103,7 @@ function Queue() {
               return (
                 <li key={r.id} className={creator.queueRow}>
                   <div className="col" style={gap(4, { minWidth: 0 })}>
-                    <Link href={`/admin/revisoes/${encodeURIComponent(r.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
+                    <Link href={`/admin/reviews/${encodeURIComponent(r.id)}`} style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                       <Untrusted>{r.name || r.slug}</Untrusted>
                     </Link>
                     <span className="tiny faint" style={{ overflowWrap: "anywhere" }}>
@@ -136,7 +136,7 @@ function Queue() {
                       </span>
                     ) : null}
                   </div>
-                  <Button variant="secondary" size="sm" href={`/admin/revisoes/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={`Revisar ${untrusted(r.name || r.slug)}`}>
+                  <Button variant="secondary" size="sm" href={`/admin/reviews/${encodeURIComponent(r.id)}`} iconRight="arrow-right" aria-label={`Revisar ${untrusted(r.name || r.slug)}`}>
                     Revisar
                   </Button>
                 </li>
