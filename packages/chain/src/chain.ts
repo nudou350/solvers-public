@@ -1051,7 +1051,7 @@ export class SolversChain {
     try {
       split = resaleSplit(listing.price, listing.royaltyBps, listing.feeBps);
     } catch {
-      throw new ResaleError(RESALE_ERROR_CODES.cutTooHigh, "Este anúncio não pode ser comprado: royalty mais taxa passam do teto.");
+      throw new ResaleError(RESALE_ERROR_CODES.cutTooHigh, "This listing can't be bought: the royalty plus the fee is above the allowed limit.");
     }
     const ix = await gen.getBuyListingInstructionAsync({
       payer: this.feePayer,

@@ -1,87 +1,87 @@
 import * as gen from "@solvers/client";
 
 /**
- * Mensagens (para quem usa a plataforma, sem jargão) de CADA erro do programa. A lista de erros vem do
+ * Mensagens (para quem usa a plataforma, sem jargão) de CADA erro do programa, em inglês. A lista de erros vem do
  * cliente gerado (`SOLVERS_ERROR__*`); `satisfies Record<SolversError, string>` quebra o typecheck e o teste
  * `program-errors.test.ts` falha se um erro novo do programa ficar sem texto.
  */
 export const PROGRAM_ERROR_MESSAGES = {
-  [gen.SOLVERS_ERROR__NOT_ADMIN]: "Só a administração da plataforma pode fazer isso.",
-  [gen.SOLVERS_ERROR__NOT_VERIFIER]: "Só o verificador da plataforma pode fazer isso.",
-  [gen.SOLVERS_ERROR__NOT_USAGE_AUTHORITY]: "Esta ação só pode ser feita pelo sistema da plataforma.",
-  [gen.SOLVERS_ERROR__NOT_CREATOR]: "Só o criador deste especialista pode fazer isso.",
-  [gen.SOLVERS_ERROR__AGENT_NOT_ACTIVE]: "Este especialista ainda não está disponível para compra.",
-  [gen.SOLVERS_ERROR__AGENT_NOT_PENDING]: "Este especialista não está aguardando aprovação.",
-  [gen.SOLVERS_ERROR__STRING_TOO_LONG]: "Algum texto passou do tamanho permitido. Encurte e tente de novo.",
-  [gen.SOLVERS_ERROR__INVALID_BPS]: "Uma porcentagem informada é inválida. Confira os valores e tente de novo.",
-  [gen.SOLVERS_ERROR__PRICE_TOO_LOW]: "O preço está abaixo do mínimo da plataforma.",
-  [gen.SOLVERS_ERROR__PAY_PER_USE_DISABLED]: "Este especialista não aceita pagamento por uso. Compre a licença para usá-lo.",
-  [gen.SOLVERS_ERROR__INVALID_AMOUNT]: "A quantidade ou o valor informado é inválido. Confira e tente de novo.",
-  [gen.SOLVERS_ERROR__NO_CREDITS]: "Seus créditos acabaram.",
-  [gen.SOLVERS_ERROR__INVALID_RATING]: "A nota deve ser de 1 a 5.",
-  [gen.SOLVERS_ERROR__NO_LICENSE]: "Você precisa ter a licença deste especialista para avaliar.",
+  [gen.SOLVERS_ERROR__NOT_ADMIN]: "Only the platform administrators can do this.",
+  [gen.SOLVERS_ERROR__NOT_VERIFIER]: "Only the platform verifier can do this.",
+  [gen.SOLVERS_ERROR__NOT_USAGE_AUTHORITY]: "This action can only be performed by the platform's system.",
+  [gen.SOLVERS_ERROR__NOT_CREATOR]: "Only the creator of this solver can do this.",
+  [gen.SOLVERS_ERROR__AGENT_NOT_ACTIVE]: "This solver isn't available for purchase yet.",
+  [gen.SOLVERS_ERROR__AGENT_NOT_PENDING]: "This solver isn't waiting for approval.",
+  [gen.SOLVERS_ERROR__STRING_TOO_LONG]: "Some text is longer than allowed. Shorten it and try again.",
+  [gen.SOLVERS_ERROR__INVALID_BPS]: "A percentage you entered is invalid. Check the values and try again.",
+  [gen.SOLVERS_ERROR__PRICE_TOO_LOW]: "The price is below the platform minimum.",
+  [gen.SOLVERS_ERROR__PAY_PER_USE_DISABLED]: "This solver doesn't accept pay-per-use. Buy the license to use it.",
+  [gen.SOLVERS_ERROR__INVALID_AMOUNT]: "The quantity or amount you entered is invalid. Check it and try again.",
+  [gen.SOLVERS_ERROR__NO_CREDITS]: "You've run out of credits.",
+  [gen.SOLVERS_ERROR__INVALID_RATING]: "The rating must be from 1 to 5.",
+  [gen.SOLVERS_ERROR__NO_LICENSE]: "You need a license for this solver to review it.",
   [gen.SOLVERS_ERROR__INVALID_TOKEN_ACCOUNT]:
-    "A conta de saldo em USDC não é válida para esta operação. Atualize a página e tente de novo; se continuar, fale com o suporte.",
-  [gen.SOLVERS_ERROR__INVALID_LICENSE_ACCOUNT]: "A licença informada não é válida para este especialista. Atualize a página e tente de novo.",
-  [gen.SOLVERS_ERROR__INVALID_MILESTONES]: "O número de etapas é inválido: use de 1 a 5 etapas.",
-  [gen.SOLVERS_ERROR__INVALID_MILESTONE_INDEX]: "Esta etapa não existe nesta garantia.",
-  [gen.SOLVERS_ERROR__INVALID_MILESTONE_STATUS]: "Esta etapa não está no estado certo para esta ação.",
-  [gen.SOLVERS_ERROR__AUTO_RELEASE_NOT_REACHED]: "Ainda não chegou o prazo de liberação automática.",
-  [gen.SOLVERS_ERROR__DISPUTE_WINDOW_CLOSED]: "O prazo para contestar esta etapa já passou.",
-  [gen.SOLVERS_ERROR__NOT_BUYER]: "Só quem criou esta garantia pode fazer isso.",
-  [gen.SOLVERS_ERROR__BUYER_NOT_ELIGIBLE]: "Sua conta não pode abrir novas garantias no momento.",
-  [gen.SOLVERS_ERROR__INSUFFICIENT_STAKE]: "O depósito de segurança do criador é insuficiente para esta operação.",
-  [gen.SOLVERS_ERROR__MATH_OVERFLOW]: "O valor informado é grande demais. Use um valor menor.",
-  [gen.SOLVERS_ERROR__INVALID_REVIEW_WINDOW]: "O prazo de revisão informado é inválido.",
-  [gen.SOLVERS_ERROR__PRICE_CHANGED]: "O preço mudou. Atualize a página para ver o novo valor e tente de novo.",
-  [gen.SOLVERS_ERROR__LICENSE_ALREADY_REVIEWED]: "Você já avaliou este especialista com esta licença.",
-  [gen.SOLVERS_ERROR__INVALID_DELIVERY_DAYS]: "O prazo de entrega é inválido: escolha até 60 dias.",
-  [gen.SOLVERS_ERROR__DELIVERY_DEADLINE_NOT_REACHED]: "O prazo de entrega ainda não terminou.",
-  [gen.SOLVERS_ERROR__DISPUTE_SLA_NOT_REACHED]: "O prazo para julgar esta contestação ainda não terminou.",
-  [gen.SOLVERS_ERROR__FEE_TOO_HIGH]: "A taxa informada passa do limite permitido pela plataforma.",
-  [gen.SOLVERS_ERROR__NOT_RENT_PAYER]: "Só quem pagou a abertura desta garantia pode encerrá-la.",
-  [gen.SOLVERS_ERROR__STALE_DISPUTE_NEEDS_JUDGMENT]: "Esta etapa já foi entregue e contestada: só a administração da plataforma pode julgar.",
+    "Your USDC balance account isn't valid for this operation. Refresh the page and try again; if it keeps happening, contact support.",
+  [gen.SOLVERS_ERROR__INVALID_LICENSE_ACCOUNT]: "The license provided isn't valid for this solver. Refresh the page and try again.",
+  [gen.SOLVERS_ERROR__INVALID_MILESTONES]: "The number of milestones is invalid: use 1 to 5 milestones.",
+  [gen.SOLVERS_ERROR__INVALID_MILESTONE_INDEX]: "This milestone doesn't exist in this guarantee.",
+  [gen.SOLVERS_ERROR__INVALID_MILESTONE_STATUS]: "This milestone isn't in the right state for this action.",
+  [gen.SOLVERS_ERROR__AUTO_RELEASE_NOT_REACHED]: "The automatic release deadline hasn't arrived yet.",
+  [gen.SOLVERS_ERROR__DISPUTE_WINDOW_CLOSED]: "The deadline to dispute this milestone has passed.",
+  [gen.SOLVERS_ERROR__NOT_BUYER]: "Only the person who created this guarantee can do this.",
+  [gen.SOLVERS_ERROR__BUYER_NOT_ELIGIBLE]: "Your account can't open new guarantees right now.",
+  [gen.SOLVERS_ERROR__INSUFFICIENT_STAKE]: "The creator's security deposit isn't enough for this operation.",
+  [gen.SOLVERS_ERROR__MATH_OVERFLOW]: "The amount you entered is too large. Use a smaller amount.",
+  [gen.SOLVERS_ERROR__INVALID_REVIEW_WINDOW]: "The review period you entered is invalid.",
+  [gen.SOLVERS_ERROR__PRICE_CHANGED]: "The price changed. Refresh the page to see the new price and try again.",
+  [gen.SOLVERS_ERROR__LICENSE_ALREADY_REVIEWED]: "You've already reviewed this solver with this license.",
+  [gen.SOLVERS_ERROR__INVALID_DELIVERY_DAYS]: "The delivery deadline is invalid: choose up to 60 days.",
+  [gen.SOLVERS_ERROR__DELIVERY_DEADLINE_NOT_REACHED]: "The delivery deadline hasn't passed yet.",
+  [gen.SOLVERS_ERROR__DISPUTE_SLA_NOT_REACHED]: "The time to rule on this dispute hasn't ended yet.",
+  [gen.SOLVERS_ERROR__FEE_TOO_HIGH]: "The fee you entered is above the limit the platform allows.",
+  [gen.SOLVERS_ERROR__NOT_RENT_PAYER]: "Only whoever paid to open this guarantee can close it.",
+  [gen.SOLVERS_ERROR__STALE_DISPUTE_NEEDS_JUDGMENT]: "This milestone was already delivered and disputed: only the platform administrators can rule on it.",
   // Operação do admin (rotação de administrador): o texto é para quem opera a plataforma.
   [gen.SOLVERS_ERROR__NOT_PENDING_ADMIN]:
-    "Só a conta indicada na proposta pode aceitar a troca de administrador. Assine com a chave do novo administrador, ou peça ao administrador atual para propor de novo com a conta certa.",
+    "Only the account named in the proposal can accept the administrator change. Sign with the new administrator's key, or ask the current administrator to propose it again with the right account.",
   [gen.SOLVERS_ERROR__INVALID_NEW_ADMIN]:
-    "O novo administrador é inválido: não pode ser o endereço vazio nem o próprio administrador atual. Confira o endereço e tente de novo.",
+    "The new administrator is invalid: it can't be the empty address or the current administrator. Check the address and try again.",
   // Pausa de emergência. `Paused` pode chegar a qualquer pessoa que compre ou pague: texto para leigo, sem prometer prazo.
   [gen.SOLVERS_ERROR__PAUSED]:
-    "Esta operação está temporariamente pausada por segurança. Tente de novo mais tarde; o que você já contratou continua valendo.",
+    "This operation is temporarily paused for safety. Try again later; what you've already purchased remains valid.",
   // Saída de stake e confisco. `AgentRetired` pode chegar a quem usa a plataforma: texto para leigo; os demais são de operação.
-  [gen.SOLVERS_ERROR__AGENT_RETIRED]: "Este especialista foi aposentado pelo criador e não está mais à venda.",
-  [gen.SOLVERS_ERROR__AGENT_NOT_RETIRED]: "Este especialista não pediu saída do depósito de segurança: só quem está aposentado pode sacar ou estender a espera.",
-  [gen.SOLVERS_ERROR__STAKE_EXIT_NOT_REACHED]: "A espera de 30 dias para sacar o depósito de segurança ainda não terminou.",
-  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENSIONS_EXHAUSTED]: "A espera do saque já foi estendida duas vezes, o máximo permitido.",
-  [gen.SOLVERS_ERROR__SLASH_PENDING]: "Há uma proposta de confisco em andamento para este especialista: o saque do depósito fica travado até ela ser cancelada ou executada.",
-  [gen.SOLVERS_ERROR__SLASH_DELAY_NOT_REACHED]: "A espera de 72 horas do confisco ainda não terminou.",
-  [gen.SOLVERS_ERROR__SLASH_ALREADY_CONTESTED]: "Esta proposta de confisco já foi contestada pelo criador.",
+  [gen.SOLVERS_ERROR__AGENT_RETIRED]: "This solver was retired by its creator and is no longer for sale.",
+  [gen.SOLVERS_ERROR__AGENT_NOT_RETIRED]: "This solver hasn't requested a security deposit withdrawal: only retired solvers can withdraw or extend the waiting period.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_NOT_REACHED]: "The 30-day wait to withdraw the security deposit hasn't ended yet.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENSIONS_EXHAUSTED]: "The withdrawal wait has already been extended twice, the maximum allowed.",
+  [gen.SOLVERS_ERROR__SLASH_PENDING]: "There is a forfeiture proposal in progress for this solver: the deposit withdrawal is locked until it is canceled or carried out.",
+  [gen.SOLVERS_ERROR__SLASH_DELAY_NOT_REACHED]: "The 72-hour wait for the forfeiture hasn't ended yet.",
+  [gen.SOLVERS_ERROR__SLASH_ALREADY_CONTESTED]: "This forfeiture proposal has already been contested by the creator.",
   // Teto de licenças. `SoldOut` chega a quem compra: texto para leigo; os outros dois são do criador.
-  [gen.SOLVERS_ERROR__SOLD_OUT]: "Esgotado: todas as licenças deste especialista já foram vendidas.",
-  [gen.SOLVERS_ERROR__SUPPLY_CAP_TOO_LOW]: "O limite de licenças precisa ser de pelo menos 1 e não pode ficar abaixo do que já foi vendido.",
-  [gen.SOLVERS_ERROR__SUPPLY_CAP_CANNOT_DECREASE]: "O limite de licenças só pode aumentar, nunca diminuir.",
-  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENDED]: "O admin estendeu a espera da saída; não dá para cancelar agora.",
-  [gen.SOLVERS_ERROR__SLASH_EXPIRED]: "A proposta de confisco venceu (72 horas mais 14 dias) e não pode mais ser executada; ela só pode ser cancelada.",
-  [gen.SOLVERS_ERROR__SLASH_NOT_EXPIRED]: "A proposta de confisco ainda não venceu: antes disso só o admin pode cancelá-la.",
+  [gen.SOLVERS_ERROR__SOLD_OUT]: "Sold out: all the licenses currently available for this solver have been sold.",
+  [gen.SOLVERS_ERROR__SUPPLY_CAP_TOO_LOW]: "The license limit must be at least 1 and can't be below the number already sold.",
+  [gen.SOLVERS_ERROR__SUPPLY_CAP_CANNOT_DECREASE]: "The license limit can only be increased, never decreased.",
+  [gen.SOLVERS_ERROR__STAKE_EXIT_EXTENDED]: "The admin extended the exit wait; it can't be canceled now.",
+  [gen.SOLVERS_ERROR__SLASH_EXPIRED]: "The forfeiture proposal expired (72 hours plus 14 days) and can no longer be carried out; it can only be canceled.",
+  [gen.SOLVERS_ERROR__SLASH_NOT_EXPIRED]: "The forfeiture proposal hasn't expired yet: until then only the admin can cancel it.",
   // Operações de admin (migração da configuração, pausa e guardian): o texto é para quem opera a plataforma.
-  [gen.SOLVERS_ERROR__CONFIG_ALREADY_MIGRATED]: "A configuração da plataforma já está no formato atual: não há nada a migrar.",
-  [gen.SOLVERS_ERROR__INVALID_PAUSE_FLAGS]: "Valor de pausa inválido: use apenas os bits 1 (entradas) e 2 (pagamentos), ou 0 para liberar tudo.",
-  [gen.SOLVERS_ERROR__NOT_PAUSE_AUTHORITY]: "Só a administração ou o guardian da plataforma pode alterar a pausa.",
-  [gen.SOLVERS_ERROR__GUARDIAN_CANNOT_UNPAUSE]: "O guardian só pode ligar a pausa; liberar de novo é da administração da plataforma.",
+  [gen.SOLVERS_ERROR__CONFIG_ALREADY_MIGRATED]: "The platform configuration is already in the current format: there is nothing to migrate.",
+  [gen.SOLVERS_ERROR__INVALID_PAUSE_FLAGS]: "Invalid pause value: use only bits 1 (new purchases) and 2 (payments), or 0 to release everything.",
+  [gen.SOLVERS_ERROR__NOT_PAUSE_AUTHORITY]: "Only the platform administrators or the guardian can change the pause.",
+  [gen.SOLVERS_ERROR__GUARDIAN_CANNOT_UNPAUSE]: "The guardian can only turn the pause on; releasing it again is up to the platform administrators.",
   // Revenda de licenças. Os textos chegam a quem compra ou anuncia: linguagem simples, sem jargão.
-  [gen.SOLVERS_ERROR__SELF_PURCHASE]: "Você não pode comprar a sua própria licença anunciada.",
-  [gen.SOLVERS_ERROR__LISTING_MISMATCH]: "Este anúncio não é desta licença ou deste especialista. Atualize a página e tente de novo.",
+  [gen.SOLVERS_ERROR__SELF_PURCHASE]: "You can't buy your own listed license.",
+  [gen.SOLVERS_ERROR__LISTING_MISMATCH]: "This listing isn't for this license or this solver. Refresh the page and try again.",
   [gen.SOLVERS_ERROR__RESALE_CUT_TOO_HIGH]:
-    "O royalty do criador somado à taxa da plataforma passa de 50% do preço, então esta licença não pode ser anunciada agora. Fale com o suporte.",
-  [gen.SOLVERS_ERROR__NOT_ASSET_OWNER]: "Esta licença não está mais na sua carteira.",
-  [gen.SOLVERS_ERROR__ASSET_NOT_IN_COLLECTION]: "Esta licença não pertence a este especialista.",
-  [gen.SOLVERS_ERROR__LISTING_STILL_VALID]: "Este anúncio ainda está valendo: só quem o publicou pode cancelá-lo.",
-  [gen.SOLVERS_ERROR__CREATOR_CANNOT_RESELL]: "O criador não pode revender licenças do próprio especialista.",
+    "The creator's royalty plus the platform fee is more than 50% of the price, so this license can't be listed right now. Contact support.",
+  [gen.SOLVERS_ERROR__NOT_ASSET_OWNER]: "This license is no longer in your wallet.",
+  [gen.SOLVERS_ERROR__ASSET_NOT_IN_COLLECTION]: "This license doesn't belong to this solver.",
+  [gen.SOLVERS_ERROR__LISTING_STILL_VALID]: "This listing is still active: only the person who posted it can cancel it.",
+  [gen.SOLVERS_ERROR__CREATOR_CANNOT_RESELL]: "Creators can't resell licenses of their own solver.",
   [gen.SOLVERS_ERROR__LISTING_NOT_AUTHORIZED]:
-    "Este anúncio não vale mais: a licença mudou de carteira ou a venda foi desautorizada. Atualize a página.",
+    "This listing is no longer valid: the license changed wallets or the sale was no longer authorized. Refresh the page.",
   [gen.SOLVERS_ERROR__CANCEL_PAYER_MISMATCH]:
-    "Não foi possível cancelar por esta via: a taxa da transação precisa ser paga pela plataforma. Atualize a página e tente de novo.",
+    "This can't be canceled this way: the transaction fee must be paid by the platform. Refresh the page and try again.",
 } satisfies Record<gen.SolversError, string>;
 
 const MESSAGES: Readonly<Record<number, string>> = PROGRAM_ERROR_MESSAGES;
@@ -122,7 +122,7 @@ export function programErrorMessage(code: number): string | null {
 
 /** Texto para um código do programa sem mensagem (erro novo ainda sem texto): nunca devolve vazio. */
 export function unknownProgramErrorMessage(code: number): string {
-  return `A operação foi recusada (código ${code}). Atualize a página e tente de novo; se continuar, fale com o suporte.`;
+  return `The operation was refused (code ${code}). Refresh the page and try again; if it keeps happening, contact support.`;
 }
 
 
@@ -131,14 +131,14 @@ const ANCHOR_NAME = /Error Code: (\w+)\. Error Number: \d+/;
 const TOKEN_PROGRAMS: ReadonlySet<string> = new Set(["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]);
 /** Erro `InsufficientFunds` do token program (Custom 1): o saldo de USDC não cobre o valor. */
 const TOKEN_INSUFFICIENT_FUNDS = 1;
-const INSUFFICIENT_FUNDS_MESSAGE = "Saldo de USDC insuficiente.";
+const INSUFFICIENT_FUNDS_MESSAGE = "Insufficient USDC balance.";
 
-const ANCHOR_GENERIC = "Uma das contas desta operação não está como esperada. Atualize a página e tente de novo; se continuar, fale com o suporte.";
+const ANCHOR_GENERIC = "One of the accounts for this operation isn't as expected. Refresh the page and try again; if it keeps happening, contact support.";
 /** Erros do framework Anchor (constraints, contas) por nome, em linguagem simples. Nome fora da lista usa o texto genérico. */
 const ANCHOR_MESSAGES: Readonly<Record<string, string>> = {
-  AccountNotInitialized: "Uma conta necessária ainda não existe (por exemplo, a de saldo em USDC). Atualize a página e tente de novo.",
-  ConstraintTokenOwner: "A conta de saldo em USDC não pertence a esta carteira. Atualize a página e tente de novo.",
-  ConstraintTokenMint: "A conta de saldo informada não é de USDC. Atualize a página e tente de novo.",
+  AccountNotInitialized: "A required account doesn't exist yet (for example, the USDC balance account). Refresh the page and try again.",
+  ConstraintTokenOwner: "The USDC balance account doesn't belong to this wallet. Refresh the page and try again.",
+  ConstraintTokenMint: "The balance account provided isn't a USDC account. Refresh the page and try again.",
   ConstraintAddress: ANCHOR_GENERIC,
   ConstraintDuplicateMutableAccount: ANCHOR_GENERIC,
   ConstraintSeeds: ANCHOR_GENERIC,

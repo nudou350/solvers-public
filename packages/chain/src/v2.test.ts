@@ -152,7 +152,7 @@ describe("friendlyError", () => {
   });
 
   it("códigos do programa continuam virando mensagem amigável", () => {
-    assert.equal(friendlyError(new Error("x"), ["Program log: AnchorError ... NoCredits ..."]), "Seus créditos acabaram.");
+    assert.equal(friendlyError(new Error("x"), ["Program log: AnchorError ... NoCredits ..."]), "You've run out of credits.");
     assert.equal(friendlyError(new Error("fetch failed"), []), "fetch failed");
   });
 });

@@ -49,21 +49,21 @@ describe("classificação do erro pelo log", () => {
   it("erro direto do programa: código do enum, nome e mensagem", () => {
     assert.equal(extractProgramErrorCode(null, directError), 6004);
     assert.equal(programErrorName(6004), "AgentNotActive");
-    assert.deepEqual(describeFailure(null, directError), { code: 6004, name: "AgentNotActive", message: "Este especialista ainda não está disponível para compra." });
+    assert.deepEqual(describeFailure(null, directError), { code: 6004, name: "AgentNotActive", message: "This solver isn't available for purchase yet." });
   });
 
   it("CPI de token sem saldo: vale o PRIMEIRO failed (token 0x1), não o código repetido pelo Solvers", () => {
     assert.equal(extractProgramErrorCode(null, tokenCpiInsufficient), null);
-    assert.deepEqual(describeFailure(null, tokenCpiInsufficient), { code: null, name: null, message: "Saldo de USDC insuficiente." });
-    assert.equal(friendlyError(new Error("x"), tokenCpiInsufficient), "Saldo de USDC insuficiente.");
+    assert.deepEqual(describeFailure(null, tokenCpiInsufficient), { code: null, name: null, message: "Insufficient USDC balance." });
+    assert.equal(friendlyError(new Error("x"), tokenCpiInsufficient), "Insufficient USDC balance.");
   });
 
   it("constraint do Anchor: mensagem amigável por nome, sem código do programa", () => {
     assert.equal(extractProgramErrorCode(null, anchorConstraint), null);
     const r = describeFailure(null, anchorConstraint);
     assert.equal(r?.code, null);
-    assert.match(r!.message, /saldo em USDC não pertence a esta carteira/);
-    assert.match(friendlyError(new Error("x"), anchorConstraint), /não pertence a esta carteira/);
+    assert.match(r!.message, /USDC balance account doesn't belong to this wallet/);
+    assert.match(friendlyError(new Error("x"), anchorConstraint), /doesn't belong to this wallet/);
   });
 
   it("nome do Anchor desconhecido, outro programa ou erro sem código: sem classificação (cai no motivo bruto)", () => {
@@ -93,15 +93,15 @@ describe("classificação do erro pelo log", () => {
 describe("friendlyError com o mapa completo", () => {
   it("erro do programa fora dos 8 antigos agora tem mensagem amigável", () => {
     const logs = [...opening, "Program log: AnchorError thrown in programs/solvers/src/lib.rs:1. Error Code: PriceChanged. Error Number: 6026. Error Message: O preço mudou.", `Program ${PROGRAM} failed: custom program error: 0x178a`];
-    assert.match(friendlyError(new Error("x"), logs), /preço mudou/i);
+    assert.match(friendlyError(new Error("x"), logs), /price changed/i);
   });
 
   it("logs só com o nome (sem a linha failed): continua achando o erro; nome longo não é mascarado pelo curto", () => {
-    assert.match(friendlyError(new Error("x"), ["Program log: Error Code: NotRentPayer"]), /pagou a abertura/);
-    assert.match(friendlyError(new Error("x"), ["Error Code: InvalidMilestoneIndex"]), /não existe/);
-    assert.match(friendlyError(new Error("x"), ["Error Code: InvalidMilestones"]), /número de etapas/);
-    assert.equal(friendlyError(new Error("x"), ["Program log: Error: insufficient funds"]), "Saldo de USDC insuficiente.");
-    assert.equal(friendlyError(new Error("x"), ["Program log: AnchorError ... NoCredits ..."]), "Seus créditos acabaram.");
+    assert.match(friendlyError(new Error("x"), ["Program log: Error Code: NotRentPayer"]), /paid to open/);
+    assert.match(friendlyError(new Error("x"), ["Error Code: InvalidMilestoneIndex"]), /doesn't exist/);
+    assert.match(friendlyError(new Error("x"), ["Error Code: InvalidMilestones"]), /number of milestones/);
+    assert.equal(friendlyError(new Error("x"), ["Program log: Error: insufficient funds"]), "Insufficient USDC balance.");
+    assert.equal(friendlyError(new Error("x"), ["Program log: AnchorError ... NoCredits ..."]), "You've run out of credits.");
   });
 
   it("erro desconhecido: mantém o motivo bruto", () => {
@@ -142,7 +142,7 @@ describe("simulate (antes da assinatura)", () => {
     assert.deepEqual(r.ok === false && r.kind === "rejected" && { code: r.code, name: r.name, message: r.message }, {
       code: 6004,
       name: "AgentNotActive",
-      message: "Este especialista ainda não está disponível para compra.",
+      message: "This solver isn't available for purchase yet.",
     });
   });
 
@@ -156,13 +156,13 @@ describe("simulate (antes da assinatura)", () => {
   it("CPI de token sem saldo (log externo do Solvers repete 0x1): rejected como saldo insuficiente, não 'código 1'", async () => {
     const { c } = await chainSimulating(async () => ({ value: { err: { InstructionError: [1, { Custom: 1 }] }, logs: tokenCpiInsufficient } }));
     const r = await c.simulate(WIRE);
-    assert.ok(!r.ok && r.kind === "rejected" && r.code === null && r.message === "Saldo de USDC insuficiente.");
+    assert.ok(!r.ok && r.kind === "rejected" && r.code === null && r.message === "Insufficient USDC balance.");
   });
 
   it("constraint do Anchor: rejected com mensagem amigável; nome desconhecido: failed (não bloqueia)", async () => {
     const { c } = await chainSimulating(async () => ({ value: { err: { InstructionError: [1, { Custom: 2015 }] }, logs: anchorConstraint } }));
     const r = await c.simulate(WIRE);
-    assert.ok(!r.ok && r.kind === "rejected" && /não pertence a esta carteira/.test(r.message));
+    assert.ok(!r.ok && r.kind === "rejected" && /doesn't belong to this wallet/.test(r.message));
     const unknown = anchorConstraint.map((l) => l.replace("ConstraintTokenOwner", "ConstraintNovoDesconhecido"));
     const { c: c2 } = await chainSimulating(async () => ({ value: { err: { InstructionError: [1, { Custom: 2015 }] }, logs: unknown } }));
     const r2 = await c2.simulate(WIRE);
