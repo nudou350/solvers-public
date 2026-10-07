@@ -44,7 +44,7 @@ export const USDC_DECIMALS = 6;
 
 /** USDC (número da configuração) -> unidades de 6 casas, sem erro de ponto flutuante. */
 export function usdcToAtomic(usdc: number): bigint {
-  if (!Number.isFinite(usdc) || usdc < 0) throw new Error("valor em USDC inválido");
+  if (!Number.isFinite(usdc) || usdc < 0) throw new Error("invalid USDC amount");
   return BigInt(Math.round(usdc * 10 ** USDC_DECIMALS));
 }
 

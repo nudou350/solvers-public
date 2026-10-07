@@ -46,9 +46,9 @@ describe("assertSupplyOpen", () => {
       assert.equal(e.status, 409);
       assert.equal(e.code, "sold_out");
       assert.deepEqual(e.extra, { maxLicenses: 3, sold: 3 });
-      assert.match(e.message, /Solver X está esgotado/);
-      assert.match(e.message, /limite atual/);
-      assert.doesNotMatch(e.message, /revenda/); // sem a flag, não sugere o mercado
+      assert.match(e.message, /Solver X is sold out/);
+      assert.match(e.message, /current license limit/);
+      assert.doesNotMatch(e.message, /resell|resale/); // sem a flag, não sugere o mercado
     }
   });
 
@@ -57,7 +57,7 @@ describe("assertSupplyOpen", () => {
       assertSupplyOpen(row(3n, 3), { resaleEnabled: true });
       assert.fail("devia lançar");
     } catch (e) {
-      assert.match((e as HttpError).message, /mercado de revenda/);
+      assert.match((e as HttpError).message, /resale market/);
     }
   });
 });

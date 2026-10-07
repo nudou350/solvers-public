@@ -38,9 +38,9 @@ export function isPlatformPair(m: { id: string; slug: string }): boolean {
 export function platformVerdict(m: { id: string; slug: string; platform?: boolean }, source: "agents" | "published"): { platform: boolean; error?: string } {
   const pair = isPlatformPair(m);
   const touchesList = PLATFORM_AGENTS.some((a) => a.id === m.id || a.slug === m.slug);
-  if (touchesList && !pair) return { platform: false, error: `id ou slug reservado a um Solver da plataforma (${m.slug} / ${m.id}), mas a dupla não confere com PLATFORM_AGENTS` };
-  if (pair && source !== "agents") return { platform: false, error: `${m.slug} é um Solver da plataforma e só pode vir da pasta de pacotes da plataforma (AGENTS_DIR)` };
-  if (m.platform === true && !pair) return { platform: false, error: `o manifesto declara platform: true, mas ${m.slug} não está em PLATFORM_AGENTS (o servidor não concorda)` };
+  if (touchesList && !pair) return { platform: false, error: `id or slug reserved for a platform Solver (${m.slug} / ${m.id}), but the pair does not match PLATFORM_AGENTS` };
+  if (pair && source !== "agents") return { platform: false, error: `${m.slug} is a platform Solver and can only come from the platform packages folder (AGENTS_DIR)` };
+  if (m.platform === true && !pair) return { platform: false, error: `the manifest declares platform: true, but ${m.slug} is not in PLATFORM_AGENTS (the server disagrees)` };
   return { platform: pair };
 }
 

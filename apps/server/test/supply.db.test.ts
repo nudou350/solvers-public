@@ -132,7 +132,7 @@ describe("teto de licenças com banco", { skip: url ? false : "defina TEST_DATAB
     // Com o RPC fora do ar o `assertEntriesOpen` pode responder antes (fail-open); o que importa: nunca monta uma compra de esgotado.
     if (res.status === 409) {
       assert.equal(body.code, "sold_out");
-      assert.match(body.error ?? "", /esgotado/);
+      assert.match(body.error ?? "", /sold out/);
     } else {
       assert.notEqual(res.status, 200);
     }

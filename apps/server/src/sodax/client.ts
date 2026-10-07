@@ -73,7 +73,7 @@ export interface TargetQuote {
 
 /** Entrada que, à taxa `rate` (USDC mínimos por unidade mínima de origem), rende `target` com folga. */
 export function sizeInput(target: bigint, rate: number, margin = MARGIN): bigint {
-  if (!(rate > 0)) throw new Error("taxa inválida");
+  if (!(rate > 0)) throw new Error("invalid rate");
   return BigInt(Math.ceil((Number(target) / rate) * margin));
 }
 

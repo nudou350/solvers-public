@@ -1,6 +1,6 @@
 "use client";
 // Vincular o Telegram do criador (PACKAGE_SPEC.md 14.1): pede um código ao servidor, mostra o link que abre o bot já com o
-// código e a alternativa de digitar `/vincular CODIGO`, e confere sozinho (a cada 4 s) enquanto o código vale.
+// código e a alternativa de digitar o comando (`/link CODE` em inglês, `/vincular CODIGO` em português), e confere sozinho (a cada 4 s) enquanto o código vale.
 import type { CreatorMe, TelegramLink } from "@solvers/api-client";
 import { ApiError } from "@solvers/api-client";
 import { useLocale, useTranslations } from "next-intl";
@@ -102,7 +102,7 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
   async function copy() {
     if (!link) return;
     try {
-      await navigator.clipboard.writeText(`/vincular ${link.code}`);
+      await navigator.clipboard.writeText(t("command", { code: link.code }));
       setCopied(true);
     } catch {
       setCopied(false);
@@ -134,7 +134,7 @@ export function TelegramLinkPanel({ onLinked, onRecheck, rechecking }: { onLinke
               </ol>
               <div className="row wrapx" style={gap(10)}>
                 <code className="mono bold" style={{ fontSize: 18, letterSpacing: "0.04em", userSelect: "all" }}>
-                  /vincular {link.code}
+                  {t("command", { code: link.code })}
                 </code>
                 <Button variant="ghost" size="sm" icon="copy" onClick={() => void copy()} aria-label={t("copyLabel")}>
                   {t("copy")}

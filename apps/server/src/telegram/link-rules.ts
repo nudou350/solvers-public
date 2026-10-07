@@ -54,19 +54,19 @@ export const deepLinkOf = (botUsername: string, code: string): string => `https:
 // ---------------------------------------------------------------------------------------------------------------
 // Comandos do bot
 
-export type Command = { kind: "link"; command: "start" | "vincular"; arg: string } | { kind: "other" };
+export type Command = { kind: "link"; command: "start" | "link" | "vincular"; arg: string } | { kind: "other" };
 
 /**
- * `/vincular CODIGO`, `/start CODIGO` (deep link) e as formas `/vincular@meubot CODIGO`. Em grupo, o comando para outro bot
+ * `/link CODE` (inglês, o padrão), `/vincular CODIGO` (alias em português), `/start CODIGO` (deep link) e as formas `/link@meubot CODIGO`. Em grupo, o comando para outro bot
  * (`@outrobot`) não é nosso. Qualquer outro texto vira `other` (o bot responde com a ajuda).
  */
 export function parseCommand(text: string, botUsername?: string | null): Command {
-  const m = /^\/(start|vincular)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/i.exec(text.trim());
+  const m = /^\/(start|link|vincular)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/i.exec(text.trim());
   if (!m) return { kind: "other" };
   if (m[2] && botUsername && m[2].toLowerCase() !== botUsername.toLowerCase()) return { kind: "other" };
-  // Só a primeira palavra conta: "/vincular LINK-ABCD2345 obrigado" ainda vincula.
+  // Só a primeira palavra conta: "/link LINK-ABCD2345 obrigado" ainda vincula.
   const arg = (m[3] ?? "").trim().split(/\s+/)[0] ?? "";
-  return { kind: "link", command: m[1]!.toLowerCase() as "start" | "vincular", arg };
+  return { kind: "link", command: m[1]!.toLowerCase() as "start" | "link" | "vincular", arg };
 }
 
 /** Limite de tentativas erradas por chat (em memória, só no processo do bot). */
@@ -105,8 +105,8 @@ export function replyText(o: LinkOutcome): string {
     case "throttled":
       return "Too many attempts with a wrong code. Wait an hour and generate a new code on the site.";
     case "usage":
-      return "Send the command with the code shown on the site, like this: /vincular LINK-ABCD2345";
+      return "Send the command with the code shown on the site, like this: /link LINK-ABCD2345";
     case "help":
-      return "To link your Telegram, generate a code on the Solvers site (Creator > Publish) and send it here: /vincular YOUR-CODE";
+      return "To link your Telegram, generate a code on the Solvers site (Creator > Publish) and send it here: /link YOUR-CODE";
   }
 }

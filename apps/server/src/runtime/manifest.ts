@@ -5,7 +5,7 @@ import { AGENT_ID_RE, slugProblem, versionProblem } from "./agent-ids.js";
 // Schema do manifest.json dos pacotes (INSTRUCTIONS.md 6). Sem env/banco: validado também nos testes.
 
 /** Um critério por item: ";" e quebra de linha separam critérios na contestação. */
-const Criterion = z.string().min(2).max(300).refine((c) => !/[;\n]/.test(c), "critério não pode conter ';' nem quebra de linha");
+const Criterion = z.string().min(2).max(300).refine((c) => !/[;\n]/.test(c), "a criterion can't contain ';' or a line break");
 
 /** Forma do manifest (sem as verificações cruzadas): o validador v1 estende esta base. */
 export const ManifestBase = z.object({
@@ -56,10 +56,10 @@ export const ManifestBase = z.object({
     .superRefine((g, ctx) => {
       if (!g.available) return;
       if (g.milestones && Math.abs(g.milestones.reduce((s, m) => s + m.sharePct, 0) - 100) > 0.001) {
-        ctx.addIssue({ code: "custom", message: "guarantee.milestones: a soma de sharePct precisa ser 100" });
+        ctx.addIssue({ code: "custom", message: "guarantee.milestones: sharePct must add up to 100" });
       }
       if (!g.milestones && g.defaultCriteria.length === 0) {
-        ctx.addIssue({ code: "custom", message: "guarantee: sem milestones, defaultCriteria precisa de pelo menos um critério" });
+        ctx.addIssue({ code: "custom", message: "guarantee: without milestones, defaultCriteria needs at least one criterion" });
       }
     }),
   /** Só licença vitalícia: pricePerUseUsdc de manifests antigos é ignorado. */
@@ -102,16 +102,16 @@ export const ManifestBase = z.object({
 export function manifestCrossChecks(m: z.infer<typeof ManifestBase>, ctx: z.RefinementCtx): void {
   if (!m.trial) return;
   if (m.trial.steps > m.steps.length) {
-    ctx.addIssue({ code: "custom", path: ["trial", "steps"], message: `trial.steps (${m.trial.steps}) maior que o número de etapas (${m.steps.length})` });
+    ctx.addIssue({ code: "custom", path: ["trial", "steps"], message: `trial.steps (${m.trial.steps}) is greater than the number of steps (${m.steps.length})` });
   }
   for (const name of Object.keys(m.trial.tools)) {
     if (!m.tools.some((t) => t.name === name)) {
-      ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: ferramenta "${name}" não existe em tools` });
+      ctx.addIssue({ code: "custom", path: ["trial", "tools", name], message: `trial.tools: tool "${name}" does not exist in tools` });
     }
   }
   for (const name of Object.keys(m.trial.toolLimits)) {
     if (!m.tools.some((t) => t.name === name)) {
-      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: ferramenta "${name}" não existe em tools` });
+      ctx.addIssue({ code: "custom", path: ["trial", "toolLimits", name], message: `trial.toolLimits: tool "${name}" does not exist in tools` });
     }
   }
 }

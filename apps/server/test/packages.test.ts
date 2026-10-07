@@ -70,9 +70,9 @@ describe("resolveInsidePackage", () => {
   });
 
   it("recusa prefixo fora do permitido e arquivo inexistente", () => {
-    assert.throws(() => resolveInsidePackage(dir, "knowledge/a.md", STEPS), /começar por steps\//);
-    assert.throws(() => resolveInsidePackage(dir, "steps/nao-existe.md", STEPS), /não existe/);
-    assert.throws(() => resolveInsidePackage(dir, "x".repeat(300), STEPS), /longo/);
+    assert.throws(() => resolveInsidePackage(dir, "knowledge/a.md", STEPS), /start with steps\//);
+    assert.throws(() => resolveInsidePackage(dir, "steps/nao-existe.md", STEPS), /does not exist/);
+    assert.throws(() => resolveInsidePackage(dir, "x".repeat(300), STEPS), /too long/);
   });
 
   it("recusa link simbólico apontando para fora (quando o sistema permite criar)", (t) => {
@@ -84,7 +84,7 @@ describe("resolveInsidePackage", () => {
       t.skip("sem permissão para criar link simbólico neste sistema");
       return;
     }
-    assert.throws(() => resolveInsidePackage(dir, "steps/link.md", STEPS), /link simbólico/);
+    assert.throws(() => resolveInsidePackage(dir, "steps/link.md", STEPS), /symbolic link/);
   });
 });
 
@@ -100,7 +100,7 @@ describe("resolveInsidePackage: diretório-link (junction no Windows, symlink no
       t.skip("não foi possível criar link de diretório neste sistema");
       return;
     }
-    assert.throws(() => resolveInsidePackage(dir, "steps/atalho/segredo.md", ["steps/"]), /link simbólico/);
+    assert.throws(() => resolveInsidePackage(dir, "steps/atalho/segredo.md", ["steps/"]), /symbolic link/);
   });
 });
 
@@ -113,7 +113,7 @@ describe("loadPackage: manifesto malicioso", () => {
 
   it("steps[].file fora de steps/ é recusado mesmo existindo", () => {
     const dir = writePackage(manifestJson({ steps: [{ file: "knowledge/a.md", gate: [] }] }), { "knowledge/a.md": "texto", "steps/01-primeira.md": "x" });
-    assert.throws(() => loadPackage(dir), /começar por steps\//);
+    assert.throws(() => loadPackage(dir), /start with steps\//);
   });
 
   it("pacote com link simbólico não carrega (nem entra no hash)", (t) => {
@@ -126,7 +126,7 @@ describe("loadPackage: manifesto malicioso", () => {
       t.skip("sem permissão para criar link simbólico neste sistema");
       return;
     }
-    assert.throws(() => loadPackage(dir), /link simbólico/);
+    assert.throws(() => loadPackage(dir), /symbolic link/);
   });
 
   it("pacote válido carrega e usa a etapa de dentro da pasta", () => {
@@ -153,7 +153,7 @@ describe("Manifest: slug e versão", () => {
   it("recusa slug com formato de id (32 hex): sequestraria a busca de outro agente", () => {
     const r = parse({ slug: ID_B });
     assert.equal(r.success, false);
-    assert.match(JSON.stringify(r.error?.issues), /formato de um id/);
+    assert.match(JSON.stringify(r.error?.issues), /format of an id/);
   });
 
   it("versões válidas e inválidas", () => {
@@ -180,7 +180,7 @@ describe("registerPackage: id e slug são um só espaço de nomes", () => {
     const reg = new Map<string, SolverPackage>();
     const first = fakePkg(ID_A, "primeiro");
     registerPackage(reg, first);
-    assert.throws(() => registerPackage(reg, fakePkg(ID_A, "segundo")), /já pertence/);
+    assert.throws(() => registerPackage(reg, fakePkg(ID_A, "segundo")), /already belongs/);
     assert.equal(reg.get(ID_A), first);
     assert.equal(reg.has("segundo"), false);
   });
@@ -188,14 +188,14 @@ describe("registerPackage: id e slug são um só espaço de nomes", () => {
   it("slug repetido é recusado", () => {
     const reg = new Map<string, SolverPackage>();
     registerPackage(reg, fakePkg(ID_A, "mesmo"));
-    assert.throws(() => registerPackage(reg, fakePkg(ID_B, "mesmo")), /já pertence/);
+    assert.throws(() => registerPackage(reg, fakePkg(ID_B, "mesmo")), /already belongs/);
     assert.equal(reg.has(ID_B), false);
   });
 
   it("slug de um igual ao id de outro é recusado (defesa, mesmo que o Manifest já bloqueie)", () => {
     const reg = new Map<string, SolverPackage>();
     registerPackage(reg, fakePkg(ID_A, "original"));
-    assert.throws(() => registerPackage(reg, fakePkg(ID_B, ID_A)), /já pertence/);
+    assert.throws(() => registerPackage(reg, fakePkg(ID_B, ID_A)), /already belongs/);
     assert.equal(reg.get(ID_A)?.manifest.slug, "original");
   });
 });
@@ -215,7 +215,7 @@ describe("loadAll", () => {
       assert.equal(reg.get(ID_A)?.manifest.slug, "primeiro");
       assert.equal(reg.has("copia"), false);
       assert.equal(errors.length, 1);
-      assert.match(errors[0]!, /b-copia.*já pertence/);
+      assert.match(errors[0]!, /b-copia.*already belongs/);
     } finally {
       rmSync(base, { recursive: true, force: true });
     }

@@ -55,18 +55,18 @@ describe("platformVerdict: o campo do manifesto só vale se o servidor concordar
     for (const source of ["agents", "published"] as const) {
       const v = platformVerdict({ id: OTHER_ID, slug: "quero-ser-platform", platform: true }, source);
       assert.equal(v.platform, false);
-      assert.match(v.error ?? "", /não está em PLATFORM_AGENTS/);
+      assert.match(v.error ?? "", /is not in PLATFORM_AGENTS/);
     }
   });
 
   it("pacote de criador não pode usar o slug nem o id da plataforma", () => {
-    assert.match(platformVerdict(CRIADOR, "published").error ?? "", /só pode vir da pasta de pacotes da plataforma/);
-    assert.match(platformVerdict({ id: OTHER_ID, slug: CRIADOR.slug }, "published").error ?? "", /reservado/);
-    assert.match(platformVerdict({ id: CRIADOR.id, slug: "meu-slug" }, "published").error ?? "", /reservado/);
+    assert.match(platformVerdict(CRIADOR, "published").error ?? "", /can only come from the platform packages folder/);
+    assert.match(platformVerdict({ id: OTHER_ID, slug: CRIADOR.slug }, "published").error ?? "", /reserved/);
+    assert.match(platformVerdict({ id: CRIADOR.id, slug: "meu-slug" }, "published").error ?? "", /reserved/);
   });
 
   it("dupla trocada na pasta da plataforma também é recusada", () => {
-    assert.match(platformVerdict({ id: CRIADOR.id, slug: "meu-slug" }, "agents").error ?? "", /não confere/);
+    assert.match(platformVerdict({ id: CRIADOR.id, slug: "meu-slug" }, "agents").error ?? "", /does not match/);
   });
 });
 

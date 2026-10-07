@@ -101,7 +101,7 @@ describe("mescla das duas fontes", () => {
     const reg = loadAll(d.agents, (dir, e) => errors.push(e.message), { source: "agents" });
     loadAll(d.published, (dir, e) => errors.push(e.message), { source: "published", into: reg });
     assert.equal(errors.length, 1);
-    assert.match(errors[0]!, /já pertence ao pacote frontend-react/);
+    assert.match(errors[0]!, /already belongs to package frontend-react/);
     assert.equal(reg.get(ID_A)?.manifest.slug, "frontend-react");
     assert.equal(reg.has("copia"), false);
   });
@@ -113,7 +113,7 @@ describe("mescla das duas fontes", () => {
     const errors: string[] = [];
     const reg = loadAll(d.agents, (dir, e) => errors.push(e.message), { source: "agents" });
     loadAll(d.published, (dir, e) => errors.push(e.message), { source: "published", into: reg });
-    assert.match(errors.join(), /"frontend-react" já pertence/);
+    assert.match(errors.join(), /"frontend-react" already belongs/);
     assert.equal(reg.get("frontend-react")?.source, "agents");
   });
 
@@ -133,7 +133,7 @@ describe("mescla das duas fontes", () => {
     pkg(d.published, "outra-pasta", v1({ id: ID_B, slug: "do-criador" }), { "templates/briefing.md": "# B" });
     const errors: string[] = [];
     loadAll(d.published, (dir, e) => errors.push(e.message), { source: "published" });
-    assert.match(errors.join(), /não é o slug do pacote/);
+    assert.match(errors.join(), /is not the package slug/);
   });
 });
 
@@ -164,7 +164,7 @@ describe("autoridade de platform (lista do servidor)", () => {
     loadAll(d2.published, (dir, e) => errors.push(e.message), { source: "published", into: reg });
     assert.equal(reg.size, 0);
     assert.equal(errors.length, 2);
-    assert.ok(errors.every((m) => /não está em PLATFORM_AGENTS/.test(m)));
+    assert.ok(errors.every((m) => /is not in PLATFORM_AGENTS/.test(m)));
   });
 
   it("criador não pode publicar com o slug nem com o id do Criador de Solvers", () => {
@@ -175,7 +175,7 @@ describe("autoridade de platform (lista do servidor)", () => {
     const reg = loadAll(d.published, (dir, e) => errors.push(e.message), { source: "published" });
     assert.equal(reg.size, 0);
     assert.equal(errors.length, 2);
-    assert.ok(errors.every((m) => /reservado/.test(m)));
+    assert.ok(errors.every((m) => /reserved/.test(m)));
   });
 });
 
@@ -185,7 +185,7 @@ describe("manifesto v1 e v0 no carregador", () => {
     const dir = pkg(d.published, "do-criador", v1({ id: ID_B, slug: "do-criador", inventado: true }), { "templates/briefing.md": "# B" });
     assert.throws(() => loadPackage(dir, { source: "published" }), /Unrecognized key/);
     const dir2 = pkg(d.published, "sem-id", { ...v1({ slug: "sem-id" }), id: undefined }, { "templates/briefing.md": "# B" });
-    assert.throws(() => loadPackage(dir2, { source: "published" }), /sem id/);
+    assert.throws(() => loadPackage(dir2, { source: "published" }), /without an id/);
   });
 
   it("v0 continua como antes: sem specVersion, sem templates", () => {
@@ -259,7 +259,7 @@ describe("packages() e reloadPackages()", () => {
     mod.reloadPackages();
     const errs = mod.packageLoadErrors();
     assert.equal(errs.length, 1);
-    assert.match(errs[0]!.message, /já pertence ao pacote frontend-react/);
+    assert.match(errs[0]!.message, /already belongs to package frontend-react/);
     assert.equal(mod.getPackage(ID_A)?.manifest.slug, "frontend-react");
   });
 });

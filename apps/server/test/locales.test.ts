@@ -44,7 +44,7 @@ describe("validador: locales/pt.json", () => {
     assert.equal(run(baseFiles()).ok, true);
   });
 
-  it("JSON inválido vira erro no caminho do arquivo", () => {
+  it("invalid JSON vira erro no caminho do arquivo", () => {
     const r = run(withLocale("{ nao é json"));
     assert.ok(r.errors.some((i) => i.code === "MANIFEST_INVALID_JSON" && i.path === "locales/pt.json"), show(r));
   });
@@ -127,7 +127,7 @@ describe("carregador: locales/pt.json", () => {
 
   it("tradução inválida ou JSON quebrado recusa o pacote com o motivo", () => {
     assert.throws(() => loadPackage(pkg({ "locales/pt.json": JSON.stringify({ name: "x" }) })), /locales\/pt\.json: .*tagline/);
-    assert.throws(() => loadPackage(pkg({ "locales/pt.json": "{ quebrado" })), /locales\/pt\.json: JSON inválido/);
+    assert.throws(() => loadPackage(pkg({ "locales/pt.json": "{ quebrado" })), /locales\/pt\.json: invalid JSON/);
     assert.throws(() => loadPackage(pkg({ "locales/pt.json": JSON.stringify({ ...PT, extra: 1 }) })), /locales\/pt\.json/);
   });
 

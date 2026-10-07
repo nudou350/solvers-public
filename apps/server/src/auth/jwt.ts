@@ -39,7 +39,7 @@ export type TokenClaims = { sub: string; jti?: string; cid?: string; exp?: numbe
 
 export async function verifyToken(token: string, audience: string): Promise<TokenClaims> {
   const { payload } = await jwtVerify(token, secret, { audience, issuer: env.PUBLIC_API_URL });
-  if (!payload.sub) throw new Error("token sem sub");
+  if (!payload.sub) throw new Error("token without sub");
   return payload as TokenClaims;
 }
 

@@ -15,7 +15,7 @@ import { EMPTY_MEMORY, MemoryRuleError, applyForget, applySave, readPayload, typ
 // 4. Cada memória é AES-256-GCM com iv aleatório.
 
 const KEK = Buffer.from(env.SERVER_KEK, "base64");
-if (KEK.length !== 32) throw new Error("SERVER_KEK precisa ter 32 bytes em base64");
+if (KEK.length !== 32) throw new Error("SERVER_KEK must be 32 bytes in base64");
 
 export function deriveMemoryKey(signature: Uint8Array, wallet: string): Buffer {
   return Buffer.from(hkdfSync("sha256", signature, Buffer.from(wallet), Buffer.from("solvers-memory"), 32));

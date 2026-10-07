@@ -132,7 +132,7 @@ describe("readTemplateFile: disco", () => {
       t.skip("sem permissão para criar link simbólico neste sistema");
       return;
     }
-    assert.throws(() => readTemplateFile(dir, { ...md, path: "templates/atalho.md" }), /link simbólico/);
+    assert.throws(() => readTemplateFile(dir, { ...md, path: "templates/atalho.md" }), /symbolic link/);
   });
 
   it("arquivo grande demais e não UTF-8 não saem", () => {

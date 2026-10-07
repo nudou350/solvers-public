@@ -19,13 +19,13 @@ export class PackagePathError extends Error {
  * o validador usa isto sobre o conteúdo de um ZIP, e `resolveInsidePackage` soma as checagens de disco.
  */
 export function relativePathProblem(rel: string, allowedPrefixes: readonly string[]): string | null {
-  if (typeof rel !== "string" || rel.length === 0) return "vazio";
-  if (rel.length > 200) return "longo demais";
-  if (/[\u0000-\u001f\\]/.test(rel)) return "tem caractere de controle ou barra invertida";
-  if (isAbsolute(rel) || /^[a-zA-Z]:/.test(rel) || rel.startsWith("/")) return "não pode ser absoluto";
+  if (typeof rel !== "string" || rel.length === 0) return "empty";
+  if (rel.length > 200) return "too long";
+  if (/[\u0000-\u001f\\]/.test(rel)) return "has a control character or a backslash";
+  if (isAbsolute(rel) || /^[a-zA-Z]:/.test(rel) || rel.startsWith("/")) return "can't be absolute";
   const parts = rel.split("/");
-  if (parts.some((p) => p === "" || p === "." || p === "..")) return "não pode ter '.', '..' ou segmento vazio";
-  if (!allowedPrefixes.some((p) => rel.startsWith(p))) return `precisa começar por ${allowedPrefixes.join(" ou ")}`;
+  if (parts.some((p) => p === "" || p === "." || p === "..")) return "can't have '.', '..' or an empty segment";
+  if (!allowedPrefixes.some((p) => rel.startsWith(p))) return `must start with ${allowedPrefixes.join(" or ")}`;
   return null;
 }
 
@@ -35,7 +35,7 @@ export function relativePathProblem(rel: string, allowedPrefixes: readonly strin
  * `allowedPrefixes`, link simbólico em qualquer segmento e qualquer coisa que, resolvida, saia da pasta.
  */
 export function resolveInsidePackage(dir: string, rel: string, allowedPrefixes: readonly string[]): string {
-  const bad = (why: string) => new PackagePathError(`caminho "${rel}" inválido: ${why}`, rel);
+  const bad = (why: string) => new PackagePathError(`invalid path "${rel}": ${why}`, rel);
   const textual = relativePathProblem(rel, allowedPrefixes);
   if (textual) throw bad(textual);
   const parts = rel.split("/");
@@ -44,7 +44,7 @@ export function resolveInsidePackage(dir: string, rel: string, allowedPrefixes: 
   try {
     root = realpathSync(dir);
   } catch {
-    throw bad("pasta do pacote não existe");
+    throw bad("the package folder does not exist");
   }
   let cur = root;
   for (const p of parts) {
@@ -53,9 +53,9 @@ export function resolveInsidePackage(dir: string, rel: string, allowedPrefixes: 
     try {
       st = lstatSync(cur);
     } catch {
-      throw bad("arquivo não existe no pacote");
+      throw bad("the file does not exist in the package");
     }
-    if (st.isSymbolicLink()) throw bad("link simbólico não é permitido");
+    if (st.isSymbolicLink()) throw bad("symbolic links are not allowed");
   }
   const real = realpathSync(cur);
   const fromRoot = relative(root, real);

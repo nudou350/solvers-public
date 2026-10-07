@@ -95,7 +95,7 @@ export function splitGuaranteeAmounts(totalUsdc: number, sharesPct: number[]): n
 
 /** agent_id: 16 bytes em hex (32 caracteres). */
 export function agentIdToBytes(id: string): Uint8Array {
-  if (!/^[0-9a-f]{32}$/.test(id)) throw new Error(`agent id inválido: ${id}`);
+  if (!/^[0-9a-f]{32}$/.test(id)) throw new Error(`invalid agent id: ${id}`);
   return Uint8Array.from(id.match(/../g)!.map((h) => parseInt(h, 16)));
 }
 
@@ -116,10 +116,10 @@ const U64_MAX = 18446744073709551615n;
  */
 export function resaleSplit(priceUnits: bigint, royaltyBps: number, feeBps: number): { royalty: bigint; fee: bigint; seller: bigint } {
   const isBps = (n: number) => Number.isInteger(n) && n >= 0 && n <= 10_000;
-  if (!isBps(royaltyBps) || !isBps(feeBps)) throw new Error(`bps inválido: royalty ${royaltyBps}, taxa ${feeBps}`);
-  if (priceUnits < 0n || priceUnits > U64_MAX) throw new Error(`preço fora do intervalo de u64: ${priceUnits}`);
+  if (!isBps(royaltyBps) || !isBps(feeBps)) throw new Error(`invalid bps: royalty ${royaltyBps}, fee ${feeBps}`);
+  if (priceUnits < 0n || priceUnits > U64_MAX) throw new Error(`price out of u64 range: ${priceUnits}`);
   if (royaltyBps + feeBps > RESALE_MAX_CUT_BPS) {
-    throw new Error(`royalty + taxa (${royaltyBps + feeBps} bps) passam do teto de ${RESALE_MAX_CUT_BPS} bps`);
+    throw new Error(`royalty + fee (${royaltyBps + feeBps} bps) exceed the cap of ${RESALE_MAX_CUT_BPS} bps`);
   }
   const royalty = (priceUnits * BigInt(royaltyBps)) / MAX_BPS;
   const fee = (priceUnits * BigInt(feeBps)) / MAX_BPS;

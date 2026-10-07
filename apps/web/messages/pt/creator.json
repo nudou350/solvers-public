@@ -281,6 +281,7 @@
     "step2": "Se preferir, procure <handle>@{username}</handle> no Telegram e envie:",
     "copy": "Copiar",
     "copyLabel": "Copiar o comando de vinculação",
+    "command": "/vincular {code}",
     "open": "Abrir no Telegram",
     "validUntil": "O código vale até {time} (<tick>{clock}</tick><sr> restantes</sr>) e só funciona uma vez.",
     "newCode": "Gerar um código novo",

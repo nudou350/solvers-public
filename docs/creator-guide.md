@@ -29,7 +29,7 @@ If you do not sign or resubmit within **30 days**, the submission expires (it be
 Telegram is how we reach you (submission received, review outcome, help requests from buyers). You link it yourself, without waiting for the team:
 
 1. On `/creator/publish` (the profile section) click **Link Telegram**. The site shows a `LINK-XXXXXXXX` code that is valid for **15 minutes** and works **once**. You can generate up to 5 per hour; a new code cancels the previous one.
-2. Click **Open in Telegram** (it pre-fills the code) and tap *Start*. Or open the Solvers bot (the site shows the @handle) and send `/vincular LINK-XXXXXXXX`.
+2. Click **Open in Telegram** (it pre-fills the code) and tap *Start*. Or open the Solvers bot (the site shows the @handle) and send `/link LINK-XXXXXXXX`.
 3. The bot replies that your Telegram was linked to Solvers. The site notices within a few seconds (or click **I already linked it**).
 
 Only private chats with the bot count. Each Telegram account belongs to a single creator. To switch Telegram accounts, generate a new code and send it from the other account. If the bot says the code is not valid, it may be wrong, expired or already used: generate another one.
@@ -94,7 +94,7 @@ pnpm --filter @solvers/server cli:invite set-chat <wallet> <chatId>             
 # inside apps/server: pnpm cli:invite create --email x@y.com
 ```
 
-Creators normally link on their own through the bot (see "Linking Telegram" in the creator part): `POST /api/creator/telegram-link` generates the code and the `solvers-worker` process (the only one that calls `getUpdates`) handles `/vincular` and `/start` in the bot. `set-chat` remains as a shortcut and requires the creator to have already registered a profile. The bot needs `TELEGRAM_BOT_TOKEN` in the server's `.env` and **must not have an active webhook** (if it does, the worker removes it once, with a log line). Notifications go to the creator's Telegram; without a link, review notices stay with the admin only.
+Creators normally link on their own through the bot (see "Linking Telegram" in the creator part): `POST /api/creator/telegram-link` generates the code and the `solvers-worker` process (the only one that calls `getUpdates`) handles `/link` (alias `/vincular`) and `/start` in the bot. `set-chat` remains as a shortcut and requires the creator to have already registered a profile. The bot needs `TELEGRAM_BOT_TOKEN` in the server's `.env` and **must not have an active webhook** (if it does, the worker removes it once, with a log line). Notifications go to the creator's Telegram; without a link, review notices stay with the admin only.
 
 ### Review at `/admin/reviews`
 

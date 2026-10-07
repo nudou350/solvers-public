@@ -94,9 +94,9 @@ describe("ids e slugs", () => {
 
   it("slugProblem explica o motivo", () => {
     assert.equal(slugProblem("frontend-react"), null);
-    assert.match(slugProblem("0123456789abcdef0123456789abcdef")!, /formato de um id/);
-    assert.match(slugProblem("Ab")!, /3 a 40/);
-    assert.match(slugProblem("Com Espaço")!, /minúsculas/);
+    assert.match(slugProblem("0123456789abcdef0123456789abcdef")!, /format of an id/);
+    assert.match(slugProblem("Ab")!, /3 to 40/);
+    assert.match(slugProblem("Com Espaço")!, /lowercase/);
   });
 
   it("versionProblem: numérica, sem pré-lançamento, até 16 bytes", () => {

@@ -88,7 +88,10 @@ describe("limite de 5 códigos por hora", () => {
 });
 
 describe("comandos do bot", () => {
-  it("/vincular e /start com código (inclusive @bot, caixa e texto depois do código)", () => {
+  it("/link (inglês) e /vincular (alias) e /start com código (inclusive @bot, caixa e texto depois do código)", () => {
+    assert.deepEqual(parseCommand("/link LINK-ABCD2345"), { kind: "link", command: "link", arg: "LINK-ABCD2345" });
+    assert.deepEqual(parseCommand("  /LINK   link-abcd2345  thanks "), { kind: "link", command: "link", arg: "link-abcd2345" });
+    assert.deepEqual(parseCommand("/link@Solvers_Bot LINK-ABCD2345", "solvers_bot"), { kind: "link", command: "link", arg: "LINK-ABCD2345" });
     assert.deepEqual(parseCommand("/vincular LINK-ABCD2345"), { kind: "link", command: "vincular", arg: "LINK-ABCD2345" });
     assert.deepEqual(parseCommand("/start LINK-ABCD2345"), { kind: "link", command: "start", arg: "LINK-ABCD2345" });
     assert.deepEqual(parseCommand("  /VINCULAR   link-abcd2345  obrigado "), { kind: "link", command: "vincular", arg: "link-abcd2345" });
@@ -98,8 +101,10 @@ describe("comandos do bot", () => {
   it("sem código: arg vazio; comando para outro bot e texto qualquer: other", () => {
     assert.deepEqual(parseCommand("/start"), { kind: "link", command: "start", arg: "" });
     assert.deepEqual(parseCommand("/vincular"), { kind: "link", command: "vincular", arg: "" });
+    assert.deepEqual(parseCommand("/link"), { kind: "link", command: "link", arg: "" });
+    assert.deepEqual(parseCommand("/link@outro_bot LINK-ABCD2345", "solvers_bot"), { kind: "other" });
     assert.deepEqual(parseCommand("/vincular@outro_bot LINK-ABCD2345", "solvers_bot"), { kind: "other" });
-    for (const t of ["oi", "vincular LINK-ABCD2345", "/ajuda", "/vincularx LINK-ABCD2345", "", "/start2 x"]) assert.deepEqual(parseCommand(t), { kind: "other" }, t);
+    for (const t of ["oi", "vincular LINK-ABCD2345", "/ajuda", "/vincularx LINK-ABCD2345", "/linkx LINK-ABCD2345", "link LINK-ABCD2345", "", "/start2 x"]) assert.deepEqual(parseCommand(t), { kind: "other" }, t);
   });
 });
 
@@ -109,6 +114,8 @@ describe("respostas", () => {
     const bad = replyText({ kind: "invalid" });
     assert.match(bad, /wrong, expired or already used/);
     assert.match(replyText({ kind: "chat_taken" }), /another Solvers creator/);
+    assert.match(replyText({ kind: "usage" }), /\/link LINK-ABCD2345/);
+    assert.match(replyText({ kind: "help" }), /\/link YOUR-CODE/);
     assert.ok(replyText({ kind: "help" }).length < 200 && !replyText({ kind: "help" }).includes("\n"));
   });
 });
@@ -156,6 +163,14 @@ describe("processUpdate", () => {
     assert.equal(out, "replied");
     assert.deepEqual(calls, [["4242", "LINK-ABCD2345", T0]]);
     assert.deepEqual(sent, [{ chatId: "4242", text: "Done! Your Telegram is now linked to Solvers as Ana." }]);
+  });
+
+  it("/link CODE (inglês) resgata igual ao /vincular", async () => {
+    const { api, sent } = fakeApi();
+    const calls: unknown[][] = [];
+    await processUpdate(msg("/link LINK-ABCD2345"), deps(api, async (...x) => (calls.push(x), { status: "linked", name: "Ana" })));
+    assert.deepEqual(calls, [["4242", "LINK-ABCD2345", T0]]);
+    assert.equal(sent[0]!.text, "Done! Your Telegram is now linked to Solvers as Ana.");
   });
 
   it("deep link /start CODIGO funciona igual", async () => {

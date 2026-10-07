@@ -48,7 +48,7 @@ function listFiles(dir: string): string[] {
     const st = lstatSync(full);
     // Link simbólico entraria no hash (e numa leitura futura) apontando para fora da pasta.
     // Confere antes de ignorar arquivos ocultos: `knowledge/.x.md` também pode ser um link.
-    if (st.isSymbolicLink()) throw new Error(`link simbólico não é permitido no pacote: ${relative(dir, full)}`);
+    if (st.isSymbolicLink()) throw new Error(`symbolic links are not allowed in the package: ${relative(dir, full)}`);
     if (name === "node_modules" || name.startsWith(".")) continue;
     if (st.isDirectory()) out.push(...listFiles(full));
     else out.push(full);
@@ -119,7 +119,7 @@ const gateText = (g: string | { text: string }): string => (typeof g === "string
 function parseManifest(raw: unknown): Manifest & ManifestExtras {
   if (raw && typeof raw === "object" && (raw as { specVersion?: unknown }).specVersion === 1) {
     const m = ManifestV1.parse(raw);
-    if (!m.id) throw new Error("manifesto v1 sem id (o servidor atribui o id no envio; um pacote publicado precisa dele)");
+    if (!m.id) throw new Error("v1 manifest without an id (the server assigns the id on upload; a published package needs one)");
     return { ...m, id: m.id, steps: m.steps.map((s) => ({ ...s, gate: s.gate.map(gateText) })) } as unknown as Manifest & ManifestExtras;
   }
   return Manifest.parse(raw);
@@ -136,15 +136,15 @@ export function loadLocales(dir: string): AgentTranslations {
     // Nunca segue link simbólico: o caminho é fixo, mas a pasta vem de um ZIP de terceiros.
     const path = join(dir, rel);
     if (!existsSync(path)) continue;
-    if (lstatSync(path).isSymbolicLink()) throw new Error(`link simbólico não é permitido no pacote: ${rel}`);
+    if (lstatSync(path).isSymbolicLink()) throw new Error(`symbolic links are not allowed in the package: ${rel}`);
     let raw: unknown;
     try {
       raw = JSON.parse(readFileSync(path, "utf8"));
     } catch (e) {
-      throw new Error(`${rel}: JSON inválido (${(e as Error).message})`);
+      throw new Error(`${rel}: invalid JSON (${(e as Error).message})`);
     }
     const parsed = PackageLocale.safeParse(raw);
-    if (!parsed.success) throw new Error(`${rel}: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ")}`);
+    if (!parsed.success) throw new Error(`${rel}: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`);
     out[lang] = parsed.data;
   }
   return out;
@@ -157,7 +157,7 @@ export function loadPackage(dir: string, opts: { source?: PackageSource } = {}):
   const verdict = platformVerdict(manifest, source);
   if (verdict.error) throw new Error(verdict.error);
   // Pacote publicado vive em PUBLISHED_DIR/<slug>/: a pasta com outro nome indica cópia solta ou troca em andamento.
-  if (source === "published" && basename(dir) !== manifest.slug) throw new Error(`a pasta ${basename(dir)} não é o slug do pacote (${manifest.slug})`);
+  if (source === "published" && basename(dir) !== manifest.slug) throw new Error(`the folder ${basename(dir)} is not the package slug (${manifest.slug})`);
   // Link simbólico nunca é aceito no pacote (só lstat, sem ler conteúdo): o hash é preguiçoso, então a recusa não pode depender dele.
   listFiles(dir);
   const steps = manifest.steps.map((s, i) => {
@@ -200,7 +200,7 @@ export function registerPackage(registry: Map<string, SolverPackage>, pkg: Solve
   const { id, slug } = pkg.manifest;
   for (const key of [id, slug]) {
     const owner = registry.get(key);
-    if (owner) throw new Error(`"${key}" já pertence ao pacote ${owner.manifest.slug} (${owner.manifest.id})`);
+    if (owner) throw new Error(`"${key}" already belongs to package ${owner.manifest.slug} (${owner.manifest.id})`);
   }
   registry.set(id, pkg);
   registry.set(slug, pkg);

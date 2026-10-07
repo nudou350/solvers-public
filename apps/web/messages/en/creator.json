@@ -281,6 +281,7 @@
     "step2": "Or search for <handle>@{username}</handle> on Telegram and send:",
     "copy": "Copy",
     "copyLabel": "Copy the link command",
+    "command": "/link {code}",
     "open": "Open in Telegram",
     "validUntil": "The code is valid until {time} (<tick>{clock}</tick><sr> left</sr>) and works only once.",
     "newCode": "Generate a new code",

@@ -27,7 +27,7 @@ export function httpFacilitator(url: string): Facilitator {
       const supported = await client.getSupported();
       const kind = supported.kinds.find((k) => k.x402Version === 2 && k.scheme === "exact" && k.network === network);
       const feePayer = (kind?.extra as { feePayer?: unknown } | undefined)?.feePayer;
-      if (typeof feePayer !== "string" || !feePayer) throw new Error(`o facilitator não suporta ${network} (exact)`);
+      if (typeof feePayer !== "string" || !feePayer) throw new Error(`the facilitator does not support ${network} (exact)`);
       cached = { network, feePayer, at: Date.now() };
       return feePayer;
     },
