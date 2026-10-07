@@ -152,8 +152,8 @@ describe("teto de licenças com banco", { skip: url ? false : "defina TEST_DATAB
     assert.match(purchaseLinkFor(sold), /sold out/);
     const advice = soldOutAdvice(sold);
     assert.match(advice, /Do not offer a purchase link/);
-    assert.match(advice, /limite atual/);
-    assert.match(advice, /mercado de revenda/); // RESALE_ENABLED=true neste teste
+    assert.match(advice, /current license limit/);
+    assert.match(advice, /resale market/); // RESALE_ENABLED=true neste teste
     assert.doesNotMatch(advice, /só existirão|apenas \d+ existem/);
   });
 
