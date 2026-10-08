@@ -120,9 +120,11 @@ for (const loc of LOCALES) {
     for (const [k, v] of flatten(messages[loc][ns], ns)) flat[loc].set(k, v);
   }
 }
+// Diferenças intencionais: en mostra o valor em dólar (1:1 com USDC) e não precisa da conversão nem da cotação.
+const PLACEHOLDER_DIFF_OK = new Set(["catalog.card.orUsdc", "checkout.view.summary.rateNote"]);
 for (const [k, v] of flat.en) {
   if (!flat.pt.has(k)) fail(`falta em pt: ${k}`);
-  else if (placeholders(v) !== placeholders(flat.pt.get(k)))
+  else if (!PLACEHOLDER_DIFF_OK.has(k) && placeholders(v) !== placeholders(flat.pt.get(k)))
     // Só aviso: um idioma pode ignorar de propósito uma variável que o outro usa (ex: en mostra $ e não a cotação em reais).
     warn(`variáveis diferentes em ${k}: en={${placeholders(v)}} pt={${placeholders(flat.pt.get(k))}}`);
 }

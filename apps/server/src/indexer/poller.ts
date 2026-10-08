@@ -6,7 +6,7 @@ import { chain } from "../chain/index.js";
 import { db, schema } from "../db/index.js";
 import { env } from "../env.js";
 import { h, unauthorized } from "../lib/http.js";
-import { clearFailure, processSignature, processTransaction, recordFailure, retryFailures } from "./processor.js";
+import { clearFailure, processSignature, recordFailure, retryFailures } from "./processor.js";
 
 // Indexador (INSTRUCTIONS.md 5.11): webhook da Helius + polling de fallback obrigatório.
 
@@ -110,11 +110,9 @@ function authorized(req: Request): boolean {
   return got.length === want.length && timingSafeEqual(got, want);
 }
 
-type HeliusRawTx = {
-  blockTime?: number;
-  meta?: { err?: unknown; logMessages?: string[] };
-  transaction?: { signatures?: string[] };
-};
+// Do corpo só usamos a assinatura: logs e status são relidos do RPC, então um corpo forjado
+// (segredo vazado) não cria eventos nem bloqueia o processamento real da mesma assinatura.
+type HeliusRawTx = { transaction?: { signatures?: string[] } };
 
 export const webhookRouter = Router();
 
@@ -127,11 +125,8 @@ webhookRouter.post(
     for (const tx of txs) {
       const sig = tx.transaction?.signatures?.[0];
       if (!sig) continue;
-      const logs = tx.meta?.logMessages;
       try {
-        count += logs
-          ? (await processTransaction(sig, logs, { failed: tx.meta?.err != null, blockTime: tx.blockTime ?? null })).length
-          : (await processSignature(sig)).length;
+        count += (await processSignature(sig)).length;
         await clearFailure(sig);
       } catch (e) {
         await recordFailure(sig, e);
