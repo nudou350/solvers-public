@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import sharp from "sharp";
 import { ART_H, ART_W, gallerySvgs, renderPng, truncate, wrap, type ArtInput } from "../src/images/seed-art.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // Cartões de galeria da demo, gerados do que o pacote declara. Sem banco nem rede (lê só os manifestos de /agents).
 
@@ -46,7 +47,7 @@ describe("gallerySvgs", () => {
     assert.deepEqual(gallerySvgs(base).map((s) => s.name), ["capa", "metodo", "antes-depois", "pacote"]);
   });
 
-  it("os 8 especialistas do repositório geram de 3 a 5 cartões que viram PNG do tamanho certo", async () => {
+  it("os 8 especialistas do repositório geram de 3 a 5 cartões que viram PNG do tamanho certo", { skip: SKIP_WITHOUT_PAID }, async () => {
     const dir = join(import.meta.dirname, "..", "..", "..", "agents");
     // Pastas começadas por "_" (ex.: _exemplos) não são pacotes do catálogo.
     const slugs = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_")).map((d) => d.name);

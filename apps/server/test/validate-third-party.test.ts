@@ -5,6 +5,7 @@ import { validatePackage, type ValidateOptions, type ValidationResult } from "..
 import { packageFromFolder, packageFromMemory } from "../src/runtime/validate/input.js";
 import type { Code } from "../src/runtime/validate/codes.js";
 import { ID, NOW, baseFiles, editManifest, type Files } from "./validate-fixtures.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // Modo "terceiros" do validador pelo contrato do fluxo de envio: validatePackage(input, { mode: "third_party", ... }).
 // Cada regra do envio de terceiros no Núcleo (PACKAGE_SPEC.md 3, 4, 5, 13, Apêndice A) tem um teste de erro; os avisos
@@ -285,7 +286,7 @@ describe("modo third_party: stats.differentiators só traz os comprovados", () =
   });
 });
 
-describe("modo third_party: regressão dos pacotes da plataforma", () => {
+describe("modo third_party: regressão dos pacotes da plataforma", { skip: SKIP_WITHOUT_PAID }, () => {
   const agents = resolve(import.meta.dirname, "../../../agents");
   for (const slug of ["backend-node", "copy-marketing", "financas-pessoais", "frontend-react", "planejador-viagens", "planilhas-dados", "revisao-contratos", "ui-design"]) {
     it(`${slug}: sem erros no modo plataforma com a nova assinatura (opts omitido)`, () => {

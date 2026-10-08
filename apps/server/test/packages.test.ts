@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import { Manifest } from "../src/runtime/manifest.js";
 import { loadAll, loadPackage, registerPackage, type SolverPackage } from "../src/runtime/package-loader.js";
 import { PackagePathError, resolveInsidePackage } from "../src/runtime/package-paths.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // Carregador de pacotes: contenção de caminhos do manifesto, formato de slug/versão e colisão de id/slug
 // (PACKAGE_SPEC.md 3.3, 4.1 e P0). Sem env, banco ou rede.
@@ -221,7 +222,7 @@ describe("loadAll", () => {
     }
   });
 
-  it("os pacotes reais do repositório carregam sem erro (regressão das regras novas)", () => {
+  it("os pacotes reais do repositório carregam sem erro (regressão das regras novas)", { skip: SKIP_WITHOUT_PAID }, () => {
     const errors: string[] = [];
     const reg = loadAll(resolve(import.meta.dirname, "../../../agents"), (dir, e) => errors.push(`${dir}: ${e.message}`));
     assert.deepEqual(errors, []);

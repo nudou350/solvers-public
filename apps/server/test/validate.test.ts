@@ -8,6 +8,7 @@ import { validatePackage, type PackageInput, type ValidateOptions, type Validati
 import { packageFromFolder, packageFromMemory } from "../src/runtime/validate/input.js";
 import { hiddenCharsAt, injectionMatch, sendingUrl, sensitiveAsk } from "../src/runtime/validate/text-scans.js";
 import { ID, NOW, baseFiles, baseManifest, editManifest, knowledgeDoc, type Files } from "./validate-fixtures.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // Validador do pacote (PACKAGE_SPEC.md 13 e Apêndice A). Um teste por código emitido, o exemplo da spec como
 // pacote válido de terceiros, os pacotes reais sem erro e a paridade código x Apêndice. Sem env, banco ou rede.
@@ -237,7 +238,7 @@ describe("regras que dependem de quem envia e da fase", () => {
   });
 });
 
-describe("pacotes reais do repositório (plataforma, v1)", () => {
+describe("pacotes reais do repositório (plataforma, v1)", { skip: SKIP_WITHOUT_PAID }, () => {
   const agents = resolve(import.meta.dirname, "../../../agents");
   for (const slug of ["backend-node", "copy-marketing", "criador-de-solvers", "financas-pessoais", "frontend-react", "planejador-viagens", "planilhas-dados", "revisao-contratos", "ui-design"]) {
     it(`${slug}: sem erros`, () => {

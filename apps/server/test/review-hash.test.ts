@@ -7,13 +7,14 @@ import { packageHashOf } from "../src/review/hash.js";
 import { packageHash } from "../src/runtime/package-loader.js";
 import { packageFromFolder, packageFromMemory } from "../src/runtime/validate/input.js";
 import { baseFiles } from "./validate-fixtures.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // O hash do PackageInput precisa ser IDÊNTICO ao do carregador do disco (o que o `cli:publish` grava on-chain como versionHash).
 
 const agents = resolve(import.meta.dirname, "../../../agents");
 const SLUGS = ["backend-node", "copy-marketing", "financas-pessoais", "frontend-react", "planejador-viagens", "planilhas-dados", "revisao-contratos", "ui-design"];
 
-describe("packageHashOf = packageHash(dir) nos pacotes de agents/", () => {
+describe("packageHashOf = packageHash(dir) nos pacotes de agents/", { skip: SKIP_WITHOUT_PAID }, () => {
   for (const slug of SLUGS) {
     it(`${slug}`, () => {
       const dir = resolve(agents, slug);

@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { isKnowledgeFile, metaJsonPathFor, parseKnowledgeFile } from "../src/knowledge/file-rules.js";
 import { trialFilesOnly } from "../src/knowledge/search-rules.js";
+import { SKIP_WITHOUT_PAID } from "./helpers/repo-agents.js";
 
 // Regressão do teste grátis: num pacote v1 o search_knowledge do teste só enxerga os arquivos de
 // `knowledge/` com `trial: true` (PACKAGE_SPEC.md 6.5 item 4). Sem nenhum arquivo marcado, a busca do teste
@@ -61,7 +62,7 @@ function loadAll(): Loaded[] {
 const packages = loadAll();
 
 describe("teste grátis: conhecimento liberado em cada pacote de agents/", () => {
-  it("encontra os pacotes (a verificação não passa por falta de pacote)", () => {
+  it("encontra os pacotes (a verificação não passa por falta de pacote)", { skip: SKIP_WITHOUT_PAID }, () => {
     assert.ok(packages.length >= 6, `esperava ao menos 6 pacotes em ${AGENTS}, achei ${packages.length}`);
     assert.ok(packages.some((p) => p.specVersion === 1 && p.trialSearches > 0), "nenhum pacote v1 com teste grátis e buscas");
   });
