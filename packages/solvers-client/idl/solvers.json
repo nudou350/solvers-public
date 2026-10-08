@@ -9,6 +9,9 @@
   "instructions": [
     {
       "name": "accept_admin",
+      "docs": [
+        "Step 2 of admin transfer: the nominee signs, becomes admin, and the proposal is closed."
+      ],
       "discriminator": [
         112,
         42,
@@ -88,6 +91,9 @@
     },
     {
       "name": "approve_agent",
+      "docs": [
+        "Admin activates a pending or suspended Solver; requires stake >= min_stake and not `Retired`."
+      ],
       "discriminator": [
         140,
         178,
@@ -152,6 +158,9 @@
     },
     {
       "name": "buy_credits",
+      "docs": [
+        "Buyer purchases `amount` pay-per-use credits; total must be >= min_price and <= `max_total`. Respects `PAUSE_ENTRIES`."
+      ],
       "discriminator": [
         14,
         173,
@@ -306,6 +315,10 @@
     },
     {
       "name": "buy_listing",
+      "docs": [
+        "Buyer purchases a listed license: transfers the asset and pays royalty, platform fee and seller in one transaction.",
+        "Fails if the price differs from `expected_price`. Respects `PAUSE_ENTRIES`."
+      ],
       "discriminator": [
         115,
         149,
@@ -500,6 +513,9 @@
     },
     {
       "name": "cancel_admin_transfer",
+      "docs": [
+        "Current admin cancels a pending admin transfer; rent returns to the original payer."
+      ],
       "discriminator": [
         38,
         131,
@@ -578,6 +594,9 @@
     },
     {
       "name": "cancel_listing",
+      "docs": [
+        "Seller cancels a listing at any time; anyone can close a stale listing. Never paused."
+      ],
       "discriminator": [
         41,
         183,
@@ -721,6 +740,9 @@
     },
     {
       "name": "cancel_slash",
+      "docs": [
+        "Cancels a slash proposal: the admin at any time, the creator only after it expires."
+      ],
       "discriminator": [
         222,
         163,
@@ -813,6 +835,9 @@
     },
     {
       "name": "cancel_stake_exit",
+      "docs": [
+        "Creator cancels the exit (Solver returns to `Suspended`); not allowed after an admin extension."
+      ],
       "discriminator": [
         184,
         9,
@@ -893,6 +918,9 @@
     },
     {
       "name": "cancel_undelivered",
+      "docs": [
+        "Buyer reclaims a still-pending milestone after the delivery deadline, with no fee."
+      ],
       "discriminator": [
         43,
         91,
@@ -995,6 +1023,9 @@
     },
     {
       "name": "close_escrow",
+      "docs": [
+        "Closes a finished escrow: leftovers go to the buyer, rent to the original payer (only that wallet can close)."
+      ],
       "discriminator": [
         139,
         171,
@@ -1099,6 +1130,9 @@
     },
     {
       "name": "consume_credit",
+      "docs": [
+        "Usage authority consumes one credit from a buyer's balance and counts a verified use."
+      ],
       "discriminator": [
         166,
         59,
@@ -1195,6 +1229,9 @@
     },
     {
       "name": "contest_slash",
+      "docs": [
+        "Creator records a contest of a slash proposal (evidence hash only; the admin decides). Once per proposal."
+      ],
       "discriminator": [
         91,
         155,
@@ -1272,6 +1309,10 @@
     },
     {
       "name": "create_escrow",
+      "docs": [
+        "Buyer funds a guarantee escrow with milestones, review window and delivery deadline; total must be >= min_price.",
+        "The platform fee is frozen at creation. Respects `PAUSE_ENTRIES`."
+      ],
       "discriminator": [
         253,
         215,
@@ -1458,6 +1499,9 @@
     },
     {
       "name": "create_supply_cap",
+      "docs": [
+        "Creator sets an optional license cap for the Solver (>= 1 and >= licenses already sold)."
+      ],
       "discriminator": [
         154,
         190,
@@ -1547,6 +1591,9 @@
     },
     {
       "name": "execute_slash",
+      "docs": [
+        "Admin executes the slash after the delay and before expiry: moves `min(amount, vault)` to the treasury."
+      ],
       "discriminator": [
         15,
         240,
@@ -1679,6 +1726,9 @@
     },
     {
       "name": "extend_stake_exit",
+      "docs": [
+        "Admin extends a pending stake exit by 30 days (at most twice), e.g. for an open report or dispute."
+      ],
       "discriminator": [
         144,
         40,
@@ -1779,6 +1829,9 @@
     },
     {
       "name": "initialize_config",
+      "docs": [
+        "Creates the global Config (fees, min_price, stake, authorities). Must be signed by the program upgrade authority."
+      ],
       "discriminator": [
         208,
         127,
@@ -1848,6 +1901,10 @@
     },
     {
       "name": "list_license",
+      "docs": [
+        "Seller lists a license for resale (price >= min_price) by approving a program PDA as transfer delegate.",
+        "The seller keeps the license until sold; the creator cannot resell. Respects `PAUSE_ENTRIES`."
+      ],
       "discriminator": [
         56,
         81,
@@ -1998,6 +2055,9 @@
     },
     {
       "name": "mark_passed",
+      "docs": [
+        "Verifier marks a pending milestone as passed with the deliverable hash. Does not respect pause."
+      ],
       "discriminator": [
         58,
         191,
@@ -2057,6 +2117,9 @@
     },
     {
       "name": "migrate_config",
+      "docs": [
+        "Migrates a v1 Config (devnet) to the v2 layout by appending zeroed fields. Signed by the upgrade authority."
+      ],
       "discriminator": [
         92,
         131,
@@ -2118,6 +2181,9 @@
     },
     {
       "name": "open_dispute",
+      "docs": [
+        "Buyer disputes a pending milestone, or a passed one within the review window."
+      ],
       "discriminator": [
         137,
         25,
@@ -2179,6 +2245,9 @@
     },
     {
       "name": "propose_admin",
+      "docs": [
+        "Step 1 of admin transfer: the current admin nominates a new admin (one `PendingAdmin` PDA at a time)."
+      ],
       "discriminator": [
         121,
         214,
@@ -2267,6 +2336,9 @@
     },
     {
       "name": "propose_slash",
+      "docs": [
+        "Admin proposes slashing `amount` of a Solver's stake; suspends an active Solver. One proposal per Solver."
+      ],
       "discriminator": [
         198,
         144,
@@ -2376,6 +2448,10 @@
     },
     {
       "name": "purchase_license",
+      "docs": [
+        "Buyer purchases a license: pays the price (split between treasury fee and creator) and receives a Metaplex",
+        "Core license NFT. Fails if the price changed from `expected_price`, the Solver is not active, sold out, or paused."
+      ],
       "discriminator": [
         42,
         213,
@@ -2583,6 +2659,9 @@
     },
     {
       "name": "raise_supply_cap",
+      "docs": [
+        "Creator raises the license cap; it can never be lowered or removed."
+      ],
       "discriminator": [
         205,
         177,
@@ -2663,6 +2742,9 @@
     },
     {
       "name": "record_usage_batch",
+      "docs": [
+        "Usage authority records a batch of `count` verified uses with a Merkle root of the usage log."
+      ],
       "discriminator": [
         19,
         97,
@@ -2741,6 +2823,10 @@
     },
     {
       "name": "register_agent",
+      "docs": [
+        "Creator registers a new Solver: deposits `min_stake`, creates its Metaplex Core collection, and starts it pending",
+        "approval. Price must be >= min_price. Respects `PAUSE_ENTRIES`; the platform pays the rent."
+      ],
       "discriminator": [
         135,
         157,
@@ -2993,6 +3079,9 @@
     },
     {
       "name": "release_milestone",
+      "docs": [
+        "Releases a milestone to the creator (minus fee): by the buyer, or by anyone after the review window. Respects `PAUSE_PAYMENTS`."
+      ],
       "discriminator": [
         56,
         2,
@@ -3151,6 +3240,9 @@
     },
     {
       "name": "request_stake_exit",
+      "docs": [
+        "Creator requests to leave: the Solver becomes `Retired` and the stake unlocks after the exit delay (30 days)."
+      ],
       "discriminator": [
         186,
         55,
@@ -3233,6 +3325,9 @@
     },
     {
       "name": "resolve_dispute",
+      "docs": [
+        "Admin resolves a disputed milestone: refund to the buyer or pay the creator. Respects `PAUSE_PAYMENTS`."
+      ],
       "discriminator": [
         231,
         6,
@@ -3421,6 +3516,10 @@
     },
     {
       "name": "resolve_stale_dispute",
+      "docs": [
+        "Anyone refunds a never-delivered disputed milestone if the admin did not rule within the dispute SLA",
+        "and the delivery deadline has passed."
+      ],
       "discriminator": [
         7,
         105,
@@ -3520,6 +3619,9 @@
     },
     {
       "name": "set_eval",
+      "docs": [
+        "Verifier records the Solver's eval score (bps) and the hash of the eval results."
+      ],
       "discriminator": [
         110,
         66,
@@ -3598,6 +3700,9 @@
     },
     {
       "name": "set_guardian",
+      "docs": [
+        "Admin sets the pause guardian; `Pubkey::default()` removes it."
+      ],
       "discriminator": [
         147,
         243,
@@ -3645,6 +3750,10 @@
     },
     {
       "name": "set_pause",
+      "docs": [
+        "Sets emergency pause bits (`PAUSE_ENTRIES`, `PAUSE_PAYMENTS`). Admin sets any valid bits;",
+        "the guardian can only add bits. Buyer exits and admin instructions never pause."
+      ],
       "discriminator": [
         63,
         32,
@@ -3689,6 +3798,9 @@
     },
     {
       "name": "set_treasury",
+      "docs": [
+        "Admin replaces the treasury USDC account (platform mint, not frozen, no delegate or close authority)."
+      ],
       "discriminator": [
         57,
         97,
@@ -3743,6 +3855,9 @@
     },
     {
       "name": "submit_review",
+      "docs": [
+        "License holder submits or edits a 1-5 rating for a Solver; a license can back only one review."
+      ],
       "discriminator": [
         106,
         30,
@@ -3873,6 +3988,9 @@
     },
     {
       "name": "submit_review_with_credits",
+      "docs": [
+        "Credits buyer submits or edits a 1-5 rating for a Solver (proof by purchased credits)."
+      ],
       "discriminator": [
         154,
         13,
@@ -3993,6 +4111,9 @@
     },
     {
       "name": "suspend_agent",
+      "docs": [
+        "Admin suspends a Solver (stops sales). A `Retired` Solver cannot be suspended."
+      ],
       "discriminator": [
         242,
         28,
@@ -4057,6 +4178,9 @@
     },
     {
       "name": "top_up_stake",
+      "docs": [
+        "Creator adds USDC to the Solver's stake (e.g. after a partial slash); re-activation still needs `approve_agent`."
+      ],
       "discriminator": [
         152,
         222,
@@ -4165,6 +4289,9 @@
     },
     {
       "name": "update_config",
+      "docs": [
+        "Admin updates the Config parameters (fee capped at MAX_FEE_BPS, min_price, min_stake, etc.)."
+      ],
       "discriminator": [
         29,
         158,
@@ -4216,6 +4343,9 @@
     },
     {
       "name": "update_pricing",
+      "docs": [
+        "Creator changes the license price (>= min_price) and per-use price (<= license price)."
+      ],
       "discriminator": [
         157,
         225,
@@ -4289,6 +4419,9 @@
     },
     {
       "name": "update_version",
+      "docs": [
+        "Creator records a new package version and hash. Resets the on-chain eval score to zero."
+      ],
       "discriminator": [
         248,
         152,
@@ -4349,6 +4482,9 @@
     },
     {
       "name": "withdraw_stake",
+      "docs": [
+        "Creator withdraws the full stake after the exit delay, if no slash proposal is pending; closes the vault."
+      ],
       "discriminator": [
         153,
         8,
