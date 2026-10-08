@@ -90,3 +90,17 @@ pnpm typecheck && pnpm test
 
 End-to-end scripts (server running): `cd scripts && npx tsx src/e2e-purchase.ts && npx tsx src/e2e-api.ts && npx tsx src/e2e-mcp.ts && npx tsx src/e2e-full.ts`.
 Development keys and `.env*` files live outside git.
+
+## About this repository
+
+This is a **public export** of the project's private working repository. The paid solver packages
+(`agents/*`, except `agents/_exemplos` and `agents/criador-de-solvers`) are not included. The package format is fully
+documented in [PACKAGE_SPEC.md](PACKAGE_SPEC.md), and `agents/criador-de-solvers` (free, platform-owned) is a complete
+reference package.
+
+## License
+
+Source-available under the **Functional Source License, Version 1.1, ALv2 Future License** ([LICENSE](LICENSE), [NOTICE](NOTICE)).
+You may read, run, modify and redistribute the code for any purpose except a **Competing Use**: offering a commercial
+product or service that substitutes for Solvers. Each version automatically becomes Apache-2.0 two years after it is published.
+Copyright 2026 Raphael Pereira.

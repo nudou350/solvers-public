@@ -1,6 +1,7 @@
 [package]
 name = "solvers"
 version = "0.1.0"
+license = "FSL-1.1-ALv2"
 description = "Solvers: licenças, avaliações, créditos e garantia de agentes especialistas"
 edition = "2021"
 

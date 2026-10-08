@@ -2,75 +2,28 @@
 
 [English](README.md) | Português
 
-Marketplace de especialistas de IA ("solvers") que se conectam ao Claude e ao ChatGPT por um único
-conector MCP. A compra gera uma licença (NFT Metaplex Core) na carteira Solana do usuário; avaliações,
-créditos, garantias (escrow) e reputação ficam on-chain. Especificação completa: [INSTRUCTIONS.md](INSTRUCTIONS.md).
+Marketplace de especialistas de IA ("solvers") que se conectam ao Claude e ao ChatGPT por um único conector MCP.
+Um solver é um pacote de dados, não código: etapas de método com checklists, base de conhecimento, modelos e evals.
+A compra gera uma **licença NFT (Metaplex Core)** na carteira Solana do comprador; avaliações, créditos, garantias
+(escrow), stake e revenda de licenças ficam on-chain. A plataforma paga todas as taxas da rede (o usuário não precisa de SOL).
 
-```
-apps/server            Node 22 + Express: API da loja, conector MCP, OAuth, indexador, jobs
-programs/solvers       Programa Anchor 1.2 (licenças, créditos, avaliações, escrow)
-packages/shared        Contrato de dados (zod) usado por servidor e vitrine
-packages/solvers-client  Cliente TS gerado com Codama a partir do IDL
-packages/chain         Transações com a plataforma como fee payer, eventos, Metaplex Core
-packages/api-client    Cliente tipado da API para a vitrine (troca os mocks sem mudar telas)
-agents/                Pacotes dos solvers (6 publicados; backend-node e planilhas-dados fora da vitrine)
-scripts/               bootstrap da rede, e2e (compra, API, conector, fluxo completo)
-infra/                 PM2, nginx e scripts de deploy no padrão da VPS
-```
+| | |
+|---|---|
+| Vitrine | https://solvers.wondervelop.com/pt |
+| Conector MCP | `https://solvers.wondervelop.com/mcp` |
+| Programa (Anchor, devnet) | [`DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW`](https://explorer.solana.com/address/DW6UzJDR9X388f6keJSLXz7WgRVJFntbvonSskRrWNaW?cluster=devnet) |
 
-## Decisões que diferem do INSTRUCTIONS.md
+Arquitetura, decisões de projeto e como rodar localmente: veja o [README em inglês](README.md).
+Documentos em português: [especificação completa](INSTRUCTIONS.md), [formato do pacote](PACKAGE_SPEC.pt-BR.md),
+[guia de conceitos](docs/guia-conceitos.md), [guia do criador](docs/criador-solvers.md).
 
-| Tema | Decisão | Motivo |
-|---|---|---|
-| Infra | PM2 + nginx + PG16 (5433) com pgvector na VPS, não docker-compose/Caddy | Respeitar a VPS compartilhada (VPS_GUIDE.md) |
-| Domínio | Um domínio só (`solvers.wondervelop.com`): vitrine em `/`, servidor em `/api`, `/mcp`, `/oauth`, `/.well-known` | Sem CORS; cookie de sessão do mesmo site |
-| Taxas | A plataforma é fee payer de toda transação (usuário não precisa de SOL) | Público leigo / login por e-mail |
-| Preço mínimo | Toda compra (licença, pacote de créditos, garantia) >= `min_price` (5 USDC) | Cobrir o rent pago pela plataforma |
-| USDC | Mint de teste próprio + faucet na API (devnet) | Faucet da Circle é limitado; demo não depende dele |
-| Avaliação | Uma licença prova uma única avaliação (PDA `license_review`), preço fixado na compra (`expected_price`) | Correções da revisão de segurança |
-| Garantia | Prazo de liberação automática por etapa (`passed_at + review_window`) | Várias etapas com prazos independentes |
-| Teste grátis | 3 usos por carteira por solver, controlado off-chain | Não existia no programa |
-| Revenda | Licença revendida pelo mercado, sem custódia, com royalty ao criador (`docs/resale.md`) | Devnet; mainnet depende dos termos com o advogado |
-| Licenças limitadas | O criador pode limitar o número de licenças de um solver (padrão: ilimitado). O limite atual é imposto pelo programa e verificável na blockchain; o criador só pode aumentá-lo, nunca reduzi-lo, e revender, transferir ou queimar uma licença não libera vaga (`docs/licencas-limitadas.md`) | Devnet, no mesmo upgrade da revenda |
-| SBPF | Build com `--arch v1` | Devnet/mainnet ainda aceitam deploy v0-v2; o validador de teste 3.x não roda v3 |
+## Sobre este repositório
 
-## Rodando localmente
+Este é um **export público** do repositório de trabalho. Os pacotes pagos (`agents/*`, exceto `agents/_exemplos` e
+`agents/criador-de-solvers`) não estão incluídos; `agents/criador-de-solvers` é um pacote de referência completo.
 
-Pré-requisitos: Node 22+, pnpm 10, WSL com Solana CLI + Anchor 1.2 (para o programa), Postgres 16 com pgvector.
+## Licença
 
-```bash
-pnpm install
-pnpm --filter @solvers/shared --filter @solvers/client --filter @solvers/chain build
-
-# programa (no WSL)
-bash scripts/chain/build-program.sh        # anchor build --arch v1 + copia o IDL
-bash scripts/chain/test-program.sh         # 13 testes LiteSVM
-bash scripts/chain/local-validator.sh      # validador local com o programa e o Metaplex Core
-
-# rede + servidor
-cd scripts && npx tsx src/bootstrap-chain.ts          # mint de USDC de teste + Config
-cd apps/server && cp ../../infra/.env.example .env     # ajuste para localnet
-pnpm --filter @solvers/server cli:publish             # publica todos os pacotes (ou só os slugs passados)
-pnpm --filter @solvers/server cli:seed                # compras, avaliações, usos, garantias
-pnpm --filter @solvers/server dev
-
-# testes ponta a ponta (servidor rodando)
-cd scripts && npx tsx src/e2e-purchase.ts && npx tsx src/e2e-api.ts && npx tsx src/e2e-mcp.ts && npx tsx src/e2e-full.ts
-```
-
-Evals dos solvers: as respostas ficam em `agents/<slug>/evals/outputs/` (geradas às cegas, com o solver ativo) e
-`cd scripts && npm run eval [slug]` aplica as checagens de `evals/cases/` e grava `evals/report.json`, cuja nota o publish leva on-chain.
-
-Chaves de desenvolvimento ficam fora do repositório (`~/solvers-keys` no WSL, `apps/server/.keys`).
-
-## Conector
-
-URL: `https://solvers.wondervelop.com/mcp`. O Claude/ChatGPT descobre o OAuth pelo 401 do `/mcp`, registra-se
-sozinho (DCR), abre `/oauth/authorize` (página "Conectar sua carteira"), recebe o token (PKCE) e passa a usar
-as 12 ferramentas: `list_my_solvers`, `find_solver`, `get_purchase_link`, `activate_solver`, `preflight_check`,
-`next_step`, `search_knowledge`, `run_tool`, `get_memory`, `save_memory`, `submit_deliverable`, `escalate_to_creator`.
-
-## Deploy
-
-Veja [NEXT_STEPS.md](NEXT_STEPS.md) para o que falta do seu lado (SOL de devnet, DNS, Helius, Telegram).
-Depois: `bash infra/deploy.sh` (envia o commit atual, compila, migra e recarrega o PM2).
+Código disponível sob a **Functional Source License 1.1, ALv2 Future License** ([LICENSE](LICENSE), [NOTICE](NOTICE)):
+uso livre, exceto para oferecer um produto concorrente. Cada versão vira Apache-2.0 dois anos após publicada.
+Copyright 2026 Raphael Pereira.
